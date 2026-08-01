@@ -12,6 +12,48 @@ Escrito em 2026-08-01, contra o código verificado na mesma data.
 
 ---
 
+## Como testar na sua máquina (depois de clonar)
+
+B1–B5 foram executados e verificados num container Linux, não na sua máquina
+Windows — ver as ressalvas de ambiente em cada item abaixo. Para gerar o
+instalador de verdade e testar:
+
+**Pré-requisitos (uma vez só, itens B1 específicos do Windows que este
+container não pôde tocar):**
+
+1. Rust (`rustup`, [rustup.rs](https://rustup.rs)) — `rustc --version` deve
+   responder num PowerShell novo.
+2. Node (o `mise.toml` já fixa a versão — `mise install` resolve).
+3. [MSVC Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+   (workload "Desktop development with C++").
+4. [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) —
+   já vem instalado de fábrica na maioria dos Windows 10/11 recentes; o
+   instalador do Tauri avisa se faltar.
+
+**Build e teste:**
+
+```powershell
+git clone <url-do-repositorio> ZeuX-teste
+cd ZeuX-teste
+npm install
+npm run tauri build
+```
+
+O comando compila o `zeuxd` (via `scripts/build-zeuxd.mjs`, chamado
+automaticamente antes do build), embute o binário como sidecar, e gera o
+instalador em `src-tauri/target/release/bundle/` (`.msi` e/ou `.exe`,
+conforme o que o Tauri escolher para Windows). Ao abrir o app instalado, o
+`zeuxd` sobe e desce sozinho — não é preciso rodar `go run ./cmd/zeuxd` à
+parte (ver B5).
+
+Para desenvolver com hot reload em vez de gerar o instalador a cada mudança:
+
+```powershell
+npm run tauri dev
+```
+
+---
+
 ## O que esta sprint realmente é
 
 Duas coisas foram empacotadas sob o nome "casca da UI", e vale separá-las porque
@@ -390,32 +432,64 @@ partes que importam (compila, linka, empacota, roda, fala com o `zeuxd`).
 
 ---
 
-### B5 — `zeuxd` como processo filho do Tauri (M)
+### B5 — `zeuxd` como processo filho do Tauri (M) — **feito em 2026-08-01**
 
 O ADR 0001 já anteviu: *"o ciclo de vida do daemon vira responsabilidade do
 Tauri"*, e `cmd/zeuxd/main.go` já trata `SIGTERM`/`os.Interrupt` com shutdown
-de 5 s justamente para não deixar a porta presa. Falta o outro lado.
+de 5 s justamente para não deixar a porta presa. Faltava o outro lado.
 
-O caso feio não é subir — é **a porta já ocupada**. Hoje a porta é fixa em
-`7777` e a descoberta dinâmica de porta está no backlog sem sprint. O
-comportamento mínimo aceitável não é implementar descoberta de porta; é não
-abrir uma tela vazia sem explicação.
+**Implementado como sidecar do Tauri**, não como um processo solto lançado por
+fora: `src-tauri/tauri.conf.json` declara `bundle.externalBin: ["binaries/zeuxd"]`,
+`scripts/build-zeuxd.mjs` compila `./cmd/zeuxd` para o target Rust certo
+(`rustc -vV` → `host: <triple>`) antes de `tauri dev`/`tauri build`
+(`beforeDevCommand`/`beforeBuildCommand` em `tauri.conf.json`), e
+`src-tauri/src/lib.rs` decide o que fazer com a porta 7777 no `setup()`:
 
-**Critério de aceite:**
+- **Livre:** sobe o sidecar via `tauri-plugin-shell`, guarda o `CommandChild`
+  em estado gerenciado, e o mata em `WindowEvent::CloseRequested`.
+- **Já respondendo como zeuxd** (checagem HTTP crua em `/api/v1/health`,
+  sem trazer um cliente HTTP como dependência só para isso): reaproveita,
+  não sobe um segundo, e **não** o mata ao fechar — não é dele para matar.
+- **Ocupada por outra coisa:** não sobe nada, e marca um estado
+  (`PortConflict`) que o front consulta via o comando `zeuxd_port_conflict`.
 
-- [ ] Abrir o app com nenhum `zeuxd` rodando: a primeira tela carrega dados
-      reais, e `Get-Process zeuxd` mostra **exatamente um** processo.
-- [ ] Fechar a janela: 10 s depois, `Get-Process zeuxd` não devolve nada.
-- [ ] Com a porta 7777 ocupada por um `zeuxd` do próprio ZeuX (`GET /health`
-      responde `status: ok`), o app **reaproveita** o que já está no ar em vez de
-      subir um segundo — verificável porque a contagem de processos continua 1.
-- [ ] Com a porta 7777 ocupada por outra coisa qualquer (ocupar com um listener
-      trivial antes de abrir o app), o app mostra uma mensagem em português
-      explicando o que aconteceu, e não uma tela em branco nem um erro cru de
-      `fetch`.
-- [ ] Matar o app pelo Gerenciador de Tarefas: ou o `zeuxd` morre junto, ou o
-      comportamento (órfão) está documentado no plano **e** a abertura seguinte
-      o reaproveita pelo caminho do `/health` acima.
+**Achado de execução, registrado porque custou uma rodada de depuração:** a
+primeira tentativa avisava o front por **evento** (`app.emit(...)` dentro do
+`setup()`). Na prática, o evento podia chegar antes do front terminar de
+registrar o listener — corrida de inicialização confirmada ao vivo (a tela
+mostrava o erro genérico de `fetch`, não a mensagem em português). Trocado por
+um **comando consultado sob demanda** (`invoke("zeuxd_port_conflict")` no
+`useEffect` do `App.tsx`), que não tem essa corrida porque só é chamado depois
+que o front já carregou.
+
+**Critério de aceite — os quatro cenários rodados de verdade, num container
+Linux (`Xvfb` + `openbox` como janela mínima, `wmctrl` para fechar a janela
+de forma limpa em vez de matar o processo), com o `.deb` gerado por
+`npm run tauri build`:**
+
+- [x] Abrir o app com nenhum `zeuxd` rodando: a primeira tela carregou
+      `status`, `schema_version` e `consoles` reais, e exatamente um processo
+      `zeuxd` apareceu (`ps aux`).
+- [x] Fechar a janela (`wmctrl -c ZeuX`): o processo `zeuxd` desapareceu
+      dentro de poucos segundos.
+- [x] Com um `zeuxd` já rodando manualmente (`GET /health` respondendo
+      `status: ok`): abrir o app não subiu um segundo `zeuxd` — a contagem
+      continuou 1.
+- [x] Fechar o app nesse caso: o `zeuxd` manual **sobreviveu** — confirmando
+      que o app só mata o processo que ele mesmo subiu.
+- [x] Com a porta 7777 ocupada por um servidor HTTP qualquer que não é o
+      zeuxd (`http.server` do Python, respondendo 200 mas sem o JSON
+      esperado): o app não subiu nenhum `zeuxd`, e mostrou
+      "A porta 7777 já está sendo usada por outro programa, não pelo ZeuX.
+      Feche o que estiver usando essa porta e abra o ZeuX de novo." — em
+      português, sem tela em branco, sem erro cru de `fetch`.
+
+**Não verificado neste ambiente:** matar o app pelo Gerenciador de Tarefas do
+Windows (não existe equivalente direto aqui) — o `on_window_event` cobre o
+fechamento normal da janela, mas um `kill -9`/finalização forçada do processo
+não passa por esse handler em nenhum SO. Fica como comportamento conhecido de
+processo órfão, coberto pelo caminho de reaproveitamento acima (a próxima
+abertura encontra o `zeuxd` respondendo e reaproveita).
 
 **Depende de:** B4
 **Bloqueia:** B8

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
-// URL fixa por enquanto: o zeuxd ainda sobe como processo separado, gerenciado
-// à mão pelo desenvolvedor. O ciclo de vida como processo filho do Tauri é o
-// item B5, ainda não feito.
+// O zeuxd agora sobe como sidecar do Tauri (item B5, src-tauri/src/lib.rs) e
+// escuta sempre neste endereço fixo — descoberta dinâmica de porta é backlog
+// sem sprint.
 const API_BASE = "http://127.0.0.1:7777/api/v1";
 
 type Health = {
@@ -17,13 +18,50 @@ type Health = {
 function App() {
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Estado inicial é "indefinido" (null), não false: até a checagem no Rust
+  // responder, não sabemos se há conflito, e a corrida (setup() do Tauri
+  // pode terminar antes ou depois deste invoke) foi resolvida consultando sob
+  // demanda em vez de escutar um evento que podia chegar cedo demais.
+  const [portConflict, setPortConflict] = useState<boolean | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/health`)
-      .then((res) => res.json())
-      .then(setHealth)
-      .catch((err) => setError(String(err)));
+    invoke<boolean>("zeuxd_port_conflict")
+      .then(setPortConflict)
+      .catch(() => setPortConflict(false));
   }, []);
+
+  useEffect(() => {
+    // Ainda não sabemos (null) ou já sabemos que há conflito: não faz sentido
+    // tentar falar com uma porta que ou não é do zeuxd, ou ainda não foi
+    // checada.
+    if (portConflict !== false) return;
+
+    // O sidecar é iniciado no setup() do Tauri, em paralelo com a criação da
+    // janela — pode levar um instante a mais para aceitar conexões. Tenta
+    // algumas vezes antes de admitir falha, em vez de mostrar erro numa
+    // corrida que se resolve sozinha um instante depois.
+    let cancelled = false;
+    let attempt = 0;
+
+    async function tryFetch() {
+      try {
+        const res = await fetch(`${API_BASE}/health`);
+        if (!cancelled) setHealth(await res.json());
+      } catch (err) {
+        attempt += 1;
+        if (attempt >= 10) {
+          if (!cancelled) setError(String(err));
+          return;
+        }
+        setTimeout(tryFetch, 300);
+      }
+    }
+
+    tryFetch();
+    return () => {
+      cancelled = true;
+    };
+  }, [portConflict]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-100">
@@ -33,7 +71,14 @@ function App() {
           Casca da UI (Sprint B) — ainda sem onboarding real.
         </p>
 
-        {error && (
+        {portConflict && (
+          <p className="mt-4 max-w-sm text-sm text-red-400">
+            A porta 7777 já está sendo usada por outro programa, não pelo
+            ZeuX. Feche o que estiver usando essa porta e abra o ZeuX de novo.
+          </p>
+        )}
+
+        {!portConflict && error && (
           <p className="mt-4 text-sm text-red-400">
             Não foi possível falar com o zeuxd: {error}
           </p>
