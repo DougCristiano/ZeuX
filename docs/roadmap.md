@@ -524,12 +524,28 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | Atualização do catálogo via nuvem | M | `schema_version` já existe para isso |
 | Escrever nos arquivos de config dos emuladores (reduz `Unapplied`) | G | Invasivo; sobrescreve ajustes do usuário. Diferente de D8: isso aplicaria opções do preset (resolução, renderer), não só pular o assistente |
 | Novos consoles: Saturn, 3DS, DS, Game Boy/Color, Master System, Xbox | M cada | Switch fica fora por decisão — [ADR 0008](decisoes/0008-excluir-switch-do-catalogo.md) |
-| Testes de `internal/api` e `internal/consent` (hoje: `[no test files]`) | M | O `Probe` já é interface, então mockável |
+| ~~Testes de `internal/api` e `internal/consent`~~ | M | **Feito 2026-08-01** — `Probe` mockado via interface; ver nota abaixo |
 | Autenticação da API local | M | Necessário se algo além do Tauri falar com ela |
 | Descoberta dinâmica de porta | P | Evita colisão em `7777` |
 | CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual |
 | Detecção de BIOS/firmware necessários por console | M | PS1, PS2, Dreamcast, Wii U precisam |
 | Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
+
+**Nota sobre os testes de `internal/api` e `internal/consent` (2026-08-01):**
+cobrem consentimento (persistência, revogação, versão de política, arquivo
+corrompido), o ciclo completo de scan (bloqueio sem consentimento, scan,
+leitura, limpeza ao revogar) e as rotas de lançamento e emuladores
+personalizados, todos via `httptest` sem tocar hardware real — o `Probe` já
+era interface, e `consent.Store`/`emulator.CustomStore` foram isolados do
+disco do usuário via `XDG_CONFIG_HOME`/`AppData` apontando para um diretório
+temporário do teste.
+
+Rodando `go test ./...` neste ambiente (Linux) foi achado
+**`TestExtractZipRecognizesBackslashDirectoryMarker` falhando em
+`internal/install`**, sem relação com os testes novos — confirmado que a
+falha é preexistente (o teste já estava assim no commit inicial, antes desta
+sessão). Não foi investigado nem corrigido aqui, por estar fora do escopo
+deste item; fica registrado para checagem separada.
 
 ---
 
