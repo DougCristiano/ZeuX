@@ -357,7 +357,7 @@ curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 | `preset` | string | Descrição legível da configuração. Ausente em `"improvavel"`. |
 | `options` | objeto | O mesmo preset em forma aplicável. É o que o `/games/launch` copia quando a requisição não manda `options`. Ausente em `"improvavel"`. |
 | `next_level` | string | O patamar imediatamente acima do alcançado. Ausente quando o console já está no melhor patamar. |
-| `bottlenecks` | array de string | **O que exatamente barra o `next_level`**, uma frase por requisito não atendido, nomeando o componente. Vazio quando o requisito falhou por dado desconhecido em vez de insuficiência. |
+| `bottlenecks` | array de string | **O que exatamente barra o `next_level`**, uma frase por requisito não atendido, nomeando o componente. **Ausente** (não `[]`) quando não há gargalo a reportar — `omitempty` no Go remove o campo para uma slice vazia (achado rodando `npm run verificar-api` contra o daemon real, item B6 do [plano da Sprint B](sprint-b-plano.md); esta linha dizia "vazio" antes de ser corrigida). |
 | `precision` | `"completa"` \| `"parcial"` | Deste console especificamente. `"parcial"` quando algum requisito não pôde ser verificado. |
 
 **404 `no_scan_yet`** — execute o scan antes.

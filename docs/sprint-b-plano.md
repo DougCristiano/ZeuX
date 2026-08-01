@@ -496,35 +496,41 @@ abertura encontra o `zeuxd` respondendo e reaproveita).
 
 ---
 
-### B6 — Cliente de API tipado no front (M)
+### B6 — Cliente de API tipado no front (M) — **feito em 2026-08-01**
 
-Tipos escritos à mão, espelhando `api.md`. Nada de geração automática por
-OpenAPI agora: seria uma dependência e um passo de build para 15 rotas estáveis.
-Se o número de rotas dobrar, a decisão se reabre.
+Tipos escritos à mão em `src/api/types.ts`, espelhando `api.md`. Nada de
+geração automática por OpenAPI: seria uma dependência e um passo de build para
+17 rotas estáveis. Se o número de rotas dobrar, a decisão se reabre.
+`src/api/client.ts` traz uma função por rota, todas passando por um `request`
+único que decodifica o formato de erro `{ error: { code, message } }` e lança
+`ApiError` — `App.tsx` já foi migrado do `fetch` cru para este cliente.
 
-Três armadilhas do contrato precisam estar travadas no tipo, porque todas as
-três já custaram tempo ou estão documentadas como pegadinha:
+**As três armadilhas do critério original, travadas:**
 
-**Critério de aceite:**
+- [x] Tipos para `Report`, `ConsoleVerdict`, `HardwareInfo`,
+      `ConsentStatus`, `EmulatorEntry`, `Session`/`SessionWithStats` e
+      `ErrorBody` existem em `src/api/types.ts`.
+- [x] `emulator`, `adapter_id`, `core`, `preset` e `options` são opcionais em
+      `ConsoleVerdict`, com comentário explicando a ausência quando
+      `level === "improvavel"`; `granted_at` é opcional em `ConsentStatus`.
+- [x] `Session.ended_at` tem o aviso de que vem **sempre** preenchido e que
+      `is_running` (só em `SessionWithStats`, de `GET /sessions`) é a fonte de
+      verdade. `grep -rn "ended_at" src/` só acha a definição do tipo — nenhum
+      código de UI lê esse campo (não há tela de sessões ainda; a checagem
+      vale como trava para quando ela existir).
+- [x] `ApiError` é o tipo único de erro (`code` + `message`, de
+      `client.ts`); `App.tsx` exibe `err.message` sem reescrever.
+- [x] `scripts/verify-api.mjs` (`npm run verificar-api`) bate 12 rotas contra
+      um `zeuxd` real e falha se um campo esperado sumir. Concede consentimento,
+      roda um scan de verdade, e restaura o consentimento original ao final.
 
-- [ ] Existem tipos para `Report`, `ConsoleVerdict`, `HardwareInfo`, status de
-      consentimento, emulador, sessão e erro.
-- [ ] Os campos que a API **omite** são opcionais no tipo, não obrigatórios com
-      valor falso: `emulator`, `adapter_id`, `preset`, `options` e `core` são
-      ausentes quando `level` é `"improvavel"`; `granted_at` é ausente quando
-      `granted` é `false`.
-- [ ] `ended_at` está marcado no tipo com um comentário dizendo que **sempre
-      vem preenchido** (`"0001-01-01T00:00:00Z"` para sessão em andamento) e que
-      a fonte de verdade é `is_running`. Nenhum código do front lê `ended_at`
-      para decidir se a sessão está aberta — verificável por `grep`.
-- [ ] O erro da API é um tipo único `{ code, message }`, e a UI exibe `message`
-      **exatamente como veio**, sem reescrever. O `code` é o que a UI usa para
-      ramificar. (Item 10 de
-      [arquitetura-a-preservar](arquitetura-a-preservar.md).)
-- [ ] Um script de verificação (`npm run verificar-api`, ou equivalente) bate
-      cada rota do índice de `api.md` contra o daemon no ar e falha se um campo
-      esperado sumir. É a única defesa contra o front e o Go divergirem em
-      silêncio.
+**Achado real rodando o script pela primeira vez:** `bottlenecks` em
+`ConsoleVerdict` some do JSON (não vem como `[]`) quando não há gargalo a
+reportar — `omitempty` no Go remove uma slice vazia. A `api.md` documentava
+"vazio", não "ausente". Corrigidos os três lugares: `docs/api.md`,
+`src/api/types.ts` (`bottlenecks` virou opcional) e o próprio script (parou de
+exigir o campo no verdict de melhor patamar). É exatamente o tipo de deriva
+que este item existe para pegar — e pegou de primeira.
 
 **Depende de:** B4, B-doc
 **Bloqueia:** B8

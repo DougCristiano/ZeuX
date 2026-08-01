@@ -1,22 +1,13 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { api, ApiError, type HealthStatus } from "./api";
 
-// O zeuxd agora sobe como sidecar do Tauri (item B5, src-tauri/src/lib.rs) e
-// escuta sempre neste endereço fixo — descoberta dinâmica de porta é backlog
-// sem sprint.
-const API_BASE = "http://127.0.0.1:7777/api/v1";
-
-type Health = {
-  status: string;
-  schema_version: number;
-  consoles: number;
-};
-
-// App é só um placeholder que prova que o scaffold (React + Tailwind + fetch)
-// fala com o zeuxd de verdade. O onboarding real (consentimento → scan →
-// parecer) é o item B8, construído sobre o wireframe em docs/wireframe.md.
+// App é só um placeholder que prova que o scaffold (React + Tailwind + cliente
+// de API tipado, item B6) fala com o zeuxd de verdade. O onboarding real
+// (consentimento → scan → parecer) é o item B8, construído sobre o wireframe
+// em docs/wireframe.md.
 function App() {
-  const [health, setHealth] = useState<Health | null>(null);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Estado inicial é "indefinido" (null), não false: até a checagem no Rust
   // responder, não sabemos se há conflito, e a corrida (setup() do Tauri
@@ -45,12 +36,17 @@ function App() {
 
     async function tryFetch() {
       try {
-        const res = await fetch(`${API_BASE}/health`);
-        if (!cancelled) setHealth(await res.json());
+        const result = await api.health();
+        if (!cancelled) setHealth(result);
       } catch (err) {
         attempt += 1;
         if (attempt >= 10) {
-          if (!cancelled) setError(String(err));
+          if (!cancelled) {
+            // ApiError.message já vem pronta para exibição (regra de
+            // produto: a UI nunca reescreve a mensagem do servidor); um erro
+            // de rede puro (zeuxd ainda não aceita conexões) não é ApiError.
+            setError(err instanceof ApiError ? err.message : String(err));
+          }
           return;
         }
         setTimeout(tryFetch, 300);
