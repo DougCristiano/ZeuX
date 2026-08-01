@@ -10,8 +10,11 @@ mise exec -- go run ./cmd/zeuxd --addr 127.0.0.1:8080
 ```
 
 Fonte desta referência: `internal/api/server.go`, `internal/hardware/types.go`,
-`internal/verdict/verdict.go`, `internal/emulator/*.go`. Última verificação
-contra o código: 2026-08-01.
+`internal/verdict/verdict.go`, `internal/emulator/*.go`, `internal/install/*.go`.
+Última verificação contra o código: 2026-08-01 (item B-doc do
+[plano da Sprint B](sprint-b-plano.md) — este arquivo estava desatualizado em
+`schema_version`, na contagem de consoles e faltavam as rotas de instalação e
+de emuladores personalizados; corrigido nesta passada).
 
 ---
 
@@ -57,6 +60,14 @@ está em português e já pode ser exibida ao usuário como está.
 | GET | `/api/v1/hardware` | Devolve o último scan da sessão |
 | GET | `/api/v1/consoles/verdicts` | Parecer por console |
 | GET | `/api/v1/emulators` | Quais emuladores estão instalados |
+| GET | `/api/v1/custom-emulators` | Lista os emuladores personalizados do usuário |
+| POST | `/api/v1/custom-emulators` | Cria ou substitui um emulador personalizado |
+| DELETE | `/api/v1/custom-emulators/{id}` | Remove um emulador personalizado |
+| GET | `/api/v1/emulator-sources` | Catálogo de fontes de download conhecidas |
+| POST | `/api/v1/emulators/{id}/install` | Dispara a instalação 1-click |
+| DELETE | `/api/v1/emulators/{id}/install` | Remove uma instalação gerenciada pelo ZeuX |
+| GET | `/api/v1/installs` | Histórico de instalações (jobs) |
+| GET | `/api/v1/installs/{id}` | Acompanha uma instalação em andamento |
 | POST | `/api/v1/games/preview` | Monta a linha de comando sem executar |
 | POST | `/api/v1/games/launch` | Executa o jogo |
 | GET | `/api/v1/sessions` | Histórico de sessões + tempo de jogo |
@@ -76,16 +87,16 @@ curl http://127.0.0.1:7777/api/v1/health
 ```json
 {
   "status": "ok",
-  "schema_version": 2,
-  "consoles": 13
+  "schema_version": 3,
+  "consoles": 33
 }
 ```
 
 | Campo | Tipo | Origem |
 |---|---|---|
 | `status` | string | Literal `"ok"`. |
-| `schema_version` | int | `catalog.SchemaVersion` — hoje `2`. |
-| `consoles` | int | Número de consoles no catálogo — hoje `13`. |
+| `schema_version` | int | `catalog.SchemaVersion` (`internal/verdict/data/consoles.json`) — hoje `3`. |
+| `consoles` | int | Número de consoles no catálogo — hoje `33`. |
 
 Esta rota não tem caminho de erro: se o catálogo não tivesse carregado, o daemon
 nem teria subido (`verdict.LoadCatalog` falha em `run()`).
@@ -350,8 +361,9 @@ curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 
 ## GET /api/v1/emulators
 
-Varre o disco procurando cada um dos 8 emuladores conhecidos. **Não recebe
-parâmetros.**
+Varre o disco procurando cada um dos 13 emuladores embutidos, mais os
+personalizados que o usuário tiver definido (ver `/custom-emulators` abaixo).
+**Não recebe parâmetros.**
 
 ```bash
 curl http://127.0.0.1:7777/api/v1/emulators
@@ -392,10 +404,246 @@ curl http://127.0.0.1:7777/api/v1/emulators
 | `installation.managed` | bool | `true` quando o binário veio da pasta gerenciada pelo ZeuX. Hoje sempre `false` na prática: nada instala nessa pasta ainda. |
 | `installation.version` | string | **Nunca preenchido hoje.** Nenhum adapter detecta versão. |
 
-A ordem dos itens é a ordem de registro em `NewRegistry`: retroarch,
-duckstation, pcsx2, dolphin, ppsspp, flycast, rpcs3, cemu.
+A ordem dos itens é a ordem de registro em `NewRegistry`, personalizados
+primeiro: retroarch, duckstation, pcsx2, dolphin, ppsspp, flycast, rpcs3, cemu,
+melonds, azahar, xemu, vita3k, xenia.
 
 Esta rota não tem caminho de erro — emulador ausente é `installed: false`.
+
+---
+
+## GET /api/v1/custom-emulators
+
+Lista os emuladores que o usuário definiu à mão — para um emulador que o ZeuX
+não conhece, ou uma instalação fora do padrão. Definições de usuário sempre têm
+precedência sobre um adapter embutido de mesmo `id`.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/custom-emulators
+```
+
+**200 OK**
+
+```json
+{
+  "custom_emulators": [
+    {
+      "id": "meu-emulador",
+      "name": "Meu Emulador",
+      "consoles": ["nes"],
+      "binary_path": "C:\\Emuladores\\meu-emulador.exe",
+      "args": ["--rom", "{rom}"],
+      "notes": ""
+    }
+  ],
+  "file_path": "C:\\Users\\doufl\\AppData\\Roaming\\ZeuX\\custom-emulators.json",
+  "placeholders": {
+    "{rom}": "caminho do jogo (obrigatório)",
+    "{scale}": "multiplicador de resolução interna do preset",
+    "{renderer}": "backend gráfico do preset"
+  }
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `custom_emulators` | array | `[]` (nunca `null`) quando não há nenhum definido. |
+| `file_path` | string | Caminho do arquivo em disco, para quem preferir editar à mão em vez de usar a API. |
+| `placeholders` | objeto | Os três marcadores aceitos em `args`, com o que cada um significa. |
+
+Esta rota não tem caminho de erro.
+
+---
+
+## POST /api/v1/custom-emulators
+
+Cria ou substitui (por `id`) um emulador personalizado.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/custom-emulators \
+  -H "Content-Type: application/json" \
+  -d '{"id":"meu-emulador","name":"Meu Emulador","consoles":["nes"],"binary_path":"C:\\Emuladores\\meu-emulador.exe","args":["--rom","{rom}"]}'
+```
+
+**Corpo**
+
+| Campo | Tipo | Obrigatório | Notas |
+|---|---|---|---|
+| `id` | string | Sim | Identificador único; um `POST` com `id` existente substitui a definição. |
+| `name` | string | Sim | Nome de exibição. |
+| `consoles` | array de string | Sim | IDs de console que este emulador atende. |
+| `binary_path` | string | Sim | Caminho do executável no disco do usuário. |
+| `args` | array de string | Sim | Template da linha de comando. **Precisa conter `{rom}`** — é onde o ZeuX substitui o caminho do jogo. |
+| `notes` | string | Não | Anotação livre do usuário. |
+
+**200 OK** — mesma forma de `GET /custom-emulators`, com a lista já atualizada.
+
+**Erros**
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `invalid_body` | Corpo não é o JSON esperado (id, name, consoles, binary_path, args). |
+| 400 | `invalid_definition` | Falha de validação — o caso mais comum é `args` sem `{rom}`. A mensagem nomeia o problema. |
+
+---
+
+## DELETE /api/v1/custom-emulators/{id}
+
+Remove uma definição personalizada.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/custom-emulators/meu-emulador
+```
+
+**200 OK** — mesma forma de `GET /custom-emulators`, com a lista já sem o item.
+
+**404 `not_found`** — nenhuma definição com este `id`.
+
+---
+
+## GET /api/v1/emulator-sources
+
+O catálogo de fontes de download conhecidas — de onde vem cada emulador que o
+`/install` sabe baixar. Serve para a interface saber, antes de tentar instalar,
+se a fonte é automática (`Kind` de download direto) ou manual (o ZeuX não
+consegue automatizar, e `Reason` explica por quê).
+
+```bash
+curl http://127.0.0.1:7777/api/v1/emulator-sources
+```
+
+**200 OK** (recortado)
+
+```json
+{
+  "sources": [
+    {
+      "adapter_id": "duckstation",
+      "name": "DuckStation",
+      "kind": "github_release",
+      "repo": "stenzek/duckstation",
+      "homepage": "https://github.com/stenzek/duckstation",
+      "license": "GPL-3.0"
+    },
+    {
+      "adapter_id": "azahar",
+      "name": "Azahar",
+      "kind": "manual",
+      "homepage": "https://azahar-emu.org/",
+      "reason": "Não publica release automatizável no formato que o instalador reconhece hoje."
+    }
+  ]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `adapter_id` | string | Mesmo identificador usado em `/emulators/{id}/install`. |
+| `kind` | string | Como o pacote é obtido. `"manual"` significa que `/install` recusa esta fonte — `reason` explica o porquê. |
+| `reason` | string | **Só presente em fontes manuais.** |
+
+Esta rota não tem caminho de erro.
+
+---
+
+## POST /api/v1/emulators/{id}/install
+
+Dispara a instalação 1-click de um emulador conhecido em
+`emulator-sources`. **Não bloqueia**: devolve o `Job` imediatamente
+(`202 Accepted`) e a interface acompanha o progresso por
+`GET /installs/{id}`.
+
+**A regra de produto está aqui, não na interface:** se nenhum console atendido
+por este emulador é viável no hardware do último scan, o servidor recusa com
+`409` em vez de instalar às cegas — e devolve o motivo mais um
+`override_hint` para repetir com `?force=true`. Basta **um** console viável
+para liberar sem ressalva (o Dolphin roda GameCube e Wii; dar conta de um dos
+dois já libera). Sem scan feito, nada é bloqueado — não há base para opinar.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/emulators/duckstation/install
+```
+
+**202 Accepted**
+
+```json
+{
+  "id": "i1",
+  "adapter_id": "duckstation",
+  "name": "DuckStation",
+  "phase": "resolvendo",
+  "message": "",
+  "started_at": "2026-08-01T15:10:00Z",
+  "finished_at": null,
+  "checksum_verified": false
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `phase` | string | `"resolvendo"` → `"baixando"` → `"verificando"` → `"extraindo"` → `"finalizando"` → `"concluido"` ou `"falhou"`. Em português, de propósito — é o que a interface exibe como está. |
+| `downloaded_bytes` / `total_bytes` | int64 | `total_bytes` pode ser `0` (tamanho desconhecido); ver `Percent()` no código, que devolve `-1` nesse caso em vez de dividir por zero. |
+| `sha256` | string | Sempre registrado quando o download termina, mesmo que o projeto não publique soma oficial — permite comparar entre máquinas depois do fato. |
+| `checksum_verified` | bool | `true` só quando a soma foi conferida contra um valor **publicado pelo projeto**, não apenas calculada localmente. |
+| `finished_at` | string ou `null` | `null` enquanto a instalação está em andamento. |
+
+**Erros**
+
+| Status | `code` | Quando |
+|---|---|---|
+| 409 | `hardware_insufficient` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `error` **e** `override_hint`. |
+| 400 | `install_refused` | `adapter_id` desconhecido em `emulator-sources`, fonte `manual`, ou já existe instalação em andamento para este emulador. |
+
+---
+
+## DELETE /api/v1/emulators/{id}/install
+
+Remove uma instalação **gerenciada pelo ZeuX** (feita por `/install`, dentro de
+`ManagedRoot()`). Não afeta uma instalação que o usuário já tinha por conta
+própria em outro caminho — o ZeuX só desinstala o que ele mesmo instalou.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/emulators/duckstation/install
+```
+
+**200 OK**
+
+```json
+{ "removed": "duckstation" }
+```
+
+**400 `uninstall_failed`** — nada gerenciado para remover, ou falha ao apagar
+os arquivos. A mensagem original do erro vai em `message`.
+
+---
+
+## GET /api/v1/installs
+
+Histórico de todas as instalações desta execução do daemon (em andamento e
+concluídas).
+
+```bash
+curl http://127.0.0.1:7777/api/v1/installs
+```
+
+**200 OK** — `{ "installs": [ /* Job, mais recente primeiro */ ] }`.
+
+Esta rota não tem caminho de erro.
+
+---
+
+## GET /api/v1/installs/{id}
+
+Acompanha uma instalação específica por `id` — é o que a interface consulta em
+intervalo curto para atualizar a barra de progresso.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/installs/i1
+```
+
+**200 OK** — mesma forma do `Job` devolvido por `POST /install`.
+
+**404 `not_found`** — nenhuma instalação com este `id`.
 
 ---
 
@@ -620,6 +868,11 @@ Esta rota não tem caminho de erro.
 | `emulator_unavailable` | 400 | POST `/games/preview` | Nenhum emulador utilizável para a requisição. |
 | `command_failed` | 400 | POST `/games/preview` | `BuildCommand` recusou (tipicamente core ausente). |
 | `launch_failed` | 400 | POST `/games/launch` | Qualquer falha do lançamento; a causa vai no `message`. |
+| `invalid_definition` | 400 | POST `/custom-emulators` | Definição inválida (o caso mais comum é `args` sem `{rom}`). |
+| `not_found` | 404 | DELETE `/custom-emulators/{id}`, GET `/installs/{id}` | Nenhum registro com este `id`. |
+| `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |
+| `install_refused` | 400 | POST `/emulators/{id}/install` | Fonte desconhecida, fonte manual, ou instalação já em andamento para este emulador. |
+| `uninstall_failed` | 400 | DELETE `/emulators/{id}/install` | Nada gerenciado para remover, ou falha ao apagar os arquivos. |
 
 ---
 
@@ -640,6 +893,7 @@ Invoke-RestMethod "$base/consent" -Method Post -Body '{"granted":true}' -Content
 Invoke-RestMethod "$base/hardware/scan" -Method Post | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/consoles/verdicts" | ConvertTo-Json -Depth 6
 Invoke-RestMethod "$base/emulators" | ConvertTo-Json -Depth 5
+Invoke-RestMethod "$base/emulator-sources" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/sessions"
 
 # Revogar também apaga o scan da memória: a próxima linha deve dar 404

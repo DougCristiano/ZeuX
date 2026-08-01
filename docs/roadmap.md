@@ -43,7 +43,7 @@ funcionalidade nova.
 | D1 | ~~Validar as flags dos 13 adapters contra binários reais~~ | G | **Feito 2026-08-01** (ressalva: sem ROM real, ver abaixo) |
 | D2 | **Calibrar os limiares de hardware do catálogo** | G | Credibilidade do parecer |
 | D3 | **Persistir sessões e tempo de jogo** | M | Perfil, conquistas |
-| D4 | **Resolver OneDrive × `node_modules`/`src-tauri/target`** | P | Início da Fase 2 |
+| D4 | **Resolver OneDrive × `node_modules`/`src-tauri/target`** | P | **A Sprint B inteira** — é o item B0 |
 | D5 | ~~Corrigir as opções silenciosamente ignoradas~~ | P | **Feito** — reconfirmado durante D1; todos os adapters já reportam em `Unapplied` |
 | D6 | Busca recursiva de binários em subdiretórios | M | Instalação 1-click |
 | D7 | Fixar as versões no `mise.toml` | P | Reprodutibilidade |
@@ -151,6 +151,22 @@ sincronização** nas configurações do OneDrive, ou mover o repositório para 
 do OneDrive e manter o backup por Git.
 
 **Fazer antes do primeiro `npm install`, não depois.**
+
+**Estado em 2026-08-01: não resolvido.** Verificado: o repositório continua em
+`C:\Users\doufl\OneDrive\Documentos\ZeuX`, e não existe junction,
+`CARGO_TARGET_DIR` nem exclusão registrada em lugar nenhum. Como nada de
+front-end foi criado ainda (`node_modules/`, `src-tauri/` e `package.json` não
+existem), o custo de resolver agora é o menor que vai ser.
+
+**Recomendação:** mover o repositório para fora do OneDrive (`C:\dev\ZeuX`), com
+o remoto do GitHub (`DougCristiano/ZeuX`, já configurado) cumprindo o papel de
+backup. É a solução menor — uma decisão, uma vez, sem mecanismo para manter. A
+alternativa por junctions funciona, mas cria um passo de setup que some em
+qualquer clone novo. Detalhe e critério de aceite em
+[`sprint-b-plano.md`](sprint-b-plano.md), item B0.
+
+Se o repositório for movido, os caminhos absolutos em `CLAUDE.md` e em
+`.claude/settings.local.json` deixam de valer — decidir junto, não depois.
 
 ### D5 — Opções silenciosamente ignoradas (P) — **feito**
 
@@ -333,7 +349,7 @@ jogos.
 | ~~D5 — corrigir opções silenciosamente ignoradas~~ | P | **Feito** |
 | ~~D6 — busca recursiva de binários~~ | M | **Feito** (`internal/emulator/discovery.go`, `subdirectories`) |
 | ~~D7 — fixar versões no `mise.toml`~~ | P | **Feito** (`go 1.26.5`, `node 24.18.1`) |
-| D4 — resolver OneDrive antes da Sprint B | P | — |
+| **D4 — resolver OneDrive antes da Sprint B** | P | — · **Não feito** (verificado 2026-08-01). Migrou para a Sprint B como item B0, porque bloqueia tudo lá |
 | Detectar `Installation.Version` | P | ~~D1~~ desbloqueado |
 | ~~Atualizar o README~~ | P | **Feito** — já documenta instalação 1-click e as rotas de `/emulators`, `/games/*`, `/sessions` |
 
@@ -344,39 +360,70 @@ por `POST /api/v1/games/launch`, com o preset aplicado e a sessão registrada.
 
 ## Sprint B — Ambiente Tauri e casca da UI
 
-Objetivo: primeira tela consumindo a API.
+Objetivo: primeira tela consumindo a API — e a primeira prova de que o
+[ADR 0001](decisoes/0001-ipc-http-local.md) (IPC por HTTP local) funciona dentro
+de um WebView de verdade.
 
-| Item | Tam. | Depende de |
-|---|---|---|
-| ~~Wireframe de estrutura das telas~~ | P | **Feito 2026-08-01** — 7 telas, com as regras de produto anotadas em cada uma |
-| Layout visual sobre o wireframe (moderno e acolhedor) | M | wireframe |
-| Instalar Rust + MSVC Build Tools + WebView2 | M | D4 |
-| Scaffold Tauri + React + Tailwind, `src-tauri/` | M | ↑ |
-| Gerenciar `zeuxd` como processo filho do Tauri (subir, derrubar, porta ocupada) | M | ↑ |
-| Resolver CORS / origin do WebView contra `127.0.0.1:7777` | P | ↑ |
-| Cliente de API tipado no front (tipos espelhando `api.md`) | M | ↑ |
-| Fluxo de onboarding: consentimento → scan → parecer | M | ↑ |
-| Tela de parecer: badge por console, gargalos nomeados, aviso de "parcial" | M | ↑ |
-| Empacotamento: binário Go dentro do instalador Tauri | M | ↑ |
+**O plano detalhado, com critério de aceite item a item, riscos e critério de
+saída, está em [`sprint-b-plano.md`](sprint-b-plano.md).** Aqui fica só a
+sequência.
 
-**Riscos:** a Sprint B é a primeira prova de que a decisão de HTTP local
-([ADR 0001](decisoes/0001-ipc-http-local.md)) funciona com o Tauri. Nada disso
-foi verificado ainda. Reservar folga.
+| # | Item | Tam. | Depende de |
+|---|---|---|---|
+| B0 | **D4 — tirar `node_modules`/`src-tauri/target` do OneDrive** | P | — · **Tentado 2026-08-01, bloqueado**: mover a pasta falha com "arquivo em uso" — o próprio VS Code (várias janelas abertas) e/ou a sessão do Claude Code, ambos ancorados neste caminho, seguram um handle. Precisa ser feito com os dois fechados; ver nota em `sprint-b-plano.md` |
+| B-wire | ~~Publicar o wireframe no repositório~~ | P | **Feito 2026-08-01** — [`wireframe.md`](wireframe.md) / [`wireframe.html`](wireframe.html) |
+| B-doc | ~~Reconciliar `api.md` com o código antes de tipar o cliente~~ | P | **Feito 2026-08-01** — `schema_version`/contagem de consoles corrigidos, rotas de instalação e de emuladores personalizados documentadas |
+| B1 | Instalar Rust + MSVC Build Tools + WebView2 | M | B0 |
+| B2 | **Prova de fogo: WebView Tauri × `127.0.0.1:7777`** | P | B1 |
+| B3 | CORS no servidor, **se** B2 mostrar que precisa | P | B2 |
+| B4 | Scaffold Tauri + React + Tailwind, `src-tauri/` | M | B2 |
+| B5 | `zeuxd` como processo filho (subir, derrubar, porta ocupada) | M | B4 |
+| B6 | Cliente de API tipado no front | M | B4, B-doc |
+| B7 | Layout visual sobre o wireframe | M | B4, B-wire |
+| B8 | Fluxo de onboarding: consentimento → scan → parecer | M | B5, B6, B7 |
+| B9 | Tela de parecer: gargalos nomeados, aviso de "parcial" | M | B8 |
+| B10 | Instalar com ressalva de hardware (servidor já faz — ver nota) | P | B9 |
+| B11 | Empacotamento: binário Go dentro do instalador Tauri | M | B4 |
+
+**A ordem tem uma razão só:** B2 vem antes de qualquer tela. O servidor **não
+tem uma linha de `Access-Control-*` hoje** (verificado por `grep` em
+`internal/api/`), e um `POST` com `Content-Type: application/json` a partir do
+WebView dispara preflight. Descobrir isso com um botão na tela custa uma tarde;
+descobrir com onze telas prontas custa a sprint.
+
+**Dois pré-requisitos que não estavam na tabela antiga — os dois já feitos:**
+
+- ~~O wireframe não está no repositório~~ **Feito 2026-08-01** —
+  [`docs/wireframe.md`](wireframe.md) e [`docs/wireframe.html`](wireframe.html)
+  versionam as 7 telas com as regras anotadas.
+- ~~`api.md` está desatualizado~~ **Feito 2026-08-01** — `schema_version`
+  corrigido para `3`, consoles para `33`, e as rotas de `custom-emulators`,
+  `emulator-sources`, `emulators/{id}/install` e `installs` (que não estavam
+  documentadas) foram acrescentadas.
+
+**Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
+(`hardwareBlocks` + `?force=true` + `override_hint`, em
+`internal/api/server.go`). Por isso a linha "aviso quando o hardware não
+comporta" saiu da Sprint C e entrou aqui como item P — a tela existe no
+wireframe, o backend existe, esperar não compra nada.
 
 **Regra de UI, não negociável:** o texto sobre hardware é **descritivo, nunca
 julgador**. Exibir números e o que a máquina alcança. Nunca "seu PC é fraco".
 Quando um patamar melhor não é atingido, mostrar o `bottlenecks` — que já vem
-pronto da API.
-
-**Wireframe de estrutura (2026-08-01):** as 7 telas estão desenhadas, sem cor
-nem tipografia escolhida, com cada regra de produto anotada onde ela encosta no
-layout. Cobre consentimento → leitura → parecer, biblioteca (vazia e com jogos),
-emuladores e o caso de instalar com ressalva de hardware. O layout visual entra
-**sobre** essa estrutura, não no lugar dela.
+pronto da API. E enquanto o D2 estiver aberto, a UI apresenta o parecer como
+**estimativa**, não promessa: os limiares nunca foram medidos.
 
 **Forma de interação:** mouse e teclado, sem modo TV — mas nenhuma ação pode
 existir só em hover ou só em clique direito, e foco é estado de primeira classe.
-Ver [ADR 0009](decisoes/0009-desktop-agora-controle-depois.md).
+Ver [ADR 0009](decisoes/0009-desktop-agora-controle-depois.md). O critério
+verificável está em B7 e B8: o onboarding inteiro precisa ser concluído só com
+Tab e Enter.
+
+**Critério de saída (resumo):** um instalador que roda numa máquina sem Go, Node
+nem Rust leva o usuário do consentimento ao parecer sem passo manual, o `zeuxd`
+sobe e desce com a janela, e o ADR 0001 deixa de ser aposta — com o `origin`
+real do WebView escrito aqui. Os sete itens completos estão em
+[`sprint-b-plano.md`](sprint-b-plano.md).
 
 ---
 
@@ -391,7 +438,7 @@ Objetivo: o usuário não precisa saber o que é DuckStation para jogar PS1.
 | Extração para `ManagedRoot()` (`UserConfigDir()/ZeuX/emulators/<id>/`) | M | ↑ |
 | Instalar/atualizar/remover apenas o que é `managed` | M | ↑ |
 | Instalação de cores do RetroArch | M | ↑ |
-| **Aviso quando o hardware não comporta, e o usuário decide** | P | Sprint B |
+| ~~**Aviso quando o hardware não comporta, e o usuário decide**~~ | P | **Migrou para a Sprint B, item B10** — o servidor já bloqueia com `?force=true`; falta só a tela |
 | Rotas: `POST /api/v1/emulators/{id}/install`, `DELETE`, progresso | M | ↑ |
 
 `ManagedRoot()` e `Installation.Managed` já existem no código e a busca já

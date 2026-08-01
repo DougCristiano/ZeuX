@@ -1,0 +1,1042 @@
+<title>ZeuX — Wireframe de estrutura</title>
+
+<style>
+  :root {
+    --paper: #FBFBFC;
+    --panel: #FFFFFF;
+    --ink: #1C1D21;
+    --wire-line: #C3C5CC;
+    --wire-line-strong: #9DA0A9;
+    --wire-fill: #ECEDF1;
+    --wire-fill-2: #DEE0E6;
+    --wire-text: #6E7178;
+    --muted: #82858D;
+    --rule: #9A6414;
+    --rule-bg: #FBF4E6;
+    --rule-line: #E2C489;
+    --focus: #2F5FA8;
+    --shadow: 0 1px 2px rgba(20, 22, 28, .06), 0 8px 24px rgba(20, 22, 28, .05);
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    --step: clamp(.78rem, .74rem + .2vw, .84rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #131418;
+      --panel: #1A1C21;
+      --ink: #E7E8EC;
+      --wire-line: #3B3E47;
+      --wire-line-strong: #5A5E69;
+      --wire-fill: #212329;
+      --wire-fill-2: #2A2D34;
+      --wire-text: #8B8E97;
+      --muted: #80838C;
+      --rule: #D8A461;
+      --rule-bg: #262015;
+      --rule-line: #574A31;
+      --focus: #6E9BE0;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #131418;
+    --panel: #1A1C21;
+    --ink: #E7E8EC;
+    --wire-line: #3B3E47;
+    --wire-line-strong: #5A5E69;
+    --wire-fill: #212329;
+    --wire-fill-2: #2A2D34;
+    --wire-text: #8B8E97;
+    --muted: #80838C;
+    --rule: #D8A461;
+    --rule-bg: #262015;
+    --rule-line: #574A31;
+    --focus: #6E9BE0;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+  }
+
+  :root[data-theme="light"] {
+    --paper: #FBFBFC;
+    --panel: #FFFFFF;
+    --ink: #1C1D21;
+    --wire-line: #C3C5CC;
+    --wire-line-strong: #9DA0A9;
+    --wire-fill: #ECEDF1;
+    --wire-fill-2: #DEE0E6;
+    --wire-text: #6E7178;
+    --muted: #82858D;
+    --rule: #9A6414;
+    --rule-bg: #FBF4E6;
+    --rule-line: #E2C489;
+    --focus: #2F5FA8;
+    --shadow: 0 1px 2px rgba(20, 22, 28, .06), 0 8px 24px rgba(20, 22, 28, .05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--ui);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 clamp(1rem, 4vw, 2.5rem) 5rem;
+  }
+
+  /* ---------- cabeçalho ---------- */
+
+  header.masthead {
+    padding: clamp(2rem, 5vw, 3.25rem) 0 1.5rem;
+    border-bottom: 1px solid var(--wire-line);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 .75rem;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 1.1rem + 1.7vw, 2.1rem);
+    line-height: 1.15;
+    letter-spacing: -.015em;
+    margin: 0 0 .75rem;
+    text-wrap: balance;
+    font-weight: 620;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: .95rem;
+  }
+
+  .lede strong { color: var(--ink); font-weight: 560; }
+
+  /* ---------- navegação de telas ---------- */
+
+  nav.screens {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--wire-line);
+    margin-bottom: 2rem;
+  }
+
+  .screens-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: .6rem clamp(1rem, 4vw, 2.5rem);
+    display: flex;
+    gap: .9rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .tabs {
+    display: flex;
+    gap: .3rem;
+    overflow-x: auto;
+    flex: 1 1 auto;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+
+  .tab {
+    appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .02em;
+    padding: .38rem .6rem;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .12s, background .12s, border-color .12s;
+  }
+
+  .tab:hover { color: var(--ink); background: var(--wire-fill); }
+
+  .tab[aria-selected="true"] {
+    color: var(--ink);
+    border-color: var(--wire-line-strong);
+    background: var(--panel);
+    font-weight: 600;
+  }
+
+  .tab .num { color: var(--wire-text); margin-right: .35em; }
+  .tab[aria-selected="true"] .num { color: var(--rule); }
+
+  .toggle {
+    appearance: none;
+    background: var(--panel);
+    border: 1px solid var(--wire-line-strong);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: .7rem;
+    padding: .4rem .65rem;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .toggle[aria-pressed="true"] {
+    background: var(--rule-bg);
+    border-color: var(--rule-line);
+    color: var(--rule);
+  }
+
+  /* ---------- tela ---------- */
+
+  .screen { display: none; }
+  .screen.is-active { display: block; animation: fade .18s ease-out; }
+
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .screen.is-active { animation: none; }
+    * { transition: none !important; }
+  }
+
+  .screen-head { margin-bottom: 1.1rem; }
+
+  .screen-head h2 {
+    font-size: 1.15rem;
+    margin: 0 0 .3rem;
+    letter-spacing: -.01em;
+    font-weight: 620;
+  }
+
+  .screen-head p {
+    margin: 0;
+    color: var(--muted);
+    font-size: .88rem;
+    max-width: 68ch;
+  }
+
+  .screen-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .screen-body { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* ---------- moldura do wireframe ---------- */
+
+  .frame {
+    background: var(--panel);
+    border: 1px solid var(--wire-line-strong);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .chrome {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .5rem .7rem;
+    border-bottom: 1px solid var(--wire-line);
+    background: var(--wire-fill);
+  }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    border: 1px solid var(--wire-line-strong);
+  }
+
+  .chrome-title {
+    font-family: var(--mono);
+    font-size: .68rem;
+    color: var(--wire-text);
+    margin-left: .3rem;
+  }
+
+  .canvas { padding: 1.25rem; display: grid; gap: 1rem; }
+
+  /* ---------- vocabulário do wireframe ---------- */
+
+  .box {
+    border: 1px solid var(--wire-line);
+    border-radius: 3px;
+    padding: .8rem .9rem;
+    background: transparent;
+  }
+
+  .box.filled { background: var(--wire-fill); }
+
+  .ph {
+    border: 1px dashed var(--wire-line-strong);
+    border-radius: 3px;
+    background: repeating-linear-gradient(
+      -45deg, transparent, transparent 6px,
+      var(--wire-fill) 6px, var(--wire-fill) 12px
+    );
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: .66rem;
+    color: var(--wire-text);
+    text-align: center;
+    padding: .5rem;
+  }
+
+  .label {
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--wire-text);
+    margin: 0 0 .5rem;
+  }
+
+  .wf-h {
+    font-size: 1.05rem;
+    font-weight: 620;
+    margin: 0 0 .4rem;
+    letter-spacing: -.01em;
+  }
+
+  .wf-p { margin: 0; font-size: var(--step); color: var(--ink); }
+  .wf-sub { margin: .3rem 0 0; font-size: var(--step); color: var(--muted); }
+
+  .btn {
+    display: inline-block;
+    border: 1px solid var(--wire-line-strong);
+    border-radius: 3px;
+    padding: .45rem .85rem;
+    font-size: var(--step);
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--ui);
+    cursor: default;
+  }
+
+  .btn.primary { background: var(--wire-fill-2); border-color: var(--wire-line-strong); font-weight: 580; }
+  .btn.ghost { border-style: dashed; color: var(--muted); }
+
+  .btn.focused {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+  .row.between { justify-content: space-between; }
+  .stack { display: grid; gap: .55rem; }
+
+  .badge {
+    display: inline-block;
+    border: 1px solid var(--wire-line-strong);
+    border-radius: 2px;
+    padding: .1rem .4rem;
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .04em;
+    color: var(--wire-text);
+    white-space: nowrap;
+  }
+
+  .badge.solid { background: var(--wire-fill-2); color: var(--ink); }
+
+  .bar {
+    height: 6px;
+    border: 1px solid var(--wire-line);
+    border-radius: 2px;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  .bar span { display: block; height: 100%; background: var(--wire-fill-2); }
+
+  /* barra de navegação lateral do app */
+  .applayout { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 1rem; }
+  @media (max-width: 620px) { .applayout { grid-template-columns: minmax(0, 1fr); } }
+
+  .sidenav { display: grid; gap: .3rem; align-content: start; }
+
+  .navitem {
+    border: 1px solid var(--wire-line);
+    border-radius: 3px;
+    padding: .4rem .55rem;
+    font-size: var(--step);
+    color: var(--muted);
+  }
+
+  .navitem.active { background: var(--wire-fill-2); color: var(--ink); font-weight: 580; border-color: var(--wire-line-strong); }
+
+  /* grades */
+  .grid-covers { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: .6rem; }
+  .cover { aspect-ratio: 3 / 4; }
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .6rem; }
+
+  table.wf {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--step);
+  }
+
+  table.wf th, table.wf td {
+    border-bottom: 1px solid var(--wire-line);
+    padding: .45rem .5rem;
+    text-align: left;
+  }
+
+  table.wf th {
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--wire-text);
+    font-weight: 500;
+  }
+
+  .scroll-x { overflow-x: auto; }
+
+  /* ---------- anotações ---------- */
+
+  aside.notes { display: grid; gap: .75rem; align-content: start; min-width: 0; }
+
+  body.notes-off aside.notes { display: none; }
+  body.notes-off .screen-body { grid-template-columns: minmax(0, 1fr); }
+
+  .note {
+    border: 1px solid var(--wire-line);
+    border-left: 3px solid var(--rule-line);
+    border-radius: 3px;
+    background: var(--rule-bg);
+    padding: .7rem .8rem;
+  }
+
+  .note h4 {
+    margin: 0 0 .35rem;
+    font-family: var(--mono);
+    font-size: .66rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--rule);
+    font-weight: 600;
+  }
+
+  .note p { margin: 0 0 .4rem; font-size: .8rem; line-height: 1.5; }
+  .note p:last-child { margin-bottom: 0; }
+  .note code {
+    font-family: var(--mono);
+    font-size: .74rem;
+    background: color-mix(in srgb, var(--rule) 10%, transparent);
+    padding: .05em .3em;
+    border-radius: 2px;
+  }
+
+  .note.structural {
+    background: transparent;
+    border-left-color: var(--wire-line-strong);
+  }
+  .note.structural h4 { color: var(--muted); }
+
+  .yes, .no { display: block; font-size: .78rem; margin-top: .25rem; }
+  .no::before { content: "✕ "; color: var(--rule); font-weight: 700; }
+  .yes::before { content: "✓ "; color: var(--rule); font-weight: 700; }
+
+  /* ---------- rodapé ---------- */
+
+  footer.legend {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--wire-line);
+  }
+
+  footer.legend h3 {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 .8rem;
+    font-weight: 600;
+  }
+
+  .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+  .legend-item { font-size: .8rem; color: var(--muted); }
+  .legend-item strong { color: var(--ink); font-weight: 580; display: block; margin-bottom: .15rem; font-size: .82rem; }
+
+  .kbd {
+    font-family: var(--mono);
+    font-size: .7rem;
+    border: 1px solid var(--wire-line-strong);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: .05em .35em;
+    color: var(--ink);
+  }
+</style>
+
+<header class="masthead">
+  <div class="shell" style="padding-bottom:0">
+    <p class="eyebrow">ZeuX · Wireframe de estrutura · v1</p>
+    <h1>Onde cada coisa fica, antes de decidir como cada coisa parece</h1>
+    <p class="lede">
+      Propositalmente sem cor, ícone ou tipografia escolhida — <strong>tudo isso é decisão da próxima
+      fase</strong>. O que está em jogo aqui é a ordem das telas, o que aparece em cada uma e onde as
+      regras de produto encostam no layout. As anotações em âmbar são as regras que
+      <strong>precisam sobreviver</strong> ao redesenho.
+    </p>
+  </div>
+</header>
+
+<nav class="screens" aria-label="Telas do wireframe">
+  <div class="screens-inner">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-screen="s1"><span class="num">01</span>Consentimento</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="s2"><span class="num">02</span>Leitura</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="s3"><span class="num">03</span>Parecer</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="s4">Biblioteca vazia</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="s5">Biblioteca</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="s6">Emuladores</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="s7">Instalar com ressalva</button>
+    </div>
+    <button class="toggle" id="notesToggle" aria-pressed="true">Anotações</button>
+  </div>
+</nav>
+
+<main class="shell">
+
+  <!-- ============ 01 ============ -->
+  <section class="screen is-active" id="s1">
+    <div class="screen-head">
+      <h2>01 · Consentimento</h2>
+      <p>Primeira coisa que existe. Nada é lido da máquina antes daqui — e essa ordem é regra de servidor, não cortesia da interface.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX</span></div>
+        <div class="canvas">
+          <div class="ph" style="height:52px">marca / nome do app</div>
+
+          <div class="box">
+            <p class="wf-h">Antes de começar</p>
+            <p class="wf-p">
+              O ZeuX vai ler as características do seu computador (modelo do processador, núcleos,
+              clock, placa de vídeo e memória) para sugerir quais consoles ele consegue rodar. Esses
+              dados são usados apenas para gerar essas sugestões e como base de comparação entre
+              jogadores. Nada além disso é coletado, e nenhum arquivo pessoal é acessado.
+            </p>
+            <p class="wf-sub">Você pode revogar essa autorização depois, a qualquer momento.</p>
+          </div>
+
+          <div class="row">
+            <span class="btn primary focused">Autorizar leitura</span>
+            <span class="btn">Agora não</span>
+          </div>
+
+          <div class="row" style="margin-top:.2rem">
+            <span class="badge">política v1</span>
+            <span class="badge">texto vem de GET /consent</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra · consentimento</h4>
+          <p>O texto exibido tem que vir do campo <code>policy_text</code> da API, nunca ser escrito no front. Se divergirem, a tela estaria pedindo autorização para uma coisa e o servidor registrando outra.</p>
+        </div>
+        <div class="note">
+          <h4>Regra · versionamento</h4>
+          <p>Quando o escopo do uso mudar, <code>PolicyVersion</code> sobe e o consentimento anterior deixa de valer — o usuário cai aqui de novo. Não é bug, é o desenho.</p>
+        </div>
+        <div class="note structural">
+          <h4>Estrutura</h4>
+          <p>"Agora não" precisa existir e levar a um app utilizável (biblioteca e emuladores funcionam sem scan). Recusar não pode ser beco sem saída.</p>
+        </div>
+        <div class="note structural">
+          <h4>Pronto para controle</h4>
+          <p>Foco inicial no botão primário, e a ordem de tabulação segue a leitura. Nenhuma ação depende de hover ou clique direito.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 02 ============ -->
+  <section class="screen" id="s2">
+    <div class="screen-head">
+      <h2>02 · Leitura do hardware</h2>
+      <p>Dura poucos segundos, mas é onde a promessa do produto começa a ser cumprida — ou quebrada, se algo não puder ser lido e a tela fingir que leu.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX</span></div>
+        <div class="canvas">
+          <div class="box">
+            <p class="wf-h">Lendo este computador…</p>
+            <div class="bar" style="margin:.7rem 0"><span style="width:68%"></span></div>
+            <div class="stack">
+              <div class="row between"><span class="wf-p">Processador</span><span class="badge solid">lido</span></div>
+              <div class="row between"><span class="wf-p">Memória</span><span class="badge solid">lido</span></div>
+              <div class="row between"><span class="wf-p">Placa de vídeo</span><span class="badge">lendo…</span></div>
+            </div>
+          </div>
+
+          <div class="box filled">
+            <p class="label">Estado parcial — precisa aparecer quando ocorrer</p>
+            <p class="wf-p">Não foi possível ler a memória da placa de vídeo neste sistema.</p>
+            <p class="wf-sub">As sugestões vão sair marcadas como parciais.</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra · não fingir certeza</h4>
+          <p>O que não pôde ser lido é declarado. Requisito não verificável <strong>não conta como atendido nem como não atendido</strong> — e o parecer inteiro sai marcado como <code>parcial</code>.</p>
+          <p>Essa caixa não é estado de erro. É estado normal em muitas máquinas, e some quando a leitura foi completa.</p>
+        </div>
+        <div class="note structural">
+          <h4>Estrutura</h4>
+          <p>Listar o que está sendo lido serve a duas coisas: preenche a espera com informação real, e torna concreto o que a autorização da tela anterior cobre.</p>
+        </div>
+        <div class="note structural">
+          <h4>A decidir</h4>
+          <p>Se o scan é rápido demais para essa tela existir sozinha, ela vira um estado dentro da tela 03 em vez de uma etapa. Medir antes de desenhar o layout.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 03 ============ -->
+  <section class="screen" id="s3">
+    <div class="screen-head">
+      <h2>03 · Parecer por console</h2>
+      <p>A tela que justifica o produto. Se só uma sobreviver ao redesenho intacta, é esta.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX · parecer</span></div>
+        <div class="canvas">
+
+          <div class="box filled">
+            <p class="label">Resumo do que foi lido</p>
+            <div class="grid-2">
+              <div><p class="wf-p"><strong>AMD Ryzen 9 7900X</strong></p><p class="wf-sub">12 núcleos · 24 threads · 4.7 GHz</p></div>
+              <div><p class="wf-p"><strong>NVIDIA RTX 3060 Ti</strong></p><p class="wf-sub">8,0 GB de memória de vídeo</p></div>
+              <div><p class="wf-p"><strong>32 GB de RAM</strong></p><p class="wf-sub">Windows 11</p></div>
+            </div>
+          </div>
+
+          <div class="row between">
+            <span class="label" style="margin:0">33 consoles · ordenados do mais viável ao menos</span>
+            <span class="row" style="gap:.3rem">
+              <span class="badge">filtrar</span><span class="badge">buscar</span>
+            </span>
+          </div>
+
+          <div class="stack">
+            <div class="box">
+              <div class="row between">
+                <p class="wf-p"><strong>PlayStation 1</strong></p>
+                <span class="badge solid">ótimo</span>
+              </div>
+              <p class="wf-sub">Roda a maioria dos jogos conhecidos deste console.</p>
+              <p class="wf-sub">DuckStation · resolução interna 4× · Vulkan</p>
+              <div class="row" style="margin-top:.5rem"><span class="btn">Ver jogos</span><span class="btn ghost">Trocar emulador</span></div>
+            </div>
+
+            <div class="box">
+              <div class="row between">
+                <p class="wf-p"><strong>PlayStation 3</strong></p>
+                <span class="badge">limitado</span>
+              </div>
+              <p class="wf-sub">Alcança parte do catálogo, com quedas em jogos mais pesados.</p>
+              <p class="wf-sub">RPCS3 · resolução nativa</p>
+              <div class="box" style="margin-top:.55rem; border-style:dashed">
+                <p class="label" style="margin-bottom:.25rem">O que separa do patamar acima</p>
+                <p class="wf-p">Este patamar pede 8 threads a 4.0 GHz; esta CPU oferece 24 threads a 4.7 GHz.</p>
+                <p class="wf-p">Este patamar pede 12 GB de memória de vídeo; a placa RTX 3060 Ti tem 8,0 GB.</p>
+              </div>
+            </div>
+
+            <div class="box">
+              <div class="row between">
+                <p class="wf-p"><strong>Nintendo 3DS</strong></p>
+                <span class="badge">parcial</span>
+              </div>
+              <p class="wf-sub">Não foi possível confirmar a memória de vídeo, então este parecer é uma estimativa.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra · descritivo, nunca julgador</h4>
+          <p>Nenhum texto avalia o computador. Ele informa números e o que a máquina alcança; quem decide se está satisfeito é o dono dela.</p>
+          <span class="no">"Seu PC é fraco para PS3."</span>
+          <span class="yes">"Este patamar pede 12 GB de memória de vídeo; a placa RTX 3060 Ti tem 8,0 GB."</span>
+        </div>
+        <div class="note">
+          <h4>Regra · nomeie o que barra</h4>
+          <p>A caixa "o que separa do patamar acima" não é detalhe opcional — é o motivo de o parecer existir. Uma nota única diria "mediano" e não diria o que fazer a respeito.</p>
+          <p>Repare que ela lista <strong>também o que passou</strong>: a CPU aparece mesmo atendendo, porque saber que o processador não é o problema é tão útil quanto saber que a GPU é.</p>
+        </div>
+        <div class="note">
+          <h4>Regra · parcial é visível</h4>
+          <p>O selo <code>parcial</code> tem que ser tão legível quanto os outros. Escondê-lo por ser feio derruba a premissa do produto.</p>
+        </div>
+        <div class="note structural">
+          <h4>A decidir no layout</h4>
+          <p>Com 33 consoles, cartão empilhado provavelmente não escala. Candidatos: agrupar por patamar, colapsar os "improváveis", ou grade densa. Decisão da próxima fase.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 04 ============ -->
+  <section class="screen" id="s4">
+    <div class="screen-head">
+      <h2>Biblioteca · estado vazio</h2>
+      <p>O primeiro estado real de todo usuário novo, e o mais fácil de esquecer de desenhar.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX · biblioteca</span></div>
+        <div class="canvas">
+          <div class="applayout">
+            <div class="sidenav">
+              <div class="navitem active">Biblioteca</div>
+              <div class="navitem">Consoles</div>
+              <div class="navitem">Emuladores</div>
+              <div class="navitem">Perfil</div>
+            </div>
+            <div class="stack">
+              <div class="box" style="padding:2rem 1rem; text-align:center">
+                <p class="wf-h">Nenhuma pasta de jogos adicionada</p>
+                <p class="wf-sub" style="max-width:44ch; margin-inline:auto">
+                  Aponte a pasta onde seus jogos já estão no disco. O ZeuX lê os arquivos de onde
+                  eles estiverem — nada é copiado ou movido.
+                </p>
+                <div class="row" style="justify-content:center; margin-top:.9rem">
+                  <span class="btn primary focused">Escolher pasta</span>
+                </div>
+              </div>
+              <div class="row"><span class="badge">1 emulador pronto: DuckStation</span><span class="badge">12 disponíveis para instalar</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra legal · inegociável</h4>
+          <p>Esta tela é o ponto de maior tentação do produto inteiro. Um usuário sem jogos é exatamente quem perguntaria "onde consigo?" — e a resposta do ZeuX é <strong>silêncio</strong>.</p>
+          <p>Nada de link, sugestão de fonte, nome de site ou "saiba mais". O texto deixa claro que o jogo já precisa estar no disco, e para por aí.</p>
+        </div>
+        <div class="note structural">
+          <h4>Estrutura</h4>
+          <p>O estado vazio aproveita para mostrar quantos emuladores já estão prontos — conecta a biblioteca vazia com a próxima ação útil sem empurrar o usuário.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 05 ============ -->
+  <section class="screen" id="s5">
+    <div class="screen-head">
+      <h2>Biblioteca · com jogos</h2>
+      <p>O destino diário. Onde o usuário passa a maior parte do tempo depois da primeira semana.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX · biblioteca</span></div>
+        <div class="canvas">
+          <div class="applayout">
+            <div class="sidenav">
+              <div class="navitem active">Biblioteca</div>
+              <div class="navitem">Consoles</div>
+              <div class="navitem">Emuladores</div>
+              <div class="navitem">Perfil</div>
+            </div>
+            <div class="stack">
+              <div class="row between">
+                <span class="row" style="gap:.3rem">
+                  <span class="badge solid">Todos</span><span class="badge">PS1</span><span class="badge">PS2</span><span class="badge">SNES</span>
+                </span>
+                <span class="badge">buscar</span>
+              </div>
+
+              <div class="grid-covers">
+                <div class="ph cover">capa</div>
+                <div class="ph cover">capa</div>
+                <div class="ph cover">capa</div>
+                <div class="ph cover">capa</div>
+                <div class="ph cover">capa</div>
+                <div class="ph cover" style="outline:2px solid var(--focus); outline-offset:2px">capa<br>(foco)</div>
+                <div class="ph cover">sem capa</div>
+                <div class="ph cover">capa</div>
+              </div>
+
+              <div class="box">
+                <p class="label">Painel do jogo em foco</p>
+                <p class="wf-p"><strong>Crash Bandicoot</strong> · PlayStation 1</p>
+                <p class="wf-sub">Jogado 4 h 20 min · última vez há 3 dias</p>
+                <p class="wf-sub">Abrirá no DuckStation, resolução interna 4×, tela cheia</p>
+                <div class="row" style="margin-top:.6rem">
+                  <span class="btn primary">Jogar</span>
+                  <span class="btn">Ver comando</span>
+                  <span class="btn ghost">Trocar preset</span>
+                </div>
+                <div class="box" style="margin-top:.6rem; border-style:dashed">
+                  <p class="label" style="margin-bottom:.25rem">Avisos do preset</p>
+                  <p class="wf-p">A resolução interna precisa ser ajustada dentro do DuckStation.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra · o que não foi aplicado aparece</h4>
+          <p>O bloco "avisos do preset" é o campo <code>Unapplied</code> da API. Se o ZeuX não conseguiu aplicar algo, ele diz — em vez de deixar o usuário achar que aplicou e não funcionou.</p>
+        </div>
+        <div class="note">
+          <h4>Regra legal · capas, não jogos</h4>
+          <p>As capas vêm de um scraper de <strong>metadados</strong>. O jogo em si nunca trafega, nem para dentro nem para fora da máquina.</p>
+        </div>
+        <div class="note structural">
+          <h4>Pronto para controle</h4>
+          <p>"Sem capa" é um estado de primeira classe, não um buraco: nome legível, mesmo tamanho de alvo. E o painel de detalhe acompanha o foco em vez de exigir hover.</p>
+        </div>
+        <div class="note structural">
+          <h4>A decidir</h4>
+          <p>Painel fixo embaixo, lateral, ou sobreposto ao selecionar? Depende de quantos jogos cabem na dobra — decidir com biblioteca real, não com oito capas.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 06 ============ -->
+  <section class="screen" id="s6">
+    <div class="screen-head">
+      <h2>Emuladores</h2>
+      <p>Onde a instalação 1-click acontece. O usuário não deveria precisar saber o que é "DuckStation" para jogar PS1 — mas deve poder saber se quiser.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX · emuladores</span></div>
+        <div class="canvas">
+          <div class="applayout">
+            <div class="sidenav">
+              <div class="navitem">Biblioteca</div>
+              <div class="navitem">Consoles</div>
+              <div class="navitem active">Emuladores</div>
+              <div class="navitem">Perfil</div>
+            </div>
+            <div class="stack">
+              <div class="scroll-x">
+                <table class="wf">
+                  <thead>
+                    <tr><th>Emulador</th><th>Consoles</th><th>Estado</th><th>Ação</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>DuckStation</td><td>PS1</td>
+                      <td><span class="badge solid">instalado pelo ZeuX</span></td>
+                      <td><span class="btn ghost">Remover</span></td>
+                    </tr>
+                    <tr>
+                      <td>PCSX2</td><td>PS2</td>
+                      <td><span class="badge">instalando · 62%</span></td>
+                      <td><span class="btn ghost">Cancelar</span></td>
+                    </tr>
+                    <tr>
+                      <td>Dolphin</td><td>GameCube, Wii</td>
+                      <td><span class="badge">já estava na máquina</span></td>
+                      <td><span class="btn ghost">Usar este</span></td>
+                    </tr>
+                    <tr>
+                      <td>RetroArch</td><td>24 sistemas</td>
+                      <td><span class="badge">instalação manual</span></td>
+                      <td><span class="btn">Abrir site oficial</span></td>
+                    </tr>
+                    <tr>
+                      <td>RPCS3</td><td>PS3</td>
+                      <td><span class="badge">não instalado</span></td>
+                      <td><span class="btn primary focused">Instalar</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="box">
+                <p class="label">Progresso da instalação em andamento</p>
+                <p class="wf-p">PCSX2 v2.6.3 · baixando de github.com/PCSX2/pcsx2</p>
+                <div class="bar" style="margin:.5rem 0"><span style="width:62%"></span></div>
+                <p class="wf-sub">16,8 MB de 26,7 MB · verificando integridade ao terminar</p>
+              </div>
+
+              <div class="row"><span class="btn ghost">Cadastrar um emulador manualmente</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra · gerenciado × do usuário</h4>
+          <p>A coluna de estado distingue o que o ZeuX instalou do que já existia na máquina. Só o gerenciado pode ser atualizado ou removido pelo app — mexer na instalação que a pessoa configurou à mão seria invasão.</p>
+        </div>
+        <div class="note">
+          <h4>Regra · sem trava no cadastro manual</h4>
+          <p>"Cadastrar manualmente" aceita qualquer executável, quaisquer argumentos, para qualquer sistema — inclusive console que o catálogo nem conhece. É a válvula de escape que impede o app de virar gaiola.</p>
+        </div>
+        <div class="note structural">
+          <h4>Estrutura</h4>
+          <p>Origem e integridade do download ficam visíveis. Baixar binário da internet e executar exige que o usuário possa ver de onde veio.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 07 ============ -->
+  <section class="screen" id="s7">
+    <div class="screen-head">
+      <h2>Instalar com ressalva de hardware</h2>
+      <p>O momento em que o produto poderia virar paternalista — e a regra diz explicitamente que não vira.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX · emuladores</span></div>
+        <div class="canvas">
+          <div class="box" style="max-width:34rem; margin-inline:auto">
+            <p class="wf-h">Sobre instalar o RPCS3</p>
+            <p class="wf-p">
+              Pelo que o ZeuX leu deste computador, o PlayStation 3 provavelmente não roda de forma
+              jogável aqui.
+            </p>
+            <div class="box" style="margin:.6rem 0; border-style:dashed">
+              <p class="label" style="margin-bottom:.25rem">O que pesou nessa leitura</p>
+              <p class="wf-p">Este patamar pede 12 GB de memória de vídeo; a placa RTX 3060 Ti tem 8,0 GB.</p>
+            </div>
+            <p class="wf-sub">Você pode instalar mesmo assim e tirar a prova.</p>
+            <div class="row" style="margin-top:.8rem">
+              <span class="btn primary focused">Instalar mesmo assim</span>
+              <span class="btn">Voltar</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra · informar, não bloquear</h4>
+          <p>"Instalar mesmo assim" é a <strong>ação primária</strong>, não um link cinza escondido no rodapé. A máquina é do usuário; o ZeuX opina uma vez e obedece.</p>
+          <p>No layout final, resistir à tentação de dar mais peso visual ao "Voltar" — seria bloquear disfarçado de informar.</p>
+        </div>
+        <div class="note">
+          <h4>Regra · sem julgamento, de novo</h4>
+          <p>"provavelmente não roda de forma jogável" descreve o resultado esperado. Não diz que o computador é ruim, e não sugere trocar peça.</p>
+        </div>
+        <div class="note structural">
+          <h4>Estrutura</h4>
+          <p>Só aparece quando <strong>nenhum</strong> console do emulador é viável. O Dolphin roda GameCube e Wii — se um dos dois passa, instala direto, sem ressalva.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <footer class="legend">
+    <h3>Como ler este wireframe</h3>
+    <div class="legend-grid">
+      <div class="legend-item">
+        <strong>Caixa com borda contínua</strong>
+        Agrupamento real de conteúdo. A hierarquia entre elas é intencional; o estilo delas não.
+      </div>
+      <div class="legend-item">
+        <strong>Hachura diagonal</strong>
+        Conteúdo cujo formato ainda não foi decidido — capa, marca, imagem.
+      </div>
+      <div class="legend-item">
+        <strong>Borda tracejada</strong>
+        Bloco que só aparece em certas condições: parcial, gargalo, aviso de preset.
+      </div>
+      <div class="legend-item">
+        <strong>Contorno azul</strong>
+        Estado de foco. Está no wireframe de propósito: o app precisa ser operável sem cursor.
+      </div>
+      <div class="legend-item">
+        <strong>Anotação âmbar</strong>
+        Regra de produto inegociável. Sobrevive a qualquer redesenho.
+      </div>
+      <div class="legend-item">
+        <strong>Anotação cinza</strong>
+        Observação de estrutura ou decisão adiada para a fase de layout.
+      </div>
+    </div>
+    <p style="margin-top:1.2rem; font-size:.8rem; color:var(--muted)">
+      Navegue com <span class="kbd">←</span> <span class="kbd">→</span> ou pelas abas. O botão
+      <span class="kbd">Anotações</span> esconde os comentários, para ver a estrutura limpa.
+    </p>
+  </footer>
+</main>
+
+<script>
+  (function () {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+    var screens = Array.prototype.slice.call(document.querySelectorAll(".screen"));
+
+    function show(id) {
+      screens.forEach(function (s) { s.classList.toggle("is-active", s.id === id); });
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t.dataset.screen === id)); });
+    }
+
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () { show(t.dataset.screen); });
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) { return; }
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") { return; }
+      var i = tabs.findIndex(function (t) { return t.getAttribute("aria-selected") === "true"; });
+      if (i < 0) { return; }
+      var next = e.key === "ArrowRight" ? Math.min(i + 1, tabs.length - 1) : Math.max(i - 1, 0);
+      show(tabs[next].dataset.screen);
+      tabs[next].focus();
+    });
+
+    var toggle = document.getElementById("notesToggle");
+    toggle.addEventListener("click", function () {
+      var on = toggle.getAttribute("aria-pressed") === "true";
+      toggle.setAttribute("aria-pressed", String(!on));
+      document.body.classList.toggle("notes-off", on);
+    });
+  })();
+</script>
