@@ -30,6 +30,11 @@ type Server struct {
 	installs  *install.Manager
 	logger    *slog.Logger
 
+	// devOrigin é a origem extra liberada por SetDevOrigin. Só é lido, nunca
+	// escrito, depois que o servidor começa a atender requisições — daí não
+	// precisar do mutex abaixo, que protege lastScan.
+	devOrigin string
+
 	mu       sync.RWMutex
 	lastScan *hardware.HardwareInfo
 }
@@ -85,7 +90,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/games/preview", s.handlePreviewLaunch)
 	mux.HandleFunc("GET /api/v1/sessions", s.handleSessions)
 
-	return s.withLogging(withCORS(mux))
+	return s.withLogging(s.withCORS(mux))
 }
 
 // allowedOrigins são os únicos valores de Origin aos quais o servidor responde
@@ -109,12 +114,22 @@ var allowedOrigins = map[string]bool{
 	"http://tauri.localhost": true,
 }
 
+// SetDevOrigin libera uma origem extra no CORS, além de allowedOrigins — pensada
+// só para o servidor de desenvolvimento do front (`npm run tauri dev`, que serve
+// de http://localhost:1420 por padrão no scaffold Vite). Nunca chamada no
+// binário que o usuário instala: cmd/zeuxd só invoca isto quando a variável de
+// ambiente ZEUX_DEV_ORIGIN está definida, o que não acontece fora da máquina de
+// quem está desenvolvendo o front.
+func (s *Server) SetDevOrigin(origin string) {
+	s.devOrigin = origin
+}
+
 // withCORS libera o fetch do WebView do Tauri para as origens conhecidas do
 // app empacotado. Ver allowedOrigins para o porquê da lista ser fechada.
-func withCORS(next http.Handler) http.Handler {
+func (s *Server) withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if allowedOrigins[origin] {
+		if allowedOrigins[origin] || (s.devOrigin != "" && origin == s.devOrigin) {
 			// Vary: Origin evita que uma resposta cacheada para uma origem
 			// permitida seja servida como se valesse para outra.
 			w.Header().Set("Access-Control-Allow-Origin", origin)

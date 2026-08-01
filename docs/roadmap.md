@@ -30,9 +30,14 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
   (`tauri://localhost`, `http://tauri.localhost`), verificado contra um build
   de produção real — ver B2/B3 em [`sprint-b-plano.md`](sprint-b-plano.md).
 
-**Não existe:** interface gráfica **do produto** (o que existe é uma prova de
-conceito descartável, fora do repositório — ver B2), banco de dados, biblioteca
-de jogos, qualquer funcionalidade social.
+- Scaffold Tauri + React + Tailwind (`src/`, `src-tauri/`) com uma tela única
+  de diagnóstico (`fetch` real em `/health`) — não é o onboarding do produto,
+  só a prova de que o scaffold fala com o `zeuxd`. Ver B4.
+
+**Não existe ainda:** o onboarding real (consentimento → scan → parecer, B8),
+o layout sobre o wireframe (B7), o ciclo de vida do `zeuxd` como processo
+filho (B5), banco de dados, biblioteca de jogos, qualquer funcionalidade
+social.
 
 ---
 
@@ -380,7 +385,7 @@ sequência.
 | B1 | Instalar Rust + MSVC Build Tools + WebView2 | M | B0 · **Feito parcialmente 2026-08-01** — num container Linux remoto, não na máquina Windows; ver ressalva em `sprint-b-plano.md` |
 | B2 | **Prova de fogo: WebView Tauri × `127.0.0.1:7777`** | P | B1 · **Feito 2026-08-01** — origin real medido (`tauri://localhost` em produção, `http://127.0.0.1:1430` em dev), CORS confirmado como necessário |
 | B3 | CORS no servidor, **se** B2 mostrar que precisa | P | B2 · **Feito 2026-08-01** — B2 mostrou que era necessário; `allowedOrigins` + `withCORS` em `internal/api/server.go`, com testes |
-| B4 | Scaffold Tauri + React + Tailwind, `src-tauri/` | M | B2 |
+| B4 | Scaffold Tauri + React + Tailwind, `src-tauri/` | M | B2 · **Feito 2026-08-01** — build de produção real rodou e falou com o `zeuxd`; hot reload do `tauri dev` não exercitado (ver ressalva em `sprint-b-plano.md`) |
 | B5 | `zeuxd` como processo filho (subir, derrubar, porta ocupada) | M | B4 |
 | B6 | Cliente de API tipado no front | M | B4, B-doc |
 | B7 | Layout visual sobre o wireframe | M | B4, B-wire |

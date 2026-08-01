@@ -398,6 +398,32 @@ func TestCORSAllowsSimpleRequestFromKnownOrigin(t *testing.T) {
 	}
 }
 
+// Trava a válvula de desenvolvimento: SetDevOrigin libera uma origem extra
+// (o devUrl do Vite, http://localhost:1420), sem abrir mão da lista fechada
+// para qualquer outra origem.
+func TestSetDevOriginAllowsOnlyThatOrigin(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	server.SetDevOrigin("http://localhost:1420")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	req.Header.Set("Origin", "http://localhost:1420")
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:1420" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, esperado a origem de dev liberada", got)
+	}
+
+	otherReq := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	otherReq.Header.Set("Origin", "http://localhost:9999")
+	otherRec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(otherRec, otherReq)
+
+	if got, ok := otherRec.Result().Header["Access-Control-Allow-Origin"]; ok {
+		t.Fatalf("origem de dev não deveria liberar outras portas, veio %v", got)
+	}
+}
+
 // Trava o formato estável de erro (code + message) para corpo inválido, já
 // que a interface trata o code programaticamente.
 func TestPostConsentWithInvalidBodyReturns400(t *testing.T) {

@@ -84,6 +84,14 @@ func run(addr string, logger *slog.Logger) error {
 		hardware.NewProbe(), catalog, consentStore,
 		registry, customStore, launcher, installer, logger)
 
+	// Só quem está rodando o front em modo desenvolvimento (`npm run tauri
+	// dev`) define esta variável — o instalador nunca a define, então o
+	// binário que o usuário recebe só aceita as origens de produção do Tauri.
+	if devOrigin := os.Getenv("ZEUX_DEV_ORIGIN"); devOrigin != "" {
+		server.SetDevOrigin(devOrigin)
+		logger.Warn("CORS liberado para origem de desenvolvimento", "origin", devOrigin)
+	}
+
 	httpServer := &http.Server{
 		Addr:              addr,
 		Handler:           server.Routes(),

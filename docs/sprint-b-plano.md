@@ -324,39 +324,66 @@ e `-Headers`), delegando as demais requisições ao roteador normal.
 - [x] Nota acrescentada aqui e em `docs/api.md`; não abriu ADR novo porque não
       mudou nenhuma decisão do ADR 0001, só a implementou.
 
-**Pendência explícita:** a origem de desenvolvimento (`http://127.0.0.1:1430`
-neste PoC) **não** foi incluída em `allowedOrigins`. Ela é específica do
-template `vanilla` sem bundler e não necessariamente será a mesma quando B4
-escolher React + Vite (que tipicamente usa uma porta de dev fixada em
-`tauri.conf.json` via `devUrl`). Resolver isso é parte do critério de aceite
-do B4, quando a porta de dev real for conhecida — não adiantado aqui para não
-travar um valor que ainda vai mudar.
+**Atualização depois do B4:** o scaffold real (React + Vite) fixa
+`devUrl: "http://localhost:1420"` em `src-tauri/tauri.conf.json` — diferente do
+`http://127.0.0.1:1430` observado no PoC do B2 (que não usava bundler nenhum).
+Em vez de adicionar essa porta a `allowedOrigins` (o que a deixaria liberada
+também no binário instalado), foi criado `Server.SetDevOrigin`
+(`internal/api/server.go`): `cmd/zeuxd/main.go` só a chama quando a variável de
+ambiente `ZEUX_DEV_ORIGIN` está definida, o que nunca acontece no app
+empacotado. Para desenvolver o front, suba o daemon com
+`ZEUX_DEV_ORIGIN=http://localhost:1420 go run ./cmd/zeuxd --debug`.
 
 **Depende de:** B2
 **Bloqueia:** nada
 
 ---
 
-### B4 — Scaffold Tauri + React + Tailwind (M)
+### B4 — Scaffold Tauri + React + Tailwind (M) — **feito em 2026-08-01, com ressalva de ambiente**
 
-Só depois de B2. Montar o projeto completo antes de saber se a comunicação
-funciona é construir a casa para descobrir o terreno depois.
+Montado com `cargo create-tauri-app` (template `react-ts`) na raiz do
+repositório — `src/`, `src-tauri/`, `index.html`, `package.json`,
+`vite.config.ts`, `tsconfig*.json`. Tailwind 4 entrou pelo plugin do Vite
+(`@tailwindcss/vite`), sem `tailwind.config.js` (não existe mais nessa versão).
+O boilerplate do template (logos, comando `greet`, CSS de exemplo) foi
+removido — `App.tsx` hoje só faz `fetch` real em `GET /api/v1/health` contra o
+`zeuxd` e mostra o resultado com classes Tailwind, provando que os três
+pedaços (React, Tailwind, fetch) funcionam juntos. `src-tauri/src/lib.rs`
+ficou sem nenhum `#[tauri::command]` — comentário explica que o ADR 0001 já
+decidiu HTTP como IPC, então não há razão para existir um comando Rust aqui.
+
+**Ressalva de ambiente, igual à do B1/B2:** rodado no mesmo container Linux
+remoto, não na máquina Windows do Douglas. `npm run tauri dev` não pôde ser
+verificado com hot reload de verdade (o container não tem um editor
+interativo mudando arquivo enquanto o dev server roda) — o que foi verificado
+foi o **build de produção completo**, que é uma prova mais forte para as
+partes que importam (compila, linka, empacota, roda, fala com o `zeuxd`).
 
 **Critério de aceite:**
 
-- [ ] `npm run tauri dev` abre a janela com hot reload funcionando.
-- [ ] `npm run tauri build` produz artefato em
-      `src-tauri/target/release/bundle/`.
-- [ ] Depois desse primeiro build real, o B0 é **reverificado**: nem
-      `node_modules/` nem `src-tauri/target/` aparecem no painel de atividade do
-      OneDrive.
-- [ ] `git status` fica limpo após um `dev` e um `build` — o `.gitignore`
-      existente cobre tudo que o scaffold gerou, ou é ajustado.
-- [ ] As dependências de front são **React, Tailwind e mais nada**. Sem
-      biblioteca de estado, sem biblioteca de componentes, sem cliente HTTP —
-      `fetch` é nativo. Qualquer adição além dessas exige justificativa escrita,
-      pela mesma regra de "simples e leve" que
-      [arquitetura-a-preservar](arquitetura-a-preservar.md) aplica ao Go.
+- [~] `npm run tauri dev` abre a janela — confirmado que abre e serve de
+      `http://localhost:1420` (ver nota do B3). Hot reload em si não foi
+      exercitado (sem edição de arquivo com o processo no ar); considerar
+      confirmado quando alguém editar `App.tsx` com `tauri dev` rodando.
+- [x] `npm run tauri build` produziu
+      `src-tauri/target/release/bundle/deb/zeux_0.1.0_amd64.deb`, e o binário
+      (`src-tauri/target/release/zeux`) rodou de verdade sob `Xvfb`, mostrando
+      `status`, `schema_version` e `consoles` vindos do `zeuxd` real — a mesma
+      prova do B2, agora com o app completo em vez do PoC descartável.
+- [x] **B0 não se aplica neste ambiente** (sem OneDrive) — fica para ser
+      reverificado na máquina Windows quando o B0 real for resolvido lá.
+- [x] `git status` limpo depois do `npm install`, `npm run build` e
+      `npm run tauri build`: `.gitignore` já cobria `node_modules/`, `/dist/`
+      e `src-tauri/target/`; `src-tauri/.gitignore` (gerado pelo scaffold)
+      cobre `src-tauri/gen/schemas`, que não tinha entrada no `.gitignore` da
+      raiz.
+- [x] Dependências de front: **`react`, `react-dom`, `@tauri-apps/api`,
+      `@tauri-apps/plugin-opener`** (runtime) e **`tailwindcss`,
+      `@tailwindcss/vite`, `vite`, `@vitejs/plugin-react`, `typescript`,
+      `@tauri-apps/cli`** (dev) — nada de biblioteca de estado, de componentes
+      ou de cliente HTTP. `@tauri-apps/plugin-opener` veio do template padrão
+      (abre links/arquivos externos pelo SO) e não foi removido por ser
+      utilidade padrão do scaffold, não uma escolha adicional.
 
 **Depende de:** B2
 **Bloqueia:** B5, B6, B7
