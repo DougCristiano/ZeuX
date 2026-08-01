@@ -85,7 +85,51 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/games/preview", s.handlePreviewLaunch)
 	mux.HandleFunc("GET /api/v1/sessions", s.handleSessions)
 
-	return s.withLogging(mux)
+	return s.withLogging(withCORS(mux))
+}
+
+// allowedOrigins são os únicos valores de Origin aos quais o servidor responde
+// com Access-Control-Allow-Origin. Comprovado em 2026-08-01 (ver
+// docs/sprint-b-plano.md, item B2): sem essa lista, o WebView do Tauri falha
+// tanto no GET simples (a requisição chega ao servidor e volta 200, mas o
+// WebView recusa entregar a resposta ao JS) quanto no POST com
+// Content-Type: application/json (o preflight OPTIONS não tem rota registrada
+// no mux, cai em 405, e a requisição real nunca sai). "tauri://localhost" é o
+// origin do build de produção rodando num container Linux; "http://tauri.localhost"
+// é o documentado pelo Tauri para builds de produção no Windows — ainda não
+// verificado numa máquina Windows real.
+//
+// O ADR 0001 já aceita que qualquer processo local alcança esta porta; CORS
+// aqui não é a defesa contra isso — é só o que destrava o fetch do WebView.
+// Por isso a lista é fechada e nunca reflete "*": ecoar qualquer origem
+// tornaria trivial para uma página maliciosa aberta num navegador comum ler a
+// resposta desta API, o que hoje não é possível sem essa reflexão.
+var allowedOrigins = map[string]bool{
+	"tauri://localhost":      true,
+	"http://tauri.localhost": true,
+}
+
+// withCORS libera o fetch do WebView do Tauri para as origens conhecidas do
+// app empacotado. Ver allowedOrigins para o porquê da lista ser fechada.
+func withCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if allowedOrigins[origin] {
+			// Vary: Origin evita que uma resposta cacheada para uma origem
+			// permitida seja servida como se valesse para outra.
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+		}
+
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleEmulators(w http.ResponseWriter, r *http.Request) {

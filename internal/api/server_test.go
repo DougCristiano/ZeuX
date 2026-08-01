@@ -339,6 +339,65 @@ func TestCustomEmulatorWithoutROMPlaceholderIsRejected(t *testing.T) {
 	}
 }
 
+// Trava o achado do B2 (docs/sprint-b-plano.md): um preflight OPTIONS vindo
+// da origem real do WebView Tauri em produção precisa devolver 204 com
+// Access-Control-Allow-Origin ecoando exatamente essa origem. Sem isso, o
+// fetch do WebView falha mesmo que o servidor responda com sucesso.
+func TestCORSPreflightAllowsKnownWebViewOrigin(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/consent", nil)
+	req.Header.Set("Origin", "tauri://localhost")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type")
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, esperado 204", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "tauri://localhost" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, esperado a origem ecoada", got)
+	}
+}
+
+// Trava a outra metade da regra do ADR 0001: a lista de origens é fechada, e
+// uma origem fora dela nunca recebe Access-Control-Allow-Origin — nem por
+// engano, nem "*".
+func TestCORSPreflightRejectsUnknownOrigin(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/consent", nil)
+	req.Header.Set("Origin", "http://exemplo.invalido")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type")
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if got, ok := rec.Result().Header["Access-Control-Allow-Origin"]; ok {
+		t.Fatalf("Access-Control-Allow-Origin não deveria existir para origem desconhecida, veio %v", got)
+	}
+}
+
+// Trava que uma requisição normal (não-preflight) também recebe o cabeçalho
+// quando a origem é conhecida — achado do B2: sem isso, o WebView recebe 200
+// do servidor mas o `fetch` falha do mesmo jeito ao tentar ler a resposta.
+func TestCORSAllowsSimpleRequestFromKnownOrigin(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	req.Header.Set("Origin", "http://tauri.localhost")
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, esperado 200", rec.Code)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://tauri.localhost" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, esperado a origem ecoada", got)
+	}
+}
+
 // Trava o formato estável de erro (code + message) para corpo inválido, já
 // que a interface trata o code programaticamente.
 func TestPostConsentWithInvalidBodyReturns400(t *testing.T) {

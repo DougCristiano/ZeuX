@@ -22,9 +22,14 @@ de emuladores personalizados; corrigido nesta passada).
 
 - Todas as respostas são `application/json; charset=utf-8`.
 - **Não há autenticação.** O bind em `127.0.0.1` é a única fronteira.
-- **Não há CORS configurado.** Ainda não foi necessário porque não existe
-  front-end; quando o Tauri entrar, isso precisa ser reavaliado (ver
-  [roadmap.md](roadmap.md)).
+- **CORS está configurado com lista fechada de origens** (`allowedOrigins` em
+  `internal/api/server.go`): `tauri://localhost` e `http://tauri.localhost`,
+  as origens do WebView do Tauri em produção. Uma origem fora da lista nunca
+  recebe `Access-Control-Allow-Origin` — nunca `*`. Verificado em 2026-08-01
+  contra um build de produção real do Tauri (item B2/B3 do
+  [plano da Sprint B](sprint-b-plano.md)): sem essa lista, o WebView falha
+  tanto no `GET` simples quanto no `POST` com `Content-Type: application/json`
+  (que dispara preflight `OPTIONS`).
 - As rotas usam os padrões de método do `http.ServeMux` do Go 1.22+
   (`"GET /api/v1/health"`). Chamar uma rota com o método errado devolve **405
   em texto puro**, gerado pelo próprio `ServeMux` — não passa pelo formato de

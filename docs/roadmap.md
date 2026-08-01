@@ -26,9 +26,13 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
   configuração. Atualizar o DuckStation preserva saves e settings do usuário —
   ver D8, único emulador mapeado até agora.
 - Rotas HTTP sob `/api/v1`. Compila nos 3 SOs; todos os testes passam.
+- CORS liberado para as origens conhecidas do WebView do Tauri
+  (`tauri://localhost`, `http://tauri.localhost`), verificado contra um build
+  de produção real — ver B2/B3 em [`sprint-b-plano.md`](sprint-b-plano.md).
 
-**Não existe:** interface gráfica, banco de dados, biblioteca de jogos, qualquer
-funcionalidade social.
+**Não existe:** interface gráfica **do produto** (o que existe é uma prova de
+conceito descartável, fora do repositório — ver B2), banco de dados, biblioteca
+de jogos, qualquer funcionalidade social.
 
 ---
 
@@ -373,9 +377,9 @@ sequência.
 | B0 | **D4 — tirar `node_modules`/`src-tauri/target` do OneDrive** | P | — · **Tentado 2026-08-01, bloqueado**: mover a pasta falha com "arquivo em uso" — o próprio VS Code (várias janelas abertas) e/ou a sessão do Claude Code, ambos ancorados neste caminho, seguram um handle. Precisa ser feito com os dois fechados; ver nota em `sprint-b-plano.md` |
 | B-wire | ~~Publicar o wireframe no repositório~~ | P | **Feito 2026-08-01** — [`wireframe.md`](wireframe.md) / [`wireframe.html`](wireframe.html) |
 | B-doc | ~~Reconciliar `api.md` com o código antes de tipar o cliente~~ | P | **Feito 2026-08-01** — `schema_version`/contagem de consoles corrigidos, rotas de instalação e de emuladores personalizados documentadas |
-| B1 | Instalar Rust + MSVC Build Tools + WebView2 | M | B0 |
-| B2 | **Prova de fogo: WebView Tauri × `127.0.0.1:7777`** | P | B1 |
-| B3 | CORS no servidor, **se** B2 mostrar que precisa | P | B2 |
+| B1 | Instalar Rust + MSVC Build Tools + WebView2 | M | B0 · **Feito parcialmente 2026-08-01** — num container Linux remoto, não na máquina Windows; ver ressalva em `sprint-b-plano.md` |
+| B2 | **Prova de fogo: WebView Tauri × `127.0.0.1:7777`** | P | B1 · **Feito 2026-08-01** — origin real medido (`tauri://localhost` em produção, `http://127.0.0.1:1430` em dev), CORS confirmado como necessário |
+| B3 | CORS no servidor, **se** B2 mostrar que precisa | P | B2 · **Feito 2026-08-01** — B2 mostrou que era necessário; `allowedOrigins` + `withCORS` em `internal/api/server.go`, com testes |
 | B4 | Scaffold Tauri + React + Tailwind, `src-tauri/` | M | B2 |
 | B5 | `zeuxd` como processo filho (subir, derrubar, porta ocupada) | M | B4 |
 | B6 | Cliente de API tipado no front | M | B4, B-doc |

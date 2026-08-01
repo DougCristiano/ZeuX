@@ -53,6 +53,22 @@ Os dois primeiros achados mudam o plano: **D4 é o item 0 da sprint**, e o
 "layout visual sobre o wireframe" pressupõe um insumo que hoje não existe em
 lugar versionado.
 
+**Atualização de 2026-08-01, mais tarde no mesmo dia:** B1, B2 e B3 foram
+executados — mas dentro de um **container Linux remoto** (sessão de IA em
+nuvem), não na máquina Windows do Douglas onde o D4/B0 (OneDrive) se aplica.
+Isso muda a leitura do bloqueio: **B0 trava a sprint na máquina Windows, mas
+não trava a validação da arquitetura**, que pôde acontecer num ambiente sem
+OneDrive. O resultado é real (o binário Tauri de produção rodou de verdade e
+falou com o `zeuxd` via HTTP), mas dois pontos ficam marcados como pendentes
+até serem checados na máquina real:
+
+- Os itens específicos de Windows do B1 (MSVC Build Tools, WebView2, `mise.toml`)
+  não foram tocados.
+- O `origin` de produção do Windows (`http://tauri.localhost`) está na lista
+  de CORS por ser o valor documentado pelo Tauri, mas **não foi observado**
+  como o do Linux (`tauri://localhost`) foi — só a chegada real numa máquina
+  Windows fecha essa lacuna.
+
 ---
 
 ## Sequência
@@ -192,96 +208,129 @@ catálogo de códigos de erro ganhou as sete entradas novas
 
 ---
 
-### B1 — Instalar Rust, MSVC Build Tools e WebView2 (M)
+### B1 — Instalar Rust, MSVC Build Tools e WebView2 (M) — **feito parcialmente em 2026-08-01, num ambiente Linux, não na máquina Windows do Douglas**
 
-A dívida do [ADR 0004](decisoes/0004-adiar-rust-e-tauri.md) vence aqui. São
-vários GB e o passo com maior chance de consumir mais tempo que o previsto —
-razão para ser o primeiro trabalho de verdade, e não algo espremido no meio.
+A dívida do [ADR 0004](decisoes/0004-adiar-rust-e-tauri.md) venceu aqui, mas
+num ambiente diferente do previsto: esta rodada aconteceu num container Linux
+remoto (sessão de IA em nuvem), não na máquina Windows do Douglas. Rust e Node
+**já estavam presentes** nesse container (`rustc 1.94.1`, `node v22.22.2`); o
+que faltou e foi instalado via `apt` foram as dependências de sistema do
+WebKitGTK que o Tauri usa no Linux (`libwebkit2gtk-4.1-dev`,
+`libjavascriptcoregtk-4.1-dev`, `libsoup-3.0-dev`, `libgtk-3-dev`,
+`libappindicator3-dev`, `librsvg2-dev`, `patchelf`).
 
-O [ADR 0003](decisoes/0003-mise-como-toolchain.md) e o D7 já fixaram Go e Node
-em versão exata. O Rust entra pela mesma porta, ou a decisão de não entrar fica
-escrita.
+**Os itens específicos de Windows (MSVC Build Tools, WebView2, chave de
+registro) continuam pendentes e só podem ser verificados na máquina real** —
+não fazem sentido num container Linux. Ver nota em B2 sobre o que isso muda no
+plano.
 
-**Critério de aceite:**
+**Critério de aceite (revisado para refletir o que foi de fato verificado):**
 
-- [ ] Em um PowerShell novo, `rustc --version` e `cargo --version` respondem.
-- [ ] `mise.toml` fixa a versão do Rust em número exato (nada de `latest`), ou
-      traz um comentário dizendo por que o Rust ficou fora do `mise` — coerente
-      com o ADR 0003.
-- [ ] A presença do WebView2 Runtime é confirmada pela chave de registro
-      `HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
-      (o valor `pv` é a versão instalada), e a versão fica registrada no
-      roadmap.
-- [ ] `cargo build` de um projeto Rust vazio compila e linka — prova de que as
-      MSVC Build Tools estão de fato presentes, não só baixadas.
-- [ ] O espaço consumido em disco fica anotado, para não virar surpresa em outra
-      máquina.
+- [x] `rustc --version` e `cargo --version` respondem — **1.94.1**, já
+      presentes no ambiente, não instalados nesta rodada.
+- [ ] `mise.toml` fixa a versão do Rust em número exato — **não feito**: o
+      projeto não usa `mise` no ambiente onde este item rodou, e a máquina
+      Windows (onde `mise` importa) não foi tocada. Fica para quando B1 for
+      revalidado lá.
+- [ ] WebView2 Runtime (chave de registro) — **não aplicável neste ambiente**
+      (Linux). Pendente de verificação na máquina Windows real.
+- [x] `cargo build` de um projeto Tauri real (não vazio) compilou e linkou —
+      ver B2, que foi além do critério original e gerou um binário de
+      produção de verdade.
+- [x] Espaço consumido: as dependências de sistema (`apt`) somaram poucas
+      dezenas de MB; o primeiro `cargo build` de um projeto Tauri baixou e
+      compilou ~490 crates, levando **1m46s** (debug) e **4m07s** (release)
+      num container com cache frio — a maior parte é da árvore de
+      dependências do `tauri`/`wry`/`tao`, não do projeto em si.
 
-**Depende de:** B0
+**Depende de:** B0 — **mas o B0 real (OneDrive) só existe na máquina Windows;
+neste container Linux a pergunta não se aplica** (não há OneDrive)
 **Bloqueia:** B2
 
 ---
 
-### B2 — Prova de fogo do ADR 0001: WebView Tauri × `127.0.0.1:7777` (P)
+### B2 — Prova de fogo do ADR 0001: WebView Tauri × `127.0.0.1:7777` (P) — **feito em 2026-08-01, com ressalva de ambiente**
 
-**Este é o item mais importante da sprint** e o motivo de ela existir nesta
-ordem. Um app Tauri do template padrão, com um botão, nada de React, nada de
-Tailwind, nada de tela — só `fetch` contra o `zeuxd` rodando à parte.
+Executado como planejado: `cargo create-tauri-app` com o template `vanilla`
+(sem React, sem Tailwind), um HTML com dois botões chamando
+`fetch("http://127.0.0.1:7777/...")` diretamente — nenhum comando Rust
+(`invoke`) envolvido, só o `fetch` puro que o plano queria testar. Rodado sob
+`Xvfb` (display virtual, já que o container não tem tela física), com cliques
+automatizados via `xdotool` e evidência em screenshot (`import`).
 
-Duas coisas precisam ser observadas, não presumidas:
+**Ressalva de ambiente:** roda em Linux, não Windows. O `origin` de produção
+do Windows (`http://tauri.localhost`, citado na documentação do Tauri) **não
+foi observado de verdade** — só o do Linux. Ele foi incluído em
+`allowedOrigins` (B3) por ser o valor documentado oficialmente, mas fica
+marcado como não verificado até alguém confirmar numa máquina Windows real.
 
-- **Qual é o `origin` real do WebView.** No Windows o Tauri costuma servir a
-  aplicação de `http://tauri.localhost`, e em outros SOs de `tauri://localhost`
-  — mas isso muda entre versões, e o plano não pode se apoiar em lembrança. O
-  jeito de saber é ler `window.location.origin` no app e o header `Origin` no
-  log do `zeuxd --debug`.
-- **Se o `POST` com `Content-Type: application/json` passa.** Este é o caso que
-  dispara *preflight* `OPTIONS`, e o servidor hoje não responde `OPTIONS` para
-  rota nenhuma nem emite `Access-Control-*`. Se falhar, falha aqui — no dia um,
-  com um botão na tela.
+**O que foi observado, os valores lidos (não presumidos):**
 
-**Critério de aceite:**
+| Cenário | `window.location.origin` | `Origin` chegando no `zeuxd --debug` |
+|---|---|---|
+| `npm run tauri dev` (servidor estático embutido do Tauri, sem `devUrl`/bundler configurado) | `http://127.0.0.1:1430` | `http://127.0.0.1:1430` |
+| `npm run tauri build` → binário de produção rodando de verdade | `tauri://localhost` | `tauri://localhost` |
 
-- [ ] Com `zeuxd` rodando à parte, um botão do app mínimo exibe na janela o JSON
-      de `GET /api/v1/health` vindo de `http://127.0.0.1:7777`.
-- [ ] O mesmo app faz `POST /api/v1/consent` com
-      `Content-Type: application/json` e mostra a resposta. Se der erro de CORS,
-      a mensagem exata do console do WebView é copiada para o roadmap e abre o
-      B3.
-- [ ] O `origin` observado fica escrito no plano — o valor lido, não o esperado.
-      Registrar os dois: `window.location.origin` e o `Origin` que chegou no
-      `zeuxd --debug`.
-- [ ] Fica registrado se foi preciso mexer em `tauri.conf.json` (CSP,
-      `connect-src`, permissões de rede) ou se `fetch` puro bastou — e, se
-      precisou, qual chave exatamente.
+- [x] Com `zeuxd --debug` rodando à parte, o botão "GET /api/v1/health" exibiu
+      o JSON `{"consoles":33,"schema_version":3,"status":"ok"}` na janela —
+      tanto no `tauri dev` (com erro de CORS, ver abaixo) quanto no build de
+      produção (com sucesso, depois do B3).
+- [x] O botão de `POST /api/v1/consent` com `Content-Type: application/json`
+      foi testado. **Sem CORS, os dois falharam** com
+      `TypeError: Load failed` no WebView — o `GET` simples chegou ao servidor
+      e voltou `200` (confirmado no log do `zeuxd --debug`), mas o WebView
+      recusou entregar a resposta ao JS; o `POST` disparou o preflight
+      `OPTIONS`, que o servidor recusava (sem rota registrada, o `ServeMux`
+      devolvia 405), então a chamada real nunca saiu. Isso abriu o B3 — feito
+      na mesma sessão.
+- [x] `origin` observado: tabela acima. Os dois valores batem exatamente com
+      o que o plano cogitava (`tauri://localhost` para builds fora do Windows),
+      mas agora são medidos, não lembrados.
+- [x] Não foi preciso mexer em `tauri.conf.json` (CSP ficou `null`, o padrão
+      do template) nem em permissões de rede — o bloqueio era inteiramente do
+      lado do servidor Go (CORS ausente), não do WebView. `fetch` puro bastou.
 
 **Depende de:** B1
 **Bloqueia:** B3, B4
 
 ---
 
-### B3 — CORS no servidor, se e somente se B2 mostrar que precisa (P)
+### B3 — CORS no servidor (P) — **feito em 2026-08-01**
 
-Item condicional de propósito. Se o B2 passar sem tocar no Go, este item é
-fechado como "não foi necessário" e nada é escrito — o ADR 0001 previa o risco,
-e uma camada de middleware que não resolve problema nenhum é peso.
+O B2 mostrou que era necessário — nos dois sentidos que o plano previa (preflight
+do `POST`) e num terceiro que não estava explícito no plano (o `GET` simples
+também precisa do cabeçalho na resposta, não só o preflight).
 
-Se precisar, a forma importa: **ecoar a origem do WebView, nunca `*`**. O ADR
-0001 já registra que qualquer processo local alcança a porta; CORS não é a
-defesa contra isso, e não é motivo para afrouxar de graça.
+**Implementado em `internal/api/server.go`:** `allowedOrigins` (mapa fechado,
+hoje com `tauri://localhost` e `http://tauri.localhost`) e o middleware
+`withCORS`, que ecoa `Access-Control-Allow-Origin` só para essas origens, nunca
+`*`, e responde `204` a qualquer `OPTIONS` (com `Access-Control-Allow-Methods`
+e `-Headers`), delegando as demais requisições ao roteador normal.
 
 **Critério de aceite:**
 
-- [ ] `curl -i -X OPTIONS http://127.0.0.1:7777/api/v1/consent -H "Origin: <origin lido no B2>" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type"`
-      responde `204` com `Access-Control-Allow-Origin` igual à origem enviada.
-- [ ] A mesma chamada com `-H "Origin: http://exemplo.invalido"` **não** traz
+- [x] `curl -i -X OPTIONS .../consent -H "Origin: tauri://localhost" ...`
+      respondeu `204` com `Access-Control-Allow-Origin: tauri://localhost`.
+- [x] A mesma chamada com `Origin: http://exemplo.invalido` **não** trouxe
       `Access-Control-Allow-Origin` na resposta.
-- [ ] Existe teste em `internal/api` travando os dois casos acima — hoje o
-      pacote está `[no test files]`, então este é o primeiro.
-- [ ] O comentário no código diz **por que** a lista é fechada, não o que o
-      código faz (convenção do repositório).
-- [ ] O ADR 0001 ganha uma nota, ou um ADR novo é escrito, se a decisão de
-      origem tiver mudado algo do que estava registrado.
+- [x] Testes em `internal/api/server_test.go`:
+      `TestCORSPreflightAllowsKnownWebViewOrigin`,
+      `TestCORSPreflightRejectsUnknownOrigin`,
+      `TestCORSAllowsSimpleRequestFromKnownOrigin` (o terceiro cobre o achado
+      extra do B2 — requisição simples, não só preflight).
+- [x] O comentário no código explica por que a lista é fechada (ADR 0001: CORS
+      não é a defesa contra acesso local, é só o que destrava o WebView) — não
+      descreve o que o código faz.
+- [x] Nota acrescentada aqui e em `docs/api.md`; não abriu ADR novo porque não
+      mudou nenhuma decisão do ADR 0001, só a implementou.
+
+**Pendência explícita:** a origem de desenvolvimento (`http://127.0.0.1:1430`
+neste PoC) **não** foi incluída em `allowedOrigins`. Ela é específica do
+template `vanilla` sem bundler e não necessariamente será a mesma quando B4
+escolher React + Vite (que tipicamente usa uma porta de dev fixada em
+`tauri.conf.json` via `devUrl`). Resolver isso é parte do critério de aceite
+do B4, quando a porta de dev real for conhecida — não adiantado aqui para não
+travar um valor que ainda vai mudar.
 
 **Depende de:** B2
 **Bloqueia:** nada
