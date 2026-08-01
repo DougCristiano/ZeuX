@@ -1,1 +1,106 @@
 @import "tailwindcss";
+
+/*
+ * Tokens de cor do item B7 (docs/sprint-b-plano.md). O wireframe
+ * (docs/wireframe.html) deixou cor de propósito em aberto — isto fecha essa
+ * decisão. A estratégia (variável CSS + media query como padrão, mais
+ * data-theme para uma alternância futura) é a mesma já testada no próprio
+ * wireframe, não uma invenção nova.
+ */
+:root {
+  --paper: #fbfbfc;
+  --panel: #ffffff;
+  --ink: #1c1d21;
+  --line: #c3c5cc;
+  --line-strong: #9da0a9;
+  --fill: #ecedf1;
+  --fill-strong: #dee0e6;
+  --muted: #6e7178;
+  --focus: #2f5fa8;
+  --amber: #9a6414;
+  --amber-bg: #fbf4e6;
+  --amber-line: #e2c489;
+  --danger: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #131418;
+    --panel: #1a1c21;
+    --ink: #e7e8ec;
+    --line: #3b3e47;
+    --line-strong: #5a5e69;
+    --fill: #212329;
+    --fill-strong: #2a2d34;
+    --muted: #8b8e97;
+    --focus: #6e9be0;
+    --amber: #d8a461;
+    --amber-bg: #262015;
+    --amber-line: #574a31;
+    --danger: #e5766d;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #131418;
+  --panel: #1a1c21;
+  --ink: #e7e8ec;
+  --line: #3b3e47;
+  --line-strong: #5a5e69;
+  --fill: #212329;
+  --fill-strong: #2a2d34;
+  --muted: #8b8e97;
+  --focus: #6e9be0;
+  --amber: #d8a461;
+  --amber-bg: #262015;
+  --amber-line: #574a31;
+  --danger: #e5766d;
+}
+
+:root[data-theme="light"] {
+  --paper: #fbfbfc;
+  --panel: #ffffff;
+  --ink: #1c1d21;
+  --line: #c3c5cc;
+  --line-strong: #9da0a9;
+  --fill: #ecedf1;
+  --fill-strong: #dee0e6;
+  --muted: #6e7178;
+  --focus: #2f5fa8;
+  --amber: #9a6414;
+  --amber-bg: #fbf4e6;
+  --amber-line: #e2c489;
+  --danger: #b3261e;
+}
+
+@theme {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fill: var(--fill);
+  --color-fill-strong: var(--fill-strong);
+  --color-muted: var(--muted);
+  --color-focus: var(--focus);
+  --color-amber: var(--amber);
+  --color-amber-bg: var(--amber-bg);
+  --color-amber-line: var(--amber-line);
+  --color-danger: var(--danger);
+
+  /*
+   * Escala tipográfica única (item B7): tudo na interface usa um destes seis
+   * degraus, para não acumular tamanhos de fonte ad-hoc tela por tela.
+   */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.9375rem;
+  --font-size-lg: 1.0625rem;
+  --font-size-xl: 1.375rem;
+  --font-size-2xl: 1.75rem;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}

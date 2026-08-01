@@ -388,7 +388,7 @@ sequência.
 | B4 | Scaffold Tauri + React + Tailwind, `src-tauri/` | M | B2 · **Feito 2026-08-01** — build de produção real rodou e falou com o `zeuxd`; hot reload do `tauri dev` não exercitado (ver ressalva em `sprint-b-plano.md`) |
 | B5 | `zeuxd` como processo filho (subir, derrubar, porta ocupada) | M | B4 · **Feito 2026-08-01** — sidecar do Tauri (`tauri-plugin-shell`); os 4 cenários de `sprint-b-plano.md` rodaram de verdade |
 | B6 | Cliente de API tipado no front | M | B4, B-doc · **Feito 2026-08-01** — `src/api/`, `npm run verificar-api`; achou e corrigiu uma divergência real entre código e `api.md` (`bottlenecks`) |
-| B7 | Layout visual sobre o wireframe | M | B4, B-wire |
+| B7 | Layout visual sobre o wireframe | M | B4, B-wire · **Feito 2026-08-01, parcial de propósito** — tokens, tipografia, componentes e as telas 01/03; 04–07 ficam para quando a funcionalidade delas existir (Sprint C/D) |
 | B8 | Fluxo de onboarding: consentimento → scan → parecer | M | B5, B6, B7 |
 | B9 | Tela de parecer: gargalos nomeados, aviso de "parcial" | M | B8 |
 | B10 | Instalar com ressalva de hardware (servidor já faz — ver nota) | P | B9 |

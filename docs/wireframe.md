@@ -47,10 +47,17 @@ o texto completo (e o porquê) está anotado na tela correspondente:
 | Informar, não bloquear | 07 |
 | Foco como estado de primeira classe; nenhuma ação só em hover ou só em clique direito ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)) | todas — visível no contorno de foco em 01, 04 e 05 |
 
-## O que ainda é decisão em aberto (fica para o B7)
+## Decisões do B7 (fechadas em 2026-08-01)
 
-- Como a lista de 33 consoles escala na tela 03 além de cartão empilhado.
-- Se a tela 02 (leitura) sobrevive como etapa própria ou vira um estado dentro
-  da tela 03, dependendo de quão rápido o scan realmente é.
+- **Escala de 33 consoles (tela 03):** `otimo`/`bom`/`limitado` empilhados e
+  sempre visíveis; `improvavel` atrás de um `<details>` nativo colapsado por
+  padrão — nunca escondido de verdade. Ver detalhe e critério de aceite em
+  [`sprint-b-plano.md`](sprint-b-plano.md), item B7.
+- **Tela 02 (leitura) não sobrevive como etapa própria** — vira estado de
+  carregamento dentro do fluxo da tela 03. O scan é rápido demais para
+  justificar uma parada de navegação própria.
+
+## O que ainda é decisão em aberto
+
 - Onde o painel de detalhe do jogo (tela 05) fica — fixo embaixo, lateral, ou
-  sobreposto.
+  sobreposto. Pertence à Sprint D (biblioteca), fora do escopo da Sprint B.

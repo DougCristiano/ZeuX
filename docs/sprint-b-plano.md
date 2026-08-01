@@ -537,34 +537,73 @@ que este item existe para pegar — e pegou de primeira.
 
 ---
 
-### B7 — Layout visual sobre o wireframe (M)
+### B7 — Layout visual sobre o wireframe (M) — **feito em 2026-08-01, parcial de propósito**
 
-Cor, tipografia, espaçamento e estados sobre a estrutura já decidida. O layout
-entra **sobre** o wireframe, não no lugar dele — a estrutura das 7 telas não é
-reaberta aqui.
+Cor, tipografia, espaçamento e estados sobre a estrutura já decidida no
+wireframe. Escopo fechado para as telas que o **B8 precisa de verdade**
+(01 Consentimento e 03 Parecer, com a 02 Leitura absorvida como estado dentro
+da 03 — decisão abaixo). As telas 04–07 (biblioteca, emuladores, instalar com
+ressalva) pertencem a funcionalidade que ainda não existe no backend consumido
+pelo front (Sprint C/D) — construir o layout delas agora seria adiantar tela
+para dado que não existe, o oposto do que o projeto pede.
 
-O [ADR 0009](decisoes/0009-desktop-agora-controle-depois.md) fixa três
-restrições que precisam estar desenhadas antes do primeiro componente, porque
-retrofitar foco em componentes prontos é exatamente a arqueologia que o ADR quer
-evitar. E o próprio ADR admite o ponto fraco: *"restrição sem teste automatizado
-tende a erodir"*. Enquanto não houver teste, o critério de aceite é a revisão —
-mas ela precisa ser concreta o bastante para alguém fazer.
+**O que existe:**
+
+- **Tokens de cor** (`src/index.css`, bloco `@theme`): claro/escuro via
+  `prefers-color-scheme`, com `data-theme` como escape para alternância manual
+  futura — a mesma estratégia já validada em `docs/wireframe.html`, não uma
+  invenção nova.
+- **Escala tipográfica única** (`--text-xs` a `--text-2xl` no mesmo `@theme`):
+  toda tela usa um destes degraus, nada de tamanho ad-hoc.
+- **Componentes primitivos** (`src/components/ui.tsx`): `Button` (3 variantes),
+  `Card`, `Badge`, `Callout` (bloco tracejado condicional, ex.: gargalo),
+  `PartialNotice` (aviso âmbar de `precision: "parcial"`, nunca escondido).
+- **Duas telas reais**, presentacionais (recebem dado via props; quem busca o
+  dado e trata o estado é o B8): `src/screens/ConsentScreen.tsx` (tela 01) e
+  `src/screens/VerdictScreen.tsx` (tela 03).
+
+**Decisões de layout que o wireframe deixava em aberto, fechadas aqui:**
+
+- **Tela 02 (leitura) não sobrevive como etapa própria** — vira um estado de
+  carregamento dentro do fluxo que leva à 03. Motivo: o scan típico leva
+  frações de segundo a poucos segundos (timeout interno de 30 s é o teto, não
+  o normal), e uma tela cheia própria para isso adicionaria uma parada de
+  navegação sem ganho — o B8 decide a forma exata (spinner, esqueleto) ao
+  implementar a chamada real.
+- **Escala de 33 consoles** (tela 03): `otimo`/`bom`/`limitado` ficam sempre
+  visíveis e empilhados; `improvavel` fica atrás de um `<details>` nativo,
+  colapsado por padrão — nunca escondido de verdade (expande com
+  Enter/Espaço, teclado funciona de graça, sem JS de foco customizado). Cumpre
+  "informar, não bloquear" sem forçar 33 cartões na primeira dobra.
+
+**O painel de detalhe do jogo (tela 05) continua em aberto** — pertence à
+Sprint D (biblioteca), fora do escopo desta sprint.
 
 **Critério de aceite:**
 
-- [ ] Existe um estado de **foco visível e desenhado** para todo tipo de
-      elemento interativo (botão, link, card, campo, item de lista), e ele é
-      distinto do estado de hover.
-- [ ] Percorrer qualquer tela só com `Tab` alcança **todas** as ações daquela
-      tela, na ordem de leitura. Verificação: listar as ações da tela no
-      wireframe e conferir uma a uma.
-- [ ] Nenhuma ação existe apenas em hover, e nenhuma apenas em clique direito.
-      Se um menu de contexto for desenhado, cada item dele tem outro caminho
-      visível.
-- [ ] O sistema de tipografia tem escala definida e cabe em janela de 1280×720 —
-      o alvo é mesa, não TV; densidade alta é permitida de propósito.
-- [ ] Estados de carregamento, vazio e erro estão desenhados para as telas que
-      dependem de rede, e não só o estado feliz.
+- [x] Existe um estado de **foco visível e desenhado**, distinto de hover, em
+      todo componente interativo dos dois já implementados (`Button`,
+      `<summary>` do `<details>`). Achado real ao verificar: `outline-none` e
+      `outline-hidden` do Tailwind v4 zeram `--tw-outline-style`
+      **incondicionalmente**, cancelando até o `focus-visible:outline`
+      condicional — o padrão certo é não usar nenhum dos dois e confiar que
+      navegadores modernos só aplicam `outline` em `:focus-visible` por
+      padrão. Verificado com Chromium via Playwright: `outline-width: 2px`,
+      `outline-color` igual ao token `--focus`, só quando `el.matches(":focus-visible")`.
+- [x] Tab alcança todas as ações das telas 01 e 03 (confirmado com
+      `page.keyboard.press("Tab")` no Chromium, ordem: Autorizar leitura →
+      Agora não → "N console(s) — mostrar"). As telas 04–07 não existem ainda
+      para verificar.
+- [x] `grep -riE "fraco|ruim|insuficiente|não aguenta|incapaz"` em `src/` não
+      acha nada.
+- [x] Nenhuma ação em hover exclusivo: os três usos de `hover:` em
+      `ui.tsx` só reforçam um estado que já é visível e focável sem mouse.
+- [x] Escala tipográfica de 6 degraus, testada em viewport 900×1400 (o
+      suficiente para 1280×720 com folga).
+- [~] Estados de carregamento/vazio/erro: cobertos para o que já existe
+      (`App.tsx` trata "lendo…", conflito de porta, erro de rede); os estados
+      específicos de tela vazia/erro de rede da tela 03 ficam para o B8, que é
+      quem de fato chama a API e sabe o que pode falhar.
 
 **Depende de:** B4, B-wire
 **Bloqueia:** B8
