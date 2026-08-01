@@ -1,0 +1,945 @@
+{
+  "schema_version": 3,
+  "updated_at": "2026-08-01",
+  "_comment": "Dicionário-semente de requisitos por console. Os patamares são avaliados de cima para baixo: vale o primeiro cujos requisitos sejam todos atendidos. O campo 'preset' é o texto que o usuário lê; 'options' é o mesmo preset em forma que o emulador obedece. Os dois precisam contar a mesma história. Os limiares são estimativas iniciais e precisam de calibração com hardware real — o sistema de compatibilidade comunitário previsto no PRD é a fonte natural desses dados. Este arquivo passará a ser atualizável via nuvem.",
+  "consoles": [
+    {
+      "id": "atari2600",
+      "name": "Atari 2600",
+      "short_name": "Atari 2600",
+      "year": 1977,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Stella)",
+          "adapter_id": "retroarch",
+          "core": "stella",
+          "preset": "Resolução interna 4x com filtros de TV",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1200, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Stella)",
+          "adapter_id": "retroarch",
+          "core": "stella",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 800, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "arcade",
+      "name": "Fliperama (Arcade)",
+      "short_name": "Arcade",
+      "year": 1980,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core MAME)",
+          "adapter_id": "retroarch",
+          "core": "mame",
+          "preset": "Resolução interna 2x, som em alta qualidade",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2500, "ram_gib": 4 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core FinalBurn Neo)",
+          "adapter_id": "retroarch",
+          "core": "fbneo",
+          "preset": "Resolução nativa, núcleo mais leve que o MAME",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "nes",
+      "name": "Nintendo Entertainment System",
+      "short_name": "NES",
+      "year": 1983,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Mesen)",
+          "adapter_id": "retroarch",
+          "core": "mesen",
+          "preset": "Resolução interna 4x com filtros de scanline",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Mesen)",
+          "adapter_id": "retroarch",
+          "core": "mesen",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 1000, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "mastersystem",
+      "name": "Sega Master System",
+      "short_name": "Master System",
+      "year": 1985,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução interna 4x com filtros de scanline",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 1000, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "pcengine",
+      "name": "PC Engine / TurboGrafx-16",
+      "short_name": "PC Engine",
+      "year": 1987,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Beetle PCE)",
+          "adapter_id": "retroarch",
+          "core": "beetle pce",
+          "preset": "Resolução interna 4x",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Beetle PCE)",
+          "adapter_id": "retroarch",
+          "core": "beetle pce",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 1000, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "megadrive",
+      "name": "Mega Drive / Genesis",
+      "short_name": "Mega Drive",
+      "year": 1988,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução interna 4x com filtros de scanline",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 1000, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "gb",
+      "name": "Game Boy",
+      "short_name": "Game Boy",
+      "year": 1989,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core SameBoy)",
+          "adapter_id": "retroarch",
+          "core": "sameboy",
+          "preset": "Emulação de alta precisão, resolução interna 4x",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Gambatte)",
+          "adapter_id": "retroarch",
+          "core": "gambatte",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 800, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "neogeo",
+      "name": "Neo Geo",
+      "short_name": "Neo Geo",
+      "year": 1990,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core FinalBurn Neo)",
+          "adapter_id": "retroarch",
+          "core": "fbneo",
+          "preset": "Resolução interna 2x, som em alta qualidade",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2000, "ram_gib": 4 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core FinalBurn Neo)",
+          "adapter_id": "retroarch",
+          "core": "fbneo",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1400, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "gamegear",
+      "name": "Sega Game Gear",
+      "short_name": "Game Gear",
+      "year": 1990,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução interna 4x, correção de cor de tela de LCD",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 800, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "snes",
+      "name": "Super Nintendo",
+      "short_name": "SNES",
+      "year": 1990,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core bsnes)",
+          "adapter_id": "retroarch",
+          "core": "bsnes",
+          "preset": "Emulação ciclo-a-ciclo, resolução interna 4x",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2000, "ram_gib": 4 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Snes9x)",
+          "adapter_id": "retroarch",
+          "core": "snes9x",
+          "preset": "Resolução interna 2x",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "segacd",
+      "name": "Sega CD / Mega CD",
+      "short_name": "Sega CD",
+      "year": 1991,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução interna 4x, vídeo full-motion suavizado",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1800, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Genesis Plus GX)",
+          "adapter_id": "retroarch",
+          "core": "genesis plus gx",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1200, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "3do",
+      "name": "3DO Interactive Multiplayer",
+      "short_name": "3DO",
+      "year": 1993,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Opera)",
+          "adapter_id": "retroarch",
+          "core": "opera",
+          "preset": "Resolução interna 2x",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2500, "ram_gib": 4 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Opera)",
+          "adapter_id": "retroarch",
+          "core": "opera",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1800, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "sega32x",
+      "name": "Sega 32X",
+      "short_name": "32X",
+      "year": 1994,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core PicoDrive)",
+          "adapter_id": "retroarch",
+          "core": "picodrive",
+          "preset": "Resolução interna 2x",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1800, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core PicoDrive)",
+          "adapter_id": "retroarch",
+          "core": "picodrive",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1200, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "saturn",
+      "name": "Sega Saturn",
+      "short_name": "Saturn",
+      "year": 1994,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Beetle Saturn)",
+          "adapter_id": "retroarch",
+          "core": "beetle saturn",
+          "preset": "Resolução interna 2x, emulação de alta precisão",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3200, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Beetle Saturn)",
+          "adapter_id": "retroarch",
+          "core": "beetle saturn",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2600, "ram_gib": 4 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "RetroArch (core Yabause)",
+          "adapter_id": "retroarch",
+          "core": "yabause",
+          "preset": "Resolução nativa, núcleo mais leve e menos preciso",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 2000, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "ps1",
+      "name": "PlayStation 1",
+      "short_name": "PS1",
+      "year": 1994,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "DuckStation",
+          "adapter_id": "duckstation",
+          "preset": "Resolução interna 8x (4K), correção de perspectiva de texturas",
+          "options": { "fullscreen": true, "internal_scale": 8, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "DuckStation",
+          "adapter_id": "duckstation",
+          "preset": "Resolução interna 3x (1080p)",
+          "options": { "fullscreen": true, "internal_scale": 3, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2200, "ram_gib": 4 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "DuckStation",
+          "adapter_id": "duckstation",
+          "preset": "Resolução nativa, renderizador por software",
+          "options": { "fullscreen": true, "internal_scale": 1, "renderer": "software", "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1600, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "virtualboy",
+      "name": "Nintendo Virtual Boy",
+      "short_name": "Virtual Boy",
+      "year": 1995,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Beetle VB)",
+          "adapter_id": "retroarch",
+          "core": "beetle vb",
+          "preset": "Resolução interna 4x, modo anaglifo configurável",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Beetle VB)",
+          "adapter_id": "retroarch",
+          "core": "beetle vb",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 1000, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "n64",
+      "name": "Nintendo 64",
+      "short_name": "N64",
+      "year": 1996,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core ParaLLEl N64)",
+          "adapter_id": "retroarch",
+          "core": "parallel n64",
+          "preset": "Resolução interna 4x com RDP em alta precisão",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Mupen64Plus-Next)",
+          "adapter_id": "retroarch",
+          "core": "mupen64plus-next",
+          "preset": "Resolução interna 2x (1080p)",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2400, "ram_gib": 4 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "RetroArch (core Mupen64Plus-Next)",
+          "adapter_id": "retroarch",
+          "core": "mupen64plus-next",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1800, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "gbc",
+      "name": "Game Boy Color",
+      "short_name": "GB Color",
+      "year": 1998,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core SameBoy)",
+          "adapter_id": "retroarch",
+          "core": "sameboy",
+          "preset": "Emulação de alta precisão, resolução interna 4x",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Gambatte)",
+          "adapter_id": "retroarch",
+          "core": "gambatte",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 800, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "dreamcast",
+      "name": "Sega Dreamcast",
+      "short_name": "Dreamcast",
+      "year": 1998,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "Flycast",
+          "adapter_id": "flycast",
+          "preset": "Resolução interna 6x (4K)",
+          "options": { "fullscreen": true, "internal_scale": 6, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "Flycast",
+          "adapter_id": "flycast",
+          "preset": "Resolução interna 2x (1080p)",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2400, "ram_gib": 4 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "Flycast",
+          "adapter_id": "flycast",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1800, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "wonderswan",
+      "name": "Bandai WonderSwan",
+      "short_name": "WonderSwan",
+      "year": 1999,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Beetle Cygne)",
+          "adapter_id": "retroarch",
+          "core": "beetle cygne",
+          "preset": "Resolução interna 4x",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1200, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Beetle Cygne)",
+          "adapter_id": "retroarch",
+          "core": "beetle cygne",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 800, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ngpc",
+      "name": "Neo Geo Pocket Color",
+      "short_name": "NGP Color",
+      "year": 1999,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core Beetle NeoPop)",
+          "adapter_id": "retroarch",
+          "core": "beetle ngp",
+          "preset": "Resolução interna 4x",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1200, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core Beetle NeoPop)",
+          "adapter_id": "retroarch",
+          "core": "beetle ngp",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 800, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "ps2",
+      "name": "PlayStation 2",
+      "short_name": "PS2",
+      "year": 2000,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "PCSX2",
+          "adapter_id": "pcsx2",
+          "preset": "Resolução interna 4x (4K), backend Vulkan, cache de texturas alto",
+          "options": { "fullscreen": true, "internal_scale": 4, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 6, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "PCSX2",
+          "adapter_id": "pcsx2",
+          "preset": "Resolução interna 2x (1080p), backend Vulkan",
+          "options": { "fullscreen": true, "internal_scale": 2, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "PCSX2",
+          "adapter_id": "pcsx2",
+          "preset": "Resolução nativa, backend OpenGL",
+          "options": { "fullscreen": true, "internal_scale": 1, "renderer": "opengl", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2600, "ram_gib": 8 }
+        }
+      ]
+    },
+    {
+      "id": "gamecube",
+      "name": "Nintendo GameCube",
+      "short_name": "GameCube",
+      "year": 2001,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "Dolphin",
+          "adapter_id": "dolphin",
+          "preset": "Resolução interna 4x (4K), backend Vulkan, compilação assíncrona de shaders",
+          "options": { "fullscreen": true, "internal_scale": 4, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 4, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "Dolphin",
+          "adapter_id": "dolphin",
+          "preset": "Resolução interna 2x (1080p), backend Vulkan",
+          "options": { "fullscreen": true, "internal_scale": 2, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "Dolphin",
+          "adapter_id": "dolphin",
+          "preset": "Resolução nativa, backend OpenGL",
+          "options": { "fullscreen": true, "internal_scale": 1, "renderer": "opengl", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2600, "ram_gib": 4 }
+        }
+      ]
+    },
+    {
+      "id": "gba",
+      "name": "Game Boy Advance",
+      "short_name": "GBA",
+      "year": 2001,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RetroArch (core mGBA)",
+          "adapter_id": "retroarch",
+          "core": "mgba",
+          "preset": "Resolução interna 4x, interpolação de cor",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1500, "ram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "RetroArch (core mGBA)",
+          "adapter_id": "retroarch",
+          "core": "mgba",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 1, "clock_mhz": 1000, "ram_gib": 1 }
+        }
+      ]
+    },
+    {
+      "id": "xbox",
+      "name": "Microsoft Xbox",
+      "short_name": "Xbox",
+      "year": 2001,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "xemu",
+          "adapter_id": "xemu",
+          "preset": "Resolução 1080p+, tela cheia",
+          "options": { "fullscreen": true, "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 4, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "xemu",
+          "adapter_id": "xemu",
+          "preset": "Resolução nativa, tela cheia",
+          "options": { "fullscreen": true, "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "xemu",
+          "adapter_id": "xemu",
+          "preset": "Resolução nativa, desempenho variável conforme o título",
+          "options": { "fullscreen": true, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2600, "ram_gib": 8 }
+        }
+      ]
+    },
+    {
+      "id": "psp",
+      "name": "PlayStation Portable",
+      "short_name": "PSP",
+      "year": 2004,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "PPSSPP",
+          "adapter_id": "ppsspp",
+          "preset": "Resolução interna 5x (4K), backend Vulkan",
+          "options": { "fullscreen": true, "internal_scale": 5, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "PPSSPP",
+          "adapter_id": "ppsspp",
+          "preset": "Resolução interna 3x (1080p)",
+          "options": { "fullscreen": true, "internal_scale": 3, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2200, "ram_gib": 4 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "PPSSPP",
+          "adapter_id": "ppsspp",
+          "preset": "Resolução nativa, backend OpenGL",
+          "options": { "fullscreen": true, "internal_scale": 1, "renderer": "opengl", "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1600, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "nds",
+      "name": "Nintendo DS",
+      "short_name": "DS",
+      "year": 2004,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "melonDS",
+          "adapter_id": "melonds",
+          "preset": "Resolução interna 4x, renderizador por hardware",
+          "options": { "fullscreen": true, "internal_scale": 4, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2800, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "bom",
+          "emulator": "melonDS",
+          "adapter_id": "melonds",
+          "preset": "Resolução interna 2x",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2200, "ram_gib": 4 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "melonDS",
+          "adapter_id": "melonds",
+          "preset": "Resolução nativa, renderizador por software",
+          "options": { "fullscreen": true, "internal_scale": 1, "renderer": "software", "exit_on_close": true },
+          "requires": { "logical_cores": 2, "clock_mhz": 1600, "ram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "xbox360",
+      "name": "Microsoft Xbox 360",
+      "short_name": "Xbox 360",
+      "year": 2005,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "Xenia",
+          "adapter_id": "xenia",
+          "preset": "Resolução 1080p+, backend Vulkan (emulação experimental)",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 12, "clock_mhz": 4000, "ram_gib": 16, "vram_gib": 8, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "Xenia",
+          "adapter_id": "xenia",
+          "preset": "Resolução 720p, desempenho muito variável conforme o título",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 4, "dedicated_gpu": true }
+        }
+      ]
+    },
+    {
+      "id": "wii",
+      "name": "Nintendo Wii",
+      "short_name": "Wii",
+      "year": 2006,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "Dolphin",
+          "adapter_id": "dolphin",
+          "preset": "Resolução interna 4x (4K), backend Vulkan",
+          "options": { "fullscreen": true, "internal_scale": 4, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 4, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "Dolphin",
+          "adapter_id": "dolphin",
+          "preset": "Resolução interna 2x (1080p), backend Vulkan",
+          "options": { "fullscreen": true, "internal_scale": 2, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "Dolphin",
+          "adapter_id": "dolphin",
+          "preset": "Resolução nativa, backend OpenGL",
+          "options": { "fullscreen": true, "internal_scale": 1, "renderer": "opengl", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2600, "ram_gib": 4 }
+        }
+      ]
+    },
+    {
+      "id": "ps3",
+      "name": "PlayStation 3",
+      "short_name": "PS3",
+      "year": 2006,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "RPCS3",
+          "adapter_id": "rpcs3",
+          "preset": "Resolução 1440p+, backend Vulkan, SPU em modo ASMJIT",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 12, "clock_mhz": 4000, "ram_gib": 16, "vram_gib": 8, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "RPCS3",
+          "adapter_id": "rpcs3",
+          "preset": "Resolução 1080p, backend Vulkan",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 4, "dedicated_gpu": true }
+        },
+        {
+          "level": "limitado",
+          "emulator": "RPCS3",
+          "adapter_id": "rpcs3",
+          "preset": "Resolução 720p, desempenho variável conforme o título",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3200, "ram_gib": 8, "vram_gib": 2, "dedicated_gpu": true }
+        }
+      ]
+    },
+    {
+      "id": "3ds",
+      "name": "Nintendo 3DS",
+      "short_name": "3DS",
+      "year": 2011,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "Azahar",
+          "adapter_id": "azahar",
+          "preset": "Resolução interna 4x, backend Vulkan",
+          "options": { "fullscreen": true, "internal_scale": 4, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 4, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "Azahar",
+          "adapter_id": "azahar",
+          "preset": "Resolução interna 2x",
+          "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        },
+        {
+          "level": "limitado",
+          "emulator": "Azahar",
+          "adapter_id": "azahar",
+          "preset": "Resolução nativa",
+          "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 2600, "ram_gib": 8 }
+        }
+      ]
+    },
+    {
+      "id": "vita",
+      "name": "PlayStation Vita",
+      "short_name": "PS Vita",
+      "year": 2011,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "Vita3K",
+          "adapter_id": "vita3k",
+          "preset": "Resolução 1080p+ (emulação experimental)",
+          "options": { "fullscreen": true, "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3500, "ram_gib": 16, "vram_gib": 4, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "Vita3K",
+          "adapter_id": "vita3k",
+          "preset": "Resolução nativa, compatibilidade limitada por título",
+          "options": { "fullscreen": true, "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        }
+      ]
+    },
+    {
+      "id": "wiiu",
+      "name": "Nintendo Wii U",
+      "short_name": "Wii U",
+      "year": 2012,
+      "tiers": [
+        {
+          "level": "otimo",
+          "emulator": "Cemu",
+          "adapter_id": "cemu",
+          "preset": "Resolução interna 4K, backend Vulkan, cache de shaders pré-compilado",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 8, "clock_mhz": 3800, "ram_gib": 16, "vram_gib": 8, "dedicated_gpu": true }
+        },
+        {
+          "level": "bom",
+          "emulator": "Cemu",
+          "adapter_id": "cemu",
+          "preset": "Resolução 1080p, backend Vulkan",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 6, "clock_mhz": 3200, "ram_gib": 8, "vram_gib": 4, "dedicated_gpu": true }
+        },
+        {
+          "level": "limitado",
+          "emulator": "Cemu",
+          "adapter_id": "cemu",
+          "preset": "Resolução 720p, engasgos durante a compilação de shaders",
+          "options": { "fullscreen": true, "renderer": "vulkan", "exit_on_close": true },
+          "requires": { "logical_cores": 4, "clock_mhz": 3000, "ram_gib": 8, "vram_gib": 2 }
+        }
+      ]
+    }
+  ]
+}

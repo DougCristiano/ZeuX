@@ -1,0 +1,8 @@
+# Versões fixadas de propósito.
+#
+# "latest" e "lts" são aliases móveis: cada máquina que rodasse `mise install`
+# poderia receber uma versão diferente, e um bug de toolchain viraria "na minha
+# máquina funciona". Subir de versão deve ser uma mudança visível no histórico.
+[tools]
+go = "1.26.5"
+node = "24.18.1"

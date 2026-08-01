@@ -1,0 +1,19 @@
+# Binários compilados
+/zeuxd
+/zeuxd.exe
+/bin/
+/dist/
+
+# Dependências do frontend (Fase 2)
+node_modules/
+
+# Artefatos de build do Tauri (Fase 2)
+src-tauri/target/
+
+# Cache e configuração local de ferramentas
+.mise.local.toml
+*.local
+
+# Sistema operacional
+Thumbs.db
+.DS_Store

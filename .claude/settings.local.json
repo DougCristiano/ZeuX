@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; mise exec -- go build ./... ; if \\($?\\) { mise exec -- go vet ./... })",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; foreach \\($os in @\\('linux','darwin'\\)\\) { $env:GOOS = $os; mise exec -- go build ./...; if \\($?\\) { \"$os -> OK\" } else { \"$os -> FALHOU\" } }; $env:GOOS = '')",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; mise exec -- go build ./...; if \\($?\\) { mise exec -- go vet ./...; mise exec -- go test ./... })",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; mise exec -- go run ./cmd/zeuxd --debug)",
+      "PowerShell($health = Invoke-RestMethod -Uri \"http://127.0.0.1:7777/api/v1/health\"; \"HEALTH: $\\($health | ConvertTo-Json -Compress\\)\"; \"\"; \"--- Scan SEM consentimento \\(deve ser recusado\\) ---\"; try { Invoke-RestMethod -Uri \"http://127.0.0.1:7777/api/v1/hardware/scan\" -Method Post -ErrorAction Stop | ConvertTo-Json -Compress } catch { \"HTTP $\\([int]$_.Exception.Response.StatusCode\\) -> $\\($_.ErrorDetails.Message\\)\" })"
+    ]
+  }
+}

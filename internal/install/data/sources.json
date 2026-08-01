@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-01",
+  "_comment": "Fontes oficiais de download por emulador. Os padrões de asset foram derivados dos nomes reais publicados nos repositórios em 2026-08-01. 'exclude' é tão importante quanto 'include': as releases misturam builds de depuração, pacotes de símbolos e instaladores junto do binário que queremos.",
+  "sources": [
+    {
+      "adapter_id": "duckstation",
+      "name": "DuckStation",
+      "kind": "github",
+      "repo": "stenzek/duckstation",
+      "homepage": "https://www.duckstation.org/",
+      "license": "CC-BY-NC-ND-4.0",
+      "assets": {
+        "windows/amd64": { "include": "^duckstation-windows-x64-release\\.zip$", "archive": "zip" },
+        "windows/arm64": { "include": "^duckstation-windows-arm64-release\\.zip$", "archive": "zip" },
+        "darwin/amd64": { "include": "^duckstation-mac-release\\.zip$", "archive": "zip" },
+        "darwin/arm64": { "include": "^duckstation-mac-release\\.zip$", "archive": "zip" },
+        "linux/amd64": { "include": "^DuckStation-x64\\.AppImage$", "archive": "appimage" },
+        "linux/arm64": { "include": "^DuckStation-arm64\\.AppImage$", "archive": "appimage" }
+      }
+    },
+    {
+      "adapter_id": "pcsx2",
+      "name": "PCSX2",
+      "kind": "github",
+      "repo": "PCSX2/pcsx2",
+      "homepage": "https://pcsx2.net/",
+      "license": "GPL-3.0",
+      "assets": {
+        "windows/amd64": {
+          "include": "windows-x64-Qt\\.7z$",
+          "exclude": "symbols|installer",
+          "archive": "7z"
+        },
+        "linux/amd64": { "include": "linux-appimage-x64-Qt\\.AppImage$", "archive": "appimage" }
+      }
+    },
+    {
+      "adapter_id": "ppsspp",
+      "name": "PPSSPP",
+      "kind": "github",
+      "repo": "hrydgard/ppsspp",
+      "homepage": "https://www.ppsspp.org/",
+      "license": "GPL-2.0",
+      "assets": {
+        "windows/amd64": { "include": "Windows-x64\\.zip$", "exclude": "debug|symbols", "archive": "zip" },
+        "windows/arm64": { "include": "Windows-ARM64\\.zip$", "exclude": "debug|symbols", "archive": "zip" },
+        "darwin/amd64": { "include": "^PPSSPPSDL-macOS-.*\\.zip$", "archive": "zip" },
+        "darwin/arm64": { "include": "^PPSSPPSDL-macOS-.*\\.zip$", "archive": "zip" },
+        "linux/amd64": { "include": "anylinux-x86_64\\.AppImage$", "archive": "appimage" },
+        "linux/arm64": { "include": "anylinux-aarch64\\.AppImage$", "archive": "appimage" }
+      }
+    },
+    {
+      "adapter_id": "flycast",
+      "name": "Flycast",
+      "kind": "github",
+      "repo": "flyinghead/flycast",
+      "homepage": "https://github.com/flyinghead/flycast",
+      "license": "GPL-2.0",
+      "assets": {
+        "windows/amd64": { "include": "^flycast-win64-.*\\.zip$", "archive": "zip" },
+        "darwin/amd64": { "include": "^flycast-macOS-.*\\.zip$", "archive": "zip" },
+        "darwin/arm64": { "include": "^flycast-macOS-.*\\.zip$", "archive": "zip" },
+        "linux/amd64": { "include": "^flycast-x86_64\\.AppImage$", "archive": "appimage" }
+      }
+    },
+    {
+      "adapter_id": "melonds",
+      "name": "melonDS",
+      "kind": "github",
+      "repo": "melonDS-emu/melonDS",
+      "homepage": "https://melonds.kuribo64.net/",
+      "license": "GPL-3.0",
+      "assets": {
+        "windows/amd64": { "include": "windows-x86_64\\.zip$", "archive": "zip" },
+        "darwin/amd64": { "include": "macOS-universal\\.zip$", "archive": "zip" },
+        "darwin/arm64": { "include": "macOS-universal\\.zip$", "archive": "zip" },
+        "linux/amd64": { "include": "appimage-x86_64\\.zip$", "archive": "zip" },
+        "linux/arm64": { "include": "appimage-aarch64\\.zip$", "archive": "zip" }
+      }
+    },
+    {
+      "adapter_id": "xemu",
+      "name": "xemu",
+      "kind": "github",
+      "repo": "xemu-project/xemu",
+      "homepage": "https://xemu.app/",
+      "license": "GPL-2.0",
+      "assets": {
+        "windows/amd64": { "include": "windows-x86_64\\.zip$", "exclude": "dbg|pdb", "archive": "zip" },
+        "windows/arm64": { "include": "windows-arm64\\.zip$", "exclude": "dbg|pdb", "archive": "zip" },
+        "darwin/amd64": { "include": "macos-universal\\.zip$", "exclude": "dbg|unsigned", "archive": "zip" },
+        "darwin/arm64": { "include": "macos-universal\\.zip$", "exclude": "dbg|unsigned", "archive": "zip" },
+        "linux/amd64": { "include": "x86_64\\.AppImage$", "exclude": "dbg", "archive": "appimage" }
+      }
+    },
+    {
+      "adapter_id": "cemu",
+      "name": "Cemu",
+      "kind": "github",
+      "repo": "cemu-project/Cemu",
+      "homepage": "https://cemu.info/",
+      "license": "MPL-2.0",
+      "_note": "O macOS recebe .dmg, formato que o ZeuX ainda não sabe extrair — por isso a plataforma não aparece aqui.",
+      "assets": {
+        "windows/amd64": { "include": "windows-x64\\.zip$", "archive": "zip" },
+        "linux/amd64": { "include": "^Cemu-.*-x86_64\\.AppImage$", "archive": "appimage" }
+      }
+    },
+    {
+      "adapter_id": "rpcs3",
+      "name": "RPCS3",
+      "kind": "github",
+      "repo": "RPCS3/rpcs3-binaries-win",
+      "homepage": "https://rpcs3.net/",
+      "license": "GPL-2.0",
+      "_note": "Este repositório publica um arquivo .sha256 ao lado do binário — a verificação de integridade aqui é real, não best-effort.",
+      "assets": {
+        "windows/amd64": { "include": "win64_msvc\\.7z$", "archive": "7z", "checksum_suffix": ".sha256" }
+      }
+    },
+    {
+      "adapter_id": "vita3k",
+      "name": "Vita3K",
+      "kind": "github",
+      "repo": "Vita3K/Vita3K",
+      "homepage": "https://vita3k.org/",
+      "license": "GPL-2.0",
+      "_note": "O macOS recebe .dmg, formato que o ZeuX ainda não sabe extrair — por isso a plataforma não aparece aqui.",
+      "assets": {
+        "windows/amd64": { "include": "^windows-latest\\.zip$", "archive": "zip" },
+        "windows/arm64": { "include": "^windows-arm64-latest\\.zip$", "archive": "zip" },
+        "linux/amd64": { "include": "^ubuntu-latest\\.zip$", "archive": "zip" },
+        "linux/arm64": { "include": "^ubuntu-aarch64-latest\\.zip$", "archive": "zip" }
+      }
+    },
+    {
+      "adapter_id": "xenia",
+      "name": "Xenia",
+      "kind": "github",
+      "repo": "xenia-canary/xenia-canary-releases",
+      "homepage": "https://xenia.jp/",
+      "license": "BSD-3-Clause",
+      "assets": {
+        "windows/amd64": { "include": "windows.*\\.zip$", "archive": "zip" }
+      }
+    },
+    {
+      "adapter_id": "azahar",
+      "name": "Azahar",
+      "kind": "github",
+      "repo": "azahar-emu/azahar",
+      "homepage": "https://azahar-emu.org/",
+      "license": "GPL-2.0",
+      "assets": {
+        "windows/amd64": {
+          "include": "windows-msvc-[0-9.]+\\.zip$",
+          "exclude": "installer|libretro|debug",
+          "archive": "zip"
+        },
+        "darwin/amd64": { "include": "^azahar-macos-universal-[0-9.]+\\.zip$", "exclude": "libretro", "archive": "zip" },
+        "darwin/arm64": { "include": "^azahar-macos-universal-[0-9.]+\\.zip$", "exclude": "libretro", "archive": "zip" },
+        "linux/amd64": { "include": "^azahar\\.AppImage$", "archive": "appimage" }
+      }
+    },
+    {
+      "adapter_id": "retroarch",
+      "name": "RetroArch",
+      "kind": "manual",
+      "homepage": "https://www.retroarch.com/?page=platforms",
+      "license": "GPL-3.0",
+      "reason": "O RetroArch distribui pelo buildbot próprio, e não publica os binários nas releases do GitHub. A instalação automática exigiria acompanhar a estrutura de diretórios do buildbot, que muda sem aviso."
+    },
+    {
+      "adapter_id": "dolphin",
+      "name": "Dolphin",
+      "kind": "manual",
+      "homepage": "https://dolphin-emu.org/download/",
+      "license": "GPL-2.0",
+      "reason": "O Dolphin distribui pelo site oficial e não publica os binários como releases do GitHub, então não há como resolver a versão mais recente de forma confiável por API."
+    }
+  ]
+}
