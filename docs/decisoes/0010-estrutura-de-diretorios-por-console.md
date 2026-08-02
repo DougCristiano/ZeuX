@@ -1,6 +1,8 @@
 # 0010 — Estrutura de diretórios gerenciados por console
 
-**Status:** Aceito (parcial — só a parte de emuladores está implementada)
+**Status:** Aceito (parcial — só a parte de emuladores está implementada; a
+parte de jogos tem a decisão tomada — metadados + referência, nunca cópia da
+ROM — mas ainda não foi construída)
 
 ## Contexto
 
@@ -46,16 +48,17 @@ save states, capas e informações do jogo. Isso depende da Sprint D (banco de
 dados + varredura de biblioteca + scraper de metadados), que ainda não foi
 desenhada — implementar a parte de jogos agora seria desenhar às cegas.
 
-**Pendência explícita, não resolvida por este ADR:** o Douglas pediu que o
-arquivo do jogo (a ROM) também fique guardado dentro dessa estrutura. Isso
-contraria a regra não-negociável já registrada no `CLAUDE.md` ("o ZeuX nunca
-copia, distribui, sugere fonte ou facilita transferência de ROMs") — regra
-que existe por risco legal (a maioria das ROMs é material protegido por
-direito autoral; um app que copia esse arquivo para dentro da própria
-estrutura gerenciada passa a "manusear" o conteúdo, não só apontar para ele).
-Fica registrado aqui como decisão em aberto, não decidida por este documento
-— precisa ser resolvida explicitamente antes da Sprint D avançar na parte de
-jogos.
+**Pendência resolvida em 2026-08-02:** o pedido original era guardar o arquivo
+do jogo (a ROM) dentro da estrutura gerenciada. Isso contraria a regra
+não-negociável do `CLAUDE.md` ("o ZeuX nunca copia, distribui, sugere fonte ou
+facilita transferência de ROMs") — regra que existe por risco legal (a maioria
+das ROMs é material protegido por direito autoral; copiar o arquivo para
+dentro de uma estrutura que o próprio ZeuX gerencia passa a "manusear" o
+conteúdo, não só apontar para ele). Apresentado o conflito, o Douglas optou
+pelo caminho compatível com a regra: `jogos/<console>/` guarda metadados
+(saves, capas, informações) e uma **referência ao caminho onde a ROM já está
+no disco do usuário** — nunca uma cópia do arquivo. Ainda não implementado;
+depende do desenho da Sprint D (banco de dados + varredura de biblioteca).
 
 ## Consequências
 
@@ -80,10 +83,12 @@ jogos.
   quantos consoles um adapter atende antes de resolver o caminho — mais uma
   consulta ao registro de adapters (`emulator.NewRegistry().ByID`), que era
   desnecessária na estrutura achatada.
-- A pendência do parágrafo anterior (guardar a ROM em si) segue sem decisão.
+- `jogos/<console>/` vai guardar uma referência (caminho) para a ROM, não o
+  arquivo — a interface precisa deixar claro que mover ou apagar o arquivo
+  original quebra a referência, já que o ZeuX não tem uma cópia própria.
 
 ## Gatilho para revisão
 
 Reabrir a parte de jogos quando a Sprint D for desenhada (banco de dados,
-varredura de biblioteca, scraper) — e resolver explicitamente, antes disso,
-se o arquivo do jogo entra ou não na estrutura gerenciada.
+varredura de biblioteca, scraper), usando a decisão já tomada aqui: metadados
+e referência ao caminho, nunca cópia da ROM.

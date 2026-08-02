@@ -35,7 +35,13 @@ func safeJoin(destDir, entryName string) (string, error) {
 		return "", fmt.Errorf("entrada com caminho absoluto: %q", entryName)
 	}
 
-	cleaned := filepath.Clean(filepath.FromSlash(entryName))
+	// Alguns pacotes (o do Azahar, por exemplo) usam "\" como separador mesmo
+	// vindo de um build feito no Windows, mas rodamos extração também em
+	// Linux/macOS, onde filepath.FromSlash não faz nada com "\" — ele só
+	// normaliza "/". Sem esta troca, "plugins\generic\qt.dll" viraria um único
+	// nome de arquivo com barras invertidas literais, em vez de duas pastas.
+	normalized := strings.ReplaceAll(entryName, "\\", "/")
+	cleaned := filepath.Clean(filepath.FromSlash(normalized))
 	target := filepath.Join(destDir, cleaned)
 
 	// A comparação com o separador no final evita que "/destino-malicioso"

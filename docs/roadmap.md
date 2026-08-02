@@ -5,7 +5,7 @@ Backlog organizado em sprints, derivado do PRD e do estado real do código.
 **Tamanho relativo:** P (poucas horas) · M (alguns dias) · G (uma sprint ou mais).
 Os tamanhos são relativos entre si, não estimativas de calendário.
 
-Última verificação contra o código: 2026-08-01.
+Última verificação contra o código: 2026-08-02.
 
 ---
 
@@ -57,8 +57,8 @@ funcionalidade nova.
 | D3 | **Persistir sessões e tempo de jogo** | M | Perfil, conquistas |
 | D4 | **Resolver OneDrive × `node_modules`/`src-tauri/target`** | P | **A Sprint B inteira** — é o item B0 |
 | D5 | ~~Corrigir as opções silenciosamente ignoradas~~ | P | **Feito** — reconfirmado durante D1; todos os adapters já reportam em `Unapplied` |
-| D6 | Busca recursiva de binários em subdiretórios | M | Instalação 1-click |
-| D7 | Fixar as versões no `mise.toml` | P | Reprodutibilidade |
+| D6 | ~~Busca recursiva de binários em subdiretórios~~ | M | **Feito** — `subdirectories()` em `internal/emulator/discovery.go`, um nível de profundidade |
+| D7 | ~~Fixar as versões no `mise.toml`~~ | P | **Feito** — `go 1.26.5`, `node 24.18.1` |
 | D8 | **Mapear o pular-assistente para os demais emuladores com wizard** | M | "Plug and play" real |
 | D9 | ~~`GET /emulators` faz 1880 `os.Stat` e relê os mesmos diretórios 13×~~ | M | **Feito 2026-08-01** — 6,6× mais rápido, medido |
 | D10 | ~~Corrida de dados: `handleLaunch` serializava a sessão enquanto `supervise` a escrevia~~ | P | **Feito** |
@@ -337,10 +337,12 @@ um campo passar a ser mutado no lugar, a cópia rasa deixa de bastar.
 
 ### Achados menores da mesma auditoria
 
-- `CustomStore.Upsert` e `Delete` (`internal/emulator/custom.go`) fazem
-  ler-modificar-gravar com `RLock` na leitura e `Lock` na escrita, mas sem
-  segurar o lock pelo conjunto. Dois `POST` simultâneos podem perder uma
-  definição. Impacto baixo (app local, um usuário), conserto simples.
+- **Corrigido em 2026-08-02:** `CustomStore.Upsert` e `Delete`
+  (`internal/emulator/custom.go`) faziam ler-modificar-gravar chamando `Load`
+  e `Save` em sequência — cada um tomando e soltando o lock por conta própria,
+  deixando uma janela aberta entre os dois onde dois `POST` simultâneos podiam
+  se perder um ao outro. Agora tomam `mu.Lock()` uma vez para o ciclo inteiro,
+  via `loadLocked`/`saveLocked` internos que não relockam.
 - **Corrigido na hora:** `joinComma` (`internal/emulator/registry.go`)
   concatenava com `+=` em laço — O(n²) nos bytes. Trocado por `strings.Builder`.
   O `n` aqui é sempre pequeno; o motivo de corrigir é o padrão não ficar no
@@ -576,12 +578,14 @@ era interface, e `consent.Store`/`emulator.CustomStore` foram isolados do
 disco do usuário via `XDG_CONFIG_HOME`/`AppData` apontando para um diretório
 temporário do teste.
 
-Rodando `go test ./...` neste ambiente (Linux) foi achado
-**`TestExtractZipRecognizesBackslashDirectoryMarker` falhando em
-`internal/install`**, sem relação com os testes novos — confirmado que a
-falha é preexistente (o teste já estava assim no commit inicial, antes desta
-sessão). Não foi investigado nem corrigido aqui, por estar fora do escopo
-deste item; fica registrado para checagem separada.
+**Corrigido em 2026-08-02:** `TestExtractZipRecognizesBackslashDirectoryMarker`
+falhava neste ambiente (Linux) desde antes desta sessão. Causa real: `safeJoin`
+(`internal/install/extract.go`) usava `filepath.FromSlash`, que só normaliza
+`/` — em Linux/macOS, `\` não é separador nenhum, então uma entrada como
+`plugins\generic\qt.dll` virava um único nome de arquivo com barras invertidas
+literais, em vez de duas pastas. Corrigido trocando `\` por `/` explicitamente
+antes de `filepath.Clean`, independente do SO em que a extração roda — os
+pacotes vêm de builds Windows mesmo quando o ZeuX está rodando em Linux/macOS.
 
 ---
 
