@@ -144,7 +144,9 @@ Também some o `Server.lastScan`, o que é aceitável (é barato refazer), mas
 significa que reiniciar o daemon devolve `404 no_scan_yet` em `/hardware` e
 `/consoles/verdicts`.
 
-Depende de: decisão de banco ([ADR 0002](decisoes/0002-adiar-banco-de-dados.md)).
+Depende de: SQLite local ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md),
+que substitui o adiamento do [ADR 0002](decisoes/0002-adiar-banco-de-dados.md)) —
+decidido em 2026-08-02, ainda não implementado.
 Bloqueia: perfil social, conquistas, "últimos jogados", ProtonDB-like.
 
 ### D4 — OneDrive × artefatos de build (P)
@@ -493,15 +495,23 @@ esse host, ou ser verificado na máquina do Douglas.
 
 Objetivo: o usuário aponta uma pasta e vê seus jogos, não caminhos de arquivo.
 
+**Estado em 2026-08-02:** o fluxo "do zero ao primeiro jogo" e o wireframe das
+telas de biblioteca já estão mapeados (`docs/wireframe.md`), e a decisão de
+banco foi reaberta e fechada — ver [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)
+(SQLite local, driver puro-Go, sem CGO). Falta implementar; nada de código
+desta sprint existe ainda.
+
 | Item | Tam. | Depende de |
 |---|---|---|
-| **Decidir e introduzir o banco (SQLite local)** | G | ADR 0002 |
+| ~~Decidir o banco~~ | G | **Decidido 2026-08-02** — [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md), falta implementar |
+| Introduzir o SQLite: dependência, migrações embutidas, `schema_migrations` | M | ADR 0011 |
 | Camada de repositório: extrair estado de `Launcher` e `Server` | M | ↑ |
 | D3 — persistir sessões e tempo de jogo | M | ↑ |
 | Varredura de pastas de ROM, por console, com detecção de extensão | M | ↑ |
+| Catálogo de BIOS exigido por console (nome esperado, validação) | M | ↑ |
 | Identificação de jogo (hash/nome de arquivo) | M | ↑ |
-| Scraper de metadados: IGDB e/ou ScreenScraper | G | ↑ |
-| Cache local de capas e metadados | M | ↑ |
+| Scraper de metadados: IGDB e/ou ScreenScraper | G | Fora do MVP — ver wireframe, decisão de 2026-08-02 |
+| Cache local de capas e metadados | M | Scraper |
 | Dashboard com grid moderno de capas | G | Sprint B |
 | "Últimos jogados" e tempo por jogo | M | D3 |
 

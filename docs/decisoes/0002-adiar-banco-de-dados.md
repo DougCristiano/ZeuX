@@ -1,6 +1,6 @@
 # 0002 — Adiar o banco de dados
 
-**Status:** Aceito
+**Status:** Substituído por [0011](0011-sqlite-local-para-biblioteca.md)
 
 ## Contexto
 

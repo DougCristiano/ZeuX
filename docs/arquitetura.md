@@ -273,12 +273,16 @@ reporta "AMD Radeon(TM) Graphics", e sem limpar o `(TM)` a busca por
 reportada: em notebook híbrido, avaliar pelo chip integrado daria um veredito
 injustamente pessimista.
 
-### 3.9 Banco de dados deliberadamente adiado
+### 3.9 Banco de dados: decidido, ainda não implementado
 
-Não existe persistência além do `consent.json`. Sessões e tempo de jogo vivem em
-memória e somem ao fechar o app. A prioridade definida foi layout, funcionalidade
-de emuladores e facilidade de configuração **antes** de infraestrutura de dados.
-Ver [ADR 0002](decisoes/0002-adiar-banco-de-dados.md).
+Hoje não existe persistência além do `consent.json`; sessões e tempo de jogo
+vivem em memória e somem ao fechar o app. O adiamento original
+([ADR 0002](decisoes/0002-adiar-banco-de-dados.md)) foi substituído em
+2026-08-02 pelo [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md):
+SQLite local, com driver Go puro (sem CGO, para não exigir compilador C em
+nenhum SO), assim que a Sprint D (biblioteca) começar a ser codada. Até lá o
+comportamento descrito acima continua valendo — a decisão foi tomada, o
+código ainda não existe.
 
 ### 3.10 Legal: nunca facilitar compartilhamento de ROMs
 
