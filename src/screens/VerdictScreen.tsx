@@ -53,6 +53,15 @@ function ConsoleCard({ verdict }: { verdict: ConsoleVerdict }) {
 const SUMMARY_FOCUS =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
+// D2 (docs/roadmap.md) — calibrar os limiares do catálogo — segue aberto: os
+// campos `requires` de consoles.json são estimativas escritas a partir de
+// conhecimento geral, nunca medidas em hardware real. Enquanto isso não
+// mudar, a tela precisa dizer isso, sempre — não é o mesmo aviso da
+// `precision: "parcial"` (que é sobre o que não pôde ser lido desta máquina
+// específica); este é sobre o catálogo inteiro, em toda máquina. Vira `true`
+// quando o D2 fechar.
+const THRESHOLDS_CALIBRATED = false;
+
 /**
  * Tela 03 do wireframe (docs/wireframe.html): o parecer por console.
  * Puramente apresentacional (props-driven) — como a tela 01, quem busca o
@@ -82,6 +91,13 @@ export function VerdictScreen({ report }: { report: Report }) {
           <p className="text-sm text-ink">{report.summary.system}</p>
         </div>
       </Card>
+
+      {!THRESHOLDS_CALIBRATED && (
+        <p className="mt-4 text-sm text-muted">
+          Os patamares abaixo são uma estimativa: os requisitos do catálogo ainda não foram medidos em
+          hardware real.
+        </p>
+      )}
 
       {report.precision === "parcial" && (
         <div className="mt-4">

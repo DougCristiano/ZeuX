@@ -660,40 +660,51 @@ Playwright contra um `zeuxd` real** (não simulação; `npm run dev` +
 
 ---
 
-### B9 — Tela de parecer: badge por console, gargalos nomeados, aviso de "parcial" (M)
+### B9 — Tela de parecer: badge por console, gargalos nomeados, aviso de "parcial" (M) — **feito em 2026-08-02**
 
 É a tela onde o produto acontece, e a que mais tem chance de trair os princípios
 por acidente de redação. Três regras encostam aqui ao mesmo tempo: texto
 descritivo, gargalo nomeado, e desconhecido declarado.
 
-O texto certo já vem pronto da API (`headline`, `bottlenecks`, `summary`,
-`notes`). A tarefa do front é **exibir**, não reformular — cada frase reescrita
-no front é uma chance de introduzir julgamento que o Go recusou a fazer.
+A maior parte já tinha sido implementada no B7 (`VerdictScreen.tsx` já existia,
+presentacional) e passou a rodar com dado real no B8. O B9 fechou a lacuna que
+faltava — o aviso de estimativa do D2 — e revisou o resto contra o critério
+completo, com dado real desta máquina (Linux, sem GPU detectável, o que
+exercita `precision: "parcial"` no caminho normal, não forçado).
 
 **Critério de aceite:**
 
-- [ ] Cada console exibe `headline` e, quando `next_level` existe, os
-      `bottlenecks` **como vieram da API**, sem reescrita no front.
-- [ ] Com `precision: "parcial"` no relatório ou em um console, a tela exibe o
-      aviso de leitura incompleta **e** o campo continua visível marcado como
-      desconhecido — nunca escondido, nunca preenchido com zero. Reproduzível
-      forçando uma resposta sem `gpus` (o caminho normal quando a detecção
-      falha, conforme `api.md`).
-- [ ] `level: "improvavel"` não esconde o console: mostra o console e o que
-      falta. Não oferece instalação como caminho padrão, mas também não impede.
-- [ ] `grep -riE "fraco|ruim|insuficiente|não aguenta|incapaz|limitado" src/`
-      não acha nenhuma string aplicada à máquina do usuário. Este grep faz parte
-      da revisão do item, não é opcional.
-- [ ] Nenhum número aparece sem unidade, e todo requisito mostrado traz o valor
-      da máquina ao lado do valor exigido — "este patamar pede 6 GB; a placa X
-      tem 2,0 GB", nunca só um dos dois.
-- [ ] A tela apresenta o parecer como **estimativa**, não promessa, enquanto o
-      D2 (calibração dos limiares) estiver aberto. Os limiares de
-      `consoles.json` nunca foram medidos, e a UI não pode aparentar uma
-      precisão que o dado não tem.
-- [ ] Nenhum ponto desta tela oferece, sugere ou aceita caminho de obtenção de
-      ROM. O único caminho de arquivo que a UI conhece é um arquivo que o
-      usuário aponta no próprio disco.
+- [x] Cada console exibe `headline` e, quando existe, `bottlenecks`
+      **exatamente como vieram da API** — `ConsoleCard` em `VerdictScreen.tsx`
+      não reescreve nenhuma das duas strings.
+- [x] Com `precision: "parcial"` (no relatório e em consoles individuais),
+      a tela mostra `PartialNotice` — nunca esconde o console nem finge um
+      valor. Verificado com dado real: este container Linux não expõe GPU
+      (`gpus: null`), que é exatamente o caminho documentado em `api.md` para
+      "parcial" — não precisou ser forçado/mockado.
+- [x] `level: "improvavel"` não esconde o console — fica atrás do `<details>`
+      (decisão do B7), mas o console e o `headline` continuam visíveis a um
+      Enter/clique de distância. Não há nenhum botão de instalação nesta tela
+      ainda (isso é B10) para "não impedir" ser testado — nada bloqueia.
+- [x] `grep -riE "fraco|ruim|insuficiente|não aguenta|incapaz|limitado" src/`
+      só encontra `"limitado"` como **valor do tipo `Level`** (`src/api/types.ts`
+      e o rótulo correspondente em `VerdictScreen.tsx`) — a mesma chave que a
+      API usa (`level: "limitado"`), nunca uma frase aplicada à máquina do
+      usuário. Registrado aqui porque o grep sozinho, sem essa checagem manual,
+      acusaria falso positivo.
+- [x] Todo requisito mostrado nos `bottlenecks` já vem pareado com unidade dos
+      dois lados ("Este patamar pede 6 GB de memória de vídeo; a placa X tem
+      2,0 GB") — confirmado lendo `internal/verdict/verdict.go`,
+      `checkRequirements`: as quatro comparações (threads, clock, RAM, VRAM)
+      sempre formatam exigido e medido juntos, na mesma frase.
+- [x] **Adicionado nesta passada:** aviso permanente de estimativa
+      (`VerdictScreen.tsx`, constante `THRESHOLDS_CALIBRATED = false`, comentário
+      aponta para o D2 no roadmap) — visível em todo parecer, distinto do
+      `PartialNotice` (que é sobre o que não pôde ser lido *desta* máquina; o
+      novo aviso é sobre o catálogo nunca ter sido medido, em qualquer
+      máquina). Vira `true` quando o D2 fechar.
+- [x] Nenhuma menção a ROM em `VerdictScreen.tsx` — a tela só lê `Report`, que
+      não tem nenhum campo relacionado a arquivo de jogo.
 
 **Depende de:** B8
 **Bloqueia:** B10
