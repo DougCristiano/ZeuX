@@ -443,23 +443,46 @@ real do WebView escrito aqui. Os sete itens completos estão em
 
 Objetivo: o usuário não precisa saber o que é DuckStation para jogar PS1.
 
-| Item | Tam. | Depende de |
-|---|---|---|
-| Manifesto de downloads por emulador × SO × arquitetura | M | D1 |
-| Download com verificação de checksum e barra de progresso | M | ↑ |
-| Extração para `ManagedRoot()` (`UserConfigDir()/ZeuX/emulators/<id>/`) | M | ↑ |
-| Instalar/atualizar/remover apenas o que é `managed` | M | ↑ |
-| Instalação de cores do RetroArch | M | ↑ |
-| ~~**Aviso quando o hardware não comporta, e o usuário decide**~~ | P | **Migrou para a Sprint B, item B10** — o servidor já bloqueia com `?force=true`; falta só a tela |
-| Rotas: `POST /api/v1/emulators/{id}/install`, `DELETE`, progresso | M | ↑ |
+**Estado revisado em 2026-08-02, contra o código real (não contra a memória
+desta tabela):** a tabela abaixo dizia "nada escreve na pasta gerenciada
+ainda", o que deixou de ser verdade em algum ponto da Fase 1 sem que este
+arquivo fosse atualizado — `internal/install/manager.go` (`promote`,
+`Uninstall`) já escreve e apaga em `ManagedRoot()` de verdade, com
+preservação de saves em atualização (`preservePortableUserData`) e
+recuperação se o `rename` falhar no meio. Testado de ponta a ponta no B10
+(Sprint B): instalação real bloqueada por hardware, instalação real que
+falhou por rede (GitHub e RetroArch), ambas com o job (`GET /installs/{id}`)
+refletindo o estado certo.
 
-`ManagedRoot()` e `Installation.Managed` já existem no código e a busca já
-prioriza a pasta gerenciada — **nada escreve nela ainda**. A infraestrutura de
-leitura está pronta; falta a de escrita.
+| Item | Tam. | Estado |
+|---|---|---|
+| ~~Manifesto de downloads por emulador × SO × arquitetura~~ | M | **Feito** — `internal/install/sources.go` + `data/sources.json` |
+| ~~Download com verificação de checksum e barra de progresso~~ | M | **Feito** — `download.go`; `Job.Percent()` trata tamanho desconhecido |
+| ~~Extração para `ManagedRoot()`~~ | M | **Feito** — `extract.go` + `manager.go` (`promote`), atômico via diretório de trabalho + `rename` |
+| ~~Instalar/atualizar/remover apenas o que é `managed`~~ | M | **Feito** — `Uninstall` só apaga dentro de `ManagedRoot()`; atualização preserva dados de instalação portátil |
+| **Instalação de cores do RetroArch** | M | **Bloqueado neste ambiente** — ver nota abaixo |
+| ~~**Aviso quando o hardware não comporta, e o usuário decide**~~ | P | **Feito na Sprint B, item B10** |
+| ~~Rotas: `POST /api/v1/emulators/{id}/install`, `DELETE`, progresso~~ | M | **Feito** — documentado em `docs/api.md`, testado de verdade no B10 |
 
 **Princípio de produto:** se o hardware não comporta o emulador, **não instalar
 automaticamente**. Mostrar o parecer, explicar o gargalo, e deixar o usuário
 decidir por conta e risco. Não bloquear — informar.
+
+### Bloqueio real: instalação de cores do RetroArch
+
+Os cores do RetroArch (libretro) são distribuídos pelo `buildbot.libretro.com`,
+não pelo GitHub Releases — um mecanismo de resolução diferente do que
+`internal/install` já sabe fazer (`sources.go` só resolve releases do GitHub).
+
+**Verificado em 2026-08-02:** `buildbot.libretro.com` está bloqueado pela
+política de rede deste container (`gateway answered 403 to CONNECT (policy
+denial)`, confirmado no status do proxy do ambiente). Isso significa que uma
+implementação feita aqui não poderia ser testada contra o servidor real —
+exatamente o tipo de afirmação sem verificação que o D1 já mostrou ser
+perigosa (uma URL ou formato de pacote errado só apareceria na máquina de um
+usuário). Por isso este item fica **registrado como bloqueado, não
+implementado às cegas** — precisa ou rodar numa máquina/ambiente com acesso a
+esse host, ou ser verificado na máquina do Douglas.
 
 ---
 

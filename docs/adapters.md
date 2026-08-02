@@ -302,9 +302,10 @@ Nomes procurados por adapter:
 | rpcs3 | `rpcs3.exe` | `rpcs3` | `RPCS3` |
 | cemu | `Cemu.exe` | `Cemu` | `Cemu` |
 
-A pasta gerenciada (`ManagedRoot()`) já é consultada e o campo
-`Installation.Managed` já é preenchido, mas **nada escreve nela ainda** — a
-instalação 1-click não existe. Hoje `managed` é sempre `false` na prática.
+A pasta gerenciada (`ManagedRoot()`) já é consultada, e a instalação 1-click
+(`internal/install`, rotas `POST`/`DELETE /emulators/{id}/install`) já escreve
+e apaga ali de verdade — ver Sprint C no [roadmap](roadmap.md), corrigido em
+2026-08-02. `Installation.Managed` sai `true` para o que o ZeuX instalou.
 
 `Installation.Version` **nunca é preenchido**: nenhum adapter detecta versão.
 O campo existe porque o sistema de compatibilidade comunitário depende dele
