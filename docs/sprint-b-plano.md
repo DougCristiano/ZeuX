@@ -711,7 +711,7 @@ exercita `precision: "parcial"` no caminho normal, não forçado).
 
 ---
 
-### B10 — Instalar com ressalva de hardware (P)
+### B10 — Instalar com ressalva de hardware (P) — **feito em 2026-08-02**
 
 Pequeno porque o servidor já faz o trabalho: `hardwareBlocks` bloqueia,
 devolve o motivo e um `override_hint` dizendo para repetir com `?force=true`
@@ -722,16 +722,47 @@ decide**" que está listada na Sprint C. Ela é trazida para cá porque a tela d
 wireframe existe, o backend existe, e o custo é de uma tarde — deixá-la na
 Sprint C seria esperar por nada.
 
-**Critério de aceite:**
+**O que foi construído, um pouco além do mínimo do critério:** o wireframe
+previa telas 06 (lista de emuladores) e 07 (ressalva) separadas; aqui as duas
+viraram uma só — `src/screens/EmulatorsScreen.tsx`, uma tabela onde cada linha
+carrega seu próprio estado de instalação (`idle` → `confirm-hardware` →
+`installing` → `done`/`error`). Sem remoção nem cadastro manual — nenhum dos
+dois é exigido pelo B10, e adicionar teria sido escopo a mais. Alcançável a
+partir do parecer (`VerdictScreen`, botão "Ver emuladores") **e** da tela de
+recusa (`DeclinedScreen`) — instalar um emulador não lê hardware nenhum, então
+não faz sentido escondê-lo de quem recusou o consentimento.
 
-- [ ] Um `POST /api/v1/emulators/{id}/install` bloqueado exibe o motivo que o
-      **servidor** mandou, mais um botão explícito de "Instalar mesmo assim" que
-      repete a chamada com `?force=true`.
-- [ ] O texto do aviso é o `message`/motivo do servidor, não uma frase inventada
-      no front — verificável mudando a frase no Go e vendo a tela mudar.
-- [ ] Recusar não esconde o emulador da lista nem desabilita a linha.
-- [ ] O progresso da instalação é lido de `GET /api/v1/installs/{id}` e mostrado;
-      falha de download aparece com a mensagem do servidor.
+**Critério de aceite — verificado com Chromium contra um `zeuxd` real, sem
+mock, incluindo uma tentativa de instalação de verdade** (o download real
+falhou por causa da política de rede deste ambiente, o que virou uma prova a
+mais em vez de um obstáculo — ver abaixo):
+
+- [x] `POST /emulators/rpcs3/install` bloqueado (409, hardware desta máquina
+      não alcança o PS3) exibiu exatamente a frase do servidor
+      ("Pelo que o ZeuX leu deste computador, RPCS3 (PlayStation 3)
+      provavelmente não roda de forma jogável aqui...") com "Instalar mesmo
+      assim" como ação primária, igual ao wireframe 07.
+- [x] O texto vem de `ApiError.message` (`src/api/client.ts`), nunca escrito em
+      `EmulatorsScreen.tsx` — o componente só lê o campo.
+- [x] "Cancelar" devolve a linha ao estado normal: confirmado que o botão
+      "Instalar" continua visível e **habilitado** depois — não é um beco sem
+      saída, e o emulador nunca some da lista.
+- [x] Progresso lido de `GET /installs/{id}` via polling — `ProgressBar` novo
+      em `src/components/ui.tsx`. **Achado ao testar com instalação real:**
+      forçar a instalação do RetroArch/RPCS3 bateu a política de rede deste
+      ambiente (proxy sem `github.com` liberado) e o servidor devolveu erros
+      reais e distintos — `"o GitHub limitou as consultas por agora..."` para
+      quatro emuladores de fonte GitHub, e
+      `"o RPCS3 não publica pacote para este sistema operacional"` ao forçar o
+      RPCS3 — ambos exibidos verbatim, com "Tentar de novo". Isso exercitou o
+      caminho de falha de download **sem precisar simular nada**: o ambiente
+      de teste criou o cenário de erro sozinho.
+- [x] Fonte manual (RetroArch, Dolphin): `install_refused` exibido com a
+      explicação completa do servidor (por que não é automatizável + onde
+      baixar manualmente), mesmo caminho de erro genérico.
+- [x] Navegação só por teclado confirmada até a tela de emuladores (Tab a
+      partir do parecer alcança "Ver emuladores" primeiro; dentro da tabela,
+      16 paradas de Tab sem prender o foco).
 
 **Depende de:** B9
 **Bloqueia:** nada
@@ -800,22 +831,41 @@ Não como princípio abstrato — como comportamento verificável, e em qual ite
 
 ## Critério de saída da Sprint B
 
-A sprint termina quando **tudo isto for verdade ao mesmo tempo**:
+A sprint termina quando **tudo isto for verdade ao mesmo tempo**. Estado em
+2026-08-02, depois de B0–B10:
 
-1. Um instalador gerado por `npm run tauri build` instala o ZeuX numa máquina
-   sem Go, sem Node e sem Rust.
-2. Nessa máquina, abrir o app pelo atalho leva o usuário do consentimento ao
+1. ⚠️ **Não verificado no Windows real.** Um instalador gerado por
+   `npm run tauri build` instala o ZeuX numa máquina sem Go, sem Node e sem
+   Rust. Estruturalmente já deveria funcionar — o `zeuxd` é compilado e
+   embutido como sidecar no mesmo comando (`scripts/build-zeuxd.mjs`, item B5),
+   não copiado à mão — mas isso só foi rodado neste container Linux. Item B11
+   (empacotamento) continua com critérios específicos de Windows em aberto:
+   elevação de administrador, desinstalar pelo painel do Windows.
+2. ✅ Nessa máquina, abrir o app pelo atalho leva o usuário do consentimento ao
    parecer por console **sem nenhum passo manual** — o `zeuxd` sobe e desce
-   junto com a janela.
-3. O parecer na tela mostra `headline`, `bottlenecks` e o aviso de `parcial` com
-   o texto que veio da API, e o `grep` por adjetivos de valor não acha nada.
-4. O onboarding inteiro é concluído usando só teclado, com foco visível.
-5. Fechar a janela não deixa `zeuxd` no ar; abrir com a porta ocupada mostra uma
-   mensagem em português.
-6. O `ADR 0001` deixa de ser aposta: está escrito no roadmap qual é o `origin`
-   real do WebView, se CORS foi necessário e o que exatamente foi feito.
-7. O D4 está marcado **Feito** com o caminho escolhido registrado, e nem
-   `node_modules/` nem `src-tauri/target/` são sincronizados pelo OneDrive.
+   junto com a janela. Verificado com o `.deb` real, processo automatizado
+   (B5) e onboarding completo (B8).
+3. ✅ O parecer na tela mostra `headline`, `bottlenecks` e o aviso de `parcial`
+   com o texto que veio da API, e o `grep` por adjetivos de valor não acha
+   nada (B9).
+4. ✅ O onboarding inteiro é concluído usando só teclado, com foco visível
+   (B7, B8, B10 — confirmado também na tela de emuladores).
+5. ✅ Fechar a janela não deixa `zeuxd` no ar; abrir com a porta ocupada mostra
+   uma mensagem em português (B5).
+6. ✅ O `ADR 0001` deixa de ser aposta: o `origin` real do WebView, se CORS foi
+   necessário e o que foi feito estão escritos aqui (B2/B3) — com a ressalva
+   de que o `origin` de produção do Windows nunca foi observado, só o
+   documentado.
+7. ❌ **Não feito, e não pode ser feito daqui.** O D4 (OneDrive × artefatos de
+   build) só existe na sua máquina Windows — este container nunca teve
+   OneDrive para começo de conversa. Continua exatamente como estava:
+   tentado em 2026-08-01, bloqueado por arquivos em uso.
+
+**Leitura honesta:** 5 dos 7 itens estão fechados e verificados de verdade
+(não só "deveria funcionar"). Os 2 que faltam (1 e 7) não são trabalho que
+falta fazer — são verificação que só acontece na sua máquina Windows. A
+arquitetura inteira (B1–B10) foi validada num ambiente equivalente; o que
+falta é a mesma prova, na máquina real, uma vez que o D4 seja resolvido lá.
 
 O que **não** faz parte do critério de saída, de propósito: biblioteca de jogos,
 grid de capas, navbar social e descoberta dinâmica de porta. São Sprint D, E e

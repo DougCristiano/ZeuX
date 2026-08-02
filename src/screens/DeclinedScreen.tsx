@@ -5,12 +5,18 @@ import { Button } from "../components/ui";
  * recusar não pode ser beco sem saída — o app continua utilizável, e a
  * recusa pode ser revista a qualquer momento.
  *
- * Honestidade de escopo: as telas de biblioteca e emuladores (wireframe 04-07)
- * ainda não existem nesta versão (Sprint C/D) — então "utilizável" hoje
- * significa "não é um beco sem saída", não "app completo sem hardware". O
- * texto diz isso, em vez de fingir uma funcionalidade que não está aqui.
+ * Honestidade de escopo: a biblioteca (wireframe 04-05) ainda não existe
+ * nesta versão (Sprint D). Emuladores (B10) já existe e não depende de
+ * consentimento — instalar um emulador não lê hardware nenhum — por isso
+ * "Ver emuladores" aparece aqui de verdade, não como promessa vazia.
  */
-export function DeclinedScreen({ onReconsider }: { onReconsider: () => void }) {
+export function DeclinedScreen({
+  onReconsider,
+  onViewEmulators,
+}: {
+  onReconsider: () => void;
+  onViewEmulators: () => void;
+}) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-paper px-6">
       <div className="flex max-w-md flex-col gap-4">
@@ -22,9 +28,12 @@ export function DeclinedScreen({ onReconsider }: { onReconsider: () => void }) {
         <p className="text-sm text-muted">
           Você pode autorizar a qualquer momento — nada foi lido, e nada muda até você decidir.
         </p>
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Button variant="primary" autoFocus onClick={onReconsider}>
             Autorizar agora
+          </Button>
+          <Button variant="secondary" onClick={onViewEmulators}>
+            Ver emuladores
           </Button>
         </div>
       </div>

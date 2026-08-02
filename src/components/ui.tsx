@@ -81,3 +81,19 @@ export function PartialNotice({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/**
+ * Barra de progresso — mesmo vocabulário do wireframe (`.bar`/`.bar span`).
+ * `percent` ausente (tamanho total desconhecido, `Job.total_bytes === 0`)
+ * mostra a barra indeterminada em vez de fingir 0% ou 100%.
+ */
+export function ProgressBar({ percent }: { percent: number | null }) {
+  return (
+    <div className="h-1.5 overflow-hidden rounded-sm border border-line" role="progressbar" aria-valuenow={percent ?? undefined}>
+      <div
+        className="h-full bg-fill-strong transition-[width]"
+        style={{ width: percent === null ? "100%" : `${percent}%`, opacity: percent === null ? 0.4 : 1 }}
+      />
+    </div>
+  );
+}

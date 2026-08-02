@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
+import { Button } from "./components/ui";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
+import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
 import { VerdictScreen } from "./screens/VerdictScreen";
 
@@ -21,7 +23,8 @@ type Phase =
   | "declined"
   | "scanning"
   | "scan-error"
-  | "verdict";
+  | "verdict"
+  | "emulators";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("checking-port");
@@ -29,6 +32,10 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [report, setReport] = useState<Report | null>(null);
+  // Emuladores (B10) não depende de consentimento — pode ser alcançado tanto
+  // do parecer quanto da tela de recusa (docs/sprint-b-plano.md, B8: "recusar
+  // não pode ser beco sem saída"). Guarda de onde veio para "Voltar" certo.
+  const [cameFromDeclined, setCameFromDeclined] = useState(false);
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
@@ -153,7 +160,15 @@ function App() {
       );
 
     case "declined":
-      return <DeclinedScreen onReconsider={() => setPhase("consent")} />;
+      return (
+        <DeclinedScreen
+          onReconsider={() => setPhase("consent")}
+          onViewEmulators={() => {
+            setCameFromDeclined(true);
+            setPhase("emulators");
+          }}
+        />
+      );
 
     case "scanning":
       return <LoadingScreen message="lendo este computador…" />;
@@ -164,9 +179,23 @@ function App() {
     case "verdict":
       return (
         <main className="min-h-screen bg-paper">
+          <div className="mx-auto flex max-w-3xl justify-end px-6 pt-6">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setCameFromDeclined(false);
+                setPhase("emulators");
+              }}
+            >
+              Ver emuladores
+            </Button>
+          </div>
           <VerdictScreen report={report!} />
         </main>
       );
+
+    case "emulators":
+      return <EmulatorsScreen onBack={() => setPhase(cameFromDeclined ? "declined" : "verdict")} />;
   }
 }
 
