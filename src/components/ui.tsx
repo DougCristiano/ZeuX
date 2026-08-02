@@ -10,8 +10,11 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 // só aparece pra navegação por teclado, nunca ao clicar com o mouse — que é
 // exatamente a distinção que a maioria dos resets de CSS erra.
 
-const FOCUS_RING =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
+// O anel de foco usa a cor de acento do tema ativo (ThemePicker) — cada
+// identidade visual (fósforo/cartucho/sala) tem a sua, não uma cor de foco
+// genérica fixa.
+export const FOCUS_RING =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
@@ -20,7 +23,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border border-line-strong bg-fill-strong font-semibold text-ink hover:bg-line-strong",
+  primary: "border border-accent bg-accent font-semibold text-accent-ink hover:bg-accent-hover",
   secondary: "border border-line-strong bg-transparent text-ink hover:bg-fill",
   ghost: "border border-dashed border-line-strong bg-transparent text-muted hover:text-ink hover:border-ink",
 };
@@ -28,7 +31,7 @@ const buttonVariants: Record<ButtonVariant, string> = {
 export function Button({ variant = "secondary", className = "", ...props }: ButtonProps) {
   return (
     <button
-      className={`rounded px-4 py-2 text-base transition-colors ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
+      className={`rounded px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
       {...props}
     />
   );
@@ -48,9 +51,7 @@ type BadgeVariant = "default" | "solid";
 
 export function Badge({ children, variant = "default" }: { children: ReactNode; variant?: BadgeVariant }) {
   const styles =
-    variant === "solid"
-      ? "border-line-strong bg-fill-strong text-ink"
-      : "border-line-strong text-muted";
+    variant === "solid" ? "border-accent bg-accent text-accent-ink" : "border-line-strong text-muted";
   return (
     <span className={`inline-block rounded-sm border px-1.5 py-0.5 font-mono text-xs tracking-wide ${styles}`}>
       {children}
@@ -91,7 +92,7 @@ export function ProgressBar({ percent }: { percent: number | null }) {
   return (
     <div className="h-1.5 overflow-hidden rounded-sm border border-line" role="progressbar" aria-valuenow={percent ?? undefined}>
       <div
-        className="h-full bg-fill-strong transition-[width]"
+        className="h-full bg-accent transition-[width]"
         style={{ width: percent === null ? "100%" : `${percent}%`, opacity: percent === null ? 0.4 : 1 }}
       />
     </div>

@@ -1,5 +1,5 @@
 import type { ConsoleVerdict, Report } from "../api/types";
-import { Badge, Callout, Card, PartialNotice } from "../components/ui";
+import { Badge, Callout, Card, FOCUS_RING, PartialNotice } from "../components/ui";
 
 const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
   otimo: "ótimo",
@@ -49,9 +49,6 @@ function ConsoleCard({ verdict }: { verdict: ConsoleVerdict }) {
     </Card>
   );
 }
-
-const SUMMARY_FOCUS =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
 // D2 (docs/roadmap.md) — calibrar os limiares do catálogo — segue aberto: os
 // campos `requires` de consoles.json são estimativas escritas a partir de
@@ -113,7 +110,7 @@ export function VerdictScreen({ report }: { report: Report }) {
 
       {improbable.length > 0 && (
         <details className="mt-4 rounded border border-line">
-          <summary className={`cursor-pointer rounded px-4 py-2 font-mono text-sm text-muted select-none ${SUMMARY_FOCUS}`}>
+          <summary className={`cursor-pointer rounded px-4 py-2 font-mono text-sm text-muted select-none ${FOCUS_RING}`}>
             {improbable.length} console(s) provavelmente não rodam aqui — mostrar
           </summary>
           <div className="flex flex-col gap-3 p-4 pt-0">

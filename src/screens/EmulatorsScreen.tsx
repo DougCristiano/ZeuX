@@ -149,7 +149,7 @@ export function EmulatorsScreen({ onBack }: { onBack: () => void }) {
   }, [reloadKey]);
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="mx-auto max-w-3xl px-6 pt-16 pb-10">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">Emuladores</h1>
         <Button variant="secondary" onClick={onBack}>

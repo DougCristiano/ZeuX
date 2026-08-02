@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Button } from "./components/ui";
+import { ThemePicker } from "./components/ThemePicker";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
@@ -128,13 +129,16 @@ function App() {
     }
   }
 
+  let screen: ReactNode;
+
   switch (phase) {
     case "checking-port":
     case "connecting":
-      return <LoadingScreen message="lendo o consentimento…" />;
+      screen = <LoadingScreen message="lendo o consentimento…" />;
+      break;
 
     case "port-conflict":
-      return (
+      screen = (
         <main className="flex min-h-screen items-center justify-center bg-paper px-6">
           <p className="max-w-sm text-base text-danger">
             A porta 7777 já está sendo usada por outro programa, não pelo ZeuX. Feche o que estiver usando
@@ -142,14 +146,16 @@ function App() {
           </p>
         </main>
       );
+      break;
 
     case "daemon-unreachable":
-      return <ErrorScreen message={errorMessage} onRetry={() => setPhase("connecting")} />;
+      screen = <ErrorScreen message={errorMessage} onRetry={() => setPhase("connecting")} />;
+      break;
 
     case "consent":
       // policy só é null momentaneamente antes do primeiro carregamento —
       // nesse ponto phase ainda não é "consent".
-      return (
+      screen = (
         <ConsentScreen
           policyText={policy!.text}
           policyVersion={policy!.version}
@@ -158,9 +164,10 @@ function App() {
           onDecline={handleDecline}
         />
       );
+      break;
 
     case "declined":
-      return (
+      screen = (
         <DeclinedScreen
           onReconsider={() => setPhase("consent")}
           onViewEmulators={() => {
@@ -169,17 +176,20 @@ function App() {
           }}
         />
       );
+      break;
 
     case "scanning":
-      return <LoadingScreen message="lendo este computador…" />;
+      screen = <LoadingScreen message="lendo este computador…" />;
+      break;
 
     case "scan-error":
-      return <ErrorScreen message={errorMessage} onRetry={runScan} />;
+      screen = <ErrorScreen message={errorMessage} onRetry={runScan} />;
+      break;
 
     case "verdict":
-      return (
+      screen = (
         <main className="min-h-screen bg-paper">
-          <div className="mx-auto flex max-w-3xl justify-end px-6 pt-6">
+          <div className="mx-auto flex max-w-3xl justify-end px-6 pt-16">
             <Button
               variant="secondary"
               onClick={() => {
@@ -193,10 +203,19 @@ function App() {
           <VerdictScreen report={report!} />
         </main>
       );
+      break;
 
     case "emulators":
-      return <EmulatorsScreen onBack={() => setPhase(cameFromDeclined ? "declined" : "verdict")} />;
+      screen = <EmulatorsScreen onBack={() => setPhase(cameFromDeclined ? "declined" : "verdict")} />;
+      break;
   }
+
+  return (
+    <>
+      <ThemePicker />
+      {screen}
+    </>
+  );
 }
 
 export default App;

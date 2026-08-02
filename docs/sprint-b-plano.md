@@ -608,6 +608,49 @@ Sprint D (biblioteca), fora do escopo desta sprint.
 **Depende de:** B4, B-wire
 **Bloqueia:** B8
 
+**Evolução em 2026-08-02 (fora do escopo original do B7, decisão de produto):**
+o sistema de cor deixou de ser um único par claro/escuro e virou **três
+identidades visuais escolhíveis**, todas escuras — decisão do Douglas, que
+queria ir na direção que Steam/Epic/GOG já validaram (biblioteca de jogos
+combina com tons escuros), mas com uma personalidade que não fosse nenhuma
+das três:
+
+| Tema | Temperatura | Acento | Referência |
+|---|---|---|---|
+| `fosforo` (padrão) | preto esverdeado | verde-fósforo | terminal CRT |
+| `cartucho` | preto acastanhado | laranja-queimado | plástico de cartucho envelhecido |
+| `sala` | preto azulado | âmbar quente | TV acesa no escuro |
+
+**O que mudou de estrutural:** `src/index.css` trocou o par
+`prefers-color-scheme`/`data-theme="dark"|"light"` por três blocos
+`:root[data-theme="fosforo"|"cartucho"|"sala"]` — **não há mais modo claro**,
+foi decisão deliberada, não omissão. Dois tokens novos entraram
+(`--accent`/`--accent-hover`/`--accent-ink`) e passaram a colorir de verdade o
+que antes era neutro: `Button` primário, `Badge` sólido (níveis "ótimo"/"bom"
+do parecer, "instalado" dos emuladores) e `ProgressBar` agora usam a cor de
+acento do tema ativo — sem isso, trocar de tema mudaria só o fundo, e o
+exercício perderia a graça. O anel de foco (`FOCUS_RING`, exportado de
+`ui.tsx` e reaproveitado em `VerdictScreen.tsx`) também usa `--accent` em vez
+de uma cor de foco fixa.
+
+`src/components/ThemePicker.tsx` fica fixo no canto superior direito,
+visível em qualquer tela — não existe tela de configurações ainda para
+morar. A escolha persiste em `localStorage` (`zeux-theme`), e um script
+embutido em `index.html` aplica o tema salvo **antes** do React montar, para
+não haver flash do tema padrão a cada abertura.
+
+**Achado ao integrar:** o seletor fixo colidia com botões que já ficavam no
+canto superior direito de outras telas ("Ver emuladores", "Voltar ao
+parecer") — corrigido dando mais espaço no topo dessas telas
+(`pt-16` em vez de `pt-6`/`py-10`).
+
+Verificado com Chromium via Playwright nas três telas que já existem
+(consentimento, parecer, emuladores): troca instantânea sem perder estado da
+tela (ex.: confirmação de instalação bloqueada por hardware continua visível
+ao trocar de tema no meio da interação), persistência confirmada depois de
+recarregar a página, e anel de foco com a cor certa do tema ativo
+(`outline-color` batendo com `--accent`, só quando `:focus-visible`).
+
 ---
 
 ### B8 — Fluxo de onboarding: consentimento → scan → parecer (M) — **feito em 2026-08-02**

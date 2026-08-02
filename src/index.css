@@ -1,76 +1,77 @@
 @import "tailwindcss";
 
 /*
- * Tokens de cor do item B7 (docs/sprint-b-plano.md). O wireframe
- * (docs/wireframe.html) deixou cor de propósito em aberto — isto fecha essa
- * decisão. A estratégia (variável CSS + media query como padrão, mais
- * data-theme para uma alternância futura) é a mesma já testada no próprio
- * wireframe, não uma invenção nova.
+ * Tokens de cor do ZeuX. O produto decidiu ir 100% escuro, com três
+ * identidades visuais escolhíveis pelo usuário (ThemePicker,
+ * src/components/ThemePicker.tsx) em vez de uma única paleta — a mesma
+ * decisão que Steam/Epic/GOG tomam (bibliotecas de jogos preferem tons
+ * escuros), mas com acento e temperatura próprios em cada uma, evitando o
+ * azul da Steam, o roxo da GOG e o preto/branco genérico da Epic.
+ *
+ * Não existe mais modo claro de propósito: a identidade é escura, e a escolha
+ * entre as três é sobre personalidade, não sobre contraste.
+ *
+ * `data-theme` no elemento raiz decide qual conjunto vale; `fosforo` é o
+ * padrão quando o atributo ainda não foi aplicado (ver index.html, que
+ * grava a escolha salva antes do React montar, para não haver flash).
  */
-:root {
-  --paper: #fbfbfc;
-  --panel: #ffffff;
-  --ink: #1c1d21;
-  --line: #c3c5cc;
-  --line-strong: #9da0a9;
-  --fill: #ecedf1;
-  --fill-strong: #dee0e6;
-  --muted: #6e7178;
-  --focus: #2f5fa8;
-  --amber: #9a6414;
-  --amber-bg: #fbf4e6;
-  --amber-line: #e2c489;
-  --danger: #b3261e;
+
+:root,
+:root[data-theme="fosforo"] {
+  /* Fósforo — terminal CRT: preto com fundo esverdeado, acento verde-fósforo. */
+  --paper: #0a0f0c;
+  --panel: #101811;
+  --ink: #d9f2e2;
+  --muted: #6f9481;
+  --line: #223129;
+  --line-strong: #35493c;
+  --fill: #16201a;
+  --fill-strong: #1e2b22;
+  --accent: #3fe08a;
+  --accent-hover: #5eeaa0;
+  --accent-ink: #04140b;
+  --amber: #e0b465;
+  --amber-bg: #201c0f;
+  --amber-line: #4a3d1e;
+  --danger: #ef7a68;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #131418;
-    --panel: #1a1c21;
-    --ink: #e7e8ec;
-    --line: #3b3e47;
-    --line-strong: #5a5e69;
-    --fill: #212329;
-    --fill-strong: #2a2d34;
-    --muted: #8b8e97;
-    --focus: #6e9be0;
-    --amber: #d8a461;
-    --amber-bg: #262015;
-    --amber-line: #574a31;
-    --danger: #e5766d;
-  }
+:root[data-theme="cartucho"] {
+  /* Cartucho — plástico envelhecido: preto com fundo acastanhado, acento laranja-queimado. */
+  --paper: #130f0b;
+  --panel: #1c1610;
+  --ink: #f1e6d6;
+  --muted: #a08b6f;
+  --line: #372a1c;
+  --line-strong: #4d3c28;
+  --fill: #1c1610;
+  --fill-strong: #2a2015;
+  --accent: #e07b3a;
+  --accent-hover: #ec9257;
+  --accent-ink: #1a0e04;
+  --amber: #e0b465;
+  --amber-bg: #241b0f;
+  --amber-line: #4a3a1e;
+  --danger: #e2685a;
 }
 
-:root[data-theme="dark"] {
-  --paper: #131418;
-  --panel: #1a1c21;
-  --ink: #e7e8ec;
-  --line: #3b3e47;
-  --line-strong: #5a5e69;
-  --fill: #212329;
-  --fill-strong: #2a2d34;
-  --muted: #8b8e97;
-  --focus: #6e9be0;
-  --amber: #d8a461;
-  --amber-bg: #262015;
-  --amber-line: #574a31;
-  --danger: #e5766d;
-}
-
-:root[data-theme="light"] {
-  --paper: #fbfbfc;
-  --panel: #ffffff;
-  --ink: #1c1d21;
-  --line: #c3c5cc;
-  --line-strong: #9da0a9;
-  --fill: #ecedf1;
-  --fill-strong: #dee0e6;
-  --muted: #6e7178;
-  --focus: #2f5fa8;
-  --amber: #9a6414;
-  --amber-bg: #fbf4e6;
-  --amber-line: #e2c489;
-  --danger: #b3261e;
+:root[data-theme="sala"] {
+  /* Sala escura — brilho de TV: preto azulado, acento âmbar quente. */
+  --paper: #0b0d13;
+  --panel: #12151d;
+  --ink: #e9ebf3;
+  --muted: #838aa0;
+  --line: #232838;
+  --line-strong: #333a4f;
+  --fill: #12151d;
+  --fill-strong: #1b2030;
+  --accent: #f0a94a;
+  --accent-hover: #f5bd6c;
+  --accent-ink: #1c1103;
+  --amber: #f0a94a;
+  --amber-bg: #241c10;
+  --amber-line: #4a3a20;
+  --danger: #e6786c;
 }
 
 @theme {
@@ -82,7 +83,9 @@
   --color-fill: var(--fill);
   --color-fill-strong: var(--fill-strong);
   --color-muted: var(--muted);
-  --color-focus: var(--focus);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
   --color-amber: var(--amber);
   --color-amber-bg: var(--amber-bg);
   --color-amber-line: var(--amber-line);
@@ -90,7 +93,7 @@
 
   /*
    * Escala tipográfica única (item B7): tudo na interface usa um destes seis
-   * degraus, para não acumular tamanhos de fonte ad-hoc tela por tela.
+   * degraus, para não acumular tamanho de fonte ad-hoc tela por tela.
    */
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.8125rem;
@@ -103,4 +106,5 @@
 body {
   background: var(--paper);
   color: var(--ink);
+  transition: background-color .15s ease, color .15s ease;
 }
