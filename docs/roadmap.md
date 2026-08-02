@@ -565,9 +565,21 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | ~~Testes de `internal/api` e `internal/consent`~~ | M | **Feito 2026-08-01** — `Probe` mockado via interface; ver nota abaixo |
 | Autenticação da API local | M | Necessário se algo além do Tauri falar com ela |
 | Descoberta dinâmica de porta | P | Evita colisão em `7777` |
-| CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual |
+| CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual — ~~build do instalador Windows~~ **feito 2026-08-02**, ver abaixo |
 | Detecção de BIOS/firmware necessários por console | M | PS1, PS2, Dreamcast, Wii U precisam |
 | Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
+
+**Build do instalador Windows via GitHub Actions (2026-08-02):**
+`.github/workflows/build-windows.yml` roda num runner `windows-latest` (que já
+tem toolchain nativa) a cada push em `src/`, `src-tauri/`, `internal/`,
+`cmd/` ou dependências, e também sob demanda (`workflow_dispatch`). Instala
+Go, Node e Rust no runner, roda `npm run tauri build` (que já dispara
+`build:daemon` via `beforeBuildCommand`) e publica o `.msi`/`.exe` gerado como
+artifact do run. Existe justamente para não depender de instalar Rust/MSVC na
+máquina Windows do Douglas — ADR 0004 segue adiada, o instalador de teste sai
+da nuvem. **Sem assinatura de código**: o instalador vai disparar o aviso do
+SmartScreen até isso ser resolvido separadamente (custo de certificado, fora
+de escopo por ora).
 
 **Nota sobre os testes de `internal/api` e `internal/consent` (2026-08-01):**
 cobrem consentimento (persistência, revogação, versão de política, arquivo
