@@ -1,6 +1,8 @@
 # 0011 — SQLite local para biblioteca, sessões e BIOS
 
-**Status:** Aceito · substitui [0002](0002-adiar-banco-de-dados.md)
+**Status:** Aceito · substitui [0002](0002-adiar-banco-de-dados.md) ·
+implementação parcial (infraestrutura + sessões prontas em 2026-08-02;
+pastas/jogos/BIOS da biblioteca ainda não têm tabela nem código)
 
 ## Contexto
 

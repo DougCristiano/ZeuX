@@ -16,6 +16,7 @@ import (
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
 	"github.com/doufl/zeux/internal/install"
+	"github.com/doufl/zeux/internal/store"
 	"github.com/doufl/zeux/internal/verdict"
 )
 
@@ -81,7 +82,13 @@ func newTestServer(t *testing.T, probe hardware.Probe) *api.Server {
 		t.Fatalf("emulator.NewCustomStore: %v", err)
 	}
 
-	launcher := emulator.NewLauncher(registry, silentLogger())
+	db, err := store.Open()
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), silentLogger())
 
 	sources, err := install.LoadCatalog()
 	if err != nil {

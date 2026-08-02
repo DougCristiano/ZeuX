@@ -801,8 +801,11 @@ verificação:
 
 Histórico de sessões e tempo de jogo acumulado.
 
-> ⚠️ **Tudo aqui vive em memória e some quando o daemon fecha.** A persistência
-> depende do banco de dados, que foi deliberadamente adiado.
+> **Persistido em SQLite local desde 2026-08-02** (ver
+> [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)) — o histórico
+> sobrevive a um reinício do daemon. `Server.lastScan` (o último scan de
+> hardware, usado para autoconfiguração) continua só em memória; é barato de
+> refazer e não é o que este aviso cobria.
 
 ```bash
 curl http://127.0.0.1:7777/api/v1/sessions
@@ -853,7 +856,8 @@ curl http://127.0.0.1:7777/api/v1/sessions
 | `sessions[].is_running` | bool | A forma correta de saber se a sessão está aberta. |
 | `playtime_seconds` | objeto | Soma por `console_id`. Inclui sessões em andamento, então **cresce entre duas chamadas**. É a base do "tempo total de jogo" do perfil. |
 
-Esta rota não tem caminho de erro.
+**500 `sessions_read_failed`** — o banco local (`internal/store`) não pôde ser
+lido. Ver o catálogo de códigos de erro.
 
 ---
 
@@ -873,6 +877,7 @@ Esta rota não tem caminho de erro.
 | `emulator_unavailable` | 400 | POST `/games/preview` | Nenhum emulador utilizável para a requisição. |
 | `command_failed` | 400 | POST `/games/preview` | `BuildCommand` recusou (tipicamente core ausente). |
 | `launch_failed` | 400 | POST `/games/launch` | Qualquer falha do lançamento; a causa vai no `message`. |
+| `sessions_read_failed` | 500 | GET `/sessions` | Erro lendo o banco local (`internal/store`) — histórico ou tempo de jogo. |
 | `invalid_definition` | 400 | POST `/custom-emulators` | Definição inválida (o caso mais comum é `args` sem `{rom}`). |
 | `not_found` | 404 | DELETE `/custom-emulators/{id}`, GET `/installs/{id}` | Nenhum registro com este `id`. |
 | `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |

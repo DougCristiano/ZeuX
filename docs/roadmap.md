@@ -29,6 +29,9 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
 - CORS liberado para as origens conhecidas do WebView do Tauri
   (`tauri://localhost`, `http://tauri.localhost`), verificado contra um build
   de produção real — ver B2/B3 em [`sprint-b-plano.md`](sprint-b-plano.md).
+- **SQLite local** (`internal/store`, driver puro-Go, sem CGO — ver
+  [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)), com sessões e
+  tempo de jogo persistidos e sobrevivendo a um reinício do daemon — ver D3.
 
 - Scaffold Tauri + React + Tailwind (`src/`, `src-tauri/`), com o `zeuxd`
   subindo e descendo sozinho como sidecar (B5), cliente de API tipado (B6),
@@ -37,9 +40,10 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
   revogação, versão de política e recuperação de erro (B8) — verificado com
   Chromium contra um `zeuxd` de verdade, não simulação.
 
-**Não existe ainda:** as telas de biblioteca e emuladores (Sprint C/D — por
-isso "recusar consentimento" hoje só leva a uma tela que explica a situação,
-não a um app completo sem hardware), banco de dados, qualquer funcionalidade
+**Não existe ainda:** as telas de biblioteca e emuladores na interface
+(Sprint C tem back-end pronto, Sprint D não tem UI nem varredura de pasta —
+por isso "recusar consentimento" hoje só leva a uma tela que explica a
+situação, não a um app completo sem hardware), qualquer funcionalidade
 social.
 
 ---
@@ -134,20 +138,24 @@ Caminhos possíveis, do mais barato ao mais caro:
 Enquanto não calibrado, a UI deve tratar o parecer como estimativa, não
 promessa. Depende de: D3 (para a opção 3).
 
-### D3 — Persistir sessões e tempo de jogo (M)
+### D3 — Persistir sessões e tempo de jogo (M) — **feito em 2026-08-02**
 
-`Launcher.sessions` e `Launcher.Playtime()` vivem em memória e **somem quando o
-daemon fecha**. O PRD promete "tempo total de jogo" no perfil — promessa hoje
-descoberta.
+`Launcher.sessions` e `Launcher.Playtime()` viviam em memória e somiam quando
+o daemon fechava. Resolvido junto da introdução do SQLite local
+([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)):
+`internal/emulator.SQLiteSessions` (`session_store.go`) persiste cada sessão
+no banco (`internal/store`), com o ID derivado do rowid autoincrement —
+sobrevive a um reinício sem colidir com sessões gravadas antes dele.
+Verificado de ponta a ponta: lançar um jogo, matar e reiniciar o `zeuxd`,
+`GET /sessions` continua mostrando a sessão anterior, e a próxima recebe
+`s2`, não `s1` de novo.
 
-Também some o `Server.lastScan`, o que é aceitável (é barato refazer), mas
-significa que reiniciar o daemon devolve `404 no_scan_yet` em `/hardware` e
-`/consoles/verdicts`.
+`Server.lastScan` continua só em memória — isso segue aceitável (é barato
+refazer), e reiniciar o daemon ainda devolve `404 no_scan_yet` em `/hardware`
+e `/consoles/verdicts` até o próximo scan.
 
-Depende de: SQLite local ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md),
-que substitui o adiamento do [ADR 0002](decisoes/0002-adiar-banco-de-dados.md)) —
-decidido em 2026-08-02, ainda não implementado.
-Bloqueia: perfil social, conquistas, "últimos jogados", ProtonDB-like.
+Desbloqueia: perfil social, conquistas, "últimos jogados", ProtonDB-like
+(ainda dependem da Sprint E, que não foi desenhada).
 
 ### D4 — OneDrive × artefatos de build (P)
 
@@ -496,17 +504,17 @@ esse host, ou ser verificado na máquina do Douglas.
 Objetivo: o usuário aponta uma pasta e vê seus jogos, não caminhos de arquivo.
 
 **Estado em 2026-08-02:** o fluxo "do zero ao primeiro jogo" e o wireframe das
-telas de biblioteca já estão mapeados (`docs/wireframe.md`), e a decisão de
-banco foi reaberta e fechada — ver [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)
-(SQLite local, driver puro-Go, sem CGO). Falta implementar; nada de código
-desta sprint existe ainda.
+telas de biblioteca já estão mapeados (`docs/wireframe.md`), e o SQLite local
+está implementado e provado — ver [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)
+e D3. A varredura de pasta, o catálogo de BIOS e o resto da biblioteca em si
+ainda não têm código: só a infraestrutura de banco existe.
 
 | Item | Tam. | Depende de |
 |---|---|---|
-| ~~Decidir o banco~~ | G | **Decidido 2026-08-02** — [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md), falta implementar |
-| Introduzir o SQLite: dependência, migrações embutidas, `schema_migrations` | M | ADR 0011 |
-| Camada de repositório: extrair estado de `Launcher` e `Server` | M | ↑ |
-| D3 — persistir sessões e tempo de jogo | M | ↑ |
+| ~~Decidir o banco~~ | G | **Decidido 2026-08-02** — [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md) |
+| ~~Introduzir o SQLite: dependência, migrações embutidas, `schema_migrations`~~ | M | **Feito 2026-08-02** — `internal/store`, `modernc.org/sqlite` (sem CGO) |
+| ~~D3 — persistir sessões e tempo de jogo~~ | M | **Feito 2026-08-02** — `internal/emulator.SQLiteSessions`, verificado sobrevivendo a reinício do daemon |
+| Camada de repositório para a biblioteca (pastas, jogos, BIOS) | M | ADR 0011 |
 | Varredura de pastas de ROM, por console, com detecção de extensão | M | ↑ |
 | Catálogo de BIOS exigido por console (nome esperado, validação) | M | ↑ |
 | Identificação de jogo (hash/nome de arquivo) | M | ↑ |
@@ -539,6 +547,18 @@ Objetivo: a promessa social do PRD, agora que há dado para exibir.
 isso já está no `PolicyText` atual. Publicar o hardware num perfil **público**
 pode exigir uma nova versão da política (`PolicyVersion`), o que invalida o
 consentimento anterior por desenho. Avaliar antes de implementar, não depois.
+
+**Nota de escopo (2026-08-02):** o SQLite introduzido pelo [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)
+é só local e sem conceito de conta — não cria nenhuma tabela de perfil,
+comentário ou identidade social, de propósito. Mockar essas telas agora
+desenharia sobre um alicerce que não existe: perfil público depende de uma
+identidade de usuário que só existe com o **backend na nuvem** (primeira
+linha da tabela acima), que por sua vez depende da sincronização
+local↔nuvem — nenhum dos dois foi desenhado ainda. Quando a Sprint E for
+mapeada (mesmo processo que gerou o wireframe da Sprint D: fluxo primeiro,
+tela depois), aí sim faz sentido protótipar comentário/perfil como estado de
+interface, sabendo contra qual identidade e qual sincronização eles vão
+rodar.
 
 ---
 

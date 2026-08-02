@@ -69,8 +69,11 @@ Detalhes que o diagrama esconde e importam:
 - **`api` guarda o último scan em memória** (`Server.lastScan`, protegido por
   `sync.RWMutex`). Nada de hardware é gravado em disco. Revogar o consentimento
   zera esse campo.
-- **Só `consent` escreve em disco.** O catálogo é embutido no binário via
-  `go:embed`; sessões vivem em memória.
+- **`consent`, `custom_emulators` e, desde 2026-08-02, as sessões escrevem em
+  disco.** O catálogo continua embutido no binário via `go:embed` — é dado de
+  leitura, não de usuário. Sessões vivem no SQLite local (`internal/store`,
+  [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)), não mais em
+  memória.
 
 ---
 
@@ -273,16 +276,27 @@ reporta "AMD Radeon(TM) Graphics", e sem limpar o `(TM)` a busca por
 reportada: em notebook híbrido, avaliar pelo chip integrado daria um veredito
 injustamente pessimista.
 
-### 3.9 Banco de dados: decidido, ainda não implementado
+### 3.9 Banco de dados: SQLite local (ADR 0011)
 
-Hoje não existe persistência além do `consent.json`; sessões e tempo de jogo
-vivem em memória e somem ao fechar o app. O adiamento original
-([ADR 0002](decisoes/0002-adiar-banco-de-dados.md)) foi substituído em
-2026-08-02 pelo [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md):
-SQLite local, com driver Go puro (sem CGO, para não exigir compilador C em
-nenhum SO), assim que a Sprint D (biblioteca) começar a ser codada. Até lá o
-comportamento descrito acima continua valendo — a decisão foi tomada, o
-código ainda não existe.
+O adiamento original ([ADR 0002](decisoes/0002-adiar-banco-de-dados.md)) foi
+substituído em 2026-08-02 pelo [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md):
+**SQLite local, com driver Go puro** (`modernc.org/sqlite`, sem CGO — a
+compilação cruzada continua sendo só `go build`, em qualquer SO).
+
+`internal/store` abre o banco (`<UserConfigDir>/ZeuX/zeux.db`, ao lado de
+`consent.json`) e aplica migrações embutidas via `//go:embed`, registradas em
+`schema_migrations`. Primeiro consumidor: `internal/emulator.SQLiteSessions`
+(`session_store.go`) substituiu o slice em memória do `Launcher` — sessões e
+tempo de jogo agora sobrevivem a um reinício do daemon, verificado de ponta a
+ponta (lançar um jogo, reiniciar o `zeuxd`, `GET /sessions` ainda mostra a
+sessão, e a próxima recebe um ID que não colide com a anterior).
+
+O que **continua** fora do banco, de propósito: `consent.json` (pequeno,
+versionado, já funciona), o catálogo de consoles (dado de leitura, embutido
+no binário) e `custom_emulators.json` (o próprio `CustomStore.Path()` existe
+para que quem prefira editar o JSON à mão consiga achar o arquivo). A
+biblioteca de jogos (pastas, entradas de jogo, BIOS por console — Sprint D)
+ainda não tem tabela: o wireframe existe, o código ainda não foi escrito.
 
 ### 3.10 Legal: nunca facilitar compartilhamento de ROMs
 

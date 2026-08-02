@@ -459,9 +459,21 @@ func (s *Server) decodeLaunch(w http.ResponseWriter, r *http.Request) (emulator.
 }
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
+	sessions, err := s.launcher.Sessions(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "sessions_read_failed", err.Error())
+		return
+	}
+
+	playtime, err := s.launcher.Playtime(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "sessions_read_failed", err.Error())
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"sessions":         s.launcher.Sessions(),
-		"playtime_seconds": s.launcher.Playtime(),
+		"sessions":         sessions,
+		"playtime_seconds": playtime,
 	})
 }
 
