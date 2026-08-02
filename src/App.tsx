@@ -1,169 +1,173 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { api, ApiError, type ConsentStatus, type Report } from "./api";
+import { api, ApiError, type Report } from "./api";
 import { ConsentScreen } from "./screens/ConsentScreen";
+import { DeclinedScreen } from "./screens/DeclinedScreen";
+import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
 import { VerdictScreen } from "./screens/VerdictScreen";
 
-// Dado de exemplo só para o item B7 (layout) poder ser conferido visualmente
-// e por teclado sem depender de consentimento + scan reais. Some assim que o
-// B8 (fluxo de onboarding de verdade) substituir isto pela chamada real a
-// GET /consoles/verdicts.
-const SAMPLE_REPORT: Report = {
-  summary: {
-    cpu: "AMD Ryzen 9 7900X — 12 núcleos físicos e 24 threads — clock base de 4.70 GHz.",
-    gpu: "NVIDIA RTX 3060 Ti — 8,0 GB de memória de vídeo dedicada.",
-    memory: "32 GB de memória RAM instalada.",
-    system: "Windows 11 (amd64).",
-  },
-  precision: "completa",
-  notes: [],
-  verdicts: [
-    {
-      console_id: "ps1",
-      name: "PlayStation 1",
-      short_name: "PS1",
-      year: 1994,
-      level: "otimo",
-      headline: "Ótima possibilidade de rodar a maioria dos jogos conhecidos deste console.",
-      emulator: "DuckStation",
-      adapter_id: "duckstation",
-      preset: "Resolução interna 4x (Vulkan)",
-      precision: "completa",
-    },
-    {
-      console_id: "ps3",
-      name: "PlayStation 3",
-      short_name: "PS3",
-      year: 2006,
-      level: "limitado",
-      headline: "Alcança parte do catálogo, com quedas em jogos mais pesados.",
-      emulator: "RPCS3",
-      adapter_id: "rpcs3",
-      preset: "Resolução nativa",
-      next_level: "bom",
-      bottlenecks: ["Este patamar pede 12 GB de memória de vídeo; a placa RTX 3060 Ti tem 8,0 GB."],
-      precision: "completa",
-    },
-    {
-      console_id: "3ds",
-      name: "Nintendo 3DS",
-      short_name: "3DS",
-      year: 2011,
-      level: "bom",
-      headline: "Boa possibilidade de rodar a maioria dos jogos conhecidos deste console.",
-      precision: "parcial",
-    },
-    {
-      console_id: "ps2",
-      name: "PlayStation 2",
-      short_name: "PS2",
-      year: 2000,
-      level: "improvavel",
-      headline: "Este hardware não alcança o mínimo necessário para rodar este console de forma jogável.",
-      bottlenecks: ["Este patamar pede uma placa de vídeo dedicada; esta máquina usa gráficos integrados."],
-      precision: "completa",
-    },
-  ],
-};
+// Item B8 (docs/sprint-b-plano.md): a jornada real de consentimento → scan →
+// parecer. A regra central é a do consentimento verificado no servidor — esta
+// tela não decide nada sozinha, só mostra o que GET /consent diz. Nenhum
+// estado é guardado entre aberturas do app: cada abertura confia de novo na
+// resposta do servidor, que já embute a checagem de PolicyVersion
+// (ConsentStatus.granted é Record.IsValid(), não Record.Granted).
+type Phase =
+  | "checking-port"
+  | "port-conflict"
+  | "connecting"
+  | "daemon-unreachable"
+  | "consent"
+  | "declined"
+  | "scanning"
+  | "scan-error"
+  | "verdict";
 
-// App é a casca do produto: layout do item B7 (docs/sprint-b-plano.md) sobre
-// dados reais quando existem. O fluxo de estado completo (consentimento →
-// scan → parecer, com POST de verdade e re-checagem de PolicyVersion) é o
-// item B8 — os cliques abaixo só logam, de propósito.
 function App() {
-  const [consent, setConsent] = useState<ConsentStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // Estado inicial é "indefinido" (null), não false: até a checagem no Rust
-  // responder, não sabemos se há conflito, e a corrida (setup() do Tauri
-  // pode terminar antes ou depois deste invoke) foi resolvida consultando sob
-  // demanda em vez de escutar um evento que podia chegar cedo demais.
-  const [portConflict, setPortConflict] = useState<boolean | null>(null);
+  const [phase, setPhase] = useState<Phase>("checking-port");
+  const [policy, setPolicy] = useState<{ text: string; version: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [report, setReport] = useState<Report | null>(null);
 
+  // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
+  // não é o zeuxd. Consultado sob demanda (não por evento) — ver
+  // src-tauri/src/lib.rs para o porquê.
   useEffect(() => {
     invoke<boolean>("zeuxd_port_conflict")
-      .then(setPortConflict)
-      .catch(() => setPortConflict(false));
+      .then((conflict) => setPhase(conflict ? "port-conflict" : "connecting"))
+      .catch(() => setPhase("connecting"));
   }, []);
 
+  // 2. Com a porta liberada, busca o consentimento. O sidecar é iniciado em
+  // paralelo com a janela (B5) e pode levar um instante a mais para aceitar
+  // conexões — por isso as novas tentativas, em vez de falhar na primeira.
   useEffect(() => {
-    // Ainda não sabemos (null) ou já sabemos que há conflito: não faz sentido
-    // tentar falar com uma porta que ou não é do zeuxd, ou ainda não foi
-    // checada.
-    if (portConflict !== false) return;
+    if (phase !== "connecting") return;
 
-    // O sidecar é iniciado no setup() do Tauri, em paralelo com a criação da
-    // janela — pode levar um instante a mais para aceitar conexões. Tenta
-    // algumas vezes antes de admitir falha, em vez de mostrar erro numa
-    // corrida que se resolve sozinha um instante depois.
     let cancelled = false;
     let attempt = 0;
 
-    async function tryFetch() {
+    async function tryLoad() {
       try {
-        const result = await api.getConsent();
-        if (!cancelled) setConsent(result);
+        const status = await api.getConsent();
+        if (cancelled) return;
+        setPolicy({ text: status.policy_text, version: status.policy_version });
+        if (status.granted) {
+          await runScan();
+        } else {
+          setPhase("consent");
+        }
       } catch (err) {
         attempt += 1;
         if (attempt >= 10) {
           if (!cancelled) {
-            setError(err instanceof ApiError ? err.message : String(err));
+            setErrorMessage(err instanceof ApiError ? err.message : "O zeuxd não respondeu.");
+            setPhase("daemon-unreachable");
           }
           return;
         }
-        setTimeout(tryFetch, 300);
+        setTimeout(tryLoad, 300);
       }
     }
 
-    tryFetch();
+    tryLoad();
     return () => {
       cancelled = true;
     };
-  }, [portConflict]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
-  if (portConflict) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-paper px-6">
-        <p className="max-w-sm text-base text-danger">
-          A porta 7777 já está sendo usada por outro programa, não pelo ZeuX. Feche o que estiver usando essa
-          porta e abra o ZeuX de novo.
-        </p>
-      </main>
-    );
+  async function runScan() {
+    setPhase("scanning");
+    try {
+      // scanHardware() e getVerdicts() são duas chamadas porque são duas
+      // rotas na API (docs/api.md) — o scan grava em memória no servidor, o
+      // parecer é computado a partir dele.
+      await api.scanHardware();
+      const nextReport = await api.getVerdicts();
+      setReport(nextReport);
+      setPhase("verdict");
+    } catch (err) {
+      setErrorMessage(err instanceof ApiError ? err.message : "Não foi possível ler este computador.");
+      setPhase("scan-error");
+    }
   }
 
-  if (error) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-paper px-6">
-        <p className="max-w-sm text-base text-danger">Não foi possível falar com o zeuxd: {error}</p>
-      </main>
-    );
+  async function handleAccept() {
+    setBusy(true);
+    try {
+      await api.setConsent(true);
+    } catch (err) {
+      setBusy(false);
+      setErrorMessage(err instanceof ApiError ? err.message : "Não foi possível registrar o consentimento.");
+      setPhase("daemon-unreachable");
+      return;
+    }
+    setBusy(false);
+    await runScan();
   }
 
-  if (!consent) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-paper">
-        <p className="font-mono text-sm text-muted">lendo o consentimento…</p>
-      </main>
-    );
+  async function handleDecline() {
+    setBusy(true);
+    try {
+      await api.setConsent(false);
+      setPhase("declined");
+    } catch (err) {
+      setErrorMessage(err instanceof ApiError ? err.message : "Não foi possível registrar o consentimento.");
+      setPhase("daemon-unreachable");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  return (
-    <main className="min-h-screen bg-paper">
-      <ConsentScreen
-        policyText={consent.policy_text}
-        policyVersion={consent.policy_version}
-        onAccept={() => console.log("TODO(B8): POST /consent { granted: true } e disparar o scan")}
-        onDecline={() => console.log("TODO(B8): POST /consent { granted: false }")}
-      />
+  switch (phase) {
+    case "checking-port":
+    case "connecting":
+      return <LoadingScreen message="lendo o consentimento…" />;
 
-      <div className="border-t border-line px-6 py-2">
-        <p className="font-mono text-xs tracking-wide text-muted uppercase">
-          Pré-visualização do item B7 — dado de exemplo, substituído pelo parecer real no B8
-        </p>
-      </div>
-      <VerdictScreen report={SAMPLE_REPORT} />
-    </main>
-  );
+    case "port-conflict":
+      return (
+        <main className="flex min-h-screen items-center justify-center bg-paper px-6">
+          <p className="max-w-sm text-base text-danger">
+            A porta 7777 já está sendo usada por outro programa, não pelo ZeuX. Feche o que estiver usando
+            essa porta e abra o ZeuX de novo.
+          </p>
+        </main>
+      );
+
+    case "daemon-unreachable":
+      return <ErrorScreen message={errorMessage} onRetry={() => setPhase("connecting")} />;
+
+    case "consent":
+      // policy só é null momentaneamente antes do primeiro carregamento —
+      // nesse ponto phase ainda não é "consent".
+      return (
+        <ConsentScreen
+          policyText={policy!.text}
+          policyVersion={policy!.version}
+          busy={busy}
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+        />
+      );
+
+    case "declined":
+      return <DeclinedScreen onReconsider={() => setPhase("consent")} />;
+
+    case "scanning":
+      return <LoadingScreen message="lendo este computador…" />;
+
+    case "scan-error":
+      return <ErrorScreen message={errorMessage} onRetry={runScan} />;
+
+    case "verdict":
+      return (
+        <main className="min-h-screen bg-paper">
+          <VerdictScreen report={report!} />
+        </main>
+      );
+  }
 }
 
 export default App;

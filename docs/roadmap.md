@@ -30,13 +30,16 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
   (`tauri://localhost`, `http://tauri.localhost`), verificado contra um build
   de produção real — ver B2/B3 em [`sprint-b-plano.md`](sprint-b-plano.md).
 
-- Scaffold Tauri + React + Tailwind (`src/`, `src-tauri/`) com uma tela única
-  de diagnóstico (`fetch` real em `/health`) — não é o onboarding do produto,
-  só a prova de que o scaffold fala com o `zeuxd`. Ver B4.
+- Scaffold Tauri + React + Tailwind (`src/`, `src-tauri/`), com o `zeuxd`
+  subindo e descendo sozinho como sidecar (B5), cliente de API tipado (B6),
+  layout sobre o wireframe para as telas 01/03 (B7), e o onboarding real
+  funcionando de ponta a ponta: consentimento → scan → parecer, com
+  revogação, versão de política e recuperação de erro (B8) — verificado com
+  Chromium contra um `zeuxd` de verdade, não simulação.
 
-**Não existe ainda:** o onboarding real (consentimento → scan → parecer, B8),
-o layout sobre o wireframe (B7), o ciclo de vida do `zeuxd` como processo
-filho (B5), banco de dados, biblioteca de jogos, qualquer funcionalidade
+**Não existe ainda:** as telas de biblioteca e emuladores (Sprint C/D — por
+isso "recusar consentimento" hoje só leva a uma tela que explica a situação,
+não a um app completo sem hardware), banco de dados, qualquer funcionalidade
 social.
 
 ---
@@ -389,7 +392,7 @@ sequência.
 | B5 | `zeuxd` como processo filho (subir, derrubar, porta ocupada) | M | B4 · **Feito 2026-08-01** — sidecar do Tauri (`tauri-plugin-shell`); os 4 cenários de `sprint-b-plano.md` rodaram de verdade |
 | B6 | Cliente de API tipado no front | M | B4, B-doc · **Feito 2026-08-01** — `src/api/`, `npm run verificar-api`; achou e corrigiu uma divergência real entre código e `api.md` (`bottlenecks`) |
 | B7 | Layout visual sobre o wireframe | M | B4, B-wire · **Feito 2026-08-01, parcial de propósito** — tokens, tipografia, componentes e as telas 01/03; 04–07 ficam para quando a funcionalidade delas existir (Sprint C/D) |
-| B8 | Fluxo de onboarding: consentimento → scan → parecer | M | B5, B6, B7 |
+| B8 | Fluxo de onboarding: consentimento → scan → parecer | M | B5, B6, B7 · **Feito 2026-08-02** — máquina de estados real em `App.tsx`, os 6 critérios verificados com Chromium contra um `zeuxd` de verdade (incluindo troca de `PolicyText`/`PolicyVersion` recompilando o Go) |
 | B9 | Tela de parecer: gargalos nomeados, aviso de "parcial" | M | B8 |
 | B10 | Instalar com ressalva de hardware (servidor já faz — ver nota) | P | B9 |
 | B11 | Empacotamento: binário Go dentro do instalador Tauri | M | B4 |

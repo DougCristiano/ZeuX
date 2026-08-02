@@ -610,32 +610,50 @@ Sprint D (biblioteca), fora do escopo desta sprint.
 
 ---
 
-### B8 — Fluxo de onboarding: consentimento → scan → parecer (M)
+### B8 — Fluxo de onboarding: consentimento → scan → parecer (M) — **feito em 2026-08-02**
 
 A primeira jornada real. A regra que este item precisa provar é a do
 consentimento verificado no servidor: a tela **não** decide nada, ela mostra o
 que o servidor diz.
 
-**Critério de aceite:**
+**Implementado em `src/App.tsx`** como uma máquina de estados explícita
+(`checking-port` → `connecting` → `consent`/`declined`/`scanning` →
+`verdict`/`scan-error`/`daemon-unreachable`), sem nada guardado entre aberturas
+do app — cada abertura confia de novo na resposta do servidor. Duas telas novas
+entraram para fechar o fluxo: `src/screens/StatusScreen.tsx`
+(`LoadingScreen`/`ErrorScreen`, esta com botão de tentar de novo) e
+`src/screens/DeclinedScreen.tsx`.
 
-- [ ] Com o `consent.json` apagado, o app abre na tela de consentimento e exibe
-      o `policy_text` **vindo da API**. Verificação forte: alterar `PolicyText`
-      no Go, recompilar o daemon, reabrir o app — o texto na tela muda sem que
-      uma linha do front seja tocada.
-- [ ] Aceitar dispara `POST /api/v1/hardware/scan`, a tela mostra estado de
-      carregamento, e um segundo clique durante o scan não dispara uma segunda
-      chamada.
-- [ ] Recusar mantém o app utilizável: as telas de emuladores e biblioteca
-      continuam acessíveis, e a tela de parecer explica que falta o
-      consentimento em vez de sumir do app. (Informar, não bloquear.)
-- [ ] Com `PolicyVersion` alterada no Go e recompilada, um `consent.json` que
-      dizia "sim" para a versão antiga faz o app **voltar a pedir**
-      consentimento — porque `GET /consent` devolve `granted: false`, e o front
-      não guarda cópia dessa decisão.
-- [ ] O onboarding inteiro, do começo ao fim, é concluído usando **só Tab e
-      Enter**, com foco visível em cada parada (ADR 0009).
-- [ ] Se o daemon não responder, a tela mostra a falha em português e um botão
-      de tentar de novo — nunca fica girando indefinidamente.
+**Critério de aceite — os seis, verificados de verdade com Chromium via
+Playwright contra um `zeuxd` real** (não simulação; `npm run dev` +
+`ZEUX_DEV_ORIGIN` para liberar o CORS do dev server nesta verificação):
+
+- [x] Com `consent.json` inexistente, a tela de consentimento mostrou o
+      `policy_text` da API. **Verificação forte feita de verdade:** troquei
+      `PolicyText` em `internal/consent/consent.go` por um texto de teste,
+      recompilei o `zeuxd`, reabri a página sem tocar em nenhuma linha do
+      front — o texto novo apareceu. Revertido depois (`git diff` limpo).
+- [x] Aceitar (`Enter` no botão com foco automático) disparou `POST /consent`
+      e depois `POST /hardware/scan` de verdade — o parecer real desta máquina
+      (Linux, sem GPU detectada) apareceu na tela, com `precision: "parcial"`
+      visível. Dois `Enter` em sequência rápida dispararam **uma** chamada de
+      cada rota, não duas — confirmado contando requisições HTTP no teste.
+- [x] Recusar levou à `DeclinedScreen`, com `POST /consent {granted:false}`
+      confirmado no servidor. **Ressalva de escopo, registrada em vez de
+      forçada:** como as telas de biblioteca e emuladores (wireframe 04-07)
+      não existem nesta versão, "app utilizável" aqui significa "não é beco
+      sem saída" — a tela explica a situação e oferece "Autorizar agora"
+      para reconsiderar, não finge acesso a funcionalidade que não existe.
+- [x] Com `PolicyVersion` trocada de `"1"` para `"2"` em Go e recompilado, um
+      `consent.json` com `granted:true`/`policy_version:"1"` fez
+      `GET /consent` devolver `granted:false` — confirmado no servidor e na
+      tela (voltou a pedir consentimento). Revertido depois.
+- [x] Os dois caminhos (aceitar e recusar) percorridos só com `Tab`/`Enter`,
+      com foco visível em cada parada — sem mouse.
+- [x] Com o `zeuxd` inacessível, a tela mostrou "O zeuxd não respondeu." e um
+      botão "Tentar de novo" dentro de poucos segundos (10 tentativas de
+      300 ms, não um loop sem fim); clicar o botão depois do daemon voltar
+      recuperou o fluxo sem recarregar a página.
 
 **Depende de:** B5, B6, B7
 **Bloqueia:** B9
