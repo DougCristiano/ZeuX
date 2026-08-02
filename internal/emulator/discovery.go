@@ -13,6 +13,16 @@ import (
 // 1-click nunca sobrescreva um emulador que a pessoa configurou à mão.
 const ManagedDirName = "emulators"
 
+// SharedDirName é onde ficam os emuladores que atendem mais de um console
+// (RetroArch, com 24 sistemas; Dolphin, com GameCube e Wii). Um emulador
+// desses não tem "o console dele" — instalá-lo dentro da pasta de cada
+// console que atende duplicaria o binário uma vez por console (no caso do
+// RetroArch, 24 cópias de ~100 MB) e multiplicaria o trabalho de atualizar.
+// Ver docs/decisoes/, decisão de 2026-08-02 (Douglas): estrutura por console
+// para o usuário achar as coisas, com uma válvula de escape para quem não
+// pertence a um console só.
+const SharedDirName = "compartilhados"
+
 // ManagedRoot devolve a raiz das instalações gerenciadas pelo ZeuX.
 func ManagedRoot() (string, error) {
 	dir, err := os.UserConfigDir()
@@ -20,6 +30,19 @@ func ManagedRoot() (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, "ZeuX", ManagedDirName), nil
+}
+
+// ManagedEmulatorDir devolve onde o binário deste adapter deve morar dentro
+// da raiz gerenciada: junto do console que ele atende sozinho
+// (<root>/<console>/emuladores/<adapter>), ou em SharedDirName quando atende
+// mais de um. `consoles` vazio (adapter desconhecido) cai no caminho
+// compartilhado por segurança — nunca em uma pasta de console que pode não
+// fazer sentido para ele.
+func ManagedEmulatorDir(root, adapterID string, consoles []string) string {
+	if len(consoles) == 1 {
+		return filepath.Join(root, consoles[0], "emuladores", adapterID)
+	}
+	return filepath.Join(root, SharedDirName, adapterID)
 }
 
 // findBinary procura o executável de um emulador e devolve o primeiro caminho
@@ -36,9 +59,9 @@ func ManagedRoot() (string, error) {
 // refazer os os.ReadDir/os.Stat. Sem índice no contexto — uma chamada avulsa,
 // fora de Survey —, o comportamento é o de sempre: constrói e testa os
 // candidatos na hora.
-func findBinary(ctx context.Context, adapterID string, names []string, extraDirs []string) (path string, managed bool, ok bool) {
+func findBinary(ctx context.Context, adapterID string, consoles []string, names []string, extraDirs []string) (path string, managed bool, ok bool) {
 	if root, err := ManagedRoot(); err == nil {
-		managedDir := filepath.Join(root, adapterID)
+		managedDir := ManagedEmulatorDir(root, adapterID, consoles)
 		for _, name := range names {
 			cand := filepath.Join(managedDir, name)
 			if isExecutableFile(cand) {

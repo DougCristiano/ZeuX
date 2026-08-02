@@ -7,6 +7,71 @@ import (
 	"testing"
 )
 
+// Emulador de console único (ex.: DuckStation, só ps1) fica dentro da pasta
+// do seu console — é o que faz "olhar a pasta do PS1 e ver o que roda ali"
+// funcionar, em vez de um diretório achatado por adapter.
+func TestManagedEmulatorDirUsesConsoleFolderForSingleConsoleAdapter(t *testing.T) {
+	got := ManagedEmulatorDir("/root", "duckstation", []string{"ps1"})
+	want := filepath.Join("/root", "ps1", "emuladores", "duckstation")
+	if got != want {
+		t.Errorf("ManagedEmulatorDir = %q, queria %q", got, want)
+	}
+}
+
+// RetroArch (24 consoles) e Dolphin (2) não têm "o console deles" — instalar
+// dentro da pasta de cada console duplicaria o binário uma vez por console
+// que atendem. Caem na pasta compartilhada.
+func TestManagedEmulatorDirUsesSharedFolderForMultiConsoleAdapter(t *testing.T) {
+	got := ManagedEmulatorDir("/root", "dolphin", []string{"gamecube", "wii"})
+	want := filepath.Join("/root", SharedDirName, "dolphin")
+	if got != want {
+		t.Errorf("ManagedEmulatorDir = %q, queria %q", got, want)
+	}
+}
+
+// Um adapter sem console conhecido (não deveria acontecer, mas a função não
+// pode presumir) cai no caminho compartilhado por segurança — nunca numa
+// pasta de console que pode nem existir.
+func TestManagedEmulatorDirDefaultsToSharedForUnknownAdapter(t *testing.T) {
+	got := ManagedEmulatorDir("/root", "desconhecido", nil)
+	want := filepath.Join("/root", SharedDirName, "desconhecido")
+	if got != want {
+		t.Errorf("ManagedEmulatorDir = %q, queria %q", got, want)
+	}
+}
+
+// findBinary precisa achar um binário de console único dentro da pasta do
+// console dele, não mais num diretório achatado por adapter.
+func TestFindBinaryLocatesSingleConsoleAdapterInsideConsoleFolder(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome) // AppData no Windows não se aplica aqui; testado em Linux.
+
+	root, err := ManagedRoot()
+	if err != nil {
+		t.Fatalf("ManagedRoot: %v", err)
+	}
+
+	dir := ManagedEmulatorDir(root, "duckstation", []string{"ps1"})
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binPath := filepath.Join(dir, "duckstation-qt")
+	if err := os.WriteFile(binPath, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	path, managed, ok := findBinary(context.Background(), "duckstation", []string{"ps1"}, []string{"duckstation-qt"}, nil)
+	if !ok {
+		t.Fatal("esperava achar o binário gerenciado")
+	}
+	if !managed {
+		t.Error("deveria estar marcado como managed")
+	}
+	if path != binPath {
+		t.Errorf("path = %q, queria %q", path, binPath)
+	}
+}
+
 // A precedência é: diretório de sistema antes de suas subpastas, e um
 // diretório de sistema inteiro antes do próximo. Testa isso plugando um
 // dirIndex construído à mão, para não depender de PATH real da máquina.

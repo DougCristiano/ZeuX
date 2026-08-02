@@ -406,7 +406,7 @@ curl http://127.0.0.1:7777/api/v1/emulators
 | `consoles` | array de string | Ordenado alfabeticamente por `Survey`. |
 | `installed` | bool | `false` é resposta normal, não erro. |
 | `installation` | objeto | **Só presente quando `installed` é `true`.** |
-| `installation.managed` | bool | `true` quando o binário veio da pasta gerenciada pelo ZeuX. Hoje sempre `false` na prática: nada instala nessa pasta ainda. |
+| `installation.managed` | bool | `true` quando o binário veio da pasta gerenciada pelo ZeuX (`POST /emulators/{id}/install`), organizada por console desde o [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md). |
 | `installation.version` | string | **Nunca preenchido hoje.** Nenhum adapter detecta versão. |
 
 A ordem dos itens é a ordem de registro em `NewRegistry`, personalizados

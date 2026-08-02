@@ -312,11 +312,14 @@ descontinuados após ação judicial. Ver [ADR 0008](decisoes/0008-excluir-switc
 
 Registrado aqui para que ninguém leia este documento e presuma o contrário:
 
-- Interface gráfica. Rust e MSVC Build Tools não estão instalados.
-- Qualquer banco de dados.
-- Instalação de emuladores. `ManagedRoot()` e o campo `Installation.Managed` já
-  existem e a busca já prioriza a pasta gerenciada, mas **nada escreve nela** —
-  a instalação 1-click ainda não foi construída.
+- Qualquer banco de dados (adiado deliberadamente, ver
+  [ADR 0002](decisoes/0002-adiar-banco-de-dados.md)).
+- Instalação de emuladores dentro da estrutura de jogos: a pasta gerenciada
+  (`ManagedRoot()`) já recebe instalações 1-click de verdade, organizadas por
+  console (ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)).
+  O que falta é a parte de jogos — cada pasta de console ainda não tem a
+  subpasta `jogos/` (saves, capas, metadados), porque isso depende da Sprint D
+  (banco de dados + varredura de biblioteca), que ainda não foi desenhada.
 - Biblioteca de jogos, scraper de metadados, perfis sociais, netplay.
 - `Installation.Version` nunca é preenchido: nenhum adapter tenta detectar
   versão hoje.

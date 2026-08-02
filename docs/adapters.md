@@ -256,13 +256,17 @@ Estão no [roadmap](roadmap.md) como item de correção.
 
 ## 4. Descoberta de binários (`discovery.go`)
 
-`findBinary(adapterID, names, extraDirs)` procura nesta ordem, **e a ordem é
-intencional**:
+`findBinary(adapterID, consoles, names, extraDirs)` procura nesta ordem, **e a
+ordem é intencional**:
 
-1. **Instalação gerenciada pelo ZeuX**:
-   `os.UserConfigDir()/ZeuX/emulators/<adapter_id>/<nome>`. Se o usuário deixou
-   o ZeuX instalar uma versão, é ela que o app sabe configurar; cair numa
-   instalação antiga do sistema traria comportamento não previsto.
+1. **Instalação gerenciada pelo ZeuX**, organizada por console desde o ADR
+   0010: `os.UserConfigDir()/ZeuX/emulators/<console_id>/emuladores/<adapter_id>/<nome>`
+   para um emulador de console único (ex.: `ps1/emuladores/duckstation/`), ou
+   `os.UserConfigDir()/ZeuX/emulators/compartilhados/<adapter_id>/<nome>` para
+   um emulador de mais de um console (RetroArch, Dolphin) — ver
+   `emulator.ManagedEmulatorDir`. Se o usuário deixou o ZeuX instalar uma
+   versão, é ela que o app sabe configurar; cair numa instalação antiga do
+   sistema traria comportamento não previsto.
 2. **Diretórios padrão do sistema.**
 3. **`PATH`** (`exec.LookPath`), como último recurso — cobre instalações por
    gerenciador de pacotes no Linux, que não vivem numa pasta previsível.
@@ -306,6 +310,10 @@ A pasta gerenciada (`ManagedRoot()`) já é consultada, e a instalação 1-click
 (`internal/install`, rotas `POST`/`DELETE /emulators/{id}/install`) já escreve
 e apaga ali de verdade — ver Sprint C no [roadmap](roadmap.md), corrigido em
 2026-08-02. `Installation.Managed` sai `true` para o que o ZeuX instalou.
+Desde o [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md), a
+pasta é organizada por console (`<console>/emuladores/<adapter>`), com
+RetroArch e Dolphin — que atendem mais de um console — numa pasta
+compartilhada em vez de duplicados.
 
 `Installation.Version` **nunca é preenchido**: nenhum adapter detecta versão.
 O campo existe porque o sistema de compatibilidade comunitário depende dele

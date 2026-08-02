@@ -32,7 +32,7 @@ func (a standaloneAdapter) Name() string       { return a.name }
 func (a standaloneAdapter) Consoles() []string { return a.consoles }
 
 func (a standaloneAdapter) Locate(ctx context.Context) (Installation, bool) {
-	path, managed, ok := findBinary(ctx, a.id, a.names, nil)
+	path, managed, ok := findBinary(ctx, a.id, a.consoles, a.names, nil)
 	if !ok {
 		return Installation{}, false
 	}
