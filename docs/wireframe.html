@@ -519,7 +519,9 @@
       <button class="tab" role="tab" aria-selected="false" data-screen="s2"><span class="num">02</span>Leitura</button>
       <button class="tab" role="tab" aria-selected="false" data-screen="s3"><span class="num">03</span>Parecer</button>
       <button class="tab" role="tab" aria-selected="false" data-screen="s4">Biblioteca vazia</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="sbios">BIOS necessário</button>
       <button class="tab" role="tab" aria-selected="false" data-screen="s5">Biblioteca</button>
+      <button class="tab" role="tab" aria-selected="false" data-screen="slazy">Instalar ao jogar</button>
       <button class="tab" role="tab" aria-selected="false" data-screen="s6">Emuladores</button>
       <button class="tab" role="tab" aria-selected="false" data-screen="s7">Instalar com ressalva</button>
     </div>
@@ -736,16 +738,31 @@
               <div class="navitem">Perfil</div>
             </div>
             <div class="stack">
-              <div class="box" style="padding:2rem 1rem; text-align:center">
+              <div class="box" style="padding:1.5rem 1rem; text-align:center">
                 <p class="wf-h">Nenhuma pasta de jogos adicionada</p>
                 <p class="wf-sub" style="max-width:44ch; margin-inline:auto">
-                  Aponte a pasta onde seus jogos já estão no disco. O ZeuX lê os arquivos de onde
-                  eles estiverem — nada é copiado ou movido.
+                  Aponte, console por console, a pasta onde seus jogos já estão no disco. O ZeuX lê
+                  os arquivos de onde eles estiverem — nada é copiado ou movido.
                 </p>
-                <div class="row" style="justify-content:center; margin-top:.9rem">
-                  <span class="btn primary focused">Escolher pasta</span>
+              </div>
+              <div class="grid-2">
+                <div class="box">
+                  <p class="wf-p"><strong>PlayStation 1</strong></p>
+                  <p class="wf-sub">Nenhuma pasta apontada</p>
+                  <div class="row" style="margin-top:.5rem"><span class="btn primary focused">Apontar pasta</span></div>
+                </div>
+                <div class="box">
+                  <p class="wf-p"><strong>PlayStation 2</strong></p>
+                  <p class="wf-sub">Nenhuma pasta apontada</p>
+                  <div class="row" style="margin-top:.5rem"><span class="btn primary">Apontar pasta</span></div>
+                </div>
+                <div class="box">
+                  <p class="wf-p"><strong>SNES</strong></p>
+                  <p class="wf-sub">Nenhuma pasta apontada</p>
+                  <div class="row" style="margin-top:.5rem"><span class="btn primary">Apontar pasta</span></div>
                 </div>
               </div>
+              <p class="wf-sub">... um cartão por console do catálogo, rolável — não os 33 de uma vez sem hierarquia.</p>
               <div class="row"><span class="badge">1 emulador pronto: DuckStation</span><span class="badge">12 disponíveis para instalar</span></div>
             </div>
           </div>
@@ -759,8 +776,69 @@
           <p>Nada de link, sugestão de fonte, nome de site ou "saiba mais". O texto deixa claro que o jogo já precisa estar no disco, e para por aí.</p>
         </div>
         <div class="note structural">
+          <h4>Estrutura · decisão de 2026-08-02</h4>
+          <p>Um cartão <strong>por console</strong>, não um botão único de "escolher pasta". Aponta o console certo desde o início — sem isso, o ZeuX teria que adivinhar de qual sistema é cada arquivo achado numa pasta misturada.</p>
+        </div>
+        <div class="note structural">
           <h4>Estrutura</h4>
           <p>O estado vazio aproveita para mostrar quantos emuladores já estão prontos — conecta a biblioteca vazia com a próxima ação útil sem empurrar o usuário.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ BIOS ============ -->
+  <section class="screen" id="sbios">
+    <div class="screen-head">
+      <h2>Biblioteca · BIOS necessário</h2>
+      <p>Alguns consoles não abrem sem um arquivo de firmware que o ZeuX não tem como obter — só apontar.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX · biblioteca · PS1</span></div>
+        <div class="canvas">
+          <div class="applayout">
+            <div class="sidenav">
+              <div class="navitem active">Biblioteca</div>
+              <div class="navitem">Consoles</div>
+              <div class="navitem">Emuladores</div>
+              <div class="navitem">Perfil</div>
+            </div>
+            <div class="stack">
+              <div class="row between">
+                <span class="row" style="gap:.3rem"><span class="badge solid">PS1</span></span>
+              </div>
+
+              <div class="box" style="border-style:dashed">
+                <p class="label" style="margin-bottom:.25rem">Falta o arquivo de BIOS do PlayStation 1</p>
+                <p class="wf-p">3 jogos desta pasta estão prontos, mas não abrem sem o BIOS do console.</p>
+                <div class="row" style="margin-top:.5rem">
+                  <span class="btn primary">Indicar arquivo de BIOS</span>
+                </div>
+              </div>
+
+              <div class="grid-covers">
+                <div class="ph cover" style="opacity:.45">sem BIOS</div>
+                <div class="ph cover" style="opacity:.45">sem BIOS</div>
+                <div class="ph cover" style="opacity:.45">sem BIOS</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note">
+          <h4>Regra · nomear o que falta, de novo</h4>
+          <p>Mesma regra do parecer (tela 03), aplicada aqui: nunca "jogo indisponível" sem dizer por quê. O aviso nomeia exatamente a peça que falta — o BIOS, não o emulador, não o jogo.</p>
+        </div>
+        <div class="note">
+          <h4>Regra legal · o ZeuX não obtém o BIOS</h4>
+          <p>"Indicar arquivo" abre um seletor para um arquivo que já está no disco do usuário. Nenhuma sugestão de onde conseguir — mesma regra das ROMs, mesmo risco legal.</p>
+        </div>
+        <div class="note structural">
+          <h4>Estrutura</h4>
+          <p>Os cartões continuam visíveis, só desabilitados — o usuário vê que os jogos existem e por que não abrem ainda, em vez de a pasta parecer vazia.</p>
         </div>
       </aside>
     </div>
@@ -792,14 +870,14 @@
               </div>
 
               <div class="grid-covers">
-                <div class="ph cover">capa</div>
-                <div class="ph cover">capa</div>
-                <div class="ph cover">capa</div>
-                <div class="ph cover">capa</div>
-                <div class="ph cover">capa</div>
-                <div class="ph cover" style="outline:2px solid var(--focus); outline-offset:2px">capa<br>(foco)</div>
-                <div class="ph cover">sem capa</div>
-                <div class="ph cover">capa</div>
+                <div class="ph cover">PS1</div>
+                <div class="ph cover">PS1</div>
+                <div class="ph cover">PS1</div>
+                <div class="ph cover">PS2</div>
+                <div class="ph cover">PS2</div>
+                <div class="ph cover" style="outline:2px solid var(--focus); outline-offset:2px">PS1<br>(foco)</div>
+                <div class="ph cover">SNES</div>
+                <div class="ph cover">SNES</div>
               </div>
 
               <div class="box">
@@ -827,17 +905,70 @@
           <h4>Regra · o que não foi aplicado aparece</h4>
           <p>O bloco "avisos do preset" é o campo <code>Unapplied</code> da API. Se o ZeuX não conseguiu aplicar algo, ele diz — em vez de deixar o usuário achar que aplicou e não funcionou.</p>
         </div>
-        <div class="note">
-          <h4>Regra legal · capas, não jogos</h4>
-          <p>As capas vêm de um scraper de <strong>metadados</strong>. O jogo em si nunca trafega, nem para dentro nem para fora da máquina.</p>
+        <div class="note structural">
+          <h4>Estrutura · decisão de 2026-08-02</h4>
+          <p>Sem scraper no MVP: a capa é um <strong>placeholder por console</strong> (mesma arte para todo PS1, por exemplo), e o título vem do nome do arquivo, limpo de sufixos comuns como <code>(USA)</code> ou <code>[!]</code> — não de metadado buscado. Capa e nome reais ficam para depois do MVP provado.</p>
         </div>
         <div class="note structural">
           <h4>Pronto para controle</h4>
-          <p>"Sem capa" é um estado de primeira classe, não um buraco: nome legível, mesmo tamanho de alvo. E o painel de detalhe acompanha o foco em vez de exigir hover.</p>
+          <p>Nome sempre legível, mesmo tamanho de alvo em todo cartão. O painel de detalhe acompanha o foco em vez de exigir hover.</p>
         </div>
         <div class="note structural">
           <h4>A decidir</h4>
           <p>Painel fixo embaixo, lateral, ou sobreposto ao selecionar? Depende de quantos jogos cabem na dobra — decidir com biblioteca real, não com oito capas.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ instalar ao jogar ============ -->
+  <section class="screen" id="slazy">
+    <div class="screen-head">
+      <h2>Biblioteca · instalar ao jogar</h2>
+      <p>O usuário nunca precisou visitar a tela de Emuladores antes — "Jogar" resolve isso sozinho.</p>
+    </div>
+    <div class="screen-body">
+      <div class="frame">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="chrome-title">ZeuX · biblioteca</span></div>
+        <div class="canvas">
+          <div class="applayout">
+            <div class="sidenav">
+              <div class="navitem active">Biblioteca</div>
+              <div class="navitem">Consoles</div>
+              <div class="navitem">Emuladores</div>
+              <div class="navitem">Perfil</div>
+            </div>
+            <div class="stack">
+              <div class="box" style="max-width:30rem">
+                <p class="label">Antes de abrir</p>
+                <p class="wf-p"><strong>Crash Team Racing</strong> · PlayStation 1</p>
+                <p class="wf-sub">Este console ainda não tem um emulador instalado.</p>
+                <div class="box" style="margin-top:.6rem">
+                  <p class="label" style="margin-bottom:.25rem">Instalando DuckStation</p>
+                  <div class="bar"><span style="width:62%"></span></div>
+                  <p class="wf-sub" style="margin-top:.35rem">62% · 41 MB de 66 MB</p>
+                </div>
+                <div class="row" style="margin-top:.6rem">
+                  <span class="btn ghost">Cancelar</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="notes">
+        <div class="note structural">
+          <h4>Estrutura · decisão de 2026-08-02</h4>
+          <p>Mesmo fluxo 1-click da tela de Emuladores, só que disparado a partir do "Jogar" — sem tirar o usuário da biblioteca. A tela de Emuladores continua existindo, como atalho para quem prefere pré-instalar tudo de uma vez.</p>
+        </div>
+        <div class="note">
+          <h4>Regra · informar, não bloquear</h4>
+          <p>Mesma ressalva de hardware da tela 07 se aplica aqui: se a máquina não comporta o emulador, o aviso aparece antes de instalar — não depois de já ter baixado.</p>
+        </div>
+        <div class="note structural">
+          <h4>Estrutura</h4>
+          <p>Ao terminar, a instalação cai direto no lançamento do jogo — o usuário não clica "Jogar" duas vezes.</p>
         </div>
       </aside>
     </div>
