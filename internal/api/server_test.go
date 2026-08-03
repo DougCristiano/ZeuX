@@ -299,6 +299,37 @@ func TestLaunchUnknownConsoleReturns400(t *testing.T) {
 	}
 }
 
+// Trava que um console que EXISTE no catálogo, mas não alcança nenhum
+// patamar nesta máquina (level "improvavel"), devolve um code distinto de
+// "console desconhecido" — dizer "unknown_console" para o ps2 seria uma
+// mentira sobre o que o catálogo sabe, só porque o hardware não é bom o
+// bastante. Ver docs/roadmap.md, achado durante a implementação do L7.
+func TestLaunchWithoutViableTierReturnsNoPreset(t *testing.T) {
+	weakHardware := hardware.HardwareInfo{
+		ScannedAt: time.Now().UTC(),
+		OS:        hardware.OSInfo{Platform: "linux", Arch: "amd64"},
+		CPU:       hardware.CPUInfo{Model: "CPU fraca", LogicalCore: 1, BaseClockMHz: 100},
+		Memory:    hardware.MemoryInfo{TotalBytes: 256 * 1024 * 1024},
+		Warnings:  []string{},
+	}
+
+	server := newTestServer(t, fakeProbe{info: weakHardware})
+	handler := server.Routes()
+
+	doJSON(t, handler, http.MethodPost, "/api/v1/consent", map[string]bool{"granted": true})
+	doJSON(t, handler, http.MethodPost, "/api/v1/hardware/scan", nil)
+
+	body := map[string]string{"rom_path": "/tmp/jogo.iso", "console_id": "ps2"}
+	rec := doJSON(t, handler, http.MethodPost, "/api/v1/games/launch", body)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, esperado 400", rec.Code)
+	}
+	if code := errorCode(decodeBody(t, rec)); code != "no_preset_available" {
+		t.Fatalf("code = %q, esperado no_preset_available (não unknown_console)", code)
+	}
+}
+
 // Trava o ciclo completo de emuladores personalizados: criar, listar e
 // remover, exercitando o mesmo caminho que a interface usaria.
 func TestCustomEmulatorLifecycle(t *testing.T) {

@@ -734,6 +734,7 @@ foi aplicado (é o caso do Dolphin).
 | 400 | `missing_fields` | `rom_path` ou `console_id` vazios. |
 | 400 | `no_scan_yet` | `options` não veio e não há scan na sessão. |
 | 400 | `unknown_console` | `options` não veio e o `console_id` não está no catálogo. |
+| 400 | `no_preset_available` | `options` não veio, o `console_id` **existe** no catálogo, mas não alcançou nenhum patamar nesta máquina (`level: "improvavel"`). Distinto de `unknown_console`: o catálogo conhece o console, só não recomenda para este hardware. |
 | 400 | `emulator_unavailable` | Adapter desconhecido, adapter que não atende o console, ou nenhum emulador para o console encontrado no disco. |
 | 400 | `command_failed` | `BuildCommand` recusou. O caso mais comum é core do RetroArch ausente no disco — a mensagem nomeia o core faltante. |
 
@@ -786,7 +787,8 @@ nem `is_running` — esses dois só aparecem em `GET /sessions`.
 **Erros**
 
 Os mesmos de `/preview` para decodificação e autoconfiguração
-(`invalid_body`, `missing_fields`, `no_scan_yet`, `unknown_console`), mais:
+(`invalid_body`, `missing_fields`, `no_scan_yet`, `unknown_console`,
+`no_preset_available`), mais:
 
 | Status | `code` | Quando |
 |---|---|---|
@@ -1034,6 +1036,7 @@ curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
 | `no_scan_yet` | **400** | `/games/*` | Autoconfiguração pediu o scan e não achou. Mesmo `code`, status diferente por rota. |
 | `unknown_console` | 400 | `/games/*`, POST `/library/folders` | `console_id` fora do catálogo (em `/games/*`, só verificado quando `options` não vem). |
 | `unknown_console` | **500** | POST `/library/folders/{id}/scan` | O console da pasta saiu do catálogo depois de apontada — dado inconsistente, não erro do usuário. |
+| `no_preset_available` | 400 | `/games/*` | `options` não veio; o console existe no catálogo mas não alcançou nenhum patamar nesta máquina. Nunca confundido com `unknown_console` — achado durante o L7, `docs/roadmap.md`. |
 | `consent_required` | 403 | POST `/hardware/scan` | Sem "sim" válido para a política atual. |
 | `consent_read_failed` | 500 | GET/POST `/consent`, POST `/hardware/scan` | Erro de I/O lendo `consent.json`. |
 | `consent_write_failed` | 500 | POST `/consent` | Erro de I/O gravando `consent.json`. |

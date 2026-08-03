@@ -927,6 +927,14 @@ desabilitado e um aviso explicando por quê — em vez de esconder o jogo ou
 deixar o clique falhar com uma mensagem confusa. Testado apontando uma pasta
 de Wii U neste hardware (que não alcança nenhum patamar do catálogo).
 
+**Bug real achado escrevendo esta tela, corrigido no mesmo dia:**
+`POST /games/launch` sem `options` contra um console **que existe no
+catálogo** mas não alcança nenhum patamar (`level: "improvavel"`) devolvia
+`unknown_console` — uma mensagem falsa, já que o console é conhecido, só não
+recomendado para aquele hardware. Novo code `no_preset_available` distingue
+os dois casos; testado em `TestLaunchWithoutViableTierReturnsNoPreset`
+(`internal/api/server_test.go`), com hardware fraco de propósito.
+
 **Depende de:** L5, L6 (ambos feitos) · **Bloqueia:** L8, L9 (ambos feitos)
 
 ### L8 — "Instalar ao jogar": instalação inline do emulador (M) — **feito em 2026-08-03**

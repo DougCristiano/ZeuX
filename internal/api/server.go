@@ -359,8 +359,15 @@ func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 	}
 
 	result, err := verdict.EvaluateConsole(s.catalog, info, body.ConsoleID)
-	if err != nil || result.Options == nil {
+	if err != nil {
 		return emulator.LaunchInput{}, fmt.Errorf("no_console")
+	}
+	// O console existe, mas nenhum patamar foi alcançado nesta máquina
+	// (level "improvavel") — diferente de console inexistente. Confundir os
+	// dois diria "console desconhecido" para um console que o catálogo
+	// conhece muito bem, só não recomenda para este hardware.
+	if result.Options == nil {
+		return emulator.LaunchInput{}, fmt.Errorf("no_preset")
 	}
 
 	input.Options = *result.Options
@@ -454,6 +461,9 @@ func (s *Server) decodeLaunch(w http.ResponseWriter, r *http.Request) (emulator.
 		case "no_scan":
 			s.writeError(w, http.StatusBadRequest, "no_scan_yet",
 				"Execute o scan de hardware para que o ZeuX escolha a configuração, ou envie o campo options.")
+		case "no_preset":
+			s.writeError(w, http.StatusBadRequest, "no_preset_available",
+				"Este computador não alcançou nenhum patamar de compatibilidade conhecido para este console. Envie o campo options para configurar manualmente.")
 		default:
 			s.writeError(w, http.StatusBadRequest, "unknown_console",
 				"O console informado não está no catálogo do ZeuX.")
