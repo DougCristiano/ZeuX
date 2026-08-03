@@ -4,7 +4,7 @@ Documento de referência da arquitetura atual. Descreve o que **existe no códig
 hoje**, não o que está planejado. O que ainda não foi construído aparece
 marcado como pendente.
 
-Última verificação contra o código: 2026-08-01.
+Última verificação contra o código: 2026-08-03.
 
 ---
 
@@ -16,9 +16,12 @@ configuração**: o app lê o hardware da máquina, diz honestamente o que aquel
 computador alcança em cada console, e monta a linha de comando do emulador já
 configurada para o patamar que a máquina atende.
 
-Hoje o projeto é composto de **um único processo**: o daemon `zeuxd`, escrito em
-Go, que expõe uma API HTTP em `127.0.0.1:7777`. A interface gráfica
-(Tauri + React) é a Fase 2 e **ainda não foi iniciada**.
+O núcleo é o daemon `zeuxd`, escrito em Go, que expõe uma API HTTP em
+`127.0.0.1:7777`. Desde a Sprint B existe também uma interface Tauri + React
+(`src/`, `src-tauri/`) que sobe o `zeuxd` como processo filho e fala com ele por
+essa mesma API — o onboarding (consentimento → scan → parecer) e a tela de
+emuladores já funcionam de ponta a ponta. As telas de biblioteca não existem
+ainda (Sprint D).
 
 ### Componentes
 
@@ -30,12 +33,14 @@ Go, que expõe uma API HTTP em `127.0.0.1:7777`. A interface gráfica
 | `internal/hardware` | Detecção de CPU, RAM (gopsutil) e GPU (por SO, com build tags). |
 | `internal/verdict` | Catálogo de consoles embutido + motor que produz o parecer. |
 | `internal/emulator` | Adapters de emulador, descoberta de binários, launcher e sessões. |
+| `internal/install` | Instalação 1-click: manifesto, download verificado, extração, promoção atômica e supressão do assistente de primeira execução. |
+| `internal/store` | Abre e migra o SQLite local ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)). |
 
 ### Diagrama de componentes
 
 ```mermaid
 graph TD
-    UI["Interface Tauri + React<br/>(Fase 2 — não iniciada)"] -.->|"fetch HTTP"| API
+    UI["Interface Tauri + React<br/>(onboarding e emuladores prontos;<br/>biblioteca é a Sprint D)"] -->|"fetch HTTP"| API
 
     subgraph daemon["Processo zeuxd (Go)"]
         API["internal/api<br/>Server + Routes()"]
@@ -43,13 +48,18 @@ graph TD
         HW["internal/hardware<br/>Probe"]
         VERDICT["internal/verdict<br/>Catalog + Evaluate"]
         EMU["internal/emulator<br/>Registry + Launcher"]
+        INSTALL["internal/install<br/>Manager + Job"]
+        STORE["internal/store<br/>SQLite local"]
     end
 
     API --> CONSENT
     API --> HW
     API --> VERDICT
     API --> EMU
+    API --> INSTALL
     VERDICT --> EMU
+    EMU --> STORE
+    INSTALL --> EMU
 
     CONSENT -->|"consent.json"| DISK[("UserConfigDir()/ZeuX")]
     HW -->|"gopsutil"| SO["Sistema operacional"]
@@ -57,7 +67,8 @@ graph TD
     VERDICT -->|"go:embed"| CAT[("data/consoles.json")]
     EMU -->|"exec.Cmd"| BIN["Binários de emulador<br/>no disco do usuário"]
 
-    style UI stroke-dasharray: 5 5
+    INSTALL -->|"grava"| MANAGED[("ManagedRoot()/console/emuladores")]
+    STORE -->|"zeux.db"| DISK
 ```
 
 Detalhes que o diagrama esconde e importam:
@@ -241,7 +252,7 @@ não um emulador. Ver [ADR 0007](decisoes/0007-options-estruturado-no-catalogo.m
 
 `//go:embed data/consoles.json`. Garante que o app funcione offline no primeiro
 uso, sem depender de uma chamada de rede antes de dar o primeiro parecer. O
-`schema_version` (hoje `2`) existe para permitir a atualização via nuvem
+`schema_version` (hoje `3`, com 33 consoles — conferido em 2026-08-03) existe para permitir a atualização via nuvem
 prevista no PRD substituir esse conteúdo em tempo de execução, sem quebrar
 binários antigos.
 
@@ -330,8 +341,14 @@ descontinuados após ação judicial. Ver [ADR 0008](decisoes/0008-excluir-switc
 
 Registrado aqui para que ninguém leia este documento e presuma o contrário:
 
-- Qualquer banco de dados (adiado deliberadamente, ver
-  [ADR 0002](decisoes/0002-adiar-banco-de-dados.md)).
+- **Tabelas de biblioteca.** O banco existe desde 2026-08-02
+  ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)) — este item dizia
+  "qualquer banco de dados" e ficou falso no mesmo dia. A única migração é
+  `0001_sessions.sql`: pastas apontadas, entradas de jogo e BIOS ainda não têm
+  tabela nem código. Ver `roadmap.md`, itens L1–L11.
+- **Nenhuma rota `/api/v1/library/*`** e nenhuma tela de biblioteca em
+  `src/screens/`.
+- **Nada sobre BIOS em lugar nenhum do código.**
 - Instalação de emuladores dentro da estrutura de jogos: a pasta gerenciada
   (`ManagedRoot()`) já recebe instalações 1-click de verdade, organizadas por
   console (ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)).
@@ -341,5 +358,6 @@ Registrado aqui para que ninguém leia este documento e presuma o contrário:
 - Biblioteca de jogos, scraper de metadados, perfis sociais, netplay.
 - `Installation.Version` nunca é preenchido: nenhum adapter tenta detectar
   versão hoje.
-- Validação das flags dos adapters contra binários reais. Ver
-  [roadmap.md](roadmap.md), item de primeira classe.
+- **Prova de que um jogo abre.** As flags foram validadas contra binários reais
+  (roadmap, D1), mas nenhuma ROM de verdade foi aberta por nenhum emulador — ver
+  D11. O critério de saída da Sprint A continua descoberto.

@@ -95,8 +95,10 @@ neste arquivo:
 
 - Onde o painel de detalhe do jogo (tela 05) fica — fixo embaixo, lateral, ou
   sobreposto. Pertence à Sprint D (biblioteca), fora do escopo da Sprint B.
-- Banco de dados: sem ele, não há onde persistir o que a varredura de pasta
-  encontrou. Precisa reabrir [ADR 0002](decisoes/0002-adiar-banco-de-dados.md)
-  antes de qualquer implementação de back-end da biblioteca.
+- ~~Banco de dados~~ — **decidido em 2026-08-02**, depois que este trecho foi
+  escrito: [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md), SQLite
+  local com driver puro-Go. A infraestrutura (`internal/store`) já existe e as
+  sessões já são persistidas nela; as tabelas da biblioteca ainda não.
 - Catálogo de qual BIOS cada console exige (nome de arquivo esperado,
-  tamanho/hash para validar) — ainda não existe em lugar nenhum do código.
+  tamanho/hash para validar) — ainda não existe em lugar nenhum do código
+  (reconferido em 2026-08-03). Virou o item L3 do `roadmap.md`.
