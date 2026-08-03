@@ -18,7 +18,8 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
   console desde o L2) e motor de parecer que nomeia
   gargalos.
 - Consentimento persistido e versionado, verificado no servidor.
-- 13 adapters de emulador, descoberta de binários, launcher e rastreio de sessão.
+- 14 adapters de emulador (13 auditados no D1 + `rmg`, adicionado em
+  2026-08-03), descoberta de binários, launcher e rastreio de sessão.
   **Flags validadas contra binário real em todos os 13** — ver D1.
 - Instalação 1-click com download verificado, extração e instalação atômica.
 - **DuckStation instalado pelo ZeuX pula o assistente de primeira execução**
@@ -74,9 +75,9 @@ como critério de saída da Sprint A, mas cada um conta uma vez só.
 | Sprint D (MVP) | **7** | L3, L5, L6, L7, L8, L9, L11 |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
-| Sem sprint | **6** | — |
+| Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
 | **Total do MVP e da dívida** | **15** | dívida + A + B + C + D |
-| **Total geral** | **33** | tudo acima |
+| **Total geral** | **34** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -170,6 +171,32 @@ Vol. 17) — autoconfigurado, sem passar `options` na mão.
 
 **PS2 / PCSX2: confirmado.** Faltam 2 dos 3 emuladores do critério de
 aceite.
+
+**Segunda tentativa, 2026-08-03 (N64) — achou um problema de produto, não de
+código:** ao preparar o teste de N64, o Douglas notou que o console usa
+RetroArch, e RetroArch **não é instalável pelo 1-click** — o usuário teria que
+instalar o RetroArch e o core na mão, mesmo depois do ZeuX dizer que o console
+estava pronto. Isso não é exclusivo do N64: **os mesmos 24 consoles que caem
+no RetroArch** (ver `internal/emulator/retroarch.go`, `defaultCoreByConsole`)
+têm o mesmo problema hoje.
+
+Verificado contra o GitHub de verdade (não por analogia — mesmo rigor do D1):
+`simple64` só publica build de Windows nas releases (Linux é só Flatpak, que o
+`internal/install` não sabe instalar); **RMG (Rosalie's Mupen GUI)** publica
+Linux (AppImage) e Windows (zip) com nome de arquivo estável entre v0.8.5 e
+v0.9.0. Adicionado como adapter novo (`rmg`) para os patamares "bom" e
+"limitado" do N64 (que já usavam Mupen64Plus-Next — mesma tecnologia de
+emulação). O patamar "otimo" continua no RetroArch + core ParaLLEl N64, que o
+RMG não tem — trocar teria escondido uma perda de qualidade. Detalhe completo
+em `docs/adapters.md`.
+
+**Isto expõe um item novo, maior que o N64:** dos 33 consoles do catálogo, só
+9 têm hoje um emulador dedicado 1-click (os 8 standalone de sempre + `rmg`); o
+resto depende do RetroArch, que **não é 1-click**. Não vou resolver isso
+para todos os consoles agora — cada um exigiria a mesma pesquisa que o N64
+teve (existe emulador dedicado? tem release real? qual a licença?). Registrado
+como item novo no backlog (ver "Backlog sem sprint atribuída") em vez de
+assumido silenciosamente resolvido.
 
 ### D1 — Validar as flags dos adapters (G) — **feito em 2026-08-01, com uma ressalva**
 
@@ -991,6 +1018,7 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual — ~~build do instalador Windows~~ **feito 2026-08-02**, ver abaixo |
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
+| **Emulador dedicado 1-click para os consoles que hoje só têm RetroArch** | G | Achado no D11 (2026-08-03): RetroArch atende 24 consoles mas não é instalável pelo 1-click (distribuição própria). N64 já resolvido (`rmg`, ver `docs/adapters.md`); os outros 23 (NES, SNES, Mega Drive, GBA, PS1 via core, Dreamcast via core...) continuam exigindo o usuário instalar RetroArch + core na mão. Cada console exige a mesma pesquisa que o N64 teve — não fazer em lote sem verificar cada um |
 
 **Build do instalador Windows via GitHub Actions (2026-08-02):**
 `.github/workflows/build-windows.yml` roda num runner `windows-latest` (que já

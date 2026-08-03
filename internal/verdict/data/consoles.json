@@ -468,18 +468,16 @@
         },
         {
           "level": "bom",
-          "emulator": "RetroArch (core Mupen64Plus-Next)",
-          "adapter_id": "retroarch",
-          "core": "mupen64plus-next",
+          "emulator": "RMG (Rosalie's Mupen GUI)",
+          "adapter_id": "rmg",
           "preset": "Resolução interna 2x (1080p)",
           "options": { "fullscreen": true, "internal_scale": 2, "exit_on_close": true },
           "requires": { "logical_cores": 4, "clock_mhz": 2400, "ram_gib": 4 }
         },
         {
           "level": "limitado",
-          "emulator": "RetroArch (core Mupen64Plus-Next)",
-          "adapter_id": "retroarch",
-          "core": "mupen64plus-next",
+          "emulator": "RMG (Rosalie's Mupen GUI)",
+          "adapter_id": "rmg",
           "preset": "Resolução nativa",
           "options": { "fullscreen": true, "internal_scale": 1, "exit_on_close": true },
           "requires": { "logical_cores": 2, "clock_mhz": 1800, "ram_gib": 2 }

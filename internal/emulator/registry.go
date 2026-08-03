@@ -37,6 +37,7 @@ func NewRegistry() *Registry {
 			newXemu(),
 			newVita3K(),
 			newXenia(),
+			newRMG(),
 		},
 	}
 }

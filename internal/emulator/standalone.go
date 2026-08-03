@@ -476,3 +476,43 @@ func newCemu() Adapter {
 		},
 	}
 }
+
+// newRMG cria o adapter do RMG (Rosalie's Mupen GUI), emulador dedicado de
+// N64 com release real no GitHub (Linux via AppImage, Windows via zip) — ao
+// contrário do RetroArch, que atende N64 mas não é instalável pelo 1-click
+// (distribuição própria, fora do GitHub). Sem isso, N64 nunca seria "plug and
+// play" de verdade: o usuário precisaria instalar o RetroArch e o core na mão
+// mesmo depois do ZeuX dizer que o console estava pronto.
+//
+// As flags foram lidas do código-fonte real (Source/RMG/main.cpp,
+// QCommandLineParser), não de documentação de terceiros — ver
+// docs/roadmap.md, achado de 2026-08-03 no D11.
+func newRMG() Adapter {
+	return standaloneAdapter{
+		id:       "rmg",
+		name:     "RMG (Rosalie's Mupen GUI)",
+		consoles: []string{"n64"},
+		names:    binaryNames("RMG", []string{"RMG.exe"}, ""),
+		buildArgs: func(req Request) ([]string, []string, []string) {
+			opts := []string{}
+			var unapplied []string
+
+			if req.Options.Fullscreen {
+				opts = append(opts, "-f")
+			}
+			if req.Options.ExitOnClose {
+				opts = append(opts, "-q")
+			}
+			if req.Options.InternalScale > 1 {
+				unapplied = append(unapplied,
+					"A resolução interna precisa ser ajustada dentro do RMG.")
+			}
+			if req.Options.Renderer != RendererDefault {
+				unapplied = append(unapplied,
+					"O backend gráfico precisa ser escolhido dentro do RMG.")
+			}
+
+			return opts, []string{req.ROMPath}, unapplied
+		},
+	}
+}
