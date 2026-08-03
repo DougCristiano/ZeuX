@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -607,6 +608,15 @@ func (s *Server) handleScanLibraryFolder(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]any{"games_found": found})
 }
 
+// gameWithStats acrescenta tempo de jogo e "jogado por último" (L11,
+// docs/roadmap.md) a um library.Game, sem alterar o tipo de domínio — a
+// junção com sessões é responsabilidade da API, não da biblioteca.
+type gameWithStats struct {
+	library.Game
+	PlaytimeSeconds int    `json:"playtime_seconds"`
+	LastPlayedAt    string `json:"last_played_at,omitempty"`
+}
+
 func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) {
 	consoleID := r.URL.Query().Get("console_id")
 	if consoleID == "" {
@@ -620,11 +630,56 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
 		return
 	}
-	if games == nil {
-		games = []library.Game{}
+
+	// Sessões vêm por rom_path, não por id de jogo — o launcher nunca soube
+	// da biblioteca (a dependência corre num sentido só, ver
+	// docs/arquitetura-a-preservar.md), então a junção é feita aqui. Uma
+	// sessão cujo rom_path não bate com nenhum jogo simplesmente não
+	// contribui para nenhuma linha; ela continua existindo em GET /sessions,
+	// que não passa por este código.
+	sessions, err := s.launcher.Sessions(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"games": games})
+	type stat struct {
+		seconds int
+		last    time.Time
+	}
+	byPath := make(map[string]stat, len(sessions))
+	for _, session := range sessions {
+		st := byPath[session.ROMPath]
+		st.seconds += session.DurationSeconds
+		if session.StartedAt.After(st.last) {
+			st.last = session.StartedAt
+		}
+		byPath[session.ROMPath] = st
+	}
+
+	result := make([]gameWithStats, 0, len(games))
+	for _, game := range games {
+		gw := gameWithStats{Game: game}
+		if st, ok := byPath[game.Path]; ok {
+			gw.PlaytimeSeconds = st.seconds
+			gw.LastPlayedAt = st.last.Format(time.RFC3339)
+		}
+		result = append(result, gw)
+	}
+
+	// Jogado mais recentemente primeiro; nunca jogado vai para o fim, na
+	// ordem que ListGames já devolveu (mais recém-adicionado primeiro).
+	sort.SliceStable(result, func(i, j int) bool {
+		if result[i].LastPlayedAt == "" {
+			return false
+		}
+		if result[j].LastPlayedAt == "" {
+			return true
+		}
+		return result[i].LastPlayedAt > result[j].LastPlayedAt
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{"games": result})
 }
 
 // syncLibraryFolder varre o disco a partir de folder, usando as extensões do

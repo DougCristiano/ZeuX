@@ -971,8 +971,15 @@ varredura, não um delta desde a anterior.
 
 ## GET /api/v1/library/games
 
-Lista os jogos achados para um console, dos mais recentes para os mais
-antigos.
+Lista os jogos achados para um console, **jogado mais recentemente primeiro**
+— quem nunca foi jogado vai para o fim, na ordem em que foi achado (item L11,
+`docs/roadmap.md`).
+
+> `playtime_seconds` e `last_played_at` vêm de uma junção com `sessions` por
+> `rom_path`, feita nesta rota — nem `internal/library` nem o launcher
+> conhecem um ao outro (ver `docs/arquitetura-a-preservar.md`). Uma sessão
+> cujo `rom_path` não bate com nenhum jogo simplesmente não aparece aqui; ela
+> continua existindo normalmente em `GET /sessions`.
 
 ```bash
 curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
@@ -990,11 +997,28 @@ curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
       "path": "C:\\Jogos\\NES\\Jogo (USA).nes",
       "title": "Jogo",
       "added_at": "2026-08-03T20:00:00Z",
-      "missing": false
+      "missing": false,
+      "playtime_seconds": 412,
+      "last_played_at": "2026-08-03T21:10:00Z"
+    },
+    {
+      "id": 6,
+      "folder_id": 1,
+      "console_id": "nes",
+      "path": "C:\\Jogos\\NES\\Outro Jogo.nes",
+      "title": "Outro Jogo",
+      "added_at": "2026-08-03T20:00:00Z",
+      "missing": false,
+      "playtime_seconds": 0
     }
   ]
 }
 ```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `playtime_seconds` | int | Soma de `duration_seconds` de todas as sessões deste `rom_path`. `0` quando nunca foi jogado — sempre presente, nunca omitido. |
+| `last_played_at` | string | **Ausente** (não `""`) quando `playtime_seconds` é `0`. |
 
 **400 `missing_fields`** — sem `console_id` na query string.
 

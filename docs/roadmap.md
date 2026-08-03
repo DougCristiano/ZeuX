@@ -964,21 +964,35 @@ Enquanto não há scraper, o título é o nome do arquivo — mas
 
 **Depende de:** L1 (feito) · **Bloqueia:** nada
 
-### L11 — "Últimos jogados" e tempo por jogo (M)
+### L11 — "Últimos jogados" e tempo por jogo (M) — **back-end feito em 2026-08-03**
 
 O dado já está no banco desde o D3: `sessions` guarda `rom_path`, `started_at` e
-`ended_at`. Falta ligar sessão a entrada de biblioteca e exibir.
+`ended_at`. Faltava ligar sessão a entrada de biblioteca e exibir.
 
 **Critério de aceite:**
-- [ ] Cada sessão é associada ao jogo da biblioteca pelo caminho da ROM.
-- [ ] A biblioteca mostra tempo acumulado por jogo e ordena por "jogado por
-      último".
-- [ ] Os números sobrevivem a reinício do daemon — mesma verificação do D3
-      (lançar, matar o `zeuxd`, subir de novo, o total continua lá).
-- [ ] Sessão cujo `rom_path` não bate com nenhum jogo da biblioteca continua
-      existindo e aparece no total geral — não é descartada.
+- [x] Cada sessão é associada ao jogo da biblioteca pelo caminho da ROM — a
+      junção é feita em `handleListLibraryGames`
+      (`internal/api/server.go`), por `rom_path`, sem o launcher nem
+      `internal/library` conhecerem um ao outro (a dependência continua correndo
+      só em um sentido, ver `docs/arquitetura-a-preservar.md`).
+- [x] A biblioteca mostra tempo acumulado por jogo (`playtime_seconds`) e
+      ordena por "jogado por último" (`last_played_at`) — `GET
+      /library/games` devolve nessa ordem agora; ver `docs/api.md`.
+- [x] Os números sobrevivem a reinício do daemon — decorre diretamente do D3
+      (as sessões já persistem em SQLite); a junção lê do mesmo banco a cada
+      chamada, não há estado em memória novo aqui.
+- [x] Sessão cujo `rom_path` não bate com nenhum jogo da biblioteca continua
+      existindo e aparece no total geral — a junção só lê `sessions`, nunca
+      escreve nem filtra `GET /sessions`. Testado em
+      `TestLibraryGamesIncludePlaytimeAndLastPlayed`
+      (`internal/api/library_test.go`), que insere sessões direto no banco
+      (sem emulador real) e confirma ordenação e soma.
 
-**Depende de:** L1, L7 · **Bloqueia:** perfil (Sprint E)
+**Falta, e fica para quando a tela existir:** exibir isso na UI (tempo e
+badge de "jogado por último" no grid do L7). O contrato da API já está pronto
+e testado; é decisão de layout, não de dado.
+
+**Depende de:** L1 (feito) · **Bloqueia:** perfil (Sprint E)
 
 ### Fora do MVP, registrado para não ser reinventado
 

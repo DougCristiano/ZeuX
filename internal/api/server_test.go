@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -61,6 +62,15 @@ func beefyHardware() hardware.HardwareInfo {
 // diretório temporário exclusivo do teste.
 func newTestServer(t *testing.T, probe hardware.Probe) *api.Server {
 	t.Helper()
+	server, _ := newTestServerWithDB(t, probe)
+	return server
+}
+
+// newTestServerWithDB é igual a newTestServer, mas também devolve o *sql.DB
+// subjacente — para os poucos testes (L11) que precisam inserir uma sessão
+// direto no banco, sem depender de um emulador de verdade rodando.
+func newTestServerWithDB(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB) {
+	t.Helper()
 
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir) // Linux/BSD
@@ -99,7 +109,8 @@ func newTestServer(t *testing.T, probe hardware.Probe) *api.Server {
 
 	libraryStore := library.NewStore(db)
 
-	return api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, silentLogger())
+	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, silentLogger())
+	return server, db
 }
 
 func silentLogger() *slog.Logger {
