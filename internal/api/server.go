@@ -207,14 +207,10 @@ func (s *Server) hardwareBlocks(adapterID string) (bool, string) {
 		return false, ""
 	}
 
-	supported := make(map[string]bool)
-	for _, id := range adapter.Consoles() {
-		supported[id] = true
-	}
-
 	var worst []string
-	for _, result := range verdict.Evaluate(s.catalog, info).Verdicts {
-		if !supported[result.ConsoleID] {
+	for _, consoleID := range adapter.Consoles() {
+		result, err := verdict.EvaluateConsole(s.catalog, info, consoleID)
+		if err != nil {
 			continue
 		}
 		if result.Level != verdict.LevelImprovavel {
@@ -349,22 +345,19 @@ func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 		return emulator.LaunchInput{}, fmt.Errorf("no_scan")
 	}
 
-	for _, result := range verdict.Evaluate(s.catalog, info).Verdicts {
-		if result.ConsoleID != body.ConsoleID || result.Options == nil {
-			continue
-		}
-
-		input.Options = *result.Options
-		if input.EmulatorID == "" {
-			input.EmulatorID = result.AdapterID
-		}
-		if input.Core == "" {
-			input.Core = result.Core
-		}
-		return input, nil
+	result, err := verdict.EvaluateConsole(s.catalog, info, body.ConsoleID)
+	if err != nil || result.Options == nil {
+		return emulator.LaunchInput{}, fmt.Errorf("no_console")
 	}
 
-	return emulator.LaunchInput{}, fmt.Errorf("no_console")
+	input.Options = *result.Options
+	if input.EmulatorID == "" {
+		input.EmulatorID = result.AdapterID
+	}
+	if input.Core == "" {
+		input.Core = result.Core
+	}
+	return input, nil
 }
 
 func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {

@@ -284,7 +284,7 @@ O parecer completo: resumo do hardware em prosa + um veredito por console.
 curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 ```
 
-**200 OK** (recortado — a lista real traz os 13 consoles):
+**200 OK** (recortado — a lista real traz os 33 consoles):
 
 ```json
 {
@@ -366,7 +366,7 @@ curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 
 ## GET /api/v1/emulators
 
-Varre o disco procurando cada um dos 13 emuladores embutidos, mais os
+Varre o disco procurando cada um dos 14 emuladores embutidos, mais os
 personalizados que o usuário tiver definido (ver `/custom-emulators` abaixo).
 **Não recebe parâmetros.**
 

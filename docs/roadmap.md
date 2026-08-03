@@ -44,11 +44,11 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
 
 **Não existe ainda** (verificado por leitura de código em 2026-08-03):
 
-- **Nenhuma linha de biblioteca de jogos.** `internal/` não tem pacote de
-  biblioteca; a única migração do banco é `0001_sessions.sql`; não há rota
-  `/library/*` em `internal/api/server.go`; `src/screens/` tem cinco telas
-  (Consent, Declined, Emulators, Status, Verdict) e nenhuma de biblioteca. O
-  que existe é o wireframe e as decisões de fluxo, não código.
+- **Nenhuma integração de biblioteca de jogos na API.** `internal/library`
+  existe e está testado (ver L1 abaixo — feito), mas não há rota `/library/*`
+  em `internal/api/server.go`; `src/screens/` tem cinco telas (Consent,
+  Declined, Emulators, Status, Verdict) e nenhuma de biblioteca. O que falta
+  é a rota HTTP e a UI (L2, L3, etc); o armazém de dados está pronto.
 - **Nenhuma menção a BIOS em lugar nenhum do código** — `grep -ci bios
   internal/verdict/data/consoles.json` devolve `0`.
 - **Nenhum jogo foi aberto de verdade por nenhum emulador.** O critério de
