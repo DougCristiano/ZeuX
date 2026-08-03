@@ -286,4 +286,10 @@ export type LibraryGame = {
    * a entrada continua existindo (o tempo de jogo referencia o caminho), só
    * marcada. Nunca some da lista sozinha. */
   missing: boolean;
+  /** Soma de todas as sessões deste jogo (L11). `0` quando nunca foi jogado —
+   * sempre presente, nunca ausente. */
+  playtime_seconds: number;
+  /** Ausente (nunca `""`) quando `playtime_seconds` é `0`. GET /library/games
+   * já devolve os jogos ordenados por este campo, mais recente primeiro. */
+  last_played_at?: string;
 };

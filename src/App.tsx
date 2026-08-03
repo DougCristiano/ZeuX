@@ -6,6 +6,7 @@ import { ThemePicker } from "./components/ThemePicker";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
+import { GamesScreen } from "./screens/GamesScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
 import { VerdictScreen } from "./screens/VerdictScreen";
@@ -27,7 +28,8 @@ type Phase =
   | "scan-error"
   | "verdict"
   | "emulators"
-  | "library";
+  | "library"
+  | "games";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("checking-port");
@@ -39,6 +41,9 @@ function App() {
   // do parecer quanto da tela de recusa (docs/sprint-b-plano.md, B8: "recusar
   // não pode ser beco sem saída"). Guarda de onde veio para "Voltar" certo.
   const [cameFromDeclined, setCameFromDeclined] = useState(false);
+  const [selectedConsole, setSelectedConsole] = useState<{ id: string; name: string; shortName: string } | null>(
+    null,
+  );
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
@@ -215,7 +220,28 @@ function App() {
       break;
 
     case "library":
-      screen = <LibraryScreen report={report!} onBack={() => setPhase("verdict")} />;
+      screen = (
+        <LibraryScreen
+          report={report!}
+          onBack={() => setPhase("verdict")}
+          onOpenGames={(id, name, shortName) => {
+            setSelectedConsole({ id, name, shortName });
+            setPhase("games");
+          }}
+        />
+      );
+      break;
+
+    case "games":
+      screen = (
+        <GamesScreen
+          consoleId={selectedConsole!.id}
+          consoleName={selectedConsole!.name}
+          shortName={selectedConsole!.shortName}
+          report={report!}
+          onBack={() => setPhase("library")}
+        />
+      );
       break;
   }
 

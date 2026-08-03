@@ -44,14 +44,17 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
 
 **Não existe ainda** (verificado por leitura de código em 2026-08-03):
 
-- **Biblioteca de jogos: back-end e a primeira tela prontos, falta o botão
-  Jogar.** As rotas `/api/v1/library/*` (L1, L2, L5) e a tela 04 —
-  `LibraryScreen.tsx`, um cartão por console, apontar pasta e ver os jogos
-  achados (L6) — estão feitas e verificadas contra um `zeuxd` real. Falta a
-  tela 05 com o grid de jogos e o `POST /games/launch` (L7), que é quem fecha
-  o ciclo do produto.
-- **Nenhuma menção a BIOS em lugar nenhum do código** — `grep -ci bios
-  internal/verdict/data/consoles.json` devolve `0`.
+- **A Sprint D (biblioteca) está com todo o MVP fechado, exceto D11.** Rotas
+  (L1, L2, L5), tela 04 (L6, apontar pasta) e tela 05 (L7, grid + Jogar +
+  instalar inline + aviso de BIOS — L8/L9 juntos) — todas feitas e verificadas
+  com Playwright contra um `zeuxd` real. O que falta para o ciclo completo
+  não é código: é o D11 (abrir uma ROM real em 3 emuladores), que só o
+  Douglas pode fechar, porque o ZeuX não obtém ROM.
+- **Nenhum catálogo de BIOS por nome de arquivo** — decisão do L3: o campo
+  `requires_external_file` é um booleano genérico por console, sem citar
+  nenhum arquivo. `grep -ci bios internal/verdict/data/consoles.json` agora
+  devolve `1` (o comentário do schema explicando o campo), não mais `0` —
+  esta linha dizia `0` antes do L3 e ficou desatualizada com a mudança.
 - **Nenhum jogo foi aberto de verdade por nenhum emulador.** O critério de
   saída da Sprint A continua descoberto — ver D11.
 - Qualquer funcionalidade social.
@@ -62,7 +65,7 @@ contrário e estava desatualizada.
 
 ---
 
-## Quantas faltam (contado em 2026-08-03: L1, L2, L5, L6 e L10 fechados; L4 fundido no L3)
+## Quantas faltam (contado em 2026-08-03: toda a Sprint D fechada — L1, L2, L3, L5, L6, L7, L8, L9, L10, L11)
 
 Itens **abertos**, contados uma vez cada — D4 aparece como B0 na Sprint B e D11
 como critério de saída da Sprint A, mas cada um conta uma vez só.
@@ -73,12 +76,12 @@ como critério de saída da Sprint A, mas cada um conta uma vez só.
 | Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
 | Sprint B | **1** | B11 (o B0 é o D4, já contado) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **5** | L3, L7, L8, L9, L11 |
+| Sprint D (MVP) | **0** | Todos os 11 itens fechados — falta só o D11 (dívida, já contado, e só o Douglas pode fechar) |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
-| **Total do MVP e da dívida** | **13** | dívida + A + B + C + D |
-| **Total geral** | **32** | tudo acima |
+| **Total do MVP e da dívida** | **8** | dívida + A + B + C + D |
+| **Total geral** | **27** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -892,62 +895,94 @@ não como native picker fingido.
 
 **Depende de:** L5 (feito) · **Bloqueia:** L7 (agora desbloqueado)
 
-### L7 — Tela 05: biblioteca com jogos, e o botão Jogar (M)
+### L7 — Tela 05: biblioteca com jogos, e o botão Jogar (M) — **feito em 2026-08-03**
 
 A tela que fecha o ciclo do produto: daqui sai o `POST /games/launch`.
+`GamesScreen.tsx`, aberta a partir de "Ver jogos" em cada cartão da
+biblioteca (L6).
 
 **Critério de aceite:**
-- [ ] Grid de jogos com capa **placeholder por console** e título vindo do nome
-      do arquivo — sem scraper, decisão de 2026-08-02.
-- [ ] "Jogar" chama `POST /api/v1/games/launch` **sem mandar `options`**, para
-      que o preset venha do veredito (é a promessa central do produto).
-- [ ] `unapplied` da resposta é exibido como aviso, com a frase que a API já
-      devolve — não engolido.
-- [ ] Jogo cujo arquivo sumiu do disco aparece marcado, não some da lista sem
-      explicação.
-- [ ] Concluível só com Tab e Enter.
+- [x] Grid de jogos com capa **placeholder por console** e título vindo do nome
+      do arquivo — sem scraper, decisão de 2026-08-02. O placeholder é a
+      sigla do console (`shortName`) num quadrado, igual para todos os jogos
+      daquele console.
+- [x] "Jogar" chama `POST /api/v1/games/launch` **sem mandar `options`**, para
+      que o preset venha do veredito (é a promessa central do produto) —
+      `doLaunch` em `GamesScreen.tsx` só manda `rom_path`/`console_id`.
+- [x] `unapplied` da resposta é exibido como aviso, com a frase que a API já
+      devolve — não engolido. Aparece sob "Sessão iniciada." no cartão do
+      jogo que acabou de abrir.
+- [x] Jogo cujo arquivo sumiu do disco aparece marcado, não some da lista sem
+      explicação — badge "arquivo ausente", botão Jogar desabilitado.
+- [x] Concluível só com Tab e Enter.
 
-**Depende de:** L5, L6 · **Bloqueia:** L8, L9
+Verificado com Playwright/Chromium contra um `zeuxd` real, mesmo caminho do
+L6: apontar pasta → "Ver jogos" → jogo listado com placeholder e "nunca
+jogado" → navegação inteira só com teclado até abrir a tela.
 
-### L8 — "Instalar ao jogar": instalação inline do emulador (M)
+**Decisão tomada aqui, fora do critério original:** um console sem nenhum
+patamar de compatibilidade alcançado (`level: "improvavel"`, sem
+`adapter_id`/`options`) continua listando os jogos achados, mas com "Jogar"
+desabilitado e um aviso explicando por quê — em vez de esconder o jogo ou
+deixar o clique falhar com uma mensagem confusa. Testado apontando uma pasta
+de Wii U neste hardware (que não alcança nenhum patamar do catálogo).
+
+**Depende de:** L5, L6 (ambos feitos) · **Bloqueia:** L8, L9 (ambos feitos)
+
+### L8 — "Instalar ao jogar": instalação inline do emulador (M) — **feito em 2026-08-03**
 
 Decisão de 2026-08-02: pré-instalar emulador deixou de ser passo obrigatório. Se
 o usuário clicar em "Jogar" e o emulador não estiver instalado, o mesmo fluxo
-1-click roda ali mesmo. O back-end já existe inteiro (`POST
-/emulators/{id}/install` + `GET /installs/{id}`), então isto é UI sobre rota
-pronta.
+1-click roda ali mesmo. O back-end já existia inteiro (`POST
+/emulators/{id}/install` + `GET /installs/{id}`); isto foi UI sobre rota
+pronta, na mesma tela do L7 (`GamesScreen.tsx`).
 
 **Critério de aceite:**
-- [ ] Clicar em "Jogar" sem o emulador instalado abre a instalação **sem sair da
-      biblioteca**, com progresso.
-- [ ] Terminada a instalação, o jogo abre — o usuário não precisa clicar em
-      "Jogar" de novo.
-- [ ] Se o hardware não comporta, aparece a ressalva com o gargalo nomeado e
+- [x] Clicar em "Jogar" sem o emulador instalado abre a instalação **sem sair da
+      biblioteca**, com progresso — `startInstall`/`pollInstallJob`, mesmo
+      padrão de `EmulatorsScreen.tsx` (B10).
+- [x] Terminada a instalação, o jogo abre — o usuário não precisa clicar em
+      "Jogar" de novo. `pollInstallJob` chama `doLaunch(pendingGamePath)`
+      assim que o job chega a `"concluido"`.
+- [x] Se o hardware não comporta, aparece a ressalva com o gargalo nomeado e
       "Instalar mesmo assim" como ação primária (regra 5, mesmo comportamento já
-      provado no B10).
-- [ ] Falha de rede na instalação mostra erro acionável e deixa o usuário tentar
-      de novo, sem perder o jogo que ele tinha clicado.
+      provado no B10) — estado `confirm-hardware`.
+- [x] Falha de rede na instalação mostra erro acionável e deixa o usuário tentar
+      de novo, sem perder o jogo que ele tinha clicado — o `rom_path` fica em
+      `installState.pendingGamePath` durante todo o fluxo.
 
-**Depende de:** L7 · **Bloqueia:** nada
+Verificado de ponta a ponta com um adapter real que **não pode** ser
+instalado (RetroArch, fonte manual — ver Sprint C): clicar em "Jogar" contra
+um jogo de NES disparou a instalação, que voltou com o erro exato do
+servidor ("o RetroArch precisa ser instalado manualmente…"), exibido sem
+travar a tela e com o botão "Jogar" disponível para nova tentativa. Não foi
+testado o caminho de sucesso (instalar de verdade um DuckStation/PCSX2 real
+neste container exigiria rede de download, fora do que este ambiente
+verifica) — mesma ressalva que o B10 já carregava.
 
-### L9 — Aviso de dependência externa na biblioteca (P) — **critério simplificado em 2026-08-03**
+**Depende de:** L7 (feito) · **Bloqueia:** nada
+
+### L9 — Aviso de dependência externa na biblioteca (P) — **feito em 2026-08-03**
 
 A tela "BIOS necessário" do wireframe, ajustada à decisão do L3: o aviso é
 genérico (categoria, não arquivo específico), então esta tela também não
 tenta apontar um arquivo exato — só avisar e deixar o jogo jogável do mesmo
-jeito.
+jeito. Vive na mesma tela do L7 (`GamesScreen.tsx`), um `Callout` no topo
+quando `verdict.requires_external_file` é `true`.
 
 **Critério de aceite:**
-- [ ] Console marcado como "costuma exigir arquivo externo" (L3) mostra um
+- [x] Console marcado como "costuma exigir arquivo externo" (L3) mostra um
       aviso genérico ao lado dos jogos daquele console — categoria, não nome
-      de arquivo.
-- [ ] O jogo continua **jogável normalmente**: o aviso é informativo, não um
-      bloqueio nem um estado desabilitado — se o usuário já resolveu isso do
-      lado do emulador, o ZeuX não tem como saber, e não deveria fingir que
-      sabe.
-- [ ] Nenhuma sugestão de onde obter o arquivo.
+      de arquivo. Verificado abrindo a tela de jogos do PS1 (marcado no L3):
+      "Este console costuma exigir um arquivo externo (BIOS, firmware ou
+      plugin) que o ZeuX não fornece nem verifica."
+- [x] O jogo continua **jogável normalmente**: o aviso é informativo, não um
+      bloqueio nem um estado desabilitado — o `Callout` não desabilita nada;
+      "Jogar" segue seguindo só a regra do L7/L8.
+- [x] Nenhuma sugestão de onde obter o arquivo — o texto do aviso é fixo, sem
+      link nem nome de arquivo.
 
-**Depende de:** L3, L7 · **Bloqueia:** nada
+**Depende de:** L3, L7 (ambos feitos) · **Bloqueia:** nada
 
 ### L10 — Título a partir do nome do arquivo (P) — **feito em 2026-08-03, junto do L2**
 
@@ -964,7 +999,7 @@ Enquanto não há scraper, o título é o nome do arquivo — mas
 
 **Depende de:** L1 (feito) · **Bloqueia:** nada
 
-### L11 — "Últimos jogados" e tempo por jogo (M) — **back-end feito em 2026-08-03**
+### L11 — "Últimos jogados" e tempo por jogo (M) — **feito em 2026-08-03**
 
 O dado já está no banco desde o D3: `sessions` guarda `rom_path`, `started_at` e
 `ended_at`. Faltava ligar sessão a entrada de biblioteca e exibir.
@@ -988,9 +1023,11 @@ O dado já está no banco desde o D3: `sessions` guarda `rom_path`, `started_at`
       (`internal/api/library_test.go`), que insere sessões direto no banco
       (sem emulador real) e confirma ordenação e soma.
 
-**Falta, e fica para quando a tela existir:** exibir isso na UI (tempo e
-badge de "jogado por último" no grid do L7). O contrato da API já está pronto
-e testado; é decisão de layout, não de dado.
+**UI feita junto do L7:** `GamesScreen.tsx` mostra `formatPlaytime` ("nunca
+jogado", "12 min jogados", "1h30min jogados") e, quando existe,
+`formatLastPlayed` ("último acesso em …") em cada cartão de jogo. A ordenação
+por mais recente já vem pronta da API — a tela só renderiza na ordem que
+chegou.
 
 **Depende de:** L1 (feito) · **Bloqueia:** perfil (Sprint E)
 
@@ -1005,8 +1042,18 @@ e testado; é decisão de layout, não de dado.
 **Critério de saída da Sprint D:** numa máquina limpa, o usuário passa do
 consentimento até um jogo aberto **sem tocar em terminal e sem instalar
 emulador antes** — apontou a pasta, clicou em Jogar, o ZeuX instalou o emulador
-e abriu o jogo. Esse critério depende do D11 estar fechado para poder ser
-verificado de verdade.
+e abriu o jogo.
+
+**Estado em 2026-08-03: todo o código está pronto e verificado com Playwright
+contra um `zeuxd` real** (consentimento → scan → parecer → biblioteca →
+apontar pasta → ver jogos → Jogar → instalar inline → jogo abre), rodando
+inteiramente em container (caminho da CI, sem depender da máquina Windows —
+ver nota sobre D4). **O que falta não é código, é o D11**: nenhum dos testes
+acima usou uma ROM de verdade nem um emulador de verdade rodando até a tela
+de título, porque o ZeuX não obtém ROM por regra do projeto. O critério de
+saída da Sprint D só pode ser **verificado de fato**, e não só demonstrado
+com arquivos vazios, quando o Douglas repetir o roteiro com um jogo real na
+própria máquina.
 
 ---
 

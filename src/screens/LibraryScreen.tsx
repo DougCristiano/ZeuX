@@ -12,10 +12,12 @@ function ConsoleLibraryCard({
   console: consoleInfo,
   folders,
   onFoldersChanged,
+  onOpenGames,
 }: {
   console: ConsoleInfo;
   folders: LibraryFolder[];
   onFoldersChanged: () => void;
+  onOpenGames: () => void;
 }) {
   const [path, setPath] = useState("");
   const [games, setGames] = useState<LibraryGame[] | null>(null);
@@ -131,14 +133,19 @@ function ConsoleLibraryCard({
       {error && <p className="text-sm text-danger">{error}</p>}
 
       {games && games.length > 0 && (
-        <ul className="flex flex-col gap-1 border-t border-line pt-2">
-          {games.map((game) => (
-            <li key={game.id} className="flex items-center justify-between gap-2 text-sm">
-              <span className="truncate text-ink">{game.title}</span>
-              {game.missing && <Badge>ausente</Badge>}
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="flex flex-col gap-1 border-t border-line pt-2">
+            {games.slice(0, 3).map((game) => (
+              <li key={game.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="truncate text-ink">{game.title}</span>
+                {game.missing && <Badge>ausente</Badge>}
+              </li>
+            ))}
+          </ul>
+          <Button type="button" variant="secondary" onClick={onOpenGames}>
+            Ver jogos ({games.length})
+          </Button>
+        </>
       )}
     </Card>
   );
@@ -152,7 +159,15 @@ function ConsoleLibraryCard({
  * no disco do usuário, contagem de jogos achados, e título derivado do nome
  * do arquivo (sem scraper, mesma decisão).
  */
-export function LibraryScreen({ report, onBack }: { report: Report; onBack: () => void }) {
+export function LibraryScreen({
+  report,
+  onBack,
+  onOpenGames,
+}: {
+  report: Report;
+  onBack: () => void;
+  onOpenGames: (consoleId: string, name: string, shortName: string) => void;
+}) {
   const [folders, setFolders] = useState<LibraryFolder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -209,6 +224,7 @@ export function LibraryScreen({ report, onBack }: { report: Report; onBack: () =
               console={consoleInfo}
               folders={folders.filter((f) => f.console_id === consoleInfo.console_id)}
               onFoldersChanged={() => setReloadKey((k) => k + 1)}
+              onOpenGames={() => onOpenGames(consoleInfo.console_id, consoleInfo.name, consoleInfo.short_name)}
             />
           ))}
         </div>
