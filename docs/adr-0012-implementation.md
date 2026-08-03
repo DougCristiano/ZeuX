@@ -36,50 +36,41 @@ irá popular este diretório durante `npm run build:daemon`.
 - **Usar `include_bytes!` no Rust:** Embute tudo no binário (cores têm 5-50 MB cada, 20 cores = 200-1000 MB só em cores). Inviável.
 - **Baixar em tempo de execução:** Quebra a promessa de ADR 0012 ("sem rede no primeiro uso").
 
-## Etapa 2: Script de download (BLOQUEADO — DECISÃO NECESSÁRIA)
+## Etapa 2: Script de download (IMPLEMENTADA — OPÇÃO B)
 
-### Problema descoberto
+**Decisão:** Usar buildbot.libretro.com (fonte oficial de cores compilados).
 
-Os cores libretro **não têm releases centralizadas no GitHub**. Cada repositório segue um padrão diferente:
+### Implementação
 
-- **mgba, stella:** publicam binários (appimage, dmg, etc), não .so/.dll/.dylib
-- **mesen:** versão 0.9.x é abandonada; 2.x não tem releases
-- **ppsspp (fork libretro):** não tem releases (usar upstream? diferente.)
-- **Fonte oficial:** buildbot.libretro.com (fora do GitHub, com política de rede variável)
+Script em `scripts/download-retroarch-cores.mjs`:
 
-Empacotar 20 cores não é tão simples quanto empacotar zeuxd.
+1. Detecta plataforma (`linux/x86_64`, `windows/x86_64`, `osx/x86_64`, etc)
+2. Para cada dos 20 cores, monta URL: `https://buildbot.libretro.com/latest/{platform}/cores/{filename}.zip`
+3. Download do .zip e armazena em `src-tauri/resources/retroarch/cores/`
+4. Registra sucesso/falha de cada core
 
-### Opções (escolha uma)
+Integração no build:
+```json
+"scripts": {
+  "download:retroarch-cores": "node scripts/download-retroarch-cores.mjs",
+  "build:daemon": "npm run download:retroarch-cores && node scripts/build-zeuxd.mjs"
+}
+```
 
-**Opção A: Compilar cores durante o build (complexo, longo)**
-- Clonar cada repositório de core, compilar cada um
-- Vantagem: fonte fidedigna, controle total
-- Desvantagem: tempo de build 30+ min, requer compiladores C/C++/Rust, complexo
+### Status
 
-**Opção B: Usar buildbot.libretro.com (quebra padrão GitHub)**
-- Baixar cores compilados da source oficial: `https://buildbot.libretro.com/`
-- Vantagem: binários reais, mantidos pelos projetos
-- Desvantagem: fora do GitHub (diferente de zeuxd, outros adapters)
+⚠️ **Script é piloto e precisa de teste real**
 
-**Opção C: Empacotar só RetroArch, deixar cores para manual**
-- Empacotar o executável do RetroArch (muito menor, ~100 MB)
-- Usuário baixa cores via "Online Updater" dentro do RetroArch
-- Vantagem: simples, reduz tamanho instalador
-- Desvantagem: volta ao passo inicial ("2 passos", não "1-click completo")
+- ✅ Código pronto, detecta plataforma corretamente
+- ⚠️ Buildbot bloqueado na rede do container (este ambiente) — **será testado na máquina do Douglas**
+- ⏳ Próxima sub-etapa: extrair .zip e validar checksums
 
-**Opção D: Compilar um subset pequeno (pragmático)**
-- Empacotar apenas cores de 3-5 consoles mais importantes (ex: NES, SNES, PS1)
-- Deixar outros para manual ou Online Updater
-- Vantagem: viável agora, pode expandir depois
-- Desvantagem: incompleto, critério de "quais?" subjetivo
+### O que falta em Etapa 2
 
-### Recomendação
-
-Para esta sessão, recomendo **Opção C ou D**:
-- **C** resolve 80% do problema (RetroArch instalado, cores manuais)
-- **D** resolve 40% mas prova o mecanismo de empacotamento
-
-A decisão é sua. Qual caminho?
+1. **Extrair .zip:** adicionar dependência `unzipper` npm e descompactar para obter .so/.dll/.dylib
+2. **Validar checksums:** buildbot fornece SHA-256, verificar integridade
+3. **Teste real:** executar `npm run download:retroarch-cores` na máquina do Douglas e confirmar que cores aparecem em `src-tauri/resources/retroarch/cores/`
+4. **Limpar versões pinadas:** hoje usa `"latest"`, depois de testar mudar para versões específicas (ex: `2025-08-03`)
 
 ## Etapa 3: Localização em tempo de execução (PENDENTE)
 

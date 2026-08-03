@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:daemon": "node scripts/build-zeuxd.mjs",
+    "download:retroarch-cores": "node scripts/download-retroarch-cores.mjs",
+    "build:daemon": "npm run download:retroarch-cores && node scripts/build-zeuxd.mjs",
     "verificar-api": "node scripts/verify-api.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
