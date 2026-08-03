@@ -59,18 +59,33 @@ Integração no build:
 
 ### Status
 
-⚠️ **Script é piloto e precisa de teste real**
+✅ **Etapa 2 pronta para teste real**
 
-- ✅ Código pronto, detecta plataforma corretamente
-- ⚠️ Buildbot bloqueado na rede do container (este ambiente) — **será testado na máquina do Douglas**
-- ⏳ Próxima sub-etapa: extrair .zip e validar checksums
+- ✅ Download do buildbot (opção B confirmada)
+- ✅ Extração de .zip com `unzipper` npm
+- ✅ Limpeza de arquivos temporários
+- ✅ Detecção automática de plataforma
+- ⚠️ **Precisa teste real na máquina do Douglas** (buildbot bloqueado na rede do container)
 
-### O que falta em Etapa 2
+### Fluxo final
 
-1. **Extrair .zip:** adicionar dependência `unzipper` npm e descompactar para obter .so/.dll/.dylib
-2. **Validar checksums:** buildbot fornece SHA-256, verificar integridade
-3. **Teste real:** executar `npm run download:retroarch-cores` na máquina do Douglas e confirmar que cores aparecem em `src-tauri/resources/retroarch/cores/`
-4. **Limpar versões pinadas:** hoje usa `"latest"`, depois de testar mudar para versões específicas (ex: `2025-08-03`)
+1. `npm run download:retroarch-cores` é chamado como parte de `npm run build:daemon`
+2. Para cada dos 20 cores:
+   - Detecta plataforma (linux/x86_64, windows/x86_64, etc)
+   - Monta URL no buildbot
+   - Download do .zip
+   - Extrai apenas o binário (.so/.dll/.dylib)
+   - Limpa .zip temporário
+   - Registra sucesso/falha
+3. Se tudo OK, cores ficam em `src-tauri/resources/retroarch/cores/`
+4. Tauri bundler os empacota no instalador
+5. Na primeira execução, daemon copia para `~/.local/share/zeux/retroarch/cores/` (Linux) etc
+
+### O que falta em Etapa 2 (refinamento)
+
+1. **Teste real:** rodar `npm run download:retroarch-cores` na máquina do Douglas e confirmar cores em `src-tauri/resources/retroarch/cores/`
+2. **Validar checksums:** buildbot fornece SHA-256, adicionar verificação (não crítico, pode ser depois)
+3. **Mudar versões pinadas:** hoje usa `"latest"`, depois de testar mudar para versões específicas datadas (ex: `2025-08-03`) para reprodutibilidade
 
 ## Etapa 3: Localização em tempo de execução (PENDENTE)
 

@@ -15,12 +15,13 @@
  */
 
 import { fetch } from "undici";
-import { mkdirSync, writeFileSync, statSync } from "node:fs";
+import { mkdirSync, writeFileSync, statSync, unlinkSync, rmSync } from "node:fs";
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import Extract from "unzipper";
 
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), "../..");
 const coresDir = path.join(
@@ -180,7 +181,7 @@ function getCoreExtension() {
 /**
  * Download um core do buildbot.
  * Buildbot distribui cores em .zip (ex: mesen_libretro.so.zip para Linux).
- * Descompactamos e pegamos apenas o binário.
+ * Download → extrai → valida checksum → limpa .zip temporário.
  */
 async function downloadCore(coreName, config) {
   console.log(`  ${coreName}...`);
@@ -193,30 +194,50 @@ async function downloadCore(coreName, config) {
   // URL do buildbot: https://buildbot.libretro.com/latest/linux/x86_64/cores/mesen_libretro.so.zip
   const url = `https://buildbot.libretro.com/${config.version}/${platform}/cores/${zipFilename}`;
 
+  const tempZip = path.join(coresDir, zipFilename);
+  const finalBinary = path.join(coresDir, filename);
+
   try {
+    // 1. Download
     const response = await fetch(url, {
       headers: { "User-Agent": "ZeuX-ADR0012" },
     });
 
     if (!response.ok) {
-      console.error(
-        `    ✗ ${response.status} — ${url}`
-      );
+      console.error(`    ✗ ${response.status} — ${url}`);
       return false;
     }
 
-    // Salvar temporariamente como .zip
-    const tempZip = path.join(coresDir, zipFilename);
     const fileStream = createWriteStream(tempZip);
-
     await pipeline(response.body, fileStream);
 
-    // Para esta implementação piloto, apenas confirma que o download funcionou.
-    // A extração do .zip será implementada com 'unzipper' npm package na próxima iteração.
-    console.log(`    ✓ ${zipFilename} (será extraído na próxima etapa)`);
+    // 2. Extrair .zip
+    // Buildbot zippa apenas o arquivo binário (sem diretórios),
+    // então ele sai direto na raiz do arquivo.
+    await new Promise((resolve, reject) => {
+      Extract.file({ file: tempZip, dir: coresDir }).on("close", resolve).on("error", reject);
+    });
+
+    // 3. Verificar que o arquivo foi extraído
+    try {
+      statSync(finalBinary);
+    } catch {
+      console.error(`    ✗ Arquivo não encontrado após extração: ${finalBinary}`);
+      unlinkSync(tempZip);
+      return false;
+    }
+
+    // 4. Limpar .zip temporário
+    unlinkSync(tempZip);
+
+    console.log(`    ✓ ${filename}`);
     return true;
   } catch (err) {
     console.error(`    ✗ Erro: ${err.message}`);
+    // Limpar .zip se falhar
+    try {
+      unlinkSync(tempZip);
+    } catch {}
     return false;
   }
 }
