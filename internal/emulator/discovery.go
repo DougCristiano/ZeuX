@@ -68,6 +68,18 @@ func findBinary(ctx context.Context, adapterID string, consoles []string, names 
 				return cand, true, true
 			}
 		}
+
+		// Os AppImages baixados pelo instalador 1-click (internal/install)
+		// mantêm o nome original do release do projeto — ex.:
+		// "pcsx2-v2.6.3-linux-appimage-x64-Qt.AppImage" — que nunca bate com o
+		// nome fixo em `names` (ex.: "pcsx2-qt"). Sem isso, todo emulador
+		// distribuído como AppImage ficava "instalado" e ao mesmo tempo
+		// indetectável no Linux — achado testando de verdade (D11). Como
+		// managedDir pertence só a este adapter, um único .AppImage ali só
+		// pode ser ele.
+		if matches, _ := filepath.Glob(filepath.Join(managedDir, "*.AppImage")); len(matches) == 1 && isExecutableFile(matches[0]) {
+			return matches[0], true, true
+		}
 	}
 
 	// O índice foi construído sem extraDirs (nenhum adapter embutido passa

@@ -136,6 +136,31 @@ regra do projeto**, então nenhuma sessão de IA pode fechar este item.
 prática, o valor de qualquer tela de biblioteca (Sprint D), que existe para
 chamar exatamente esta rota.
 
+**Primeira tentativa, 2026-08-03 (Zorin OS, PS2/PCSX2) — achou um bug real:**
+o Douglas instalou o PCSX2 pelo 1-click (`POST /emulators/pcsx2/install`,
+concluiu certo, v2.6.3) e mandou abrir um `.bin` de PS2 de verdade. O
+lançamento falhou com `"o emulador PCSX2 não foi encontrado nesta máquina"`
+— **logo depois de o próprio ZeuX ter acabado de instalá-lo.**
+
+Causa: no Linux, o instalador baixa o PCSX2 como AppImage e mantém o nome
+original do arquivo do release (`pcsx2-v2.6.3-linux-appimage-x64-Qt.AppImage`),
+mas a descoberta procurava um nome fixo (`pcsx2-qt`) que nunca existiu nesse
+formato. **Os mesmos 6 adapters que usam AppImage no Linux** (PCSX2,
+DuckStation, PPSSPP, Flycast, Cemu, Azahar) tinham o mesmo problema — instalar
+funcionava, abrir o jogo não, porque a instalação ficava indetectável.
+**Corrigido no mesmo dia**: `findBinary` (`internal/emulator/discovery.go`)
+agora aceita um único `.AppImage` dentro da pasta gerenciada quando o nome
+exato não bate — o diretório pertence só a este adapter, então não há
+ambiguidade. Dois testes novos travam isso, incluindo o caso de duas
+AppImages no mesmo lugar (não escolhe às cegas).
+
+Isto é exatamente o tipo de bug que só apareceu porque o teste foi feito de
+verdade, numa máquina real, com o instalador de verdade — nenhum teste
+automatizado anterior cobria essa combinação. **Ainda não tentado de novo
+depois da correção** — falta repetir o lançamento do mesmo jogo para
+confirmar que abre, e ainda faltam os outros 2 emuladores do critério de
+aceite.
+
 ### D1 — Validar as flags dos adapters (G) — **feito em 2026-08-01, com uma ressalva**
 
 Os 13 adapters foram instalados de verdade (11 pelo instalador 1-click, RetroArch
