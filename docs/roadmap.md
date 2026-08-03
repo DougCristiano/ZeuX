@@ -783,7 +783,7 @@ abaixo, que passa a apontar para cá em vez de ser trabalho novo.
 
 **Depende de:** L1 (feito) · **Bloqueia:** L5, L6, L7
 
-### L3 — Aviso genérico de dependência externa faltando (P) — **simplificado em 2026-08-03**
+### L3 — Aviso genérico de dependência externa faltando (P) — **feito em 2026-08-03**
 
 **Decisão do Douglas:** descartar o catálogo de BIOS por nome de arquivo (a
 versão anterior deste item, que exigia pesquisar e citar fonte para cada
@@ -798,15 +798,29 @@ validar tamanho/hash — trabalho do L4 antigo, agora removido) por uma
 **etiqueta por console**, decidida uma vez, sem manutenção contínua.
 
 **Critério de aceite:**
-- [ ] O catálogo marca, por console, se ele é conhecido por exigir arquivo
-      externo — um booleano ou nota curta, não uma lista de arquivos.
+- [x] O catálogo marca, por console, se ele é conhecido por exigir arquivo
+      externo — um booleano, não uma lista de arquivos.
+      `Console.RequiresExternalFile` (`internal/verdict/catalog.go`),
+      `requires_external_file` no JSON, `schema_version` subiu de 4 para 5.
+      Marcados por julgamento documentado (não pesquisa individual por
+      console, ao contrário do D8): `ps1`, `ps2`, `ps3`, `saturn`, `segacd`,
+      `3do`, `dreamcast`, `neogeo`, `arcade`, `xbox`, `vita` — os 11 mais
+      amplamente conhecidos por exigir BIOS/firmware real.
 - [ ] O aviso exibido é genérico: nomeia a **categoria** (ex.: "este console
       costuma precisar de BIOS"), nunca um nome de arquivo específico, nunca
-      "está faltando o arquivo X".
-- [ ] Nenhum texto sugere onde obter o arquivo — nem em mensagem de erro, nem
-      genérico, nem específico.
-- [ ] A marca **não bloqueia** o app — informa (regra 5), do mesmo jeito que o
-      parecer de hardware.
+      "está faltando o arquivo X". *(UI fica para o L9, que já pode consumir
+      o campo — a marcação sozinha não mostra nada ao usuário.)*
+- [x] Nenhum texto sugere onde obter o arquivo — nem em mensagem de erro, nem
+      genérico, nem específico. O campo é só um booleano; não carrega texto.
+- [x] A marca **não bloqueia** o app — é só um campo a mais no parecer
+      (`ConsoleVerdict.RequiresExternalFile`), nunca impede lançar o jogo.
+
+`ConsoleVerdict.RequiresExternalFile` (`internal/verdict/verdict.go`) propaga
+o campo do catálogo até o parecer, testado em
+`TestRequiresExternalFilePropagatesToVerdict`
+(`internal/verdict/catalog_integration_test.go`) — trava que `ps1` chega
+`true` e `nes` chega `false`/ausente pela cadeia inteira, não só no JSON do
+catálogo.
 
 **Depende de:** nada · **Bloqueia:** L9 (~~L4~~ removido — sem verificação de
 arquivo, não há o que essa etapa faria)

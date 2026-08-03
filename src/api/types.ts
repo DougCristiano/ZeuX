@@ -109,6 +109,14 @@ export type ConsoleVerdict = {
    */
   bottlenecks?: string[];
   precision: Precision;
+  /**
+   * `true` para consoles amplamente conhecidos por exigir BIOS/firmware
+   * externo (PS1, PS2, PS3, Saturn, Sega CD, 3DO, Dreamcast, Neo Geo,
+   * Arcade, Xbox, Vita) — nunca varia por patamar. Ausente (nunca `false`)
+   * nos demais. Usado pela biblioteca (L9) para um aviso genérico, nunca um
+   * nome de arquivo.
+   */
+  requires_external_file?: boolean;
 };
 
 export type Report = {

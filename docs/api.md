@@ -364,6 +364,7 @@ curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 | `next_level` | string | O patamar imediatamente acima do alcançado. Ausente quando o console já está no melhor patamar. |
 | `bottlenecks` | array de string | **O que exatamente barra o `next_level`**, uma frase por requisito não atendido, nomeando o componente. **Ausente** (não `[]`) quando não há gargalo a reportar — `omitempty` no Go remove o campo para uma slice vazia (achado rodando `npm run verificar-api` contra o daemon real, item B6 do [plano da Sprint B](sprint-b-plano.md); esta linha dizia "vazio" antes de ser corrigida). |
 | `precision` | `"completa"` \| `"parcial"` | Deste console especificamente. `"parcial"` quando algum requisito não pôde ser verificado. |
+| `requires_external_file` | bool | `true` quando o console é amplamente conhecido por exigir BIOS/firmware/plugin externo (PS1, PS2, PS3, Saturn, Sega CD, 3DO, Dreamcast, Neo Geo, Arcade, Xbox, Vita). **Não varia por patamar** — vem do catálogo, não da avaliação de hardware. Ausente (nunca `false`) nos demais consoles (item L3, `docs/roadmap.md`). A biblioteca (L9) usa isto para um aviso genérico, nunca um nome de arquivo. |
 
 **404 `no_scan_yet`** — execute o scan antes.
 

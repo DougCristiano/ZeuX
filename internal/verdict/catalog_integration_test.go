@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/doufl/zeux/internal/emulator"
+	"github.com/doufl/zeux/internal/hardware"
 )
 
 // O catálogo e os adapters são mantidos em arquivos separados e é fácil um sair
@@ -78,6 +79,42 @@ func TestEveryConsoleDeclaresAtLeastOneExtension(t *testing.T) {
 				t.Errorf("%s: extensão %q deveria estar em minúsculas", console.ID, ext)
 			}
 		}
+	}
+}
+
+// Trava o contrato do L3 (docs/roadmap.md): o aviso de arquivo externo
+// precisa sair do catálogo até o parecer, sem se perder na travessia — senão
+// L9 (aviso na biblioteca) mostraria o badge errado sem nenhum teste
+// percebendo.
+func TestRequiresExternalFilePropagatesToVerdict(t *testing.T) {
+	catalog, err := LoadCatalog()
+	if err != nil {
+		t.Fatalf("carregando catálogo: %v", err)
+	}
+
+	// beefyInfo faz qualquer console alcançar algum patamar, para que o
+	// campo seja testado independente de qual nível foi atingido —
+	// RequiresExternalFile não varia por patamar.
+	beefyInfo := hardware.HardwareInfo{
+		CPU:    hardware.CPUInfo{LogicalCore: 32, BaseClockMHz: 5000},
+		Memory: hardware.MemoryInfo{TotalBytes: 64 * 1024 * 1024 * 1024},
+		GPUs:   []hardware.GPUInfo{{VRAMBytes: 24 * 1024 * 1024 * 1024}},
+	}
+
+	ps1, err := EvaluateConsole(catalog, beefyInfo, "ps1")
+	if err != nil {
+		t.Fatalf("avaliando ps1: %v", err)
+	}
+	if !ps1.RequiresExternalFile {
+		t.Error("ps1 é conhecido por exigir BIOS; RequiresExternalFile deveria ser true")
+	}
+
+	nes, err := EvaluateConsole(catalog, beefyInfo, "nes")
+	if err != nil {
+		t.Fatalf("avaliando nes: %v", err)
+	}
+	if nes.RequiresExternalFile {
+		t.Error("nes não está marcado no catálogo; RequiresExternalFile deveria ser false")
 	}
 }
 

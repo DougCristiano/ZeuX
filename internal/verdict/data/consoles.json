@@ -1,7 +1,7 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "updated_at": "2026-08-03",
-  "_comment": "Dicionário-semente de requisitos por console. Os patamares são avaliados de cima para baixo: vale o primeiro cujos requisitos sejam todos atendidos. O campo 'preset' é o texto que o usuário lê; 'options' é o mesmo preset em forma que o emulador obedece. Os dois precisam contar a mesma história. Os limiares são estimativas iniciais e precisam de calibração com hardware real — o sistema de compatibilidade comunitário previsto no PRD é a fonte natural desses dados. Este arquivo passará a ser atualizável via nuvem. O campo 'extensions' (adicionado no schema_version 4) é a lista de extensões de arquivo reconhecidas na varredura de biblioteca (internal/library) — minúsculas, sem o ponto; consoles cujos jogos circulam como romset de arcade (arcade, neogeo) reconhecem só '.zip', que é o formato universal desses dois no MAME/FBNeo/RetroArch.",
+  "_comment": "Dicionário-semente de requisitos por console. Os patamares são avaliados de cima para baixo: vale o primeiro cujos requisitos sejam todos atendidos. O campo 'preset' é o texto que o usuário lê; 'options' é o mesmo preset em forma que o emulador obedece. Os dois precisam contar a mesma história. Os limiares são estimativas iniciais e precisam de calibração com hardware real — o sistema de compatibilidade comunitário previsto no PRD é a fonte natural desses dados. Este arquivo passará a ser atualizável via nuvem. O campo 'extensions' (adicionado no schema_version 4) é a lista de extensões de arquivo reconhecidas na varredura de biblioteca (internal/library) — minúsculas, sem o ponto; consoles cujos jogos circulam como romset de arcade (arcade, neogeo) reconhecem só '.zip', que é o formato universal desses dois no MAME/FBNeo/RetroArch. O campo 'requires_external_file' (adicionado no schema_version 5, docs/roadmap.md item L3) marca, sem citar arquivo nenhum, os consoles amplamente conhecidos por exigir BIOS/firmware para emulação — julgamento documentado no roadmap, não pesquisa individual por console; ausente (nunca 'false' explícito) equivale a não marcado.",
   "consoles": [
     {
       "id": "atari2600",
@@ -36,6 +36,7 @@
       "short_name": "Arcade",
       "year": 1980,
       "extensions": ["zip"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -198,6 +199,7 @@
       "short_name": "Neo Geo",
       "year": 1990,
       "extensions": ["zip"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -279,6 +281,7 @@
       "short_name": "Sega CD",
       "year": 1991,
       "extensions": ["cue", "chd"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -306,6 +309,7 @@
       "short_name": "3DO",
       "year": 1993,
       "extensions": ["cue", "chd", "iso"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -360,6 +364,7 @@
       "short_name": "Saturn",
       "year": 1994,
       "extensions": ["cue", "chd"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -396,6 +401,7 @@
       "short_name": "PS1",
       "year": 1994,
       "extensions": ["cue", "chd", "pbp", "bin"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -517,6 +523,7 @@
       "short_name": "Dreamcast",
       "year": 1998,
       "extensions": ["cdi", "gdi", "chd"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -604,6 +611,7 @@
       "short_name": "PS2",
       "year": 2000,
       "extensions": ["iso", "chd"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -697,6 +705,7 @@
       "short_name": "Xbox",
       "year": 2001,
       "extensions": ["iso", "xiso"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -854,6 +863,7 @@
       "short_name": "PS3",
       "year": 2006,
       "extensions": ["iso", "pkg"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",
@@ -920,6 +930,7 @@
       "short_name": "PS Vita",
       "year": 2011,
       "extensions": ["vpk"],
+      "requires_external_file": true,
       "tiers": [
         {
           "level": "otimo",

@@ -28,6 +28,11 @@ type ConsoleVerdict struct {
 	Level    Level  `json:"level"`
 	Headline string `json:"headline"`
 
+	// RequiresExternalFile vem direto do catálogo (Console.RequiresExternalFile)
+	// — nunca varia por patamar, então fica fora do bloco condicional abaixo.
+	// L9 (docs/roadmap.md) usa isto para mostrar o aviso genérico na biblioteca.
+	RequiresExternalFile bool `json:"requires_external_file,omitempty"`
+
 	// Emulator e Preset ficam vazios quando o nível é "improvavel": não faz
 	// sentido sugerir configuração para algo que não deve rodar.
 	Emulator  string `json:"emulator,omitempty"`
@@ -92,12 +97,13 @@ func Evaluate(catalog *Catalog, info hardware.HardwareInfo) Report {
 // que impede o patamar imediatamente acima.
 func evaluateConsole(console Console, info hardware.HardwareInfo) ConsoleVerdict {
 	result := ConsoleVerdict{
-		ConsoleID: console.ID,
-		Name:      console.Name,
-		ShortName: console.ShortName,
-		Year:      console.Year,
-		Level:     LevelImprovavel,
-		Precision: PrecisionCompleta,
+		ConsoleID:            console.ID,
+		Name:                 console.Name,
+		ShortName:            console.ShortName,
+		Year:                 console.Year,
+		Level:                LevelImprovavel,
+		Precision:            PrecisionCompleta,
+		RequiresExternalFile: console.RequiresExternalFile,
 	}
 
 	for index, tier := range console.Tiers {
