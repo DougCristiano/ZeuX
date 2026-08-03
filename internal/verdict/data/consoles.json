@@ -1,13 +1,14 @@
 {
-  "schema_version": 3,
-  "updated_at": "2026-08-01",
-  "_comment": "Dicionário-semente de requisitos por console. Os patamares são avaliados de cima para baixo: vale o primeiro cujos requisitos sejam todos atendidos. O campo 'preset' é o texto que o usuário lê; 'options' é o mesmo preset em forma que o emulador obedece. Os dois precisam contar a mesma história. Os limiares são estimativas iniciais e precisam de calibração com hardware real — o sistema de compatibilidade comunitário previsto no PRD é a fonte natural desses dados. Este arquivo passará a ser atualizável via nuvem.",
+  "schema_version": 4,
+  "updated_at": "2026-08-03",
+  "_comment": "Dicionário-semente de requisitos por console. Os patamares são avaliados de cima para baixo: vale o primeiro cujos requisitos sejam todos atendidos. O campo 'preset' é o texto que o usuário lê; 'options' é o mesmo preset em forma que o emulador obedece. Os dois precisam contar a mesma história. Os limiares são estimativas iniciais e precisam de calibração com hardware real — o sistema de compatibilidade comunitário previsto no PRD é a fonte natural desses dados. Este arquivo passará a ser atualizável via nuvem. O campo 'extensions' (adicionado no schema_version 4) é a lista de extensões de arquivo reconhecidas na varredura de biblioteca (internal/library) — minúsculas, sem o ponto; consoles cujos jogos circulam como romset de arcade (arcade, neogeo) reconhecem só '.zip', que é o formato universal desses dois no MAME/FBNeo/RetroArch.",
   "consoles": [
     {
       "id": "atari2600",
       "name": "Atari 2600",
       "short_name": "Atari 2600",
       "year": 1977,
+      "extensions": ["a26", "bin"],
       "tiers": [
         {
           "level": "otimo",
@@ -34,6 +35,7 @@
       "name": "Fliperama (Arcade)",
       "short_name": "Arcade",
       "year": 1980,
+      "extensions": ["zip"],
       "tiers": [
         {
           "level": "otimo",
@@ -60,6 +62,7 @@
       "name": "Nintendo Entertainment System",
       "short_name": "NES",
       "year": 1983,
+      "extensions": ["nes"],
       "tiers": [
         {
           "level": "otimo",
@@ -86,6 +89,7 @@
       "name": "Sega Master System",
       "short_name": "Master System",
       "year": 1985,
+      "extensions": ["sms"],
       "tiers": [
         {
           "level": "otimo",
@@ -112,6 +116,7 @@
       "name": "PC Engine / TurboGrafx-16",
       "short_name": "PC Engine",
       "year": 1987,
+      "extensions": ["pce"],
       "tiers": [
         {
           "level": "otimo",
@@ -138,6 +143,7 @@
       "name": "Mega Drive / Genesis",
       "short_name": "Mega Drive",
       "year": 1988,
+      "extensions": ["md", "gen", "bin", "smd"],
       "tiers": [
         {
           "level": "otimo",
@@ -164,6 +170,7 @@
       "name": "Game Boy",
       "short_name": "Game Boy",
       "year": 1989,
+      "extensions": ["gb"],
       "tiers": [
         {
           "level": "otimo",
@@ -190,6 +197,7 @@
       "name": "Neo Geo",
       "short_name": "Neo Geo",
       "year": 1990,
+      "extensions": ["zip"],
       "tiers": [
         {
           "level": "otimo",
@@ -216,6 +224,7 @@
       "name": "Sega Game Gear",
       "short_name": "Game Gear",
       "year": 1990,
+      "extensions": ["gg"],
       "tiers": [
         {
           "level": "otimo",
@@ -242,6 +251,7 @@
       "name": "Super Nintendo",
       "short_name": "SNES",
       "year": 1990,
+      "extensions": ["sfc", "smc"],
       "tiers": [
         {
           "level": "otimo",
@@ -268,6 +278,7 @@
       "name": "Sega CD / Mega CD",
       "short_name": "Sega CD",
       "year": 1991,
+      "extensions": ["cue", "chd"],
       "tiers": [
         {
           "level": "otimo",
@@ -294,6 +305,7 @@
       "name": "3DO Interactive Multiplayer",
       "short_name": "3DO",
       "year": 1993,
+      "extensions": ["cue", "chd", "iso"],
       "tiers": [
         {
           "level": "otimo",
@@ -320,6 +332,7 @@
       "name": "Sega 32X",
       "short_name": "32X",
       "year": 1994,
+      "extensions": ["32x"],
       "tiers": [
         {
           "level": "otimo",
@@ -346,6 +359,7 @@
       "name": "Sega Saturn",
       "short_name": "Saturn",
       "year": 1994,
+      "extensions": ["cue", "chd"],
       "tiers": [
         {
           "level": "otimo",
@@ -381,6 +395,7 @@
       "name": "PlayStation 1",
       "short_name": "PS1",
       "year": 1994,
+      "extensions": ["cue", "chd", "pbp", "bin"],
       "tiers": [
         {
           "level": "otimo",
@@ -413,6 +428,7 @@
       "name": "Nintendo Virtual Boy",
       "short_name": "Virtual Boy",
       "year": 1995,
+      "extensions": ["vb"],
       "tiers": [
         {
           "level": "otimo",
@@ -439,6 +455,7 @@
       "name": "Nintendo 64",
       "short_name": "N64",
       "year": 1996,
+      "extensions": ["n64", "z64", "v64"],
       "tiers": [
         {
           "level": "otimo",
@@ -474,6 +491,7 @@
       "name": "Game Boy Color",
       "short_name": "GB Color",
       "year": 1998,
+      "extensions": ["gbc"],
       "tiers": [
         {
           "level": "otimo",
@@ -500,6 +518,7 @@
       "name": "Sega Dreamcast",
       "short_name": "Dreamcast",
       "year": 1998,
+      "extensions": ["cdi", "gdi", "chd"],
       "tiers": [
         {
           "level": "otimo",
@@ -532,6 +551,7 @@
       "name": "Bandai WonderSwan",
       "short_name": "WonderSwan",
       "year": 1999,
+      "extensions": ["ws", "wsc"],
       "tiers": [
         {
           "level": "otimo",
@@ -558,6 +578,7 @@
       "name": "Neo Geo Pocket Color",
       "short_name": "NGP Color",
       "year": 1999,
+      "extensions": ["ngp", "ngc"],
       "tiers": [
         {
           "level": "otimo",
@@ -584,6 +605,7 @@
       "name": "PlayStation 2",
       "short_name": "PS2",
       "year": 2000,
+      "extensions": ["iso", "chd"],
       "tiers": [
         {
           "level": "otimo",
@@ -616,6 +638,7 @@
       "name": "Nintendo GameCube",
       "short_name": "GameCube",
       "year": 2001,
+      "extensions": ["iso", "rvz", "gcm"],
       "tiers": [
         {
           "level": "otimo",
@@ -648,6 +671,7 @@
       "name": "Game Boy Advance",
       "short_name": "GBA",
       "year": 2001,
+      "extensions": ["gba"],
       "tiers": [
         {
           "level": "otimo",
@@ -674,6 +698,7 @@
       "name": "Microsoft Xbox",
       "short_name": "Xbox",
       "year": 2001,
+      "extensions": ["iso", "xiso"],
       "tiers": [
         {
           "level": "otimo",
@@ -706,6 +731,7 @@
       "name": "PlayStation Portable",
       "short_name": "PSP",
       "year": 2004,
+      "extensions": ["iso", "cso"],
       "tiers": [
         {
           "level": "otimo",
@@ -738,6 +764,7 @@
       "name": "Nintendo DS",
       "short_name": "DS",
       "year": 2004,
+      "extensions": ["nds"],
       "tiers": [
         {
           "level": "otimo",
@@ -770,6 +797,7 @@
       "name": "Microsoft Xbox 360",
       "short_name": "Xbox 360",
       "year": 2005,
+      "extensions": ["iso", "xex"],
       "tiers": [
         {
           "level": "otimo",
@@ -794,6 +822,7 @@
       "name": "Nintendo Wii",
       "short_name": "Wii",
       "year": 2006,
+      "extensions": ["iso", "rvz", "wbfs"],
       "tiers": [
         {
           "level": "otimo",
@@ -826,6 +855,7 @@
       "name": "PlayStation 3",
       "short_name": "PS3",
       "year": 2006,
+      "extensions": ["iso", "pkg"],
       "tiers": [
         {
           "level": "otimo",
@@ -858,6 +888,7 @@
       "name": "Nintendo 3DS",
       "short_name": "3DS",
       "year": 2011,
+      "extensions": ["3ds", "cia"],
       "tiers": [
         {
           "level": "otimo",
@@ -890,6 +921,7 @@
       "name": "PlayStation Vita",
       "short_name": "PS Vita",
       "year": 2011,
+      "extensions": ["vpk"],
       "tiers": [
         {
           "level": "otimo",
@@ -914,6 +946,7 @@
       "name": "Nintendo Wii U",
       "short_name": "Wii U",
       "year": 2012,
+      "extensions": ["wud", "wux", "rpx"],
       "tiers": [
         {
           "level": "otimo",

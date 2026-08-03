@@ -1,6 +1,7 @@
 package verdict
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/doufl/zeux/internal/emulator"
@@ -44,6 +45,37 @@ func TestEveryTierPointsToAKnownAdapter(t *testing.T) {
 			if !supported {
 				t.Errorf("%s/%s: o adapter %q não declara suporte a este console",
 					console.ID, tier.Level, tier.AdapterID)
+			}
+		}
+	}
+}
+
+// Sem extensão declarada, a varredura de biblioteca (internal/library, item
+// L2 do roadmap) varreria a pasta de um console e não acharia nada — em
+// silêncio, sem erro nenhum avisando que o console ficou de fora. Isso é
+// exatamente a classe de bug que passa despercebida até um usuário reportar
+// "apontei a pasta e não achou nenhum jogo".
+func TestEveryConsoleDeclaresAtLeastOneExtension(t *testing.T) {
+	catalog, err := LoadCatalog()
+	if err != nil {
+		t.Fatalf("carregando catálogo: %v", err)
+	}
+
+	for _, console := range catalog.Consoles {
+		if len(console.Extensions) == 0 {
+			t.Errorf("%s: nenhuma extensão declarada", console.ID)
+			continue
+		}
+
+		for _, ext := range console.Extensions {
+			if ext == "" {
+				t.Errorf("%s: extensão vazia na lista", console.ID)
+			}
+			if strings.HasPrefix(ext, ".") {
+				t.Errorf("%s: extensão %q não deveria incluir o ponto", console.ID, ext)
+			}
+			if ext != strings.ToLower(ext) {
+				t.Errorf("%s: extensão %q deveria estar em minúsculas", console.ID, ext)
 			}
 		}
 	}

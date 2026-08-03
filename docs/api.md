@@ -92,7 +92,7 @@ curl http://127.0.0.1:7777/api/v1/health
 ```json
 {
   "status": "ok",
-  "schema_version": 3,
+  "schema_version": 4,
   "consoles": 33
 }
 ```
@@ -100,7 +100,7 @@ curl http://127.0.0.1:7777/api/v1/health
 | Campo | Tipo | Origem |
 |---|---|---|
 | `status` | string | Literal `"ok"`. |
-| `schema_version` | int | `catalog.SchemaVersion` (`internal/verdict/data/consoles.json`) — hoje `3`. |
+| `schema_version` | int | `catalog.SchemaVersion` (`internal/verdict/data/consoles.json`) — hoje `4` (subiu de `3` em 2026-08-03 com o campo `extensions`, usado por `internal/library` na varredura). |
 | `consoles` | int | Número de consoles no catálogo — hoje `33`. |
 
 Esta rota não tem caminho de erro: se o catálogo não tivesse carregado, o daemon

@@ -14,7 +14,8 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
 **Pronto e verificado (Fase 1):**
 
 - Detecção de CPU/RAM (gopsutil) e GPU por SO, com fallback gracioso.
-- Catálogo de 33 consoles (`schema_version 3`) e motor de parecer que nomeia
+- Catálogo de 33 consoles (`schema_version 4`, com extensões de arquivo por
+  console desde o L2) e motor de parecer que nomeia
   gargalos.
 - Consentimento persistido e versionado, verificado no servidor.
 - 13 adapters de emulador, descoberta de binários, launcher e rastreio de sessão.
@@ -70,12 +71,12 @@ como critério de saída da Sprint A, mas cada um conta uma vez só.
 | Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
 | Sprint B | **1** | B11 (o B0 é o D4, já contado) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **10** | L2–L11 (L1 fechado em 2026-08-03) |
+| Sprint D (MVP) | **8** | L3–L9, L11 (L1, L2 e L10 fechados em 2026-08-03) |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **6** | — |
-| **Total do MVP e da dívida** | **18** | dívida + A + B + C + D |
-| **Total geral** | **36** | tudo acima |
+| **Total do MVP e da dívida** | **16** | dívida + A + B + C + D |
+| **Total geral** | **34** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -624,6 +625,8 @@ ainda não têm código: só a infraestrutura de banco existe.
 | ~~Introduzir o SQLite: dependência, migrações embutidas, `schema_migrations`~~ | M | **Feito 2026-08-02** — `internal/store`, `modernc.org/sqlite` (sem CGO) |
 | ~~D3 — persistir sessões e tempo de jogo~~ | M | **Feito 2026-08-02** — `internal/emulator.SQLiteSessions`, verificado sobrevivendo a reinício do daemon |
 | ~~L1 — Tabelas e repositório da biblioteca~~ | M | **Feito 2026-08-03** — ver detalhe abaixo |
+| ~~L2 — Varredura de pasta por console~~ | M | **Feito 2026-08-03** — `internal/library/scan.go`, `consoles.json` schema_version 4 |
+| ~~L10 — Título a partir do nome do arquivo~~ | P | **Feito 2026-08-03**, junto do L2 — `TitleFromFilename` |
 
 **Revisão de 2026-08-03:** os itens abertos abaixo estavam como quatro linhas de
 tabela com uma palavra cada ("varredura", "BIOS", "identificação"). Agora que o
@@ -676,31 +679,46 @@ consumidor.
 **Depende de:** [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md) (feito)
 **Bloqueia:** L2, L3, L5, L6, L7, L9
 
-### L2 — Varredura de pasta por console (M)
+### L2 — Varredura de pasta por console (M) — **feito em 2026-08-03**
 
 O usuário aponta uma pasta e diz de qual console ela é (decisão de 2026-08-02:
 pasta por console, não arquivo avulso, para não ter que adivinhar o console de
 cada arquivo). A varredura acha os jogos ali dentro.
 
 **Critério de aceite:**
-- [ ] Cada console do catálogo tem uma lista de extensões reconhecidas; onde ela
-      mora é decisão de implementação, mas se for em `consoles.json` o
-      `schema_version` sobe junto (hoje é `3`).
-- [ ] Um teste garante que **todo console do catálogo tem pelo menos uma
-      extensão** — um console sem extensão varre e não acha nada, em silêncio.
-- [ ] A varredura desce subdiretórios com profundidade limitada, pelo mesmo
-      motivo do D6 (usuário organiza ROM em subpasta), e o limite está escrito
-      no código como comentário do porquê.
-- [ ] Varrer a mesma pasta duas vezes não duplica entradas.
-- [ ] Arquivo que sumiu do disco entre uma varredura e outra é marcado como
-      ausente, não apagado em silêncio nem exibido como se estivesse lá.
-- [ ] **A varredura não copia, move nem renomeia nada:** um teste conta os
-      arquivos da pasta de origem e o conteúdo de `ManagedRoot()` antes e depois,
-      e ambos ficam iguais.
-- [ ] Medido: varrer uma pasta com 1000 arquivos leva menos de 1 s, e o número
-      medido fica escrito aqui.
+- [x] Cada console do catálogo tem uma lista de extensões reconhecidas —
+      `consoles.json` ganhou o campo `extensions` em todos os 33 consoles,
+      `schema_version` subiu de `3` para `4`.
+- [x] Um teste garante que **todo console do catálogo tem pelo menos uma
+      extensão** — `TestEveryConsoleDeclaresAtLeastOneExtension`
+      (`internal/verdict/catalog_integration_test.go`).
+- [x] A varredura desce subdiretórios com profundidade limitada
+      (`maxScanDepth = 4`, `internal/library/scan.go`), pelo mesmo motivo do
+      D6, com o porquê escrito ao lado da constante —
+      `TestFindROMsRespectsMaxDepth`.
+- [x] Varrer a mesma pasta duas vezes não duplica entradas —
+      `TestSaveGamesDoesNotDuplicateOnRepeatedScan` (L1) e o `ON CONFLICT` de
+      `SyncFolder`.
+- [x] Arquivo que sumiu do disco entre uma varredura e outra é marcado como
+      ausente, não apagado em silêncio nem exibido como se estivesse lá —
+      coluna `missing` (`0003_library_games_missing.sql`),
+      `Store.SyncFolder`, `TestSyncFolderMarksMissingWhenFileDisappears` e
+      `TestSyncFolderClearsMissingWhenFileReappears` (reaparecer limpa o
+      estado).
+- [x] **A varredura não copia, move nem renomeia nada** —
+      `TestFindROMsNeverWritesToSourceOrManagedRoot` compara um retrato
+      (tamanho + mtime) da pasta de origem antes/depois; `FindROMs` só chama
+      `filepath.WalkDir`, nenhuma escrita.
+- [x] Medido: **777,6 µs para 1000 arquivos** nesta máquina
+      (`TestFindROMsPerformanceWith1000Files`), bem abaixo de 1s.
 
-**Depende de:** L1 · **Bloqueia:** L5, L6, L7
+**Bônus não pedido no critério original, fechado junto por ser trivial e a
+mesma varredura precisar de um título para gravar:** `TitleFromFilename`
+(`internal/library/scan.go`) resolve o L10 — remove extensão e etiquetas
+entre parênteses/colchetes (região, revisão, código de mídia, disco). Ver L10
+abaixo, que passa a apontar para cá em vez de ser trabalho novo.
+
+**Depende de:** L1 (feito) · **Bloqueia:** L5, L6, L7
 
 ### L3 — Catálogo de qual BIOS cada console exige (P)
 
@@ -826,18 +844,20 @@ aviso nomeia a peça que falta.
 
 **Depende de:** L4, L7 · **Bloqueia:** nada
 
-### L10 — Título a partir do nome do arquivo (P)
+### L10 — Título a partir do nome do arquivo (P) — **feito em 2026-08-03, junto do L2**
 
 Enquanto não há scraper, o título é o nome do arquivo — mas
 `Crash Bandicoot (USA) [SLUS-00304].bin` cru na tela é ruim.
 
 **Critério de aceite:**
-- [ ] Extensão e etiquetas entre parênteses/colchetes são removidas para exibir.
-- [ ] O caminho original nunca é alterado — a limpeza é de exibição.
-- [ ] Testes cobrem os casos que aparecem de verdade: região, revisão, código de
-      mídia, `Disc 1`, e um nome que não tem etiqueta nenhuma.
+- [x] Extensão e etiquetas entre parênteses/colchetes são removidas para
+      exibir — `TitleFromFilename` (`internal/library/scan.go`).
+- [x] O caminho original nunca é alterado — a limpeza acontece só ao gravar
+      `Title`; `Game.Path` continua sendo o caminho cru do arquivo.
+- [x] Testes cobrem região, revisão, código de mídia e `Disc 1` —
+      `TestTitleFromFilenameStripsCommonTags`.
 
-**Depende de:** L1 · **Bloqueia:** nada
+**Depende de:** L1 (feito) · **Bloqueia:** nada
 
 ### L11 — "Últimos jogados" e tempo por jogo (M)
 

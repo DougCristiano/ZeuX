@@ -35,6 +35,7 @@ ainda (Sprint D).
 | `internal/emulator` | Adapters de emulador, descoberta de binários, launcher e sessões. |
 | `internal/install` | Instalação 1-click: manifesto, download verificado, extração, promoção atômica e supressão do assistente de primeira execução. |
 | `internal/store` | Abre e migra o SQLite local ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)). |
+| `internal/library` | Pastas de ROM apontadas, jogos encontrados na varredura, referência de caminho (nunca cópia). Testado; ainda sem rota HTTP nem uso em `cmd/zeuxd`. |
 
 ### Diagrama de componentes
 
@@ -252,7 +253,9 @@ não um emulador. Ver [ADR 0007](decisoes/0007-options-estruturado-no-catalogo.m
 
 `//go:embed data/consoles.json`. Garante que o app funcione offline no primeiro
 uso, sem depender de uma chamada de rede antes de dar o primeiro parecer. O
-`schema_version` (hoje `3`, com 33 consoles — conferido em 2026-08-03) existe para permitir a atualização via nuvem
+`schema_version` (hoje `4`, com 33 consoles — subiu de `3` em 2026-08-03 com o
+campo `extensions` por console, usado pela varredura de biblioteca em
+`internal/library`) existe para permitir a atualização via nuvem
 prevista no PRD substituir esse conteúdo em tempo de execução, sem quebrar
 binários antigos.
 
@@ -341,20 +344,21 @@ descontinuados após ação judicial. Ver [ADR 0008](decisoes/0008-excluir-switc
 
 Registrado aqui para que ninguém leia este documento e presuma o contrário:
 
-- **Tabelas de biblioteca.** O banco existe desde 2026-08-02
-  ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)) — este item dizia
-  "qualquer banco de dados" e ficou falso no mesmo dia. A única migração é
-  `0001_sessions.sql`: pastas apontadas, entradas de jogo e BIOS ainda não têm
-  tabela nem código. Ver `roadmap.md`, itens L1–L11.
-- **Nenhuma rota `/api/v1/library/*`** e nenhuma tela de biblioteca em
-  `src/screens/`.
-- **Nada sobre BIOS em lugar nenhum do código.**
+- **Rota HTTP e tela da biblioteca.** `internal/library` existe desde
+  2026-08-03 e está testado (tabelas `library_folders`/`library_games` —
+  migrações `0002_library.sql` e `0003_library_games_missing.sql` — mais o
+  repositório `Store` e a varredura `FindROMs`/`SyncFolder`), mas **nada o
+  chama ainda**: nenhuma rota `/api/v1/library/*` em `internal/api`, nenhuma
+  tela em `src/screens/`, e o pacote não está sequer referenciado em
+  `cmd/zeuxd`. Ver `roadmap.md`, itens L5–L9 (L1, L2 e L10 já fechados).
+- **Nada sobre BIOS em lugar nenhum do código** — nem catálogo (L3), nem
+  verificação (L4).
 - Instalação de emuladores dentro da estrutura de jogos: a pasta gerenciada
   (`ManagedRoot()`) já recebe instalações 1-click de verdade, organizadas por
   console (ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)).
   O que falta é a parte de jogos — cada pasta de console ainda não tem a
-  subpasta `jogos/` (saves, capas, metadados), porque isso depende da Sprint D
-  (banco de dados + varredura de biblioteca), que ainda não foi desenhada.
+  subpasta `jogos/` (saves, capas, metadados); a varredura (L2) já existe,
+  mas grava referência no banco, não organiza nada em disco por console.
 - Biblioteca de jogos, scraper de metadados, perfis sociais, netplay.
 - `Installation.Version` nunca é preenchido: nenhum adapter tenta detectar
   versão hoje.

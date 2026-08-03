@@ -5,10 +5,9 @@
 // nunca copia, distribui ou facilita transferência de ROM, e um dado que não
 // pôde ser confirmado é declarado como tal, nunca fingido. Por isso Game.Path
 // é sempre uma referência a um arquivo que já está no disco do usuário — este
-// pacote nunca lê, copia nem move o conteúdo desse arquivo. Marcar um jogo
-// cujo arquivo sumiu do disco como ausente (em vez de apagá-lo em silêncio)
-// é responsabilidade da varredura (L2, ainda não implementada) — este
-// pacote só oferece onde gravar e ler o que ela decidir.
+// pacote nunca lê, copia nem move o conteúdo desse arquivo — e um jogo cujo
+// arquivo sumiu de uma varredura para a outra fica marcado em Game.Missing,
+// nunca apagado em silêncio nem exibido como se ainda estivesse lá.
 package library
 
 import (
@@ -35,6 +34,13 @@ type Game struct {
 	Path      string    `json:"path"`
 	Title     string    `json:"title"`
 	AddedAt   time.Time `json:"added_at"`
+
+	// Missing é true quando uma varredura mais recente não achou mais o
+	// arquivo neste caminho — o usuário pode ter movido, apagado, ou só
+	// desconectado o disco onde ele estava. A entrada continua existindo em
+	// vez de sumir, porque o tempo de jogo já registrado (D3) referencia este
+	// jogo pelo caminho.
+	Missing bool `json:"missing"`
 }
 
 // NewGame é o que a varredura (L2) precisa fornecer para gravar uma entrada;
@@ -163,8 +169,9 @@ func (s *Store) RemoveFolder(ctx context.Context, id int64) error {
 }
 
 // SaveGames grava os jogos encontrados numa varredura de folderID. Um jogo
-// com o mesmo Path de um já gravado é ignorado — varrer a mesma pasta duas
-// vezes não duplica entradas.
+// com o mesmo Path de um já gravado tem só o título atualizado e volta a
+// `missing = 0` — reaparecer no mesmo caminho desfaz o estado de ausente
+// sem criar uma segunda linha.
 func (s *Store) SaveGames(ctx context.Context, folderID int64, games []NewGame) error {
 	if len(games) == 0 {
 		return nil
@@ -179,11 +186,70 @@ func (s *Store) SaveGames(ctx context.Context, folderID int64, games []NewGame) 
 	addedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	for _, game := range games {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO library_games (folder_id, console_id, path, title, added_at)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT (path) DO NOTHING
+			INSERT INTO library_games (folder_id, console_id, path, title, added_at, missing)
+			VALUES (?, ?, ?, ?, ?, 0)
+			ON CONFLICT (path) DO UPDATE SET title = excluded.title, missing = 0
 		`, folderID, game.ConsoleID, game.Path, game.Title, addedAt); err != nil {
 			return fmt.Errorf("gravando o jogo %q: %w", game.Path, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// SyncFolder reconcilia o resultado de uma varredura com o que já estava
+// gravado para folderID: grava os jogos encontrados (via SaveGames) e marca
+// como ausente (Missing) qualquer jogo desta pasta que não apareceu na lista
+// — nunca apaga a entrada, porque tempo de jogo (D3) referencia o jogo pelo
+// caminho, e um HD externo desconectado não deveria custar esse histórico.
+func (s *Store) SyncFolder(ctx context.Context, folderID int64, found []NewGame) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("iniciando sincronização da pasta %d: %w", folderID, err)
+	}
+	defer tx.Rollback()
+
+	foundPaths := make(map[string]bool, len(found))
+	addedAt := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, game := range found {
+		foundPaths[game.Path] = true
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO library_games (folder_id, console_id, path, title, added_at, missing)
+			VALUES (?, ?, ?, ?, ?, 0)
+			ON CONFLICT (path) DO UPDATE SET title = excluded.title, missing = 0
+		`, folderID, game.ConsoleID, game.Path, game.Title, addedAt); err != nil {
+			return fmt.Errorf("gravando o jogo %q: %w", game.Path, err)
+		}
+	}
+
+	rows, err := tx.QueryContext(ctx, `SELECT id, path FROM library_games WHERE folder_id = ?`, folderID)
+	if err != nil {
+		return fmt.Errorf("lendo jogos existentes da pasta %d: %w", folderID, err)
+	}
+
+	var staleIDs []int64
+	for rows.Next() {
+		var (
+			id   int64
+			path string
+		)
+		if err := rows.Scan(&id, &path); err != nil {
+			rows.Close()
+			return fmt.Errorf("lendo linha ao reconciliar a pasta %d: %w", folderID, err)
+		}
+		if !foundPaths[path] {
+			staleIDs = append(staleIDs, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	for _, id := range staleIDs {
+		if _, err := tx.ExecContext(ctx, `UPDATE library_games SET missing = 1 WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("marcando o jogo %d como ausente: %w", id, err)
 		}
 	}
 
@@ -194,7 +260,7 @@ func (s *Store) SaveGames(ctx context.Context, folderID int64, games []NewGame) 
 // antigos.
 func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at
+		SELECT id, folder_id, console_id, path, title, added_at, missing
 		FROM library_games
 		WHERE console_id = ?
 		ORDER BY id DESC
@@ -209,8 +275,9 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 		var (
 			game    Game
 			addedAt string
+			missing int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -218,6 +285,7 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
 		}
 		game.AddedAt = parsed
+		game.Missing = missing != 0
 		games = append(games, game)
 	}
 
