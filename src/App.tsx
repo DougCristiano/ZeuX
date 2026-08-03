@@ -6,6 +6,7 @@ import { ThemePicker } from "./components/ThemePicker";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
+import { LibraryScreen } from "./screens/LibraryScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
 import { VerdictScreen } from "./screens/VerdictScreen";
 
@@ -25,7 +26,8 @@ type Phase =
   | "scanning"
   | "scan-error"
   | "verdict"
-  | "emulators";
+  | "emulators"
+  | "library";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("checking-port");
@@ -189,7 +191,10 @@ function App() {
     case "verdict":
       screen = (
         <main className="min-h-screen bg-paper">
-          <div className="mx-auto flex max-w-3xl justify-end px-6 pt-16">
+          <div className="mx-auto flex max-w-3xl justify-end gap-2 px-6 pt-16">
+            <Button variant="secondary" onClick={() => setPhase("library")}>
+              Ver biblioteca
+            </Button>
             <Button
               variant="secondary"
               onClick={() => {
@@ -207,6 +212,10 @@ function App() {
 
     case "emulators":
       screen = <EmulatorsScreen onBack={() => setPhase(cameFromDeclined ? "declined" : "verdict")} />;
+      break;
+
+    case "library":
+      screen = <LibraryScreen report={report!} onBack={() => setPhase("verdict")} />;
       break;
   }
 

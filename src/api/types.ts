@@ -257,3 +257,25 @@ export type HealthStatus = {
   schema_version: number;
   consoles: number;
 };
+
+// --- Biblioteca (L5, docs/roadmap.md) ---
+
+export type LibraryFolder = {
+  id: number;
+  console_id: string;
+  path: string;
+  added_at: string;
+};
+
+export type LibraryGame = {
+  id: number;
+  folder_id: number;
+  console_id: string;
+  path: string;
+  title: string;
+  added_at: string;
+  /** `true` quando a última varredura não achou mais o arquivo neste caminho —
+   * a entrada continua existindo (o tempo de jogo referencia o caminho), só
+   * marcada. Nunca some da lista sozinha. */
+  missing: boolean;
+};

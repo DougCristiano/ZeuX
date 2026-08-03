@@ -44,11 +44,12 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
 
 **Não existe ainda** (verificado por leitura de código em 2026-08-03):
 
-- **Biblioteca de jogos sem UI ainda.** As rotas `/api/v1/library/*` já
-  existem e estão testadas (L1, L2 e L5 — todos feitos), mas `src/screens/`
-  continua com cinco telas (Consent, Declined, Emulators, Status, Verdict) e
-  nenhuma de biblioteca. O que falta agora é só a UI (L6, L7, etc); back-end
-  e rota estão prontos.
+- **Biblioteca de jogos: back-end e a primeira tela prontos, falta o botão
+  Jogar.** As rotas `/api/v1/library/*` (L1, L2, L5) e a tela 04 —
+  `LibraryScreen.tsx`, um cartão por console, apontar pasta e ver os jogos
+  achados (L6) — estão feitas e verificadas contra um `zeuxd` real. Falta a
+  tela 05 com o grid de jogos e o `POST /games/launch` (L7), que é quem fecha
+  o ciclo do produto.
 - **Nenhuma menção a BIOS em lugar nenhum do código** — `grep -ci bios
   internal/verdict/data/consoles.json` devolve `0`.
 - **Nenhum jogo foi aberto de verdade por nenhum emulador.** O critério de
@@ -61,7 +62,7 @@ contrário e estava desatualizada.
 
 ---
 
-## Quantas faltam (contado em 2026-08-03: L1, L2, L5 e L10 fechados; L4 fundido no L3)
+## Quantas faltam (contado em 2026-08-03: L1, L2, L5, L6 e L10 fechados; L4 fundido no L3)
 
 Itens **abertos**, contados uma vez cada — D4 aparece como B0 na Sprint B e D11
 como critério de saída da Sprint A, mas cada um conta uma vez só.
@@ -72,12 +73,12 @@ como critério de saída da Sprint A, mas cada um conta uma vez só.
 | Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
 | Sprint B | **1** | B11 (o B0 é o D4, já contado) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **6** | L3, L6, L7, L8, L9, L11 |
+| Sprint D (MVP) | **5** | L3, L7, L8, L9, L11 |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
-| **Total do MVP e da dívida** | **14** | dívida + A + B + C + D |
-| **Total geral** | **33** | tudo acima |
+| **Total do MVP e da dívida** | **13** | dívida + A + B + C + D |
+| **Total geral** | **32** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -845,22 +846,37 @@ de `internal/library/scan_test.go`.
 **Depende de:** L1, L2 (ambos feitos) · **Bloqueia:** L6, L7 (agora
 desbloqueados)
 
-### L6 — Tela 04: biblioteca vazia, um cartão por console (M)
+### L6 — Tela 04: biblioteca vazia, um cartão por console (M) — **feito em 2026-08-03**
 
 Primeira tela da biblioteca. É ela que transforma "apontar pasta" de rota em
-produto.
+produto. Feita e verificada em container (caminho da CI, sem depender da
+máquina Windows) — ver nota sobre D4/OneDrive abaixo.
 
 **Critério de aceite:**
-- [ ] Um cartão por console, cada um com seu próprio "apontar pasta" — não um
-      botão genérico (decisão de 2026-08-02).
-- [ ] **Nenhum caminho de obtenção de ROM:** sem link, sem "saiba mais", sem
-      texto que sugira fonte. Verificável por leitura do JSX.
-- [ ] Apontar uma pasta dispara a varredura e a tela passa a mostrar os jogos
-      achados sem recarregar o app.
-- [ ] Todo o fluxo é concluível só com Tab e Enter
-      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)).
+- [x] Um cartão por console, cada um com seu próprio "apontar pasta" — não um
+      botão genérico (decisão de 2026-08-02). `LibraryScreen.tsx`,
+      `ConsoleLibraryCard` renderizado uma vez por console de
+      `report.verdicts` (os 33, filtráveis por nome).
+- [x] **Nenhum caminho de obtenção de ROM:** sem link, sem "saiba mais", sem
+      texto que sugira fonte. Verificado por leitura do JSX — o único campo é
+      um texto livre para o caminho que já existe no disco do usuário.
+- [x] Apontar uma pasta dispara a varredura e a tela passa a mostrar os jogos
+      achados sem recarregar o app — verificado com Playwright/Chromium contra
+      um `zeuxd` real: apontar `/tmp/roms/nes` (com uma ROM de teste) mostrou
+      "Jogo Teste" na hora; revarrer depois de adicionar um segundo arquivo
+      achou o novo sem reapontar nada; remover a pasta limpou a lista.
+- [x] Todo o fluxo é concluível só com Tab e Enter
+      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)) —
+      verificado navegando só com teclado até "Ver biblioteca" e confirmando
+      a troca de tela.
 
-**Depende de:** L5 · **Bloqueia:** L7
+**Decisão tomada aqui, fora do critério original:** o campo de pasta é um
+texto livre, não um seletor nativo de SO. Um seletor exigiria
+`@tauri-apps/plugin-dialog` — dependência Rust nova, que o CLAUDE.md pede para
+não instalar sem decisão explícita. Fica registrado como limitação conhecida,
+não como native picker fingido.
+
+**Depende de:** L5 (feito) · **Bloqueia:** L7 (agora desbloqueado)
 
 ### L7 — Tela 05: biblioteca com jogos, e o botão Jogar (M)
 
