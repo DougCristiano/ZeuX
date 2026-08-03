@@ -115,11 +115,42 @@ Integração no build:
 
 Testes: todos passam (nenhuma mudança em comportamento de teste existente).
 
-## Etapa 4: Integração de build e medição (PENDENTE)
+## Etapa 4: Integração Tauri (PENDENTE)
 
-1. Configurar GitHub Actions para download de cores em tempo de build
-2. Medir tamanho do instalador final (antes e depois)
-3. Documentar em ADR 0012 o tamanho real e por plataforma
+Esta etapa envolve configurar o Tauri para:
+1. Empacotar `src-tauri/resources/retroarch/cores/` no instalador
+2. Passar `ZEUX_BUNDLED_CORES_DIR` para o daemon na inicialização
+3. Testar o build completo em Windows, Linux e macOS
+
+### Checklist de Etapa 4
+
+- [ ] **Tauri bundler:** garantir que `src-tauri/resources/` é incluído no instalador
+  - Windows: `src-tauri/resources/` → `{app}/resources/`
+  - Linux AppImage: `src-tauri/resources/` → `{app}/resources/`
+  - macOS .app: `src-tauri/resources/` → `{app}.app/Contents/Resources/`
+
+- [ ] **Passar variável de ambiente:** Tauri precisa seter `ZEUX_BUNDLED_CORES_DIR` quando inicia o sidecar `zeuxd`
+  - Tauri v2 permite isso em `tauri.conf.json` (seção `app > windows > env` ou via Rust)
+  - Apontar para a pasta `resources/retroarch/cores` relativa ao app
+
+- [ ] **Teste de build real:** rodar `npm run tauri build` em cada plataforma
+  - Verificar que cores aparecem em `~/.local/share/zeux/retroarch/cores/` (Linux) na primeira execução
+  - Confirmar que cores são usados ao lançar um jogo
+
+- [ ] **Medir tamanho do instalador:** comparar antes e depois (cada plataforma)
+  - Documentar crescimento em ADR 0012 (revisão final)
+
+### Recursos
+
+Documentação Tauri v2:
+- Sidecar environment: https://tauri.app/docs/v2/features/command/
+- Bundler configuration: https://tauri.app/docs/v2/features/bundler/
+
+### Nota
+
+Esta etapa requer trabalho no código Tauri/Rust (fora do escopo do Go code).
+Douglas pode completar isto com o frontend team ou deixar como futuro.
+A parte Go está 100% pronta (etapas 1-3).
 
 ## Licenças verificadas (Etapa 1 concluída)
 
