@@ -87,17 +87,33 @@ Integração no build:
 2. **Validar checksums:** buildbot fornece SHA-256, adicionar verificação (não crítico, pode ser depois)
 3. **Mudar versões pinadas:** hoje usa `"latest"`, depois de testar mudar para versões específicas datadas (ex: `2025-08-03`) para reprodutibilidade
 
-## Etapa 3: Localização em tempo de execução (PENDENTE)
+## Etapa 3: Localização em tempo de execução (IMPLEMENTADA)
 
-Modificar `retroarch.go` para procurar em:
+**Mecanismo:** cores bundled são copiados na primeira execução via variável de ambiente.
 
-1. `~/.local/share/zeux/retroarch/cores/` (Linux) — **onde cores bundled são copiados no primeiro uso**
-2. `~/Library/Application Support/ZeuX/RetroArch/cores` (macOS)
-3. `%APPDATA%\ZeuX\RetroArch\cores` (Windows)
+### Fluxo
 
-Estes diretórios são **preenchidos pelo instalador** (durante Tauri install, cores bundled são copiados de `AppName.app/Contents/Resources/retroarch/cores/` para o local de dados do usuário).
+1. Tauri seta `ZEUX_BUNDLED_CORES_DIR` apontando para recursos do instalador
+2. Daemon lê cores de `$ZEUX_BUNDLED_CORES_DIR/retroarch/cores/`
+3. Na primeira chamada a `locateCore()`, copia para:
+   - Linux: `~/.local/share/zeux/retroarch/cores/`
+   - macOS: `~/Library/Application Support/ZeuX/RetroArch/cores/`
+   - Windows: `%APPDATA%\ZeuX\RetroArch\cores`
+4. Idempotente: se arquivo já existe, não copia duas vezes
+5. Erros não bloqueiam daemon: cores podem vir do Online Updater do RetroArch
 
-Na primeira execução, daemon verifica se o diretório existe e está vazio → copia cores bundled de `AppName.app/Contents/` (via Rust FFI ou execução de `tauri::api::fs::copy_recursive`).
+### Implementação
+
+**Arquivo novo:** `internal/emulator/bundled_cores.go`
+- `ensureBundledCoresAvailable()` — copia cores bundled (primeira vez)
+- `bundledCoreDirsForWrite()` — detecta diretório de escrita conforme SO
+- `copyFile()` — utilitário de cópia atômico
+
+**Modificações:** `internal/emulator/retroarch.go`
+- `locateCore()` chamaa `ensureBundledCoresAvailable()` na primeira vez via `sync.Once`
+- `bundledCoresInitOnce` garante execução única
+
+Testes: todos passam (nenhuma mudança em comportamento de teste existente).
 
 ## Etapa 4: Integração de build e medição (PENDENTE)
 
