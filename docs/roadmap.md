@@ -156,9 +156,19 @@ AppImages no mesmo lugar (não escolhe às cegas).
 
 Isto é exatamente o tipo de bug que só apareceu porque o teste foi feito de
 verdade, numa máquina real, com o instalador de verdade — nenhum teste
-automatizado anterior cobria essa combinação. **Ainda não tentado de novo
-depois da correção** — falta repetir o lançamento do mesmo jogo para
-confirmar que abre, e ainda faltam os outros 2 emuladores do critério de
+automatizado anterior cobria essa combinação.
+
+**Repetido depois da correção, no mesmo dia — 1/3 confirmado:** com o
+`findBinary` corrigido, o mesmo `POST /games/launch` (sem `options`, preset
+vindo do veredito) abriu o PCSX2 de verdade. Na primeira tentativa, o PCSX2
+mostrou o próprio assistente de primeira execução (esperado — nenhum
+emulador de PS2 roda sem uma BIOS real, e o ZeuX corretamente não tenta
+fornecer isso, nem sugerir de onde tirar). O Douglas configurou a BIOS dele
+mesmo, teve uma tela preta na primeira tentativa, reiniciou, e **o jogo
+abriu até a tela de título** (Phantasy Star Generation:2, Sega Ages 2500
+Vol. 17) — autoconfigurado, sem passar `options` na mão.
+
+**PS2 / PCSX2: confirmado.** Faltam 2 dos 3 emuladores do critério de
 aceite.
 
 ### D1 — Validar as flags dos adapters (G) — **feito em 2026-08-01, com uma ressalva**
