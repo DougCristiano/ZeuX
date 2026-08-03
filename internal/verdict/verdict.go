@@ -146,12 +146,11 @@ func evaluateConsole(console Console, info hardware.HardwareInfo) ConsoleVerdict
 // EvaluateConsole retorna o parecer para um único console, sem recalcular os demais.
 // É mais eficiente que Evaluate() quando só um console interessa.
 func EvaluateConsole(catalog *Catalog, info hardware.HardwareInfo, consoleID string) (ConsoleVerdict, error) {
-	for _, console := range catalog.Consoles {
-		if console.ID == consoleID {
-			return evaluateConsole(console, info), nil
-		}
+	console, ok := catalog.ConsoleByID(consoleID)
+	if !ok {
+		return ConsoleVerdict{}, fmt.Errorf("console %q desconhecido", consoleID)
 	}
-	return ConsoleVerdict{}, fmt.Errorf("console %q desconhecido", consoleID)
+	return evaluateConsole(console, info), nil
 }
 
 // checkRequirements devolve a lista de exigências não atendidas, em linguagem

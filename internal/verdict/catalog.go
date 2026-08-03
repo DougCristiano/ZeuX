@@ -98,6 +98,19 @@ type Catalog struct {
 	Consoles      []Console `json:"consoles"`
 }
 
+// ConsoleByID procura um console pelo identificador. Devolve false quando o
+// catálogo não conhece esse id — quem chama decide se isso é erro do usuário
+// (console inexistente) ou dado desatualizado (console removido do catálogo
+// depois de já referenciado em outro lugar, como uma pasta de biblioteca).
+func (c *Catalog) ConsoleByID(id string) (Console, bool) {
+	for _, console := range c.Consoles {
+		if console.ID == id {
+			return console, true
+		}
+	}
+	return Console{}, false
+}
+
 // LoadCatalog lê o dicionário embutido no binário. Embutir garante que o app
 // funcione offline no primeiro uso; a atualização via nuvem prevista no PRD
 // entra depois, substituindo este conteúdo em tempo de execução.

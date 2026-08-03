@@ -44,11 +44,11 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
 
 **Não existe ainda** (verificado por leitura de código em 2026-08-03):
 
-- **Nenhuma integração de biblioteca de jogos na API.** `internal/library`
-  existe e está testado (ver L1 abaixo — feito), mas não há rota `/library/*`
-  em `internal/api/server.go`; `src/screens/` tem cinco telas (Consent,
-  Declined, Emulators, Status, Verdict) e nenhuma de biblioteca. O que falta
-  é a rota HTTP e a UI (L2, L3, etc); o armazém de dados está pronto.
+- **Biblioteca de jogos sem UI ainda.** As rotas `/api/v1/library/*` já
+  existem e estão testadas (L1, L2 e L5 — todos feitos), mas `src/screens/`
+  continua com cinco telas (Consent, Declined, Emulators, Status, Verdict) e
+  nenhuma de biblioteca. O que falta agora é só a UI (L6, L7, etc); back-end
+  e rota estão prontos.
 - **Nenhuma menção a BIOS em lugar nenhum do código** — `grep -ci bios
   internal/verdict/data/consoles.json` devolve `0`.
 - **Nenhum jogo foi aberto de verdade por nenhum emulador.** O critério de
@@ -61,7 +61,7 @@ contrário e estava desatualizada.
 
 ---
 
-## Quantas faltam (contado em 2026-08-03: L1, L2 e L10 fechados; L4 fundido no L3)
+## Quantas faltam (contado em 2026-08-03: L1, L2, L5 e L10 fechados; L4 fundido no L3)
 
 Itens **abertos**, contados uma vez cada — D4 aparece como B0 na Sprint B e D11
 como critério de saída da Sprint A, mas cada um conta uma vez só.
@@ -72,12 +72,12 @@ como critério de saída da Sprint A, mas cada um conta uma vez só.
 | Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
 | Sprint B | **1** | B11 (o B0 é o D4, já contado) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **7** | L3, L5, L6, L7, L8, L9, L11 |
+| Sprint D (MVP) | **6** | L3, L6, L7, L8, L9, L11 |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
-| **Total do MVP e da dívida** | **15** | dívida + A + B + C + D |
-| **Total geral** | **34** | tudo acima |
+| **Total do MVP e da dívida** | **14** | dívida + A + B + C + D |
+| **Total geral** | **33** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -810,23 +810,40 @@ validar tamanho/hash — trabalho do L4 antigo, agora removido) por uma
 **Depende de:** nada · **Bloqueia:** L9 (~~L4~~ removido — sem verificação de
 arquivo, não há o que essa etapa faria)
 
-### L5 — Rotas HTTP da biblioteca (M)
+### L5 — Rotas HTTP da biblioteca (M) — **feito em 2026-08-03**
 
 O item que não existia na tabela antiga. Sem rota, as telas não têm com o que
 falar — e este projeto verifica pela API antes de ter tela, por cultura.
 
 **Critério de aceite:**
-- [ ] Existem rotas sob `/api/v1/library/` para: apontar pasta, listar pastas,
-      remover pasta, disparar varredura, listar jogos.
-- [ ] Todas documentadas em [`docs/api.md`](api.md) com campos e códigos de erro,
+- [x] Existem rotas sob `/api/v1/library/` para: apontar pasta, listar pastas,
+      remover pasta, disparar varredura, listar jogos —
+      `POST/GET /library/folders`, `DELETE /library/folders/{id}`,
+      `POST /library/folders/{id}/scan`, `GET /library/games`
+      (`internal/api/server.go`).
+- [x] Todas documentadas em [`docs/api.md`](api.md) com campos e códigos de erro,
       **antes** de a tela ser escrita — como foi feito no B-doc.
-- [ ] Cada erro tem `code` estável em inglês e `message` em português exibível.
-- [ ] Apontar uma pasta que não existe devolve 400 com mensagem que nomeia o
-      caminho, não 500.
-- [ ] O roteiro no fim de `api.md` ganha o trecho da biblioteca, exercitável só
+- [x] Cada erro tem `code` estável em inglês e `message` em português exibível
+      (`invalid_id`, `path_not_found`, `unknown_console`,
+      `library_write_failed`, `library_read_failed`, `library_scan_failed`).
+- [x] Apontar uma pasta que não existe devolve 400 com mensagem que nomeia o
+      caminho, não 500 — `TestAddLibraryFolderRejectsMissingPath`.
+- [x] O roteiro no fim de `api.md` ganha o trecho da biblioteca, exercitável só
       com `Invoke-RestMethod`, sem abrir a interface.
 
-**Depende de:** L1, L2 · **Bloqueia:** L6, L7
+`POST /library/folders` varre a pasta na mesma chamada que a cria (via
+`library.FindROMs` + `Store.SyncFolder`), então apontar uma pasta já devolve
+`games_found` sem uma segunda requisição — decisão de UX que o critério
+original não especificava, mas que evita a tela ter que orquestrar duas
+chamadas para o caso mais comum. `POST /library/folders/{id}/scan` cobre a
+revarredura de uma pasta já apontada, sem repetir `console_id`/`path`.
+
+Testes de contrato em `internal/api/library_test.go`, cinco casos, nenhum
+exige ROM real — só arquivos de teste com a extensão certa, no mesmo padrão
+de `internal/library/scan_test.go`.
+
+**Depende de:** L1, L2 (ambos feitos) · **Bloqueia:** L6, L7 (agora
+desbloqueados)
 
 ### L6 — Tela 04: biblioteca vazia, um cartão por console (M)
 

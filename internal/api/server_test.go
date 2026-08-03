@@ -16,6 +16,7 @@ import (
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
 	"github.com/doufl/zeux/internal/install"
+	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/store"
 	"github.com/doufl/zeux/internal/verdict"
 )
@@ -96,7 +97,9 @@ func newTestServer(t *testing.T, probe hardware.Probe) *api.Server {
 	}
 	installer := install.NewManager(sources, silentLogger())
 
-	return api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, silentLogger())
+	libraryStore := library.NewStore(db)
+
+	return api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, silentLogger())
 }
 
 func silentLogger() *slog.Logger {

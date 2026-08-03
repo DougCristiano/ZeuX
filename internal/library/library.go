@@ -117,6 +117,33 @@ func (s *Store) folderByPath(ctx context.Context, consoleID, path string) (*Fold
 	return &folder, nil
 }
 
+// FolderByID devolve a pasta pelo identificador, ou false se não existir —
+// usado para reencontrar console e caminho antes de repetir uma varredura.
+func (s *Store) FolderByID(ctx context.Context, id int64) (Folder, bool, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, console_id, path, added_at FROM library_folders WHERE id = ?
+	`, id)
+
+	var (
+		folder  Folder
+		addedAt string
+	)
+	if err := row.Scan(&folder.ID, &folder.ConsoleID, &folder.Path, &addedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return Folder{}, false, nil
+		}
+		return Folder{}, false, fmt.Errorf("procurando a pasta %d: %w", id, err)
+	}
+
+	parsed, err := time.Parse(time.RFC3339Nano, addedAt)
+	if err != nil {
+		return Folder{}, false, fmt.Errorf("interpretando added_at da pasta %d: %w", folder.ID, err)
+	}
+	folder.AddedAt = parsed
+
+	return folder, true, nil
+}
+
 // ListFolders devolve todas as pastas apontadas, das mais recentes para as
 // mais antigas.
 func (s *Store) ListFolders(ctx context.Context) ([]Folder, error) {
