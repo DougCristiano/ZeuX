@@ -20,3 +20,4 @@ ADR que a substitua e marque o antigo como *Substituído por 00XX*.
 | [0009](0009-desktop-agora-controle-depois.md) | Mouse e teclado agora, sem fechar a porta para controle | Aceito |
 | [0010](0010-estrutura-de-diretorios-por-console.md) | Estrutura de diretórios gerenciados por console | Aceito (parcial) |
 | [0011](0011-sqlite-local-para-biblioteca.md) | SQLite local para biblioteca, sessões e BIOS | Aceito (parcial) |
+| [0012](0012-empacotar-retroarch-e-cores.md) | Empacotar RetroArch e cores selecionados no instalador | Aceito (decisão apenas, implementação não começou) |
