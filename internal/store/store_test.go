@@ -18,6 +18,15 @@ func TestOpenAtIsIdempotentAcrossRestarts(t *testing.T) {
 	if _, err := db1.Exec(`INSERT INTO sessions (console_id, adapter_id, emulator, rom_path, started_at) VALUES ('ps1', 'duckstation', 'DuckStation', '/jogo.bin', '2026-01-01T00:00:00Z')`); err != nil {
 		t.Fatalf("gravando na primeira abertura: %v", err)
 	}
+
+	var migrationsAfterFirstOpen int
+	if err := db1.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationsAfterFirstOpen); err != nil {
+		t.Fatalf("lendo schema_migrations na primeira abertura: %v", err)
+	}
+	if migrationsAfterFirstOpen == 0 {
+		t.Fatal("esperava ao menos uma migração registrada")
+	}
+
 	if err := db1.Close(); err != nil {
 		t.Fatalf("fechando a primeira abertura: %v", err)
 	}
@@ -36,12 +45,15 @@ func TestOpenAtIsIdempotentAcrossRestarts(t *testing.T) {
 		t.Errorf("esperava 1 linha sobrevivendo ao reinício, achou %d", count)
 	}
 
-	var migrations int
-	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&migrations); err != nil {
-		t.Fatalf("lendo schema_migrations: %v", err)
+	// A prova de idempotência não é um número fixo (o total de migrações
+	// cresce a cada nova migração adicionada ao pacote) — é que reabrir não
+	// tentou reaplicar nenhuma: o total não muda entre as duas aberturas.
+	var migrationsAfterSecondOpen int
+	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&migrationsAfterSecondOpen); err != nil {
+		t.Fatalf("lendo schema_migrations na segunda abertura: %v", err)
 	}
-	if migrations != 1 {
-		t.Errorf("esperava a migração registrada exatamente uma vez, achou %d registros", migrations)
+	if migrationsAfterSecondOpen != migrationsAfterFirstOpen {
+		t.Errorf("total de migrações mudou ao reabrir: %d -> %d", migrationsAfterFirstOpen, migrationsAfterSecondOpen)
 	}
 }
 

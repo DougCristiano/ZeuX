@@ -59,7 +59,7 @@ contrário e estava desatualizada.
 
 ---
 
-## Quantas faltam (contado em 2026-08-03)
+## Quantas faltam (contado em 2026-08-03, L1 fechado no mesmo dia)
 
 Itens **abertos**, contados uma vez cada — D4 aparece como B0 na Sprint B e D11
 como critério de saída da Sprint A, mas cada um conta uma vez só.
@@ -70,12 +70,12 @@ como critério de saída da Sprint A, mas cada um conta uma vez só.
 | Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
 | Sprint B | **1** | B11 (o B0 é o D4, já contado) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **11** | L1–L11 |
+| Sprint D (MVP) | **10** | L2–L11 (L1 fechado em 2026-08-03) |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **6** | — |
-| **Total do MVP e da dívida** | **19** | dívida + A + B + C + D |
-| **Total geral** | **37** | tudo acima |
+| **Total do MVP e da dívida** | **18** | dívida + A + B + C + D |
+| **Total geral** | **36** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -623,6 +623,7 @@ ainda não têm código: só a infraestrutura de banco existe.
 | ~~Decidir o banco~~ | G | **Decidido 2026-08-02** — [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md) |
 | ~~Introduzir o SQLite: dependência, migrações embutidas, `schema_migrations`~~ | M | **Feito 2026-08-02** — `internal/store`, `modernc.org/sqlite` (sem CGO) |
 | ~~D3 — persistir sessões e tempo de jogo~~ | M | **Feito 2026-08-02** — `internal/emulator.SQLiteSessions`, verificado sobrevivendo a reinício do daemon |
+| ~~L1 — Tabelas e repositório da biblioteca~~ | M | **Feito 2026-08-03** — ver detalhe abaixo |
 
 **Revisão de 2026-08-03:** os itens abertos abaixo estavam como quatro linhas de
 tabela com uma palavra cada ("varredura", "BIOS", "identificação"). Agora que o
@@ -641,25 +642,36 @@ conteúdo. O ZeuX nunca copia, distribui, sugere fonte ou facilita transferênci
 de ROM — nem de BIOS, que tem o mesmo risco legal. Isso vale como critério de
 aceite em L1, L2 e L4, não como aviso de rodapé.
 
-### L1 — Tabelas e repositório da biblioteca (M)
+### L1 — Tabelas e repositório da biblioteca (M) — **feito em 2026-08-03**
 
 Sem um lugar para guardar "quais pastas o usuário apontou" e "quais jogos foram
 achados nelas", nenhuma das telas do wireframe tem o que exibir. É o alicerce
 dos outros oito itens.
 
 **Critério de aceite:**
-- [ ] Migração nova em `internal/store/migrations/` (a próxima depois de
+- [x] Migração nova em `internal/store/migrations/` (a próxima depois de
       `0001_sessions.sql`) cria as pastas apontadas e as entradas de jogo, com
       unicidade por `(console_id, caminho)` — apontar a mesma pasta duas vezes
-      não cria duas linhas.
-- [ ] Existe `internal/library` com um repositório que cobre: adicionar pasta,
+      não cria duas linhas. `0002_library.sql`: `library_folders` com
+      `UNIQUE(console_id, path)`, `library_games` com `path UNIQUE` e
+      `ON DELETE CASCADE` em `folder_id`.
+- [x] Existe `internal/library` com um repositório que cobre: adicionar pasta,
       listar pastas, remover pasta, gravar jogos achados, listar jogos por
-      console.
-- [ ] Remover uma pasta remove as entradas de jogo que vieram dela, e só elas.
-- [ ] **Nenhuma coluna guarda conteúdo de arquivo** — só caminho, título e
-      metadado. Verificável lendo o `.sql` da migração.
-- [ ] `mise exec -- go test ./internal/library` passa, sem exigir ROM nem
-      emulador instalado.
+      console. `library.Store`: `AddFolder`, `ListFolders`, `RemoveFolder`,
+      `SaveGames`, `ListGames`.
+- [x] Remover uma pasta remove as entradas de jogo que vieram dela, e só elas —
+      `TestRemoveFolderDeletesOnlyItsOwnGames`.
+- [x] **Nenhuma coluna guarda conteúdo de arquivo** — só caminho, título e
+      metadado. Verificável lendo `0002_library.sql`: nenhuma coluna `BLOB`
+      nem equivalente.
+- [x] `go test ./internal/library` passa, sem exigir ROM nem emulador
+      instalado — 6 testes, todos contra um SQLite temporário
+      (`store.OpenAt`).
+
+**Ainda não feito, de propósito — é o L5:** nenhuma rota HTTP usa este
+repositório ainda. `internal/library` existe e está testado, mas não está
+plugado em `cmd/zeuxd`; conectar antes da rota existir seria código sem
+consumidor.
 
 **Depende de:** [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md) (feito)
 **Bloqueia:** L2, L3, L5, L6, L7, L9
