@@ -7,7 +7,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
+
+// bundledCoresInitOnce garante que cores bundled são copiados apenas uma vez
+// por execução do daemon (idempotente na primeira vez).
+var bundledCoresInitOnce sync.Once
 
 // O RetroArch não é um emulador, e sim um front-end que carrega cores. Sem
 // core ele não roda nada, então este adapter carrega uma responsabilidade que
@@ -103,7 +108,7 @@ func (retroArchAdapter) Consoles() []string {
 func (a retroArchAdapter) Locate(ctx context.Context) (Installation, bool) {
 	names := binaryNames("retroarch", []string{"retroarch.exe"}, "RetroArch")
 
-	path, managed, ok := findBinary(ctx, a.ID(), names, nil)
+	path, managed, ok := findBinary(ctx, a.ID(), a.Consoles(), names, nil)
 	if !ok {
 		return Installation{}, false
 	}
@@ -198,7 +203,18 @@ func coreExtension() string {
 
 // locateCore procura o arquivo do core nos diretórios onde o RetroArch os
 // mantém, que variam conforme a forma de instalação.
+//
+// Na primeira chamada, tenta copiar cores bundled do instalador para
+// ~/.local/share/zeux/retroarch/cores (Linux) ou equivalentes (ADR 0012).
 func locateCore(binaryPath, coreName string) (string, bool) {
+	// Garantir que cores bundled foram copiados (uma vez por daemon)
+	bundledCoresInitOnce.Do(func() {
+		if err := ensureBundledCoresAvailable(); err != nil {
+			// Aviso mas não bloqueia — cores podem vir do Online Updater
+			fmt.Fprintf(os.Stderr, "aviso ao copiar cores bundled: %v\n", err)
+		}
+	})
+
 	file, ok := retroArchCores[coreName]
 	if !ok {
 		return "", false
@@ -215,11 +231,14 @@ func locateCore(binaryPath, coreName string) (string, bool) {
 	return "", false
 }
 
-// coreDirs lista os diretórios de cores. No Windows os cores ficam ao lado do
-// executável; no Linux e no macOS costumam ficar no diretório de configuração
-// do usuário ou em caminhos do sistema.
+// coreDirs lista os diretórios de cores. A busca começa pelos cores bundled
+// (empacotados com o ZeuX via ADR 0012), depois os do usuário e do sistema.
+//
+// No Windows os cores do usuário ficam ao lado do executável; no Linux e
+// macOS ficam no diretório de configuração do usuário ou caminhos do sistema.
 func coreDirs(binaryPath string) []string {
-	dirs := []string{filepath.Join(filepath.Dir(binaryPath), "cores")}
+	dirs := bundledCoreDirs()
+	dirs = append(dirs, filepath.Join(filepath.Dir(binaryPath), "cores"))
 
 	if home, err := os.UserHomeDir(); err == nil {
 		switch runtime.GOOS {
@@ -240,4 +259,30 @@ func coreDirs(binaryPath string) []string {
 	}
 
 	return dirs
+}
+
+// bundledCoreDirs retorna o diretório onde os cores empacotados com o ZeuX
+// (via ADR 0012) são mantidos. Isto permite que o instalador do Tauri ou um
+// script de setup prepopule cores sem depender de download em tempo de execução.
+//
+// Retorna lista (pode estar vazia se o diretório não existir) porque a busca
+// em coreDirs continua pelos outros diretórios.
+func bundledCoreDirs() []string {
+	if home, err := os.UserHomeDir(); err == nil {
+		switch runtime.GOOS {
+		case "windows":
+			// %APPDATA%\ZeuX\RetroArch\cores
+			appData := os.Getenv("APPDATA")
+			if appData != "" {
+				return []string{filepath.Join(appData, "ZeuX", "RetroArch", "cores")}
+			}
+		case "darwin":
+			// ~/Library/Application Support/ZeuX/RetroArch/cores
+			return []string{filepath.Join(home, "Library", "Application Support", "ZeuX", "RetroArch", "cores")}
+		default:
+			// ~/.local/share/zeux/retroarch/cores
+			return []string{filepath.Join(home, ".local", "share", "zeux", "retroarch", "cores")}
+		}
+	}
+	return []string{}
 }

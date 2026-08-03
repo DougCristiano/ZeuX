@@ -112,6 +112,33 @@ func TestDolphinAppliesFullPreset(t *testing.T) {
 	}
 }
 
+// As flags do RMG foram lidas do código-fonte real (main.cpp), não de
+// documentação de terceiros — ver docs/roadmap.md, achado do D11 em
+// 2026-08-03. -f e -q existem; resolução interna e backend gráfico não têm
+// flag e precisam virar Unapplied, não uma flag inventada.
+func TestRMGAppliesFullscreenAndExitOnCloseReportsRest(t *testing.T) {
+	cmd, err := newRMG().BuildCommand(
+		install("rmg", "/usr/bin/RMG"),
+		Request{ROMPath: "/roms/jogo.z64", ConsoleID: "n64", Options: fullPreset()},
+	)
+	if err != nil {
+		t.Fatalf("BuildCommand falhou: %v", err)
+	}
+
+	if !hasArg(cmd, "-f") {
+		t.Errorf("tela cheia não aplicada: %s", argvString(cmd))
+	}
+	if !hasArg(cmd, "-q") {
+		t.Errorf("encerrar junto com o jogo não aplicado: %s", argvString(cmd))
+	}
+	if cmd.Argv[len(cmd.Argv)-1] != "/roms/jogo.z64" {
+		t.Errorf("o caminho do jogo deveria ser o último argumento: %s", argvString(cmd))
+	}
+	if len(cmd.Unapplied) != 2 {
+		t.Errorf("esperava 2 pendências (resolução interna, backend gráfico), veio: %v", cmd.Unapplied)
+	}
+}
+
 // Onde a opção não cabe na linha de comando, o adapter precisa dizer — e não
 // inventar uma flag. Uma flag inexistente faria o emulador recusar a abrir.
 func TestUnsupportedOptionsAreReportedNotInvented(t *testing.T) {
@@ -278,7 +305,7 @@ func TestNoOptionIsSilentlyIgnored(t *testing.T) {
 		}{
 			{"tela cheia", strings.Contains(argv, "full") || strings.Contains(argv, "-f"), []string{"tela cheia"}},
 			{"resolução interna", strings.Contains(argv, "resolution") || strings.Contains(argv, "scale"), []string{"resolução"}},
-			{"encerrar junto com o jogo", strings.Contains(argv, "batch") || strings.Contains(argv, "-b") || strings.Contains(argv, "no-gui") || strings.Contains(argv, "escape-exit"), []string{"fechar o jogo", "encerrá-lo"}},
+			{"encerrar junto com o jogo", strings.Contains(argv, "batch") || strings.Contains(argv, "-b") || strings.Contains(argv, "no-gui") || strings.Contains(argv, "escape-exit") || strings.Contains(argv, "-q"), []string{"fechar o jogo", "encerrá-lo"}},
 		}
 
 		for _, check := range checks {

@@ -4,7 +4,7 @@ Documento de referência da arquitetura atual. Descreve o que **existe no códig
 hoje**, não o que está planejado. O que ainda não foi construído aparece
 marcado como pendente.
 
-Última verificação contra o código: 2026-08-01.
+Última verificação contra o código: 2026-08-03.
 
 ---
 
@@ -16,9 +16,12 @@ configuração**: o app lê o hardware da máquina, diz honestamente o que aquel
 computador alcança em cada console, e monta a linha de comando do emulador já
 configurada para o patamar que a máquina atende.
 
-Hoje o projeto é composto de **um único processo**: o daemon `zeuxd`, escrito em
-Go, que expõe uma API HTTP em `127.0.0.1:7777`. A interface gráfica
-(Tauri + React) é a Fase 2 e **ainda não foi iniciada**.
+O núcleo é o daemon `zeuxd`, escrito em Go, que expõe uma API HTTP em
+`127.0.0.1:7777`. Desde a Sprint B existe também uma interface Tauri + React
+(`src/`, `src-tauri/`) que sobe o `zeuxd` como processo filho e fala com ele por
+essa mesma API — o onboarding (consentimento → scan → parecer) e a tela de
+emuladores já funcionam de ponta a ponta. As telas de biblioteca não existem
+ainda (Sprint D).
 
 ### Componentes
 
@@ -30,12 +33,15 @@ Go, que expõe uma API HTTP em `127.0.0.1:7777`. A interface gráfica
 | `internal/hardware` | Detecção de CPU, RAM (gopsutil) e GPU (por SO, com build tags). |
 | `internal/verdict` | Catálogo de consoles embutido + motor que produz o parecer. |
 | `internal/emulator` | Adapters de emulador, descoberta de binários, launcher e sessões. |
+| `internal/install` | Instalação 1-click: manifesto, download verificado, extração, promoção atômica e supressão do assistente de primeira execução. |
+| `internal/store` | Abre e migra o SQLite local ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)). |
+| `internal/library` | Pastas de ROM apontadas, jogos encontrados na varredura, referência de caminho (nunca cópia). Testado; ainda sem rota HTTP nem uso em `cmd/zeuxd`. |
 
 ### Diagrama de componentes
 
 ```mermaid
 graph TD
-    UI["Interface Tauri + React<br/>(Fase 2 — não iniciada)"] -.->|"fetch HTTP"| API
+    UI["Interface Tauri + React<br/>(onboarding e emuladores prontos;<br/>biblioteca é a Sprint D)"] -->|"fetch HTTP"| API
 
     subgraph daemon["Processo zeuxd (Go)"]
         API["internal/api<br/>Server + Routes()"]
@@ -43,13 +49,18 @@ graph TD
         HW["internal/hardware<br/>Probe"]
         VERDICT["internal/verdict<br/>Catalog + Evaluate"]
         EMU["internal/emulator<br/>Registry + Launcher"]
+        INSTALL["internal/install<br/>Manager + Job"]
+        STORE["internal/store<br/>SQLite local"]
     end
 
     API --> CONSENT
     API --> HW
     API --> VERDICT
     API --> EMU
+    API --> INSTALL
     VERDICT --> EMU
+    EMU --> STORE
+    INSTALL --> EMU
 
     CONSENT -->|"consent.json"| DISK[("UserConfigDir()/ZeuX")]
     HW -->|"gopsutil"| SO["Sistema operacional"]
@@ -57,7 +68,8 @@ graph TD
     VERDICT -->|"go:embed"| CAT[("data/consoles.json")]
     EMU -->|"exec.Cmd"| BIN["Binários de emulador<br/>no disco do usuário"]
 
-    style UI stroke-dasharray: 5 5
+    INSTALL -->|"grava"| MANAGED[("ManagedRoot()/console/emuladores")]
+    STORE -->|"zeux.db"| DISK
 ```
 
 Detalhes que o diagrama esconde e importam:
@@ -69,8 +81,11 @@ Detalhes que o diagrama esconde e importam:
 - **`api` guarda o último scan em memória** (`Server.lastScan`, protegido por
   `sync.RWMutex`). Nada de hardware é gravado em disco. Revogar o consentimento
   zera esse campo.
-- **Só `consent` escreve em disco.** O catálogo é embutido no binário via
-  `go:embed`; sessões vivem em memória.
+- **`consent`, `custom_emulators` e, desde 2026-08-02, as sessões escrevem em
+  disco.** O catálogo continua embutido no binário via `go:embed` — é dado de
+  leitura, não de usuário. Sessões vivem no SQLite local (`internal/store`,
+  [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)), não mais em
+  memória.
 
 ---
 
@@ -238,7 +253,9 @@ não um emulador. Ver [ADR 0007](decisoes/0007-options-estruturado-no-catalogo.m
 
 `//go:embed data/consoles.json`. Garante que o app funcione offline no primeiro
 uso, sem depender de uma chamada de rede antes de dar o primeiro parecer. O
-`schema_version` (hoje `2`) existe para permitir a atualização via nuvem
+`schema_version` (hoje `4`, com 33 consoles — subiu de `3` em 2026-08-03 com o
+campo `extensions` por console, usado pela varredura de biblioteca em
+`internal/library`) existe para permitir a atualização via nuvem
 prevista no PRD substituir esse conteúdo em tempo de execução, sem quebrar
 binários antigos.
 
@@ -273,12 +290,27 @@ reporta "AMD Radeon(TM) Graphics", e sem limpar o `(TM)` a busca por
 reportada: em notebook híbrido, avaliar pelo chip integrado daria um veredito
 injustamente pessimista.
 
-### 3.9 Banco de dados deliberadamente adiado
+### 3.9 Banco de dados: SQLite local (ADR 0011)
 
-Não existe persistência além do `consent.json`. Sessões e tempo de jogo vivem em
-memória e somem ao fechar o app. A prioridade definida foi layout, funcionalidade
-de emuladores e facilidade de configuração **antes** de infraestrutura de dados.
-Ver [ADR 0002](decisoes/0002-adiar-banco-de-dados.md).
+O adiamento original ([ADR 0002](decisoes/0002-adiar-banco-de-dados.md)) foi
+substituído em 2026-08-02 pelo [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md):
+**SQLite local, com driver Go puro** (`modernc.org/sqlite`, sem CGO — a
+compilação cruzada continua sendo só `go build`, em qualquer SO).
+
+`internal/store` abre o banco (`<UserConfigDir>/ZeuX/zeux.db`, ao lado de
+`consent.json`) e aplica migrações embutidas via `//go:embed`, registradas em
+`schema_migrations`. Primeiro consumidor: `internal/emulator.SQLiteSessions`
+(`session_store.go`) substituiu o slice em memória do `Launcher` — sessões e
+tempo de jogo agora sobrevivem a um reinício do daemon, verificado de ponta a
+ponta (lançar um jogo, reiniciar o `zeuxd`, `GET /sessions` ainda mostra a
+sessão, e a próxima recebe um ID que não colide com a anterior).
+
+O que **continua** fora do banco, de propósito: `consent.json` (pequeno,
+versionado, já funciona), o catálogo de consoles (dado de leitura, embutido
+no binário) e `custom_emulators.json` (o próprio `CustomStore.Path()` existe
+para que quem prefira editar o JSON à mão consiga achar o arquivo). A
+biblioteca de jogos (pastas, entradas de jogo, BIOS por console — Sprint D)
+ainda não tem tabela: o wireframe existe, o código ainda não foi escrito.
 
 ### 3.10 Legal: nunca facilitar compartilhamento de ROMs
 
@@ -312,13 +344,24 @@ descontinuados após ação judicial. Ver [ADR 0008](decisoes/0008-excluir-switc
 
 Registrado aqui para que ninguém leia este documento e presuma o contrário:
 
-- Interface gráfica. Rust e MSVC Build Tools não estão instalados.
-- Qualquer banco de dados.
-- Instalação de emuladores. `ManagedRoot()` e o campo `Installation.Managed` já
-  existem e a busca já prioriza a pasta gerenciada, mas **nada escreve nela** —
-  a instalação 1-click ainda não foi construída.
+- **Rota HTTP e tela da biblioteca.** `internal/library` existe desde
+  2026-08-03 e está testado (tabelas `library_folders`/`library_games` —
+  migrações `0002_library.sql` e `0003_library_games_missing.sql` — mais o
+  repositório `Store` e a varredura `FindROMs`/`SyncFolder`), mas **nada o
+  chama ainda**: nenhuma rota `/api/v1/library/*` em `internal/api`, nenhuma
+  tela em `src/screens/`, e o pacote não está sequer referenciado em
+  `cmd/zeuxd`. Ver `roadmap.md`, itens L5–L9 (L1, L2 e L10 já fechados).
+- **Nada sobre BIOS em lugar nenhum do código** — nem catálogo (L3), nem
+  verificação (L4).
+- Instalação de emuladores dentro da estrutura de jogos: a pasta gerenciada
+  (`ManagedRoot()`) já recebe instalações 1-click de verdade, organizadas por
+  console (ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)).
+  O que falta é a parte de jogos — cada pasta de console ainda não tem a
+  subpasta `jogos/` (saves, capas, metadados); a varredura (L2) já existe,
+  mas grava referência no banco, não organiza nada em disco por console.
 - Biblioteca de jogos, scraper de metadados, perfis sociais, netplay.
 - `Installation.Version` nunca é preenchido: nenhum adapter tenta detectar
   versão hoje.
-- Validação das flags dos adapters contra binários reais. Ver
-  [roadmap.md](roadmap.md), item de primeira classe.
+- **Prova de que um jogo abre.** As flags foram validadas contra binários reais
+  (roadmap, D1), mas nenhuma ROM de verdade foi aberta por nenhum emulador — ver
+  D11. O critério de saída da Sprint A continua descoberto.

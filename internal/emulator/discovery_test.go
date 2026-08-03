@@ -7,6 +7,137 @@ import (
 	"testing"
 )
 
+// Emulador de console único (ex.: DuckStation, só ps1) fica dentro da pasta
+// do seu console — é o que faz "olhar a pasta do PS1 e ver o que roda ali"
+// funcionar, em vez de um diretório achatado por adapter.
+func TestManagedEmulatorDirUsesConsoleFolderForSingleConsoleAdapter(t *testing.T) {
+	got := ManagedEmulatorDir("/root", "duckstation", []string{"ps1"})
+	want := filepath.Join("/root", "ps1", "emuladores", "duckstation")
+	if got != want {
+		t.Errorf("ManagedEmulatorDir = %q, queria %q", got, want)
+	}
+}
+
+// RetroArch (24 consoles) e Dolphin (2) não têm "o console deles" — instalar
+// dentro da pasta de cada console duplicaria o binário uma vez por console
+// que atendem. Caem na pasta compartilhada.
+func TestManagedEmulatorDirUsesSharedFolderForMultiConsoleAdapter(t *testing.T) {
+	got := ManagedEmulatorDir("/root", "dolphin", []string{"gamecube", "wii"})
+	want := filepath.Join("/root", SharedDirName, "dolphin")
+	if got != want {
+		t.Errorf("ManagedEmulatorDir = %q, queria %q", got, want)
+	}
+}
+
+// Um adapter sem console conhecido (não deveria acontecer, mas a função não
+// pode presumir) cai no caminho compartilhado por segurança — nunca numa
+// pasta de console que pode nem existir.
+func TestManagedEmulatorDirDefaultsToSharedForUnknownAdapter(t *testing.T) {
+	got := ManagedEmulatorDir("/root", "desconhecido", nil)
+	want := filepath.Join("/root", SharedDirName, "desconhecido")
+	if got != want {
+		t.Errorf("ManagedEmulatorDir = %q, queria %q", got, want)
+	}
+}
+
+// findBinary precisa achar um binário de console único dentro da pasta do
+// console dele, não mais num diretório achatado por adapter.
+func TestFindBinaryLocatesSingleConsoleAdapterInsideConsoleFolder(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome) // AppData no Windows não se aplica aqui; testado em Linux.
+
+	root, err := ManagedRoot()
+	if err != nil {
+		t.Fatalf("ManagedRoot: %v", err)
+	}
+
+	dir := ManagedEmulatorDir(root, "duckstation", []string{"ps1"})
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binPath := filepath.Join(dir, "duckstation-qt")
+	if err := os.WriteFile(binPath, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	path, managed, ok := findBinary(context.Background(), "duckstation", []string{"ps1"}, []string{"duckstation-qt"}, nil)
+	if !ok {
+		t.Fatal("esperava achar o binário gerenciado")
+	}
+	if !managed {
+		t.Error("deveria estar marcado como managed")
+	}
+	if path != binPath {
+		t.Errorf("path = %q, queria %q", path, binPath)
+	}
+}
+
+// Achado testando de verdade (D11, 2026-08-03): o instalador 1-click mantém o
+// nome original do release para AppImages (ex.:
+// "pcsx2-v2.6.3-linux-appimage-x64-Qt.AppImage"), que nunca bate com o nome
+// fixo que os adapters esperam (ex.: "pcsx2-qt"). Sem este caso, PCSX2,
+// DuckStation, PPSSPP, Flycast, Cemu e Azahar ficavam "instalados" e ao mesmo
+// tempo indetectáveis em qualquer sistema Linux.
+func TestFindBinaryLocatesAppImageByGlobWhenExactNameDoesNotMatch(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	root, err := ManagedRoot()
+	if err != nil {
+		t.Fatalf("ManagedRoot: %v", err)
+	}
+
+	dir := ManagedEmulatorDir(root, "pcsx2", []string{"ps2"})
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	appImagePath := filepath.Join(dir, "pcsx2-v2.6.3-linux-appimage-x64-Qt.AppImage")
+	if err := os.WriteFile(appImagePath, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// "pcsx2-qt" é o nome que o adapter procura primeiro — não existe aqui, só
+	// o AppImage, então a busca exata falha e precisa cair no glob.
+	path, managed, ok := findBinary(context.Background(), "pcsx2", []string{"ps2"}, []string{"pcsx2-qt"}, nil)
+	if !ok {
+		t.Fatal("esperava achar o AppImage pelo glob")
+	}
+	if !managed {
+		t.Error("deveria estar marcado como managed")
+	}
+	if path != appImagePath {
+		t.Errorf("path = %q, queria %q", path, appImagePath)
+	}
+}
+
+// Duas AppImages no mesmo diretório gerenciado não deveriam acontecer na
+// prática (o instalador substitui a anterior), mas se acontecer, escolher
+// uma às cegas seria pior que não achar nenhuma.
+func TestFindBinaryDoesNotGuessBetweenMultipleAppImages(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	root, err := ManagedRoot()
+	if err != nil {
+		t.Fatalf("ManagedRoot: %v", err)
+	}
+
+	dir := ManagedEmulatorDir(root, "pcsx2", []string{"ps2"})
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"pcsx2-v2.6.2.AppImage", "pcsx2-v2.6.3.AppImage"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, _, ok := findBinary(context.Background(), "pcsx2", []string{"ps2"}, []string{"pcsx2-qt"}, nil)
+	if ok {
+		t.Error("não deveria escolher entre duas AppImages ambíguas")
+	}
+}
+
 // A precedência é: diretório de sistema antes de suas subpastas, e um
 // diretório de sistema inteiro antes do próximo. Testa isso plugando um
 // dirIndex construído à mão, para não depender de PATH real da máquina.

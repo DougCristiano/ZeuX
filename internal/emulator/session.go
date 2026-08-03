@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"sync"
 	"time"
 )
 
@@ -62,19 +61,32 @@ type MarshalSession struct {
 	IsRunning       bool `json:"is_running"`
 }
 
+// SessionRepository persiste sessões de jogo. É uma interface — não o tipo
+// concreto SQLiteSessions (internal/emulator/session_store.go) — para que os
+// testes do Launcher rodem com uma implementação em memória, sem precisar de
+// um banco de verdade. Ver ADR 0011 (docs/decisoes/), que decidiu SQLite
+// local para isso.
+type SessionRepository interface {
+	// Insert grava a sessão e devolve o ID definitivo — quem persiste é quem
+	// decide o ID (ex.: a implementação em SQLite usa o rowid autoincrement),
+	// para que ele sobreviva a um reinício sem colidir com sessões antigas.
+	Insert(ctx context.Context, session Session) (id string, err error)
+	Close(ctx context.Context, id string, endedAt time.Time, exitError string) error
+	List(ctx context.Context) ([]Session, error)
+}
+
 // Launcher executa jogos e mantém o registro das sessões.
 type Launcher struct {
 	registry *Registry
 	logger   *slog.Logger
-
-	mu       sync.RWMutex
-	sessions []*Session
-	sequence int
+	sessions SessionRepository
 }
 
-// NewLauncher cria o executor de jogos.
-func NewLauncher(registry *Registry, logger *slog.Logger) *Launcher {
-	return &Launcher{registry: registry, logger: logger}
+// NewLauncher cria o executor de jogos. sessions é onde o histórico de
+// sessões e o tempo de jogo (Playtime) são persistidos — antes da decisão do
+// ADR 0011, isso vivia num slice em memória e sumia a cada reinício.
+func NewLauncher(registry *Registry, sessions SessionRepository, logger *slog.Logger) *Launcher {
+	return &Launcher{registry: registry, sessions: sessions, logger: logger}
 }
 
 // LaunchInput descreve o pedido de execução vindo da interface.
@@ -96,12 +108,6 @@ type LaunchInput struct {
 // A chamada não bloqueia: devolve assim que o emulador sobe, e uma goroutine
 // cuida de esperar o fim para fechar a sessão. Travar aqui prenderia a
 // requisição HTTP pelo tempo inteiro da partida.
-//
-// Devolve uma cópia da sessão, não o ponteiro guardado internamente: a
-// goroutine supervise grava EndedAt/ExitError nesse ponteiro assim que o
-// processo termina, e o chamador (handleLaunch) serializa o valor para JSON
-// logo em seguida. Ponteiro compartilhado ali seria leitura e escrita
-// concorrente na mesma struct, sem lock do lado de quem lê.
 func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, error) {
 	if err := ValidateROM(input.ROMPath); err != nil {
 		return Session{}, err
@@ -134,7 +140,25 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		return Session{}, fmt.Errorf("não foi possível iniciar o %s: %w", adapter.Name(), err)
 	}
 
-	session := l.register(input, adapter, built, cmd.Process.Pid)
+	session := Session{
+		ConsoleID: input.ConsoleID,
+		AdapterID: adapter.ID(),
+		Emulator:  adapter.Name(),
+		ROMPath:   input.ROMPath,
+		StartedAt: time.Now().UTC(),
+		Unapplied: built.Unapplied,
+		pid:       cmd.Process.Pid,
+	}
+
+	// A persistência também roda desligada do contexto da requisição: se o
+	// cliente HTTP cancelar a conexão bem no instante entre o processo subir
+	// e a sessão ser gravada, o jogo já está rodando e a sessão precisa ser
+	// registrada de qualquer forma.
+	id, err := l.sessions.Insert(context.Background(), session)
+	if err != nil {
+		return Session{}, fmt.Errorf("registrando a sessão: %w", err)
+	}
+	session.ID = id
 
 	l.logger.Info("jogo iniciado",
 		"sessao", session.ID,
@@ -144,71 +168,38 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 
 	go l.supervise(session, cmd)
 
-	return l.snapshot(session), nil
+	return session, nil
 }
 
-// snapshot copia a sessão sob o lock, para devolver ao chamador um valor que
-// nenhuma goroutine vai continuar escrevendo.
-//
-// A cópia rasa basta porque supervise **substitui** o ponteiro EndedAt em vez
-// de alterar o time.Time apontado, e Unapplied é preenchido uma única vez no
-// register. Um campo que passasse a ser mutado no lugar exigiria cópia
-// profunda aqui.
-func (l *Launcher) snapshot(s *Session) Session {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return *s
-}
-
-// register cria e guarda a sessão.
-func (l *Launcher) register(input LaunchInput, adapter Adapter, built Command, pid int) *Session {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	l.sequence++
-	session := &Session{
-		ID:        fmt.Sprintf("s%d", l.sequence),
-		ConsoleID: input.ConsoleID,
-		AdapterID: adapter.ID(),
-		Emulator:  adapter.Name(),
-		ROMPath:   input.ROMPath,
-		StartedAt: time.Now().UTC(),
-		Unapplied: built.Unapplied,
-		pid:       pid,
-	}
-
-	l.sessions = append(l.sessions, session)
-	return session
-}
-
-// supervise espera o emulador terminar e fecha a sessão.
-func (l *Launcher) supervise(session *Session, cmd *exec.Cmd) {
-	err := cmd.Wait()
+// supervise espera o emulador terminar e fecha a sessão no repositório.
+func (l *Launcher) supervise(session Session, cmd *exec.Cmd) {
+	waitErr := cmd.Wait()
 
 	endedAt := time.Now().UTC()
-
-	l.mu.Lock()
-	session.EndedAt = &endedAt
-	if err != nil {
-		session.ExitError = err.Error()
+	exitError := ""
+	if waitErr != nil {
+		exitError = waitErr.Error()
 	}
-	duration := session.Duration()
-	l.mu.Unlock()
+
+	if err := l.sessions.Close(context.Background(), session.ID, endedAt, exitError); err != nil {
+		l.logger.Error("não foi possível fechar a sessão no banco", "sessao", session.ID, "erro", err)
+	}
 
 	l.logger.Info("jogo encerrado",
 		"sessao", session.ID,
 		"emulador", session.Emulator,
-		"duracao", duration.Round(time.Second))
+		"duracao", endedAt.Sub(session.StartedAt).Round(time.Second))
 }
 
 // Sessions devolve o histórico, do mais recente para o mais antigo.
-func (l *Launcher) Sessions() []MarshalSession {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
+func (l *Launcher) Sessions(ctx context.Context) ([]MarshalSession, error) {
+	sessions, err := l.sessions.List(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	result := make([]MarshalSession, 0, len(l.sessions))
-	for i := len(l.sessions) - 1; i >= 0; i-- {
-		session := *l.sessions[i]
+	result := make([]MarshalSession, 0, len(sessions))
+	for _, session := range sessions {
 		result = append(result, MarshalSession{
 			Session:         session,
 			DurationSeconds: int(session.Duration().Seconds()),
@@ -216,22 +207,23 @@ func (l *Launcher) Sessions() []MarshalSession {
 		})
 	}
 
-	return result
+	return result, nil
 }
 
 // Playtime soma o tempo jogado por console. É a base do "tempo total de jogo"
-// do perfil; hoje vive em memória e some ao fechar o app, até a persistência
-// entrar.
-func (l *Launcher) Playtime() map[string]int {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
+// do perfil.
+func (l *Launcher) Playtime(ctx context.Context) (map[string]int, error) {
+	sessions, err := l.sessions.List(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	totals := make(map[string]int)
-	for _, session := range l.sessions {
+	for _, session := range sessions {
 		totals[session.ConsoleID] += int(session.Duration().Seconds())
 	}
 
-	return totals
+	return totals, nil
 }
 
 // ValidateROM confirma que o arquivo existe antes de tentar abrir o emulador.

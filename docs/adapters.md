@@ -115,7 +115,7 @@ atendidos.
 
 | Adapter ID | Nome | Consoles atendidos |
 |---|---|---|
-| `retroarch` | RetroArch | `nes`, `snes`, `megadrive`, `gba`, `n64`, `ps1`, `dreamcast` |
+| `retroarch` | RetroArch | `nes`, `snes`, `megadrive`, `gba`, `n64`, `ps1`, `dreamcast`, e mais — ver nota abaixo |
 | `duckstation` | DuckStation | `ps1` |
 | `pcsx2` | PCSX2 | `ps2` |
 | `dolphin` | Dolphin | `gamecube`, `wii` |
@@ -123,6 +123,22 @@ atendidos.
 | `flycast` | Flycast | `dreamcast` |
 | `rpcs3` | RPCS3 | `ps3` |
 | `cemu` | Cemu | `wiiu` |
+| `melonds` | melonDS | `nds` |
+| `azahar` | Azahar | `3ds` |
+| `xemu` | xemu | `xbox` |
+| `vita3k` | Vita3K | `vita` |
+| `xenia` | Xenia | `xbox360` |
+| `rmg` | RMG (Rosalie's Mupen GUI) | `n64` (patamares "bom"/"limitado" — ver nota) |
+
+**`rmg`, adicionado em 2026-08-03:** o RetroArch atende N64, mas não é
+instalável pelo 1-click (distribuição própria, fora do GitHub — ver
+`retroarch` em `internal/install/data/sources.json`, `kind: "manual"`). Sem
+um adapter dedicado, N64 nunca seria "plug and play" de verdade. O RMG
+(front-end do Mupen64Plus com release real no GitHub, AppImage no Linux)
+resolve isso para os patamares "bom" e "limitado" do catálogo, que já usavam
+o core Mupen64Plus-Next. O patamar "otimo" continua no RetroArch + core
+ParaLLEl N64 — o RMG não embute esse core, e trocar teria sido apresentar uma
+emulação diferente como equivalente.
 
 > A lista do RetroArch **não é declarada literalmente**: `Consoles()` devolve as
 > chaves do mapa `defaultCoreByConsole`. Adicionar um console lá adiciona
@@ -203,8 +219,14 @@ Legenda: ✅ aplicada na linha de comando · 📋 reportada em `Unapplied` ·
 | Flycast | 📋 | 📋 | ⚠️ | ⚠️ |
 | RPCS3 | ✅ `--fullscreen` | 📋 | 📋 | ✅ `--no-gui` |
 | Cemu | ✅ `-f` | 📋 | 📋 | ⚠️ |
+| RMG | ✅ `-f` | 📋 | 📋 | ✅ `-q` |
 
 `extra` é sempre repassado, em todos os adapters.
+
+**RMG não passou pela auditoria do D1** (2026-08-01) — foi adicionado depois,
+em 2026-08-03. As flags vieram da leitura direta de
+`Source/RMG/main.cpp` (`QCommandLineParser`) no repositório oficial, mesmo
+padrão de rigor do D1, só que feito na hora da adição em vez de em lote.
 
 **O Dolphin é o único que aplica o preset inteiro.** `-C` sobrescreve qualquer
 chave do INI direto na linha de comando, então é o único emulador onde a
@@ -256,13 +278,17 @@ Estão no [roadmap](roadmap.md) como item de correção.
 
 ## 4. Descoberta de binários (`discovery.go`)
 
-`findBinary(adapterID, names, extraDirs)` procura nesta ordem, **e a ordem é
-intencional**:
+`findBinary(adapterID, consoles, names, extraDirs)` procura nesta ordem, **e a
+ordem é intencional**:
 
-1. **Instalação gerenciada pelo ZeuX**:
-   `os.UserConfigDir()/ZeuX/emulators/<adapter_id>/<nome>`. Se o usuário deixou
-   o ZeuX instalar uma versão, é ela que o app sabe configurar; cair numa
-   instalação antiga do sistema traria comportamento não previsto.
+1. **Instalação gerenciada pelo ZeuX**, organizada por console desde o ADR
+   0010: `os.UserConfigDir()/ZeuX/emulators/<console_id>/emuladores/<adapter_id>/<nome>`
+   para um emulador de console único (ex.: `ps1/emuladores/duckstation/`), ou
+   `os.UserConfigDir()/ZeuX/emulators/compartilhados/<adapter_id>/<nome>` para
+   um emulador de mais de um console (RetroArch, Dolphin) — ver
+   `emulator.ManagedEmulatorDir`. Se o usuário deixou o ZeuX instalar uma
+   versão, é ela que o app sabe configurar; cair numa instalação antiga do
+   sistema traria comportamento não previsto.
 2. **Diretórios padrão do sistema.**
 3. **`PATH`** (`exec.LookPath`), como último recurso — cobre instalações por
    gerenciador de pacotes no Linux, que não vivem numa pasta previsível.
@@ -302,9 +328,14 @@ Nomes procurados por adapter:
 | rpcs3 | `rpcs3.exe` | `rpcs3` | `RPCS3` |
 | cemu | `Cemu.exe` | `Cemu` | `Cemu` |
 
-A pasta gerenciada (`ManagedRoot()`) já é consultada e o campo
-`Installation.Managed` já é preenchido, mas **nada escreve nela ainda** — a
-instalação 1-click não existe. Hoje `managed` é sempre `false` na prática.
+A pasta gerenciada (`ManagedRoot()`) já é consultada, e a instalação 1-click
+(`internal/install`, rotas `POST`/`DELETE /emulators/{id}/install`) já escreve
+e apaga ali de verdade — ver Sprint C no [roadmap](roadmap.md), corrigido em
+2026-08-02. `Installation.Managed` sai `true` para o que o ZeuX instalou.
+Desde o [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md), a
+pasta é organizada por console (`<console>/emuladores/<adapter>`), com
+RetroArch e Dolphin — que atendem mais de um console — numa pasta
+compartilhada em vez de duplicados.
 
 `Installation.Version` **nunca é preenchido**: nenhum adapter detecta versão.
 O campo existe porque o sistema de compatibilidade comunitário depende dele

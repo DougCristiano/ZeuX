@@ -81,7 +81,14 @@ type Console struct {
 	Name      string `json:"name"`
 	ShortName string `json:"short_name"`
 	Year      int    `json:"year"`
-	Tiers     []Tier `json:"tiers"`
+
+	// Extensions são as extensões de arquivo reconhecidas na varredura de
+	// biblioteca (internal/library), em minúsculas e sem o ponto. Existe aqui,
+	// e não hardcoded no scanner, para que o catálogo continue sendo a única
+	// fonte de verdade sobre um console — mesmo raciocínio de Options.
+	Extensions []string `json:"extensions"`
+
+	Tiers []Tier `json:"tiers"`
 }
 
 // Catalog é o dicionário de requisitos por console.

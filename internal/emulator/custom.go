@@ -205,6 +205,10 @@ func (s *CustomStore) Load() ([]CustomDefinition, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	return s.loadLocked()
+}
+
+func (s *CustomStore) loadLocked() ([]CustomDefinition, error) {
 	data, err := os.ReadFile(s.path)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -228,6 +232,10 @@ func (s *CustomStore) Save(definitions []CustomDefinition) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.saveLocked(definitions)
+}
+
+func (s *CustomStore) saveLocked(definitions []CustomDefinition) error {
 	if definitions == nil {
 		definitions = []CustomDefinition{}
 	}
@@ -251,12 +259,20 @@ func (s *CustomStore) Save(definitions []CustomDefinition) error {
 }
 
 // Upsert adiciona ou substitui uma definição pelo ID.
+//
+// Load e Save tomam o lock por conta própria, então chamá-los em sequência
+// deixaria uma janela entre os dois onde outra goroutine poderia gravar por
+// cima — dois POSTs simultâneos podiam se perder um ao outro. Aqui o lock é
+// tomado uma vez só, para o ciclo ler-modificar-gravar inteiro.
 func (s *CustomStore) Upsert(def CustomDefinition) ([]CustomDefinition, error) {
 	if err := def.Validate(); err != nil {
 		return nil, err
 	}
 
-	definitions, err := s.Load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	definitions, err := s.loadLocked()
 	if err != nil {
 		return nil, err
 	}
@@ -273,12 +289,16 @@ func (s *CustomStore) Upsert(def CustomDefinition) ([]CustomDefinition, error) {
 		definitions = append(definitions, def)
 	}
 
-	return definitions, s.Save(definitions)
+	return definitions, s.saveLocked(definitions)
 }
 
-// Delete remove uma definição pelo ID.
+// Delete remove uma definição pelo ID. Mesmo motivo do Upsert: um lock só
+// para o ciclo ler-modificar-gravar inteiro.
 func (s *CustomStore) Delete(id string) ([]CustomDefinition, error) {
-	definitions, err := s.Load()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	definitions, err := s.loadLocked()
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +317,7 @@ func (s *CustomStore) Delete(id string) ([]CustomDefinition, error) {
 		return nil, fmt.Errorf("nenhum emulador personalizado com o id %q", id)
 	}
 
-	return filtered, s.Save(filtered)
+	return filtered, s.saveLocked(filtered)
 }
 
 // BuildAdapters converte definições em adapters, ignorando as inválidas.

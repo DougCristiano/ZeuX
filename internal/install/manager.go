@@ -256,11 +256,11 @@ func (m *Manager) promote(stagingDir, adapterID string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
+
+	final := managedDirFor(root, adapterID)
+	if err := os.MkdirAll(filepath.Dir(final), 0o755); err != nil {
 		return err
 	}
-
-	final := filepath.Join(root, adapterID)
 
 	// A versão anterior sai do caminho antes, mas só é apagada depois de a nova
 	// entrar: se o rename falhar, ainda dá para voltar atrás.
@@ -304,12 +304,25 @@ func (m *Manager) Uninstall(adapterID string) error {
 		return err
 	}
 
-	target := filepath.Join(root, adapterID)
+	target := managedDirFor(root, adapterID)
 	if _, err := os.Stat(target); os.IsNotExist(err) {
 		return fmt.Errorf("o ZeuX não instalou este emulador; nada a remover")
 	}
 
 	return os.RemoveAll(target)
+}
+
+// managedDirFor resolve o diretório gerenciado de um adapter a partir do seu
+// ID, consultando o registro de adapters embutidos para saber quantos
+// consoles ele atende (ver emulator.ManagedEmulatorDir). Um adapter
+// desconhecido do registro (não deveria acontecer: os IDs vêm do mesmo
+// catálogo que os adapters) cai no caminho compartilhado, por segurança.
+func managedDirFor(root, adapterID string) string {
+	var consoles []string
+	if adapter, ok := emulator.NewRegistry().ByID(adapterID); ok {
+		consoles = adapter.Consoles()
+	}
+	return emulator.ManagedEmulatorDir(root, adapterID, consoles)
 }
 
 // update aplica uma alteração ao job com o lock tomado.

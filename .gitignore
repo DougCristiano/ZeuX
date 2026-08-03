@@ -10,6 +10,10 @@ node_modules/
 # Artefatos de build do Tauri (Fase 2)
 src-tauri/target/
 
+# zeuxd compilado como sidecar do Tauri (scripts/build-zeuxd.mjs); é gerado a
+# cada build, por plataforma — não faz sentido versionar.
+src-tauri/binaries/
+
 # Cache e configuração local de ferramentas
 .mise.local.toml
 *.local

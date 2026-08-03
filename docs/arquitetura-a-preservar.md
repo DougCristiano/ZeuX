@@ -60,7 +60,7 @@ Não executa processo, não lê nem escreve disco, não consulta rede. Recebe
 localizar o arquivo do core — e ela é excepcional de propósito, documentada no
 próprio adapter.
 
-**O que quebra:** é o que torna os 13 adapters testáveis com **nada instalado**.
+**O que quebra:** é o que torna os 14 adapters testáveis com **nada instalado**.
 `internal/emulator/adapter_test.go` roda em qualquer máquina, em milissegundos,
 sem baixar 200 MB de emulador. Assim que `BuildCommand` tocar o mundo, essa
 suíte inteira vira teste de integração lento e frágil, e a cobertura cai na
@@ -191,7 +191,7 @@ Regras práticas que evitam quase todos os casos:
 | Recalcular o todo para responder sobre a parte | desperdício | Consulta direta |
 | Laço aninhado sobre coleções que crescem juntas | O(n²) | Repense |
 
-Varredura linear sobre **`n` fixo e pequeno** (13 adapters, 33 consoles) é
+Varredura linear sobre **`n` fixo e pequeno** (14 adapters, 33 consoles) é
 aceitável e frequentemente mais simples que um mapa — não troque clareza por
 micro-otimização onde o `n` não cresce. O critério é: *este `n` cresce com o uso
 do app?* Se sim, precisa ser sublinear ou indexado. Se não, deixe simples.

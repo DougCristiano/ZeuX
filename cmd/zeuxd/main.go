@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
 	"github.com/doufl/zeux/internal/install"
+	"github.com/doufl/zeux/internal/store"
 	"github.com/doufl/zeux/internal/verdict"
 )
 
@@ -72,7 +74,13 @@ func run(addr string, logger *slog.Logger) error {
 		}
 	}
 
-	launcher := emulator.NewLauncher(registry, logger)
+	db, err := store.Open()
+	if err != nil {
+		return fmt.Errorf("abrindo o banco local: %w", err)
+	}
+	defer db.Close()
+
+	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), logger)
 
 	sources, err := install.LoadCatalog()
 	if err != nil {
@@ -83,6 +91,14 @@ func run(addr string, logger *slog.Logger) error {
 	server := api.NewServer(
 		hardware.NewProbe(), catalog, consentStore,
 		registry, customStore, launcher, installer, logger)
+
+	// Só quem está rodando o front em modo desenvolvimento (`npm run tauri
+	// dev`) define esta variável — o instalador nunca a define, então o
+	// binário que o usuário recebe só aceita as origens de produção do Tauri.
+	if devOrigin := os.Getenv("ZEUX_DEV_ORIGIN"); devOrigin != "" {
+		server.SetDevOrigin(devOrigin)
+		logger.Warn("CORS liberado para origem de desenvolvimento", "origin", devOrigin)
+	}
 
 	httpServer := &http.Server{
 		Addr:              addr,

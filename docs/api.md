@@ -22,9 +22,14 @@ de emuladores personalizados; corrigido nesta passada).
 
 - Todas as respostas são `application/json; charset=utf-8`.
 - **Não há autenticação.** O bind em `127.0.0.1` é a única fronteira.
-- **Não há CORS configurado.** Ainda não foi necessário porque não existe
-  front-end; quando o Tauri entrar, isso precisa ser reavaliado (ver
-  [roadmap.md](roadmap.md)).
+- **CORS está configurado com lista fechada de origens** (`allowedOrigins` em
+  `internal/api/server.go`): `tauri://localhost` e `http://tauri.localhost`,
+  as origens do WebView do Tauri em produção. Uma origem fora da lista nunca
+  recebe `Access-Control-Allow-Origin` — nunca `*`. Verificado em 2026-08-01
+  contra um build de produção real do Tauri (item B2/B3 do
+  [plano da Sprint B](sprint-b-plano.md)): sem essa lista, o WebView falha
+  tanto no `GET` simples quanto no `POST` com `Content-Type: application/json`
+  (que dispara preflight `OPTIONS`).
 - As rotas usam os padrões de método do `http.ServeMux` do Go 1.22+
   (`"GET /api/v1/health"`). Chamar uma rota com o método errado devolve **405
   em texto puro**, gerado pelo próprio `ServeMux` — não passa pelo formato de
@@ -87,7 +92,7 @@ curl http://127.0.0.1:7777/api/v1/health
 ```json
 {
   "status": "ok",
-  "schema_version": 3,
+  "schema_version": 4,
   "consoles": 33
 }
 ```
@@ -95,7 +100,7 @@ curl http://127.0.0.1:7777/api/v1/health
 | Campo | Tipo | Origem |
 |---|---|---|
 | `status` | string | Literal `"ok"`. |
-| `schema_version` | int | `catalog.SchemaVersion` (`internal/verdict/data/consoles.json`) — hoje `3`. |
+| `schema_version` | int | `catalog.SchemaVersion` (`internal/verdict/data/consoles.json`) — hoje `4` (subiu de `3` em 2026-08-03 com o campo `extensions`, usado por `internal/library` na varredura). |
 | `consoles` | int | Número de consoles no catálogo — hoje `33`. |
 
 Esta rota não tem caminho de erro: se o catálogo não tivesse carregado, o daemon
@@ -352,7 +357,7 @@ curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 | `preset` | string | Descrição legível da configuração. Ausente em `"improvavel"`. |
 | `options` | objeto | O mesmo preset em forma aplicável. É o que o `/games/launch` copia quando a requisição não manda `options`. Ausente em `"improvavel"`. |
 | `next_level` | string | O patamar imediatamente acima do alcançado. Ausente quando o console já está no melhor patamar. |
-| `bottlenecks` | array de string | **O que exatamente barra o `next_level`**, uma frase por requisito não atendido, nomeando o componente. Vazio quando o requisito falhou por dado desconhecido em vez de insuficiência. |
+| `bottlenecks` | array de string | **O que exatamente barra o `next_level`**, uma frase por requisito não atendido, nomeando o componente. **Ausente** (não `[]`) quando não há gargalo a reportar — `omitempty` no Go remove o campo para uma slice vazia (achado rodando `npm run verificar-api` contra o daemon real, item B6 do [plano da Sprint B](sprint-b-plano.md); esta linha dizia "vazio" antes de ser corrigida). |
 | `precision` | `"completa"` \| `"parcial"` | Deste console especificamente. `"parcial"` quando algum requisito não pôde ser verificado. |
 
 **404 `no_scan_yet`** — execute o scan antes.
@@ -401,7 +406,7 @@ curl http://127.0.0.1:7777/api/v1/emulators
 | `consoles` | array de string | Ordenado alfabeticamente por `Survey`. |
 | `installed` | bool | `false` é resposta normal, não erro. |
 | `installation` | objeto | **Só presente quando `installed` é `true`.** |
-| `installation.managed` | bool | `true` quando o binário veio da pasta gerenciada pelo ZeuX. Hoje sempre `false` na prática: nada instala nessa pasta ainda. |
+| `installation.managed` | bool | `true` quando o binário veio da pasta gerenciada pelo ZeuX (`POST /emulators/{id}/install`), organizada por console desde o [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md). |
 | `installation.version` | string | **Nunca preenchido hoje.** Nenhum adapter detecta versão. |
 
 A ordem dos itens é a ordem de registro em `NewRegistry`, personalizados
@@ -763,7 +768,7 @@ curl -X POST http://127.0.0.1:7777/api/v1/games/launch \
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `id` | string | Sequencial dentro da execução do daemon: `s1`, `s2`, ... Reinicia do zero quando o daemon reinicia. |
+| `id` | string | `s1`, `s2`, ... — persistido no banco local desde o [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md); **não reinicia do zero** quando o daemon reinicia, continua de onde parou. |
 | `started_at` | string | RFC 3339, UTC. |
 | `ended_at` | string | ⚠️ **Sempre presente.** O `omitempty` da tag não funciona em `time.Time`, então uma sessão em andamento traz `"0001-01-01T00:00:00Z"`. Para saber se está rodando, use `is_running` de `GET /sessions` ou compare com o zero value. |
 | `exit_error` | string | Ausente enquanto o jogo roda. Depois, descreve saída anormal. **Código de saída diferente de zero é comum** quando o usuário fecha pela janela — é informativo, não necessariamente falha. |
@@ -796,8 +801,11 @@ verificação:
 
 Histórico de sessões e tempo de jogo acumulado.
 
-> ⚠️ **Tudo aqui vive em memória e some quando o daemon fecha.** A persistência
-> depende do banco de dados, que foi deliberadamente adiado.
+> **Persistido em SQLite local desde 2026-08-02** (ver
+> [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)) — o histórico
+> sobrevive a um reinício do daemon. `Server.lastScan` (o último scan de
+> hardware, usado para autoconfiguração) continua só em memória; é barato de
+> refazer e não é o que este aviso cobria.
 
 ```bash
 curl http://127.0.0.1:7777/api/v1/sessions
@@ -848,7 +856,8 @@ curl http://127.0.0.1:7777/api/v1/sessions
 | `sessions[].is_running` | bool | A forma correta de saber se a sessão está aberta. |
 | `playtime_seconds` | objeto | Soma por `console_id`. Inclui sessões em andamento, então **cresce entre duas chamadas**. É a base do "tempo total de jogo" do perfil. |
 
-Esta rota não tem caminho de erro.
+**500 `sessions_read_failed`** — o banco local (`internal/store`) não pôde ser
+lido. Ver o catálogo de códigos de erro.
 
 ---
 
@@ -868,6 +877,7 @@ Esta rota não tem caminho de erro.
 | `emulator_unavailable` | 400 | POST `/games/preview` | Nenhum emulador utilizável para a requisição. |
 | `command_failed` | 400 | POST `/games/preview` | `BuildCommand` recusou (tipicamente core ausente). |
 | `launch_failed` | 400 | POST `/games/launch` | Qualquer falha do lançamento; a causa vai no `message`. |
+| `sessions_read_failed` | 500 | GET `/sessions` | Erro lendo o banco local (`internal/store`) — histórico ou tempo de jogo. |
 | `invalid_definition` | 400 | POST `/custom-emulators` | Definição inválida (o caso mais comum é `args` sem `{rom}`). |
 | `not_found` | 404 | DELETE `/custom-emulators/{id}`, GET `/installs/{id}` | Nenhum registro com este `id`. |
 | `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |

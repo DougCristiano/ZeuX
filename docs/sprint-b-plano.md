@@ -12,6 +12,48 @@ Escrito em 2026-08-01, contra o código verificado na mesma data.
 
 ---
 
+## Como testar na sua máquina (depois de clonar)
+
+B1–B5 foram executados e verificados num container Linux, não na sua máquina
+Windows — ver as ressalvas de ambiente em cada item abaixo. Para gerar o
+instalador de verdade e testar:
+
+**Pré-requisitos (uma vez só, itens B1 específicos do Windows que este
+container não pôde tocar):**
+
+1. Rust (`rustup`, [rustup.rs](https://rustup.rs)) — `rustc --version` deve
+   responder num PowerShell novo.
+2. Node (o `mise.toml` já fixa a versão — `mise install` resolve).
+3. [MSVC Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+   (workload "Desktop development with C++").
+4. [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) —
+   já vem instalado de fábrica na maioria dos Windows 10/11 recentes; o
+   instalador do Tauri avisa se faltar.
+
+**Build e teste:**
+
+```powershell
+git clone <url-do-repositorio> ZeuX-teste
+cd ZeuX-teste
+npm install
+npm run tauri build
+```
+
+O comando compila o `zeuxd` (via `scripts/build-zeuxd.mjs`, chamado
+automaticamente antes do build), embute o binário como sidecar, e gera o
+instalador em `src-tauri/target/release/bundle/` (`.msi` e/ou `.exe`,
+conforme o que o Tauri escolher para Windows). Ao abrir o app instalado, o
+`zeuxd` sobe e desce sozinho — não é preciso rodar `go run ./cmd/zeuxd` à
+parte (ver B5).
+
+Para desenvolver com hot reload em vez de gerar o instalador a cada mudança:
+
+```powershell
+npm run tauri dev
+```
+
+---
+
 ## O que esta sprint realmente é
 
 Duas coisas foram empacotadas sob o nome "casca da UI", e vale separá-las porque
@@ -52,6 +94,22 @@ Levantado lendo o código e a árvore de arquivos, não a memória:
 Os dois primeiros achados mudam o plano: **D4 é o item 0 da sprint**, e o
 "layout visual sobre o wireframe" pressupõe um insumo que hoje não existe em
 lugar versionado.
+
+**Atualização de 2026-08-01, mais tarde no mesmo dia:** B1, B2 e B3 foram
+executados — mas dentro de um **container Linux remoto** (sessão de IA em
+nuvem), não na máquina Windows do Douglas onde o D4/B0 (OneDrive) se aplica.
+Isso muda a leitura do bloqueio: **B0 trava a sprint na máquina Windows, mas
+não trava a validação da arquitetura**, que pôde acontecer num ambiente sem
+OneDrive. O resultado é real (o binário Tauri de produção rodou de verdade e
+falou com o `zeuxd` via HTTP), mas dois pontos ficam marcados como pendentes
+até serem checados na máquina real:
+
+- Os itens específicos de Windows do B1 (MSVC Build Tools, WebView2, `mise.toml`)
+  não foram tocados.
+- O `origin` de produção do Windows (`http://tauri.localhost`) está na lista
+  de CORS por ser o valor documentado pelo Tauri, mas **não foi observado**
+  como o do Linux (`tauri://localhost`) foi — só a chegada real numa máquina
+  Windows fecha essa lacuna.
 
 ---
 
@@ -192,302 +250,511 @@ catálogo de códigos de erro ganhou as sete entradas novas
 
 ---
 
-### B1 — Instalar Rust, MSVC Build Tools e WebView2 (M)
+### B1 — Instalar Rust, MSVC Build Tools e WebView2 (M) — **feito parcialmente em 2026-08-01, num ambiente Linux, não na máquina Windows do Douglas**
 
-A dívida do [ADR 0004](decisoes/0004-adiar-rust-e-tauri.md) vence aqui. São
-vários GB e o passo com maior chance de consumir mais tempo que o previsto —
-razão para ser o primeiro trabalho de verdade, e não algo espremido no meio.
+A dívida do [ADR 0004](decisoes/0004-adiar-rust-e-tauri.md) venceu aqui, mas
+num ambiente diferente do previsto: esta rodada aconteceu num container Linux
+remoto (sessão de IA em nuvem), não na máquina Windows do Douglas. Rust e Node
+**já estavam presentes** nesse container (`rustc 1.94.1`, `node v22.22.2`); o
+que faltou e foi instalado via `apt` foram as dependências de sistema do
+WebKitGTK que o Tauri usa no Linux (`libwebkit2gtk-4.1-dev`,
+`libjavascriptcoregtk-4.1-dev`, `libsoup-3.0-dev`, `libgtk-3-dev`,
+`libappindicator3-dev`, `librsvg2-dev`, `patchelf`).
 
-O [ADR 0003](decisoes/0003-mise-como-toolchain.md) e o D7 já fixaram Go e Node
-em versão exata. O Rust entra pela mesma porta, ou a decisão de não entrar fica
-escrita.
+**Os itens específicos de Windows (MSVC Build Tools, WebView2, chave de
+registro) continuam pendentes e só podem ser verificados na máquina real** —
+não fazem sentido num container Linux. Ver nota em B2 sobre o que isso muda no
+plano.
 
-**Critério de aceite:**
+**Critério de aceite (revisado para refletir o que foi de fato verificado):**
 
-- [ ] Em um PowerShell novo, `rustc --version` e `cargo --version` respondem.
-- [ ] `mise.toml` fixa a versão do Rust em número exato (nada de `latest`), ou
-      traz um comentário dizendo por que o Rust ficou fora do `mise` — coerente
-      com o ADR 0003.
-- [ ] A presença do WebView2 Runtime é confirmada pela chave de registro
-      `HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
-      (o valor `pv` é a versão instalada), e a versão fica registrada no
-      roadmap.
-- [ ] `cargo build` de um projeto Rust vazio compila e linka — prova de que as
-      MSVC Build Tools estão de fato presentes, não só baixadas.
-- [ ] O espaço consumido em disco fica anotado, para não virar surpresa em outra
-      máquina.
+- [x] `rustc --version` e `cargo --version` respondem — **1.94.1**, já
+      presentes no ambiente, não instalados nesta rodada.
+- [ ] `mise.toml` fixa a versão do Rust em número exato — **não feito**: o
+      projeto não usa `mise` no ambiente onde este item rodou, e a máquina
+      Windows (onde `mise` importa) não foi tocada. Fica para quando B1 for
+      revalidado lá.
+- [ ] WebView2 Runtime (chave de registro) — **não aplicável neste ambiente**
+      (Linux). Pendente de verificação na máquina Windows real.
+- [x] `cargo build` de um projeto Tauri real (não vazio) compilou e linkou —
+      ver B2, que foi além do critério original e gerou um binário de
+      produção de verdade.
+- [x] Espaço consumido: as dependências de sistema (`apt`) somaram poucas
+      dezenas de MB; o primeiro `cargo build` de um projeto Tauri baixou e
+      compilou ~490 crates, levando **1m46s** (debug) e **4m07s** (release)
+      num container com cache frio — a maior parte é da árvore de
+      dependências do `tauri`/`wry`/`tao`, não do projeto em si.
 
-**Depende de:** B0
+**Depende de:** B0 — **mas o B0 real (OneDrive) só existe na máquina Windows;
+neste container Linux a pergunta não se aplica** (não há OneDrive)
 **Bloqueia:** B2
 
 ---
 
-### B2 — Prova de fogo do ADR 0001: WebView Tauri × `127.0.0.1:7777` (P)
+### B2 — Prova de fogo do ADR 0001: WebView Tauri × `127.0.0.1:7777` (P) — **feito em 2026-08-01, com ressalva de ambiente**
 
-**Este é o item mais importante da sprint** e o motivo de ela existir nesta
-ordem. Um app Tauri do template padrão, com um botão, nada de React, nada de
-Tailwind, nada de tela — só `fetch` contra o `zeuxd` rodando à parte.
+Executado como planejado: `cargo create-tauri-app` com o template `vanilla`
+(sem React, sem Tailwind), um HTML com dois botões chamando
+`fetch("http://127.0.0.1:7777/...")` diretamente — nenhum comando Rust
+(`invoke`) envolvido, só o `fetch` puro que o plano queria testar. Rodado sob
+`Xvfb` (display virtual, já que o container não tem tela física), com cliques
+automatizados via `xdotool` e evidência em screenshot (`import`).
 
-Duas coisas precisam ser observadas, não presumidas:
+**Ressalva de ambiente:** roda em Linux, não Windows. O `origin` de produção
+do Windows (`http://tauri.localhost`, citado na documentação do Tauri) **não
+foi observado de verdade** — só o do Linux. Ele foi incluído em
+`allowedOrigins` (B3) por ser o valor documentado oficialmente, mas fica
+marcado como não verificado até alguém confirmar numa máquina Windows real.
 
-- **Qual é o `origin` real do WebView.** No Windows o Tauri costuma servir a
-  aplicação de `http://tauri.localhost`, e em outros SOs de `tauri://localhost`
-  — mas isso muda entre versões, e o plano não pode se apoiar em lembrança. O
-  jeito de saber é ler `window.location.origin` no app e o header `Origin` no
-  log do `zeuxd --debug`.
-- **Se o `POST` com `Content-Type: application/json` passa.** Este é o caso que
-  dispara *preflight* `OPTIONS`, e o servidor hoje não responde `OPTIONS` para
-  rota nenhuma nem emite `Access-Control-*`. Se falhar, falha aqui — no dia um,
-  com um botão na tela.
+**O que foi observado, os valores lidos (não presumidos):**
 
-**Critério de aceite:**
+| Cenário | `window.location.origin` | `Origin` chegando no `zeuxd --debug` |
+|---|---|---|
+| `npm run tauri dev` (servidor estático embutido do Tauri, sem `devUrl`/bundler configurado) | `http://127.0.0.1:1430` | `http://127.0.0.1:1430` |
+| `npm run tauri build` → binário de produção rodando de verdade | `tauri://localhost` | `tauri://localhost` |
 
-- [ ] Com `zeuxd` rodando à parte, um botão do app mínimo exibe na janela o JSON
-      de `GET /api/v1/health` vindo de `http://127.0.0.1:7777`.
-- [ ] O mesmo app faz `POST /api/v1/consent` com
-      `Content-Type: application/json` e mostra a resposta. Se der erro de CORS,
-      a mensagem exata do console do WebView é copiada para o roadmap e abre o
-      B3.
-- [ ] O `origin` observado fica escrito no plano — o valor lido, não o esperado.
-      Registrar os dois: `window.location.origin` e o `Origin` que chegou no
-      `zeuxd --debug`.
-- [ ] Fica registrado se foi preciso mexer em `tauri.conf.json` (CSP,
-      `connect-src`, permissões de rede) ou se `fetch` puro bastou — e, se
-      precisou, qual chave exatamente.
+- [x] Com `zeuxd --debug` rodando à parte, o botão "GET /api/v1/health" exibiu
+      o JSON `{"consoles":33,"schema_version":3,"status":"ok"}` na janela —
+      tanto no `tauri dev` (com erro de CORS, ver abaixo) quanto no build de
+      produção (com sucesso, depois do B3).
+- [x] O botão de `POST /api/v1/consent` com `Content-Type: application/json`
+      foi testado. **Sem CORS, os dois falharam** com
+      `TypeError: Load failed` no WebView — o `GET` simples chegou ao servidor
+      e voltou `200` (confirmado no log do `zeuxd --debug`), mas o WebView
+      recusou entregar a resposta ao JS; o `POST` disparou o preflight
+      `OPTIONS`, que o servidor recusava (sem rota registrada, o `ServeMux`
+      devolvia 405), então a chamada real nunca saiu. Isso abriu o B3 — feito
+      na mesma sessão.
+- [x] `origin` observado: tabela acima. Os dois valores batem exatamente com
+      o que o plano cogitava (`tauri://localhost` para builds fora do Windows),
+      mas agora são medidos, não lembrados.
+- [x] Não foi preciso mexer em `tauri.conf.json` (CSP ficou `null`, o padrão
+      do template) nem em permissões de rede — o bloqueio era inteiramente do
+      lado do servidor Go (CORS ausente), não do WebView. `fetch` puro bastou.
 
 **Depende de:** B1
 **Bloqueia:** B3, B4
 
 ---
 
-### B3 — CORS no servidor, se e somente se B2 mostrar que precisa (P)
+### B3 — CORS no servidor (P) — **feito em 2026-08-01**
 
-Item condicional de propósito. Se o B2 passar sem tocar no Go, este item é
-fechado como "não foi necessário" e nada é escrito — o ADR 0001 previa o risco,
-e uma camada de middleware que não resolve problema nenhum é peso.
+O B2 mostrou que era necessário — nos dois sentidos que o plano previa (preflight
+do `POST`) e num terceiro que não estava explícito no plano (o `GET` simples
+também precisa do cabeçalho na resposta, não só o preflight).
 
-Se precisar, a forma importa: **ecoar a origem do WebView, nunca `*`**. O ADR
-0001 já registra que qualquer processo local alcança a porta; CORS não é a
-defesa contra isso, e não é motivo para afrouxar de graça.
+**Implementado em `internal/api/server.go`:** `allowedOrigins` (mapa fechado,
+hoje com `tauri://localhost` e `http://tauri.localhost`) e o middleware
+`withCORS`, que ecoa `Access-Control-Allow-Origin` só para essas origens, nunca
+`*`, e responde `204` a qualquer `OPTIONS` (com `Access-Control-Allow-Methods`
+e `-Headers`), delegando as demais requisições ao roteador normal.
 
 **Critério de aceite:**
 
-- [ ] `curl -i -X OPTIONS http://127.0.0.1:7777/api/v1/consent -H "Origin: <origin lido no B2>" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type"`
-      responde `204` com `Access-Control-Allow-Origin` igual à origem enviada.
-- [ ] A mesma chamada com `-H "Origin: http://exemplo.invalido"` **não** traz
+- [x] `curl -i -X OPTIONS .../consent -H "Origin: tauri://localhost" ...`
+      respondeu `204` com `Access-Control-Allow-Origin: tauri://localhost`.
+- [x] A mesma chamada com `Origin: http://exemplo.invalido` **não** trouxe
       `Access-Control-Allow-Origin` na resposta.
-- [ ] Existe teste em `internal/api` travando os dois casos acima — hoje o
-      pacote está `[no test files]`, então este é o primeiro.
-- [ ] O comentário no código diz **por que** a lista é fechada, não o que o
-      código faz (convenção do repositório).
-- [ ] O ADR 0001 ganha uma nota, ou um ADR novo é escrito, se a decisão de
-      origem tiver mudado algo do que estava registrado.
+- [x] Testes em `internal/api/server_test.go`:
+      `TestCORSPreflightAllowsKnownWebViewOrigin`,
+      `TestCORSPreflightRejectsUnknownOrigin`,
+      `TestCORSAllowsSimpleRequestFromKnownOrigin` (o terceiro cobre o achado
+      extra do B2 — requisição simples, não só preflight).
+- [x] O comentário no código explica por que a lista é fechada (ADR 0001: CORS
+      não é a defesa contra acesso local, é só o que destrava o WebView) — não
+      descreve o que o código faz.
+- [x] Nota acrescentada aqui e em `docs/api.md`; não abriu ADR novo porque não
+      mudou nenhuma decisão do ADR 0001, só a implementou.
+
+**Atualização depois do B4:** o scaffold real (React + Vite) fixa
+`devUrl: "http://localhost:1420"` em `src-tauri/tauri.conf.json` — diferente do
+`http://127.0.0.1:1430` observado no PoC do B2 (que não usava bundler nenhum).
+Em vez de adicionar essa porta a `allowedOrigins` (o que a deixaria liberada
+também no binário instalado), foi criado `Server.SetDevOrigin`
+(`internal/api/server.go`): `cmd/zeuxd/main.go` só a chama quando a variável de
+ambiente `ZEUX_DEV_ORIGIN` está definida, o que nunca acontece no app
+empacotado. Para desenvolver o front, suba o daemon com
+`ZEUX_DEV_ORIGIN=http://localhost:1420 go run ./cmd/zeuxd --debug`.
 
 **Depende de:** B2
 **Bloqueia:** nada
 
 ---
 
-### B4 — Scaffold Tauri + React + Tailwind (M)
+### B4 — Scaffold Tauri + React + Tailwind (M) — **feito em 2026-08-01, com ressalva de ambiente**
 
-Só depois de B2. Montar o projeto completo antes de saber se a comunicação
-funciona é construir a casa para descobrir o terreno depois.
+Montado com `cargo create-tauri-app` (template `react-ts`) na raiz do
+repositório — `src/`, `src-tauri/`, `index.html`, `package.json`,
+`vite.config.ts`, `tsconfig*.json`. Tailwind 4 entrou pelo plugin do Vite
+(`@tailwindcss/vite`), sem `tailwind.config.js` (não existe mais nessa versão).
+O boilerplate do template (logos, comando `greet`, CSS de exemplo) foi
+removido — `App.tsx` hoje só faz `fetch` real em `GET /api/v1/health` contra o
+`zeuxd` e mostra o resultado com classes Tailwind, provando que os três
+pedaços (React, Tailwind, fetch) funcionam juntos. `src-tauri/src/lib.rs`
+ficou sem nenhum `#[tauri::command]` — comentário explica que o ADR 0001 já
+decidiu HTTP como IPC, então não há razão para existir um comando Rust aqui.
+
+**Ressalva de ambiente, igual à do B1/B2:** rodado no mesmo container Linux
+remoto, não na máquina Windows do Douglas. `npm run tauri dev` não pôde ser
+verificado com hot reload de verdade (o container não tem um editor
+interativo mudando arquivo enquanto o dev server roda) — o que foi verificado
+foi o **build de produção completo**, que é uma prova mais forte para as
+partes que importam (compila, linka, empacota, roda, fala com o `zeuxd`).
 
 **Critério de aceite:**
 
-- [ ] `npm run tauri dev` abre a janela com hot reload funcionando.
-- [ ] `npm run tauri build` produz artefato em
-      `src-tauri/target/release/bundle/`.
-- [ ] Depois desse primeiro build real, o B0 é **reverificado**: nem
-      `node_modules/` nem `src-tauri/target/` aparecem no painel de atividade do
-      OneDrive.
-- [ ] `git status` fica limpo após um `dev` e um `build` — o `.gitignore`
-      existente cobre tudo que o scaffold gerou, ou é ajustado.
-- [ ] As dependências de front são **React, Tailwind e mais nada**. Sem
-      biblioteca de estado, sem biblioteca de componentes, sem cliente HTTP —
-      `fetch` é nativo. Qualquer adição além dessas exige justificativa escrita,
-      pela mesma regra de "simples e leve" que
-      [arquitetura-a-preservar](arquitetura-a-preservar.md) aplica ao Go.
+- [~] `npm run tauri dev` abre a janela — confirmado que abre e serve de
+      `http://localhost:1420` (ver nota do B3). Hot reload em si não foi
+      exercitado (sem edição de arquivo com o processo no ar); considerar
+      confirmado quando alguém editar `App.tsx` com `tauri dev` rodando.
+- [x] `npm run tauri build` produziu
+      `src-tauri/target/release/bundle/deb/zeux_0.1.0_amd64.deb`, e o binário
+      (`src-tauri/target/release/zeux`) rodou de verdade sob `Xvfb`, mostrando
+      `status`, `schema_version` e `consoles` vindos do `zeuxd` real — a mesma
+      prova do B2, agora com o app completo em vez do PoC descartável.
+- [x] **B0 não se aplica neste ambiente** (sem OneDrive) — fica para ser
+      reverificado na máquina Windows quando o B0 real for resolvido lá.
+- [x] `git status` limpo depois do `npm install`, `npm run build` e
+      `npm run tauri build`: `.gitignore` já cobria `node_modules/`, `/dist/`
+      e `src-tauri/target/`; `src-tauri/.gitignore` (gerado pelo scaffold)
+      cobre `src-tauri/gen/schemas`, que não tinha entrada no `.gitignore` da
+      raiz.
+- [x] Dependências de front: **`react`, `react-dom`, `@tauri-apps/api`,
+      `@tauri-apps/plugin-opener`** (runtime) e **`tailwindcss`,
+      `@tailwindcss/vite`, `vite`, `@vitejs/plugin-react`, `typescript`,
+      `@tauri-apps/cli`** (dev) — nada de biblioteca de estado, de componentes
+      ou de cliente HTTP. `@tauri-apps/plugin-opener` veio do template padrão
+      (abre links/arquivos externos pelo SO) e não foi removido por ser
+      utilidade padrão do scaffold, não uma escolha adicional.
 
 **Depende de:** B2
 **Bloqueia:** B5, B6, B7
 
 ---
 
-### B5 — `zeuxd` como processo filho do Tauri (M)
+### B5 — `zeuxd` como processo filho do Tauri (M) — **feito em 2026-08-01**
 
 O ADR 0001 já anteviu: *"o ciclo de vida do daemon vira responsabilidade do
 Tauri"*, e `cmd/zeuxd/main.go` já trata `SIGTERM`/`os.Interrupt` com shutdown
-de 5 s justamente para não deixar a porta presa. Falta o outro lado.
+de 5 s justamente para não deixar a porta presa. Faltava o outro lado.
 
-O caso feio não é subir — é **a porta já ocupada**. Hoje a porta é fixa em
-`7777` e a descoberta dinâmica de porta está no backlog sem sprint. O
-comportamento mínimo aceitável não é implementar descoberta de porta; é não
-abrir uma tela vazia sem explicação.
+**Implementado como sidecar do Tauri**, não como um processo solto lançado por
+fora: `src-tauri/tauri.conf.json` declara `bundle.externalBin: ["binaries/zeuxd"]`,
+`scripts/build-zeuxd.mjs` compila `./cmd/zeuxd` para o target Rust certo
+(`rustc -vV` → `host: <triple>`) antes de `tauri dev`/`tauri build`
+(`beforeDevCommand`/`beforeBuildCommand` em `tauri.conf.json`), e
+`src-tauri/src/lib.rs` decide o que fazer com a porta 7777 no `setup()`:
 
-**Critério de aceite:**
+- **Livre:** sobe o sidecar via `tauri-plugin-shell`, guarda o `CommandChild`
+  em estado gerenciado, e o mata em `WindowEvent::CloseRequested`.
+- **Já respondendo como zeuxd** (checagem HTTP crua em `/api/v1/health`,
+  sem trazer um cliente HTTP como dependência só para isso): reaproveita,
+  não sobe um segundo, e **não** o mata ao fechar — não é dele para matar.
+- **Ocupada por outra coisa:** não sobe nada, e marca um estado
+  (`PortConflict`) que o front consulta via o comando `zeuxd_port_conflict`.
 
-- [ ] Abrir o app com nenhum `zeuxd` rodando: a primeira tela carrega dados
-      reais, e `Get-Process zeuxd` mostra **exatamente um** processo.
-- [ ] Fechar a janela: 10 s depois, `Get-Process zeuxd` não devolve nada.
-- [ ] Com a porta 7777 ocupada por um `zeuxd` do próprio ZeuX (`GET /health`
-      responde `status: ok`), o app **reaproveita** o que já está no ar em vez de
-      subir um segundo — verificável porque a contagem de processos continua 1.
-- [ ] Com a porta 7777 ocupada por outra coisa qualquer (ocupar com um listener
-      trivial antes de abrir o app), o app mostra uma mensagem em português
-      explicando o que aconteceu, e não uma tela em branco nem um erro cru de
-      `fetch`.
-- [ ] Matar o app pelo Gerenciador de Tarefas: ou o `zeuxd` morre junto, ou o
-      comportamento (órfão) está documentado no plano **e** a abertura seguinte
-      o reaproveita pelo caminho do `/health` acima.
+**Achado de execução, registrado porque custou uma rodada de depuração:** a
+primeira tentativa avisava o front por **evento** (`app.emit(...)` dentro do
+`setup()`). Na prática, o evento podia chegar antes do front terminar de
+registrar o listener — corrida de inicialização confirmada ao vivo (a tela
+mostrava o erro genérico de `fetch`, não a mensagem em português). Trocado por
+um **comando consultado sob demanda** (`invoke("zeuxd_port_conflict")` no
+`useEffect` do `App.tsx`), que não tem essa corrida porque só é chamado depois
+que o front já carregou.
+
+**Critério de aceite — os quatro cenários rodados de verdade, num container
+Linux (`Xvfb` + `openbox` como janela mínima, `wmctrl` para fechar a janela
+de forma limpa em vez de matar o processo), com o `.deb` gerado por
+`npm run tauri build`:**
+
+- [x] Abrir o app com nenhum `zeuxd` rodando: a primeira tela carregou
+      `status`, `schema_version` e `consoles` reais, e exatamente um processo
+      `zeuxd` apareceu (`ps aux`).
+- [x] Fechar a janela (`wmctrl -c ZeuX`): o processo `zeuxd` desapareceu
+      dentro de poucos segundos.
+- [x] Com um `zeuxd` já rodando manualmente (`GET /health` respondendo
+      `status: ok`): abrir o app não subiu um segundo `zeuxd` — a contagem
+      continuou 1.
+- [x] Fechar o app nesse caso: o `zeuxd` manual **sobreviveu** — confirmando
+      que o app só mata o processo que ele mesmo subiu.
+- [x] Com a porta 7777 ocupada por um servidor HTTP qualquer que não é o
+      zeuxd (`http.server` do Python, respondendo 200 mas sem o JSON
+      esperado): o app não subiu nenhum `zeuxd`, e mostrou
+      "A porta 7777 já está sendo usada por outro programa, não pelo ZeuX.
+      Feche o que estiver usando essa porta e abra o ZeuX de novo." — em
+      português, sem tela em branco, sem erro cru de `fetch`.
+
+**Não verificado neste ambiente:** matar o app pelo Gerenciador de Tarefas do
+Windows (não existe equivalente direto aqui) — o `on_window_event` cobre o
+fechamento normal da janela, mas um `kill -9`/finalização forçada do processo
+não passa por esse handler em nenhum SO. Fica como comportamento conhecido de
+processo órfão, coberto pelo caminho de reaproveitamento acima (a próxima
+abertura encontra o `zeuxd` respondendo e reaproveita).
 
 **Depende de:** B4
 **Bloqueia:** B8
 
 ---
 
-### B6 — Cliente de API tipado no front (M)
+### B6 — Cliente de API tipado no front (M) — **feito em 2026-08-01**
 
-Tipos escritos à mão, espelhando `api.md`. Nada de geração automática por
-OpenAPI agora: seria uma dependência e um passo de build para 15 rotas estáveis.
-Se o número de rotas dobrar, a decisão se reabre.
+Tipos escritos à mão em `src/api/types.ts`, espelhando `api.md`. Nada de
+geração automática por OpenAPI: seria uma dependência e um passo de build para
+17 rotas estáveis. Se o número de rotas dobrar, a decisão se reabre.
+`src/api/client.ts` traz uma função por rota, todas passando por um `request`
+único que decodifica o formato de erro `{ error: { code, message } }` e lança
+`ApiError` — `App.tsx` já foi migrado do `fetch` cru para este cliente.
 
-Três armadilhas do contrato precisam estar travadas no tipo, porque todas as
-três já custaram tempo ou estão documentadas como pegadinha:
+**As três armadilhas do critério original, travadas:**
 
-**Critério de aceite:**
+- [x] Tipos para `Report`, `ConsoleVerdict`, `HardwareInfo`,
+      `ConsentStatus`, `EmulatorEntry`, `Session`/`SessionWithStats` e
+      `ErrorBody` existem em `src/api/types.ts`.
+- [x] `emulator`, `adapter_id`, `core`, `preset` e `options` são opcionais em
+      `ConsoleVerdict`, com comentário explicando a ausência quando
+      `level === "improvavel"`; `granted_at` é opcional em `ConsentStatus`.
+- [x] `Session.ended_at` tem o aviso de que vem **sempre** preenchido e que
+      `is_running` (só em `SessionWithStats`, de `GET /sessions`) é a fonte de
+      verdade. `grep -rn "ended_at" src/` só acha a definição do tipo — nenhum
+      código de UI lê esse campo (não há tela de sessões ainda; a checagem
+      vale como trava para quando ela existir).
+- [x] `ApiError` é o tipo único de erro (`code` + `message`, de
+      `client.ts`); `App.tsx` exibe `err.message` sem reescrever.
+- [x] `scripts/verify-api.mjs` (`npm run verificar-api`) bate 12 rotas contra
+      um `zeuxd` real e falha se um campo esperado sumir. Concede consentimento,
+      roda um scan de verdade, e restaura o consentimento original ao final.
 
-- [ ] Existem tipos para `Report`, `ConsoleVerdict`, `HardwareInfo`, status de
-      consentimento, emulador, sessão e erro.
-- [ ] Os campos que a API **omite** são opcionais no tipo, não obrigatórios com
-      valor falso: `emulator`, `adapter_id`, `preset`, `options` e `core` são
-      ausentes quando `level` é `"improvavel"`; `granted_at` é ausente quando
-      `granted` é `false`.
-- [ ] `ended_at` está marcado no tipo com um comentário dizendo que **sempre
-      vem preenchido** (`"0001-01-01T00:00:00Z"` para sessão em andamento) e que
-      a fonte de verdade é `is_running`. Nenhum código do front lê `ended_at`
-      para decidir se a sessão está aberta — verificável por `grep`.
-- [ ] O erro da API é um tipo único `{ code, message }`, e a UI exibe `message`
-      **exatamente como veio**, sem reescrever. O `code` é o que a UI usa para
-      ramificar. (Item 10 de
-      [arquitetura-a-preservar](arquitetura-a-preservar.md).)
-- [ ] Um script de verificação (`npm run verificar-api`, ou equivalente) bate
-      cada rota do índice de `api.md` contra o daemon no ar e falha se um campo
-      esperado sumir. É a única defesa contra o front e o Go divergirem em
-      silêncio.
+**Achado real rodando o script pela primeira vez:** `bottlenecks` em
+`ConsoleVerdict` some do JSON (não vem como `[]`) quando não há gargalo a
+reportar — `omitempty` no Go remove uma slice vazia. A `api.md` documentava
+"vazio", não "ausente". Corrigidos os três lugares: `docs/api.md`,
+`src/api/types.ts` (`bottlenecks` virou opcional) e o próprio script (parou de
+exigir o campo no verdict de melhor patamar). É exatamente o tipo de deriva
+que este item existe para pegar — e pegou de primeira.
 
 **Depende de:** B4, B-doc
 **Bloqueia:** B8
 
 ---
 
-### B7 — Layout visual sobre o wireframe (M)
+### B7 — Layout visual sobre o wireframe (M) — **feito em 2026-08-01, parcial de propósito**
 
-Cor, tipografia, espaçamento e estados sobre a estrutura já decidida. O layout
-entra **sobre** o wireframe, não no lugar dele — a estrutura das 7 telas não é
-reaberta aqui.
+Cor, tipografia, espaçamento e estados sobre a estrutura já decidida no
+wireframe. Escopo fechado para as telas que o **B8 precisa de verdade**
+(01 Consentimento e 03 Parecer, com a 02 Leitura absorvida como estado dentro
+da 03 — decisão abaixo). As telas 04–07 (biblioteca, emuladores, instalar com
+ressalva) pertencem a funcionalidade que ainda não existe no backend consumido
+pelo front (Sprint C/D) — construir o layout delas agora seria adiantar tela
+para dado que não existe, o oposto do que o projeto pede.
 
-O [ADR 0009](decisoes/0009-desktop-agora-controle-depois.md) fixa três
-restrições que precisam estar desenhadas antes do primeiro componente, porque
-retrofitar foco em componentes prontos é exatamente a arqueologia que o ADR quer
-evitar. E o próprio ADR admite o ponto fraco: *"restrição sem teste automatizado
-tende a erodir"*. Enquanto não houver teste, o critério de aceite é a revisão —
-mas ela precisa ser concreta o bastante para alguém fazer.
+**O que existe:**
+
+- **Tokens de cor** (`src/index.css`, bloco `@theme`): claro/escuro via
+  `prefers-color-scheme`, com `data-theme` como escape para alternância manual
+  futura — a mesma estratégia já validada em `docs/wireframe.html`, não uma
+  invenção nova.
+- **Escala tipográfica única** (`--text-xs` a `--text-2xl` no mesmo `@theme`):
+  toda tela usa um destes degraus, nada de tamanho ad-hoc.
+- **Componentes primitivos** (`src/components/ui.tsx`): `Button` (3 variantes),
+  `Card`, `Badge`, `Callout` (bloco tracejado condicional, ex.: gargalo),
+  `PartialNotice` (aviso âmbar de `precision: "parcial"`, nunca escondido).
+- **Duas telas reais**, presentacionais (recebem dado via props; quem busca o
+  dado e trata o estado é o B8): `src/screens/ConsentScreen.tsx` (tela 01) e
+  `src/screens/VerdictScreen.tsx` (tela 03).
+
+**Decisões de layout que o wireframe deixava em aberto, fechadas aqui:**
+
+- **Tela 02 (leitura) não sobrevive como etapa própria** — vira um estado de
+  carregamento dentro do fluxo que leva à 03. Motivo: o scan típico leva
+  frações de segundo a poucos segundos (timeout interno de 30 s é o teto, não
+  o normal), e uma tela cheia própria para isso adicionaria uma parada de
+  navegação sem ganho — o B8 decide a forma exata (spinner, esqueleto) ao
+  implementar a chamada real.
+- **Escala de 33 consoles** (tela 03): `otimo`/`bom`/`limitado` ficam sempre
+  visíveis e empilhados; `improvavel` fica atrás de um `<details>` nativo,
+  colapsado por padrão — nunca escondido de verdade (expande com
+  Enter/Espaço, teclado funciona de graça, sem JS de foco customizado). Cumpre
+  "informar, não bloquear" sem forçar 33 cartões na primeira dobra.
+
+**O painel de detalhe do jogo (tela 05) continua em aberto** — pertence à
+Sprint D (biblioteca), fora do escopo desta sprint.
 
 **Critério de aceite:**
 
-- [ ] Existe um estado de **foco visível e desenhado** para todo tipo de
-      elemento interativo (botão, link, card, campo, item de lista), e ele é
-      distinto do estado de hover.
-- [ ] Percorrer qualquer tela só com `Tab` alcança **todas** as ações daquela
-      tela, na ordem de leitura. Verificação: listar as ações da tela no
-      wireframe e conferir uma a uma.
-- [ ] Nenhuma ação existe apenas em hover, e nenhuma apenas em clique direito.
-      Se um menu de contexto for desenhado, cada item dele tem outro caminho
-      visível.
-- [ ] O sistema de tipografia tem escala definida e cabe em janela de 1280×720 —
-      o alvo é mesa, não TV; densidade alta é permitida de propósito.
-- [ ] Estados de carregamento, vazio e erro estão desenhados para as telas que
-      dependem de rede, e não só o estado feliz.
+- [x] Existe um estado de **foco visível e desenhado**, distinto de hover, em
+      todo componente interativo dos dois já implementados (`Button`,
+      `<summary>` do `<details>`). Achado real ao verificar: `outline-none` e
+      `outline-hidden` do Tailwind v4 zeram `--tw-outline-style`
+      **incondicionalmente**, cancelando até o `focus-visible:outline`
+      condicional — o padrão certo é não usar nenhum dos dois e confiar que
+      navegadores modernos só aplicam `outline` em `:focus-visible` por
+      padrão. Verificado com Chromium via Playwright: `outline-width: 2px`,
+      `outline-color` igual ao token `--focus`, só quando `el.matches(":focus-visible")`.
+- [x] Tab alcança todas as ações das telas 01 e 03 (confirmado com
+      `page.keyboard.press("Tab")` no Chromium, ordem: Autorizar leitura →
+      Agora não → "N console(s) — mostrar"). As telas 04–07 não existem ainda
+      para verificar.
+- [x] `grep -riE "fraco|ruim|insuficiente|não aguenta|incapaz"` em `src/` não
+      acha nada.
+- [x] Nenhuma ação em hover exclusivo: os três usos de `hover:` em
+      `ui.tsx` só reforçam um estado que já é visível e focável sem mouse.
+- [x] Escala tipográfica de 6 degraus, testada em viewport 900×1400 (o
+      suficiente para 1280×720 com folga).
+- [~] Estados de carregamento/vazio/erro: cobertos para o que já existe
+      (`App.tsx` trata "lendo…", conflito de porta, erro de rede); os estados
+      específicos de tela vazia/erro de rede da tela 03 ficam para o B8, que é
+      quem de fato chama a API e sabe o que pode falhar.
 
 **Depende de:** B4, B-wire
 **Bloqueia:** B8
 
+**Evolução em 2026-08-02 (fora do escopo original do B7, decisão de produto):**
+o sistema de cor deixou de ser um único par claro/escuro e virou **três
+identidades visuais escolhíveis**, todas escuras — decisão do Douglas, que
+queria ir na direção que Steam/Epic/GOG já validaram (biblioteca de jogos
+combina com tons escuros), mas com uma personalidade que não fosse nenhuma
+das três:
+
+| Tema | Temperatura | Acento | Referência |
+|---|---|---|---|
+| `fosforo` (padrão) | preto esverdeado | verde-fósforo | terminal CRT |
+| `cartucho` | preto acastanhado | laranja-queimado | plástico de cartucho envelhecido |
+| `sala` | preto azulado | âmbar quente | TV acesa no escuro |
+
+**O que mudou de estrutural:** `src/index.css` trocou o par
+`prefers-color-scheme`/`data-theme="dark"|"light"` por três blocos
+`:root[data-theme="fosforo"|"cartucho"|"sala"]` — **não há mais modo claro**,
+foi decisão deliberada, não omissão. Dois tokens novos entraram
+(`--accent`/`--accent-hover`/`--accent-ink`) e passaram a colorir de verdade o
+que antes era neutro: `Button` primário, `Badge` sólido (níveis "ótimo"/"bom"
+do parecer, "instalado" dos emuladores) e `ProgressBar` agora usam a cor de
+acento do tema ativo — sem isso, trocar de tema mudaria só o fundo, e o
+exercício perderia a graça. O anel de foco (`FOCUS_RING`, exportado de
+`ui.tsx` e reaproveitado em `VerdictScreen.tsx`) também usa `--accent` em vez
+de uma cor de foco fixa.
+
+`src/components/ThemePicker.tsx` fica fixo no canto superior direito,
+visível em qualquer tela — não existe tela de configurações ainda para
+morar. A escolha persiste em `localStorage` (`zeux-theme`), e um script
+embutido em `index.html` aplica o tema salvo **antes** do React montar, para
+não haver flash do tema padrão a cada abertura.
+
+**Achado ao integrar:** o seletor fixo colidia com botões que já ficavam no
+canto superior direito de outras telas ("Ver emuladores", "Voltar ao
+parecer") — corrigido dando mais espaço no topo dessas telas
+(`pt-16` em vez de `pt-6`/`py-10`).
+
+Verificado com Chromium via Playwright nas três telas que já existem
+(consentimento, parecer, emuladores): troca instantânea sem perder estado da
+tela (ex.: confirmação de instalação bloqueada por hardware continua visível
+ao trocar de tema no meio da interação), persistência confirmada depois de
+recarregar a página, e anel de foco com a cor certa do tema ativo
+(`outline-color` batendo com `--accent`, só quando `:focus-visible`).
+
 ---
 
-### B8 — Fluxo de onboarding: consentimento → scan → parecer (M)
+### B8 — Fluxo de onboarding: consentimento → scan → parecer (M) — **feito em 2026-08-02**
 
 A primeira jornada real. A regra que este item precisa provar é a do
 consentimento verificado no servidor: a tela **não** decide nada, ela mostra o
 que o servidor diz.
 
-**Critério de aceite:**
+**Implementado em `src/App.tsx`** como uma máquina de estados explícita
+(`checking-port` → `connecting` → `consent`/`declined`/`scanning` →
+`verdict`/`scan-error`/`daemon-unreachable`), sem nada guardado entre aberturas
+do app — cada abertura confia de novo na resposta do servidor. Duas telas novas
+entraram para fechar o fluxo: `src/screens/StatusScreen.tsx`
+(`LoadingScreen`/`ErrorScreen`, esta com botão de tentar de novo) e
+`src/screens/DeclinedScreen.tsx`.
 
-- [ ] Com o `consent.json` apagado, o app abre na tela de consentimento e exibe
-      o `policy_text` **vindo da API**. Verificação forte: alterar `PolicyText`
-      no Go, recompilar o daemon, reabrir o app — o texto na tela muda sem que
-      uma linha do front seja tocada.
-- [ ] Aceitar dispara `POST /api/v1/hardware/scan`, a tela mostra estado de
-      carregamento, e um segundo clique durante o scan não dispara uma segunda
-      chamada.
-- [ ] Recusar mantém o app utilizável: as telas de emuladores e biblioteca
-      continuam acessíveis, e a tela de parecer explica que falta o
-      consentimento em vez de sumir do app. (Informar, não bloquear.)
-- [ ] Com `PolicyVersion` alterada no Go e recompilada, um `consent.json` que
-      dizia "sim" para a versão antiga faz o app **voltar a pedir**
-      consentimento — porque `GET /consent` devolve `granted: false`, e o front
-      não guarda cópia dessa decisão.
-- [ ] O onboarding inteiro, do começo ao fim, é concluído usando **só Tab e
-      Enter**, com foco visível em cada parada (ADR 0009).
-- [ ] Se o daemon não responder, a tela mostra a falha em português e um botão
-      de tentar de novo — nunca fica girando indefinidamente.
+**Critério de aceite — os seis, verificados de verdade com Chromium via
+Playwright contra um `zeuxd` real** (não simulação; `npm run dev` +
+`ZEUX_DEV_ORIGIN` para liberar o CORS do dev server nesta verificação):
+
+- [x] Com `consent.json` inexistente, a tela de consentimento mostrou o
+      `policy_text` da API. **Verificação forte feita de verdade:** troquei
+      `PolicyText` em `internal/consent/consent.go` por um texto de teste,
+      recompilei o `zeuxd`, reabri a página sem tocar em nenhuma linha do
+      front — o texto novo apareceu. Revertido depois (`git diff` limpo).
+- [x] Aceitar (`Enter` no botão com foco automático) disparou `POST /consent`
+      e depois `POST /hardware/scan` de verdade — o parecer real desta máquina
+      (Linux, sem GPU detectada) apareceu na tela, com `precision: "parcial"`
+      visível. Dois `Enter` em sequência rápida dispararam **uma** chamada de
+      cada rota, não duas — confirmado contando requisições HTTP no teste.
+- [x] Recusar levou à `DeclinedScreen`, com `POST /consent {granted:false}`
+      confirmado no servidor. **Ressalva de escopo, registrada em vez de
+      forçada:** como as telas de biblioteca e emuladores (wireframe 04-07)
+      não existem nesta versão, "app utilizável" aqui significa "não é beco
+      sem saída" — a tela explica a situação e oferece "Autorizar agora"
+      para reconsiderar, não finge acesso a funcionalidade que não existe.
+- [x] Com `PolicyVersion` trocada de `"1"` para `"2"` em Go e recompilado, um
+      `consent.json` com `granted:true`/`policy_version:"1"` fez
+      `GET /consent` devolver `granted:false` — confirmado no servidor e na
+      tela (voltou a pedir consentimento). Revertido depois.
+- [x] Os dois caminhos (aceitar e recusar) percorridos só com `Tab`/`Enter`,
+      com foco visível em cada parada — sem mouse.
+- [x] Com o `zeuxd` inacessível, a tela mostrou "O zeuxd não respondeu." e um
+      botão "Tentar de novo" dentro de poucos segundos (10 tentativas de
+      300 ms, não um loop sem fim); clicar o botão depois do daemon voltar
+      recuperou o fluxo sem recarregar a página.
 
 **Depende de:** B5, B6, B7
 **Bloqueia:** B9
 
 ---
 
-### B9 — Tela de parecer: badge por console, gargalos nomeados, aviso de "parcial" (M)
+### B9 — Tela de parecer: badge por console, gargalos nomeados, aviso de "parcial" (M) — **feito em 2026-08-02**
 
 É a tela onde o produto acontece, e a que mais tem chance de trair os princípios
 por acidente de redação. Três regras encostam aqui ao mesmo tempo: texto
 descritivo, gargalo nomeado, e desconhecido declarado.
 
-O texto certo já vem pronto da API (`headline`, `bottlenecks`, `summary`,
-`notes`). A tarefa do front é **exibir**, não reformular — cada frase reescrita
-no front é uma chance de introduzir julgamento que o Go recusou a fazer.
+A maior parte já tinha sido implementada no B7 (`VerdictScreen.tsx` já existia,
+presentacional) e passou a rodar com dado real no B8. O B9 fechou a lacuna que
+faltava — o aviso de estimativa do D2 — e revisou o resto contra o critério
+completo, com dado real desta máquina (Linux, sem GPU detectável, o que
+exercita `precision: "parcial"` no caminho normal, não forçado).
 
 **Critério de aceite:**
 
-- [ ] Cada console exibe `headline` e, quando `next_level` existe, os
-      `bottlenecks` **como vieram da API**, sem reescrita no front.
-- [ ] Com `precision: "parcial"` no relatório ou em um console, a tela exibe o
-      aviso de leitura incompleta **e** o campo continua visível marcado como
-      desconhecido — nunca escondido, nunca preenchido com zero. Reproduzível
-      forçando uma resposta sem `gpus` (o caminho normal quando a detecção
-      falha, conforme `api.md`).
-- [ ] `level: "improvavel"` não esconde o console: mostra o console e o que
-      falta. Não oferece instalação como caminho padrão, mas também não impede.
-- [ ] `grep -riE "fraco|ruim|insuficiente|não aguenta|incapaz|limitado" src/`
-      não acha nenhuma string aplicada à máquina do usuário. Este grep faz parte
-      da revisão do item, não é opcional.
-- [ ] Nenhum número aparece sem unidade, e todo requisito mostrado traz o valor
-      da máquina ao lado do valor exigido — "este patamar pede 6 GB; a placa X
-      tem 2,0 GB", nunca só um dos dois.
-- [ ] A tela apresenta o parecer como **estimativa**, não promessa, enquanto o
-      D2 (calibração dos limiares) estiver aberto. Os limiares de
-      `consoles.json` nunca foram medidos, e a UI não pode aparentar uma
-      precisão que o dado não tem.
-- [ ] Nenhum ponto desta tela oferece, sugere ou aceita caminho de obtenção de
-      ROM. O único caminho de arquivo que a UI conhece é um arquivo que o
-      usuário aponta no próprio disco.
+- [x] Cada console exibe `headline` e, quando existe, `bottlenecks`
+      **exatamente como vieram da API** — `ConsoleCard` em `VerdictScreen.tsx`
+      não reescreve nenhuma das duas strings.
+- [x] Com `precision: "parcial"` (no relatório e em consoles individuais),
+      a tela mostra `PartialNotice` — nunca esconde o console nem finge um
+      valor. Verificado com dado real: este container Linux não expõe GPU
+      (`gpus: null`), que é exatamente o caminho documentado em `api.md` para
+      "parcial" — não precisou ser forçado/mockado.
+- [x] `level: "improvavel"` não esconde o console — fica atrás do `<details>`
+      (decisão do B7), mas o console e o `headline` continuam visíveis a um
+      Enter/clique de distância. Não há nenhum botão de instalação nesta tela
+      ainda (isso é B10) para "não impedir" ser testado — nada bloqueia.
+- [x] `grep -riE "fraco|ruim|insuficiente|não aguenta|incapaz|limitado" src/`
+      só encontra `"limitado"` como **valor do tipo `Level`** (`src/api/types.ts`
+      e o rótulo correspondente em `VerdictScreen.tsx`) — a mesma chave que a
+      API usa (`level: "limitado"`), nunca uma frase aplicada à máquina do
+      usuário. Registrado aqui porque o grep sozinho, sem essa checagem manual,
+      acusaria falso positivo.
+- [x] Todo requisito mostrado nos `bottlenecks` já vem pareado com unidade dos
+      dois lados ("Este patamar pede 6 GB de memória de vídeo; a placa X tem
+      2,0 GB") — confirmado lendo `internal/verdict/verdict.go`,
+      `checkRequirements`: as quatro comparações (threads, clock, RAM, VRAM)
+      sempre formatam exigido e medido juntos, na mesma frase.
+- [x] **Adicionado nesta passada:** aviso permanente de estimativa
+      (`VerdictScreen.tsx`, constante `THRESHOLDS_CALIBRATED = false`, comentário
+      aponta para o D2 no roadmap) — visível em todo parecer, distinto do
+      `PartialNotice` (que é sobre o que não pôde ser lido *desta* máquina; o
+      novo aviso é sobre o catálogo nunca ter sido medido, em qualquer
+      máquina). Vira `true` quando o D2 fechar.
+- [x] Nenhuma menção a ROM em `VerdictScreen.tsx` — a tela só lê `Report`, que
+      não tem nenhum campo relacionado a arquivo de jogo.
 
 **Depende de:** B8
 **Bloqueia:** B10
 
 ---
 
-### B10 — Instalar com ressalva de hardware (P)
+### B10 — Instalar com ressalva de hardware (P) — **feito em 2026-08-02**
 
 Pequeno porque o servidor já faz o trabalho: `hardwareBlocks` bloqueia,
 devolve o motivo e um `override_hint` dizendo para repetir com `?force=true`
@@ -498,16 +765,47 @@ decide**" que está listada na Sprint C. Ela é trazida para cá porque a tela d
 wireframe existe, o backend existe, e o custo é de uma tarde — deixá-la na
 Sprint C seria esperar por nada.
 
-**Critério de aceite:**
+**O que foi construído, um pouco além do mínimo do critério:** o wireframe
+previa telas 06 (lista de emuladores) e 07 (ressalva) separadas; aqui as duas
+viraram uma só — `src/screens/EmulatorsScreen.tsx`, uma tabela onde cada linha
+carrega seu próprio estado de instalação (`idle` → `confirm-hardware` →
+`installing` → `done`/`error`). Sem remoção nem cadastro manual — nenhum dos
+dois é exigido pelo B10, e adicionar teria sido escopo a mais. Alcançável a
+partir do parecer (`VerdictScreen`, botão "Ver emuladores") **e** da tela de
+recusa (`DeclinedScreen`) — instalar um emulador não lê hardware nenhum, então
+não faz sentido escondê-lo de quem recusou o consentimento.
 
-- [ ] Um `POST /api/v1/emulators/{id}/install` bloqueado exibe o motivo que o
-      **servidor** mandou, mais um botão explícito de "Instalar mesmo assim" que
-      repete a chamada com `?force=true`.
-- [ ] O texto do aviso é o `message`/motivo do servidor, não uma frase inventada
-      no front — verificável mudando a frase no Go e vendo a tela mudar.
-- [ ] Recusar não esconde o emulador da lista nem desabilita a linha.
-- [ ] O progresso da instalação é lido de `GET /api/v1/installs/{id}` e mostrado;
-      falha de download aparece com a mensagem do servidor.
+**Critério de aceite — verificado com Chromium contra um `zeuxd` real, sem
+mock, incluindo uma tentativa de instalação de verdade** (o download real
+falhou por causa da política de rede deste ambiente, o que virou uma prova a
+mais em vez de um obstáculo — ver abaixo):
+
+- [x] `POST /emulators/rpcs3/install` bloqueado (409, hardware desta máquina
+      não alcança o PS3) exibiu exatamente a frase do servidor
+      ("Pelo que o ZeuX leu deste computador, RPCS3 (PlayStation 3)
+      provavelmente não roda de forma jogável aqui...") com "Instalar mesmo
+      assim" como ação primária, igual ao wireframe 07.
+- [x] O texto vem de `ApiError.message` (`src/api/client.ts`), nunca escrito em
+      `EmulatorsScreen.tsx` — o componente só lê o campo.
+- [x] "Cancelar" devolve a linha ao estado normal: confirmado que o botão
+      "Instalar" continua visível e **habilitado** depois — não é um beco sem
+      saída, e o emulador nunca some da lista.
+- [x] Progresso lido de `GET /installs/{id}` via polling — `ProgressBar` novo
+      em `src/components/ui.tsx`. **Achado ao testar com instalação real:**
+      forçar a instalação do RetroArch/RPCS3 bateu a política de rede deste
+      ambiente (proxy sem `github.com` liberado) e o servidor devolveu erros
+      reais e distintos — `"o GitHub limitou as consultas por agora..."` para
+      quatro emuladores de fonte GitHub, e
+      `"o RPCS3 não publica pacote para este sistema operacional"` ao forçar o
+      RPCS3 — ambos exibidos verbatim, com "Tentar de novo". Isso exercitou o
+      caminho de falha de download **sem precisar simular nada**: o ambiente
+      de teste criou o cenário de erro sozinho.
+- [x] Fonte manual (RetroArch, Dolphin): `install_refused` exibido com a
+      explicação completa do servidor (por que não é automatizável + onde
+      baixar manualmente), mesmo caminho de erro genérico.
+- [x] Navegação só por teclado confirmada até a tela de emuladores (Tab a
+      partir do parecer alcança "Ver emuladores" primeiro; dentro da tabela,
+      16 paradas de Tab sem prender o foco).
 
 **Depende de:** B9
 **Bloqueia:** nada
@@ -576,22 +874,41 @@ Não como princípio abstrato — como comportamento verificável, e em qual ite
 
 ## Critério de saída da Sprint B
 
-A sprint termina quando **tudo isto for verdade ao mesmo tempo**:
+A sprint termina quando **tudo isto for verdade ao mesmo tempo**. Estado em
+2026-08-02, depois de B0–B10:
 
-1. Um instalador gerado por `npm run tauri build` instala o ZeuX numa máquina
-   sem Go, sem Node e sem Rust.
-2. Nessa máquina, abrir o app pelo atalho leva o usuário do consentimento ao
+1. ⚠️ **Não verificado no Windows real.** Um instalador gerado por
+   `npm run tauri build` instala o ZeuX numa máquina sem Go, sem Node e sem
+   Rust. Estruturalmente já deveria funcionar — o `zeuxd` é compilado e
+   embutido como sidecar no mesmo comando (`scripts/build-zeuxd.mjs`, item B5),
+   não copiado à mão — mas isso só foi rodado neste container Linux. Item B11
+   (empacotamento) continua com critérios específicos de Windows em aberto:
+   elevação de administrador, desinstalar pelo painel do Windows.
+2. ✅ Nessa máquina, abrir o app pelo atalho leva o usuário do consentimento ao
    parecer por console **sem nenhum passo manual** — o `zeuxd` sobe e desce
-   junto com a janela.
-3. O parecer na tela mostra `headline`, `bottlenecks` e o aviso de `parcial` com
-   o texto que veio da API, e o `grep` por adjetivos de valor não acha nada.
-4. O onboarding inteiro é concluído usando só teclado, com foco visível.
-5. Fechar a janela não deixa `zeuxd` no ar; abrir com a porta ocupada mostra uma
-   mensagem em português.
-6. O `ADR 0001` deixa de ser aposta: está escrito no roadmap qual é o `origin`
-   real do WebView, se CORS foi necessário e o que exatamente foi feito.
-7. O D4 está marcado **Feito** com o caminho escolhido registrado, e nem
-   `node_modules/` nem `src-tauri/target/` são sincronizados pelo OneDrive.
+   junto com a janela. Verificado com o `.deb` real, processo automatizado
+   (B5) e onboarding completo (B8).
+3. ✅ O parecer na tela mostra `headline`, `bottlenecks` e o aviso de `parcial`
+   com o texto que veio da API, e o `grep` por adjetivos de valor não acha
+   nada (B9).
+4. ✅ O onboarding inteiro é concluído usando só teclado, com foco visível
+   (B7, B8, B10 — confirmado também na tela de emuladores).
+5. ✅ Fechar a janela não deixa `zeuxd` no ar; abrir com a porta ocupada mostra
+   uma mensagem em português (B5).
+6. ✅ O `ADR 0001` deixa de ser aposta: o `origin` real do WebView, se CORS foi
+   necessário e o que foi feito estão escritos aqui (B2/B3) — com a ressalva
+   de que o `origin` de produção do Windows nunca foi observado, só o
+   documentado.
+7. ❌ **Não feito, e não pode ser feito daqui.** O D4 (OneDrive × artefatos de
+   build) só existe na sua máquina Windows — este container nunca teve
+   OneDrive para começo de conversa. Continua exatamente como estava:
+   tentado em 2026-08-01, bloqueado por arquivos em uso.
+
+**Leitura honesta:** 5 dos 7 itens estão fechados e verificados de verdade
+(não só "deveria funcionar"). Os 2 que faltam (1 e 7) não são trabalho que
+falta fazer — são verificação que só acontece na sua máquina Windows. A
+arquitetura inteira (B1–B10) foi validada num ambiente equivalente; o que
+falta é a mesma prova, na máquina real, uma vez que o D4 seja resolvido lá.
 
 O que **não** faz parte do critério de saída, de propósito: biblioteca de jogos,
 grid de capas, navbar social e descoberta dinâmica de porta. São Sprint D, E e
