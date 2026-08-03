@@ -60,7 +60,7 @@ contrário e estava desatualizada.
 
 ---
 
-## Quantas faltam (contado em 2026-08-03, L1 fechado no mesmo dia)
+## Quantas faltam (contado em 2026-08-03: L1, L2 e L10 fechados; L4 fundido no L3)
 
 Itens **abertos**, contados uma vez cada — D4 aparece como B0 na Sprint B e D11
 como critério de saída da Sprint A, mas cada um conta uma vez só.
@@ -71,12 +71,12 @@ como critério de saída da Sprint A, mas cada um conta uma vez só.
 | Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
 | Sprint B | **1** | B11 (o B0 é o D4, já contado) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **8** | L3–L9, L11 (L1, L2 e L10 fechados em 2026-08-03) |
+| Sprint D (MVP) | **7** | L3, L5, L6, L7, L8, L9, L11 |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **6** | — |
-| **Total do MVP e da dívida** | **16** | dívida + A + B + C + D |
-| **Total geral** | **34** | tudo acima |
+| **Total do MVP e da dívida** | **15** | dívida + A + B + C + D |
+| **Total geral** | **33** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -643,7 +643,7 @@ honesta.
 arquivos que já estão no disco do usuário. O banco guarda **caminho**, nunca
 conteúdo. O ZeuX nunca copia, distribui, sugere fonte ou facilita transferência
 de ROM — nem de BIOS, que tem o mesmo risco legal. Isso vale como critério de
-aceite em L1, L2 e L4, não como aviso de rodapé.
+aceite em L1, L2 e L3, não como aviso de rodapé.
 
 ### L1 — Tabelas e repositório da biblioteca (M) — **feito em 2026-08-03**
 
@@ -720,43 +720,33 @@ abaixo, que passa a apontar para cá em vez de ser trabalho novo.
 
 **Depende de:** L1 (feito) · **Bloqueia:** L5, L6, L7
 
-### L3 — Catálogo de qual BIOS cada console exige (P)
+### L3 — Aviso genérico de dependência externa faltando (P) — **simplificado em 2026-08-03**
 
-Dado puro, separado da verificação (L4) porque é o pedaço que dá para escrever e
-travar com teste sem tocar em disco nenhum. Hoje **não existe menção a BIOS em
-lugar nenhum do código** — `grep -ci bios internal/verdict/data/consoles.json`
-devolve `0`.
+**Decisão do Douglas:** descartar o catálogo de BIOS por nome de arquivo (a
+versão anterior deste item, que exigia pesquisar e citar fonte para cada
+console — mesmo rigor do D8). Em vez disso, o aviso é **genérico**: alguns
+consoles são conhecidos por exigir arquivo extra (BIOS, plugin, firmware —
+o que for) que o ZeuX não fornece nem verifica. Isso vale para BIOS hoje e
+para qualquer outra dependência externa que aparecer depois (plugin de
+codec, firmware de controle), sem precisar de um item novo por categoria.
 
-**Critério de aceite:**
-- [ ] Para cada console que exige BIOS (PS1, PS2, Dreamcast, Wii U e os que a
-      pesquisa apontar), o catálogo declara o nome de arquivo esperado e um jeito
-      de validar (tamanho e/ou hash).
-- [ ] Console que **não** exige BIOS declara isso explicitamente, em vez de
-      omitir — ausência de campo não pode ser confundida com "não pesquisado".
-- [ ] **Nenhum campo aponta para fonte de download.** `grep -i "http" ` no bloco
-      de BIOS volta vazio, e existe um teste que trava isso.
-- [ ] Os valores vieram de fonte citada (documentação do emulador), e a fonte
-      fica escrita ao lado — mesmo rigor do D8, não analogia.
-
-**Depende de:** nada · **Bloqueia:** L4
-
-### L4 — Verificar BIOS presente e declarar o que falta (M)
-
-A regra 3 do produto ("nomeie o componente que barra") aplicada fora do parecer:
-o jogo aparece desabilitado dizendo **qual arquivo** falta, nunca "indisponível".
+Isto troca **verificação por arquivo** (que exigiria saber o nome exato e
+validar tamanho/hash — trabalho do L4 antigo, agora removido) por uma
+**etiqueta por console**, decidida uma vez, sem manutenção contínua.
 
 **Critério de aceite:**
-- [ ] O usuário consegue apontar onde seus arquivos de BIOS estão, e isso é
-      persistido.
-- [ ] Para um console que exige BIOS e não tem o arquivo, o estado devolvido
-      nomeia o arquivo que falta e o console — não um booleano opaco.
-- [ ] Arquivo presente mas com tamanho/hash diferente do esperado é reportado
-      como **inválido**, distinto de ausente. Fingir que está tudo certo é o
-      mesmo pecado da regra 4.
-- [ ] Nenhum texto sugere onde obter o arquivo, nem em mensagem de erro.
-- [ ] BIOS ausente **não bloqueia** o app — informa (regra 5).
+- [ ] O catálogo marca, por console, se ele é conhecido por exigir arquivo
+      externo — um booleano ou nota curta, não uma lista de arquivos.
+- [ ] O aviso exibido é genérico: nomeia a **categoria** (ex.: "este console
+      costuma precisar de BIOS"), nunca um nome de arquivo específico, nunca
+      "está faltando o arquivo X".
+- [ ] Nenhum texto sugere onde obter o arquivo — nem em mensagem de erro, nem
+      genérico, nem específico.
+- [ ] A marca **não bloqueia** o app — informa (regra 5), do mesmo jeito que o
+      parecer de hardware.
 
-**Depende de:** L3 · **Bloqueia:** L9
+**Depende de:** nada · **Bloqueia:** L9 (~~L4~~ removido — sem verificação de
+arquivo, não há o que essa etapa faria)
 
 ### L5 — Rotas HTTP da biblioteca (M)
 
@@ -831,18 +821,24 @@ pronta.
 
 **Depende de:** L7 · **Bloqueia:** nada
 
-### L9 — Aviso de BIOS na biblioteca (P)
+### L9 — Aviso de dependência externa na biblioteca (P) — **critério simplificado em 2026-08-03**
 
-A tela "BIOS necessário" do wireframe: o jogo é listado, mas desabilitado, e o
-aviso nomeia a peça que falta.
+A tela "BIOS necessário" do wireframe, ajustada à decisão do L3: o aviso é
+genérico (categoria, não arquivo específico), então esta tela também não
+tenta apontar um arquivo exato — só avisar e deixar o jogo jogável do mesmo
+jeito.
 
 **Critério de aceite:**
-- [ ] Console com BIOS ausente lista os jogos **desabilitados**, não escondidos.
-- [ ] O aviso nomeia o arquivo exato que falta e onde o ZeuX o procurou.
-- [ ] BIOS inválido (L4) tem texto diferente de BIOS ausente.
+- [ ] Console marcado como "costuma exigir arquivo externo" (L3) mostra um
+      aviso genérico ao lado dos jogos daquele console — categoria, não nome
+      de arquivo.
+- [ ] O jogo continua **jogável normalmente**: o aviso é informativo, não um
+      bloqueio nem um estado desabilitado — se o usuário já resolveu isso do
+      lado do emulador, o ZeuX não tem como saber, e não deveria fingir que
+      sabe.
 - [ ] Nenhuma sugestão de onde obter o arquivo.
 
-**Depende de:** L4, L7 · **Bloqueia:** nada
+**Depende de:** L3, L7 · **Bloqueia:** nada
 
 ### L10 — Título a partir do nome do arquivo (P) — **feito em 2026-08-03, junto do L2**
 
@@ -958,7 +954,7 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | Autenticação da API local | M | Necessário se algo além do Tauri falar com ela |
 | Descoberta dinâmica de porta | P | Evita colisão em `7777` |
 | CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual — ~~build do instalador Windows~~ **feito 2026-08-02**, ver abaixo |
-| ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho de L3 + L4, na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
+| ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
 
 **Build do instalador Windows via GitHub Actions (2026-08-02):**
