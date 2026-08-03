@@ -768,7 +768,7 @@ curl -X POST http://127.0.0.1:7777/api/v1/games/launch \
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `id` | string | Sequencial dentro da execução do daemon: `s1`, `s2`, ... Reinicia do zero quando o daemon reinicia. |
+| `id` | string | `s1`, `s2`, ... — persistido no banco local desde o [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md); **não reinicia do zero** quando o daemon reinicia, continua de onde parou. |
 | `started_at` | string | RFC 3339, UTC. |
 | `ended_at` | string | ⚠️ **Sempre presente.** O `omitempty` da tag não funciona em `time.Time`, então uma sessão em andamento traz `"0001-01-01T00:00:00Z"`. Para saber se está rodando, use `is_running` de `GET /sessions` ou compare com o zero value. |
 | `exit_error` | string | Ausente enquanto o jogo roda. Depois, descreve saída anormal. **Código de saída diferente de zero é comum** quando o usuário fecha pela janela — é informativo, não necessariamente falha. |
