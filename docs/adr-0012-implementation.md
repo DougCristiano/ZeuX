@@ -36,24 +36,50 @@ irá popular este diretório durante `npm run build:daemon`.
 - **Usar `include_bytes!` no Rust:** Embute tudo no binário (cores têm 5-50 MB cada, 20 cores = 200-1000 MB só em cores). Inviável.
 - **Baixar em tempo de execução:** Quebra a promessa de ADR 0012 ("sem rede no primeiro uso").
 
-## Etapa 2: Script de download (PENDENTE)
+## Etapa 2: Script de download (BLOQUEADO — DECISÃO NECESSÁRIA)
 
-Será implementado em `scripts/download-retroarch-cores.mjs`. Responsabilidades:
+### Problema descoberto
 
-1. Ler a lista de 20 cores de `internal/emulator/retroarch.go` (ou usar um manifest JSON fixo)
-2. Para cada core, buscar a release mais recente no GitHub
-3. Download do arquivo binário correspondente à plataforma (SO/DLL/dylib)
-4. Armazenar em `src-tauri/resources/retroarch/cores/`
-5. Calcular SHA-256 para verificação de integridade
-6. Registrar o resultado em um `manifest.json` (versões baixadas, checksums)
+Os cores libretro **não têm releases centralizadas no GitHub**. Cada repositório segue um padrão diferente:
 
-**Integração no build:** adicionar ao `package.json` script `build:daemon`:
+- **mgba, stella:** publicam binários (appimage, dmg, etc), não .so/.dll/.dylib
+- **mesen:** versão 0.9.x é abandonada; 2.x não tem releases
+- **ppsspp (fork libretro):** não tem releases (usar upstream? diferente.)
+- **Fonte oficial:** buildbot.libretro.com (fora do GitHub, com política de rede variável)
 
-```json
-"build:daemon": "npm run download:retroarch-cores && node scripts/build-zeuxd.mjs"
-```
+Empacotar 20 cores não é tão simples quanto empacotar zeuxd.
 
-Versões de cores serão **pinadas manualmente** em um arquivo (não `latest` automaticamente).
+### Opções (escolha uma)
+
+**Opção A: Compilar cores durante o build (complexo, longo)**
+- Clonar cada repositório de core, compilar cada um
+- Vantagem: fonte fidedigna, controle total
+- Desvantagem: tempo de build 30+ min, requer compiladores C/C++/Rust, complexo
+
+**Opção B: Usar buildbot.libretro.com (quebra padrão GitHub)**
+- Baixar cores compilados da source oficial: `https://buildbot.libretro.com/`
+- Vantagem: binários reais, mantidos pelos projetos
+- Desvantagem: fora do GitHub (diferente de zeuxd, outros adapters)
+
+**Opção C: Empacotar só RetroArch, deixar cores para manual**
+- Empacotar o executável do RetroArch (muito menor, ~100 MB)
+- Usuário baixa cores via "Online Updater" dentro do RetroArch
+- Vantagem: simples, reduz tamanho instalador
+- Desvantagem: volta ao passo inicial ("2 passos", não "1-click completo")
+
+**Opção D: Compilar um subset pequeno (pragmático)**
+- Empacotar apenas cores de 3-5 consoles mais importantes (ex: NES, SNES, PS1)
+- Deixar outros para manual ou Online Updater
+- Vantagem: viável agora, pode expandir depois
+- Desvantagem: incompleto, critério de "quais?" subjetivo
+
+### Recomendação
+
+Para esta sessão, recomendo **Opção C ou D**:
+- **C** resolve 80% do problema (RetroArch instalado, cores manuais)
+- **D** resolve 40% mas prova o mecanismo de empacotamento
+
+A decisão é sua. Qual caminho?
 
 ## Etapa 3: Localização em tempo de execução (PENDENTE)
 
