@@ -1362,7 +1362,7 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
 | ~~Emulador dedicado 1-click para os consoles que hoje só têm RetroArch~~ | G | **Substituído em 2026-08-03** pela decisão do [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — em vez de um adapter dedicado por console, empacotar o RetroArch + cores selecionados dentro do próprio instalador do ZeuX. N64 continua com o `rmg` como adapter dedicado (não foi desfeito), mas os outros 23 consoles vão pelo empacotamento, não por pesquisa individual |
-| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado e confirmado em 2026-08-04**, ver detalhe abaixo. Falta: integrar no build do Tauri de ponta a ponta, medir tamanho final do instalador com os cores dentro, e confirmar que o RetroArch empacotado acha os cores sem baixar nada na primeira execução |
+| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 20 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. Falta: confirmar em Windows/macOS e testar a instalação de verdade (o RetroArch empacotado achar os cores sem baixar nada na primeira execução) |
 
 **Download dos cores do RetroArch desbloqueado em 2026-08-04 — dois bugs reais
 achados e corrigidos, verificados pelo Douglas numa máquina com acesso ao
@@ -1388,14 +1388,35 @@ bugs eram a causa raiz do bloqueio — não era rede além do que já se sabia
 (este ambiente de sessão de IA não alcança o host; a máquina do Douglas
 alcança normalmente).
 
-**O que ainda falta, agora que o download funciona:**
-- [ ] Rodar `npm run tauri build` de ponta a ponta com os cores presentes em
-      `src-tauri/resources/retroarch/cores/` e confirmar que o instalador
-      final os inclui.
-- [ ] Medir o tamanho final do instalador com os 20 cores dentro (podem
-      somar dezenas de MB — vale registrar aqui quando medido).
-- [ ] Instalar e confirmar que `bundledCoreDirs()` acha os cores certos sem
-      o RetroArch precisar baixar nada na primeira execução.
+**`npm run tauri build` de ponta a ponta, confirmado em 2026-08-04 (build
+Linux local, sessão de IA):** rodou sem erros — os únicos ajustes necessários
+foram de ambiente, não de código: instalar os pacotes de sistema que o Tauri
+exige para compilar no Linux (`libwebkit2gtk-4.1-dev`,
+`libjavascriptcoregtk-4.1-dev`, `libgtk-3-dev`, `libayatana-appindicator3-dev`,
+`librsvg2-dev`, `build-essential`, `libsoup-3.0-dev` — nenhum estava presente
+neste ambiente). `download:retroarch-cores` tentou rebaixar os cores (rede
+segue bloqueada nesta sessão de IA) mas não falhou o build, como já esperado
+pelo próprio script — os 20 cores presentes em disco desde a etapa anterior
+foram usados. Gerou os três formatos Linux: `.deb` (178M), `.rpm` (178M),
+`.AppImage` (224M). Inspecionado com `dpkg-deb -c`: **os 20 cores e o sidecar
+`zeuxd` estão de fato dentro do `.deb`**, em
+`usr/lib/zeux/resources/retroarch/cores/`.
+
+**Nota de tempo:** o empacotamento do `.rpm` sozinho levou ~26min neste
+ambiente — o Tauri v2 comprime `.rpm` com uma lib Rust nativa (crate `rpm`,
+sem depender de `rpmbuild` do sistema), e o core do MAME (415MB, o maior dos
+20 de longe) domina esse tempo. Não é um problema de "rpmbuild ausente";
+instalar o `rpmbuild` do sistema não mudaria nada, o binário não é chamado.
+
+**O que ainda falta:**
+- [ ] Instalar o `.deb`/`.rpm`/`.AppImage` de verdade e confirmar que
+      `bundledCoreDirs()` acha os cores certos sem o RetroArch precisar baixar
+      nada na primeira execução — isso não foi testado nesta sessão, só a
+      presença dos arquivos dentro do pacote.
+- [ ] Repetir a confirmação em Windows e macOS (os workflows
+      `build-windows.yml`/`build-macos.yml`/`release.yml` já existem e cobrem
+      os três SOs, mas não há evidência de um run bem-sucedido registrado
+      aqui ainda).
 
 **Build do instalador Windows via GitHub Actions (2026-08-02):**
 `.github/workflows/build-windows.yml` roda num runner `windows-latest` (que já
