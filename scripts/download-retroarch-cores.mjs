@@ -128,6 +128,31 @@ const coresManifest = {
     filename: "fbneo_libretro",
     version: "latest",
   },
+
+  // Os 4 abaixo não são o core padrão de nenhum console
+  // (defaultCoreByConsole, internal/emulator/retroarch.go), mas são o core
+  // de precisão máxima que o catálogo (internal/verdict/data/consoles.json)
+  // recomenda para o tier "ótimo" de gb/gbc, snes, n64 e um tier de saturn —
+  // achado em 2026-08-04 lançando um jogo de GB de verdade: hardware bom
+  // demais recomendava "sameboy", que não estava empacotado, e o RetroArch
+  // recusava com "instale pelo Online Updater". Sem estes 4, autoconfiguração
+  // em hardware forte falhava — pior experiência que hardware mediano.
+  sameboy: {
+    filename: "sameboy_libretro",
+    version: "latest",
+  },
+  bsnes: {
+    filename: "bsnes_libretro",
+    version: "latest",
+  },
+  "parallel n64": {
+    filename: "parallel_n64_libretro",
+    version: "latest",
+  },
+  yabause: {
+    filename: "yabause_libretro",
+    version: "latest",
+  },
 };
 
 /**

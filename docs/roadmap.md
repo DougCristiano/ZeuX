@@ -1427,6 +1427,137 @@ dev.
       os três SOs, mas não há evidência de um run bem-sucedido registrado
       aqui ainda).
 
+**Lacuna real achada e corrigida em 2026-08-04: o ADR 0012 nunca empacotou o
+executável do RetroArch, só os cores.** Testando o `.deb` instalado de
+verdade, a tela de Emuladores mostrava "RetroArch não instalado" mesmo com os
+20 cores dentro do pacote — `Locate()` nunca teve um lugar bundled para
+procurar o binário (só os cores tinham `bundledCoreDirs()`). Detalhe completo
+em `docs/adr-0012-implementation.md`, Etapa 5, e no ADR 0012 atualizado.
+Resumo do que mudou:
+
+- Novo comando `cmd/download-retroarch-app`, chamado por
+  `npm run download:retroarch-app` (encadeado em `build:daemon`), baixa o app
+  do RetroArch do buildbot **de verdade** (esta sessão teve acesso pontual ao
+  host, confirmado com `curl`) e extrai só o necessário: no Linux, um único
+  AppImage autocontido (~11MB); no Windows, `retroarch.exe` + ~65 DLLs
+  (~147MB) — sem elas o executável não abre. Extração em Go puro
+  (`github.com/bodgit/sevenzip`, já usado pelo projeto), sem dependência nova
+  nem binário `7z` de sistema.
+- `internal/emulator/bundled_retroarch.go` copia isso para o mesmo diretório
+  gerenciado que uma instalação 1-click usaria — **nenhuma mudança em
+  `retroArchAdapter.Locate()`** foi necessária, `findBinary` já sabia
+  procurar lá (inclusive com detecção de `*.AppImage` único).
+  `cmd/zeuxd/main.go` chama isso cedo, antes de qualquer requisição a
+  `/emulators`.
+- `internal/install/sources.go`: novo `KindBundled`; a entrada do RetroArch
+  em `sources.json` deixou de ser `"kind": "manual"` (texto do buildbot,
+  desatualizado) e virou `"kind": "bundled"`.
+- **macOS ficou de fora por decisão explícita**, não esquecimento: o buildbot
+  distribui o app do RetroArch para macOS como `.dmg`
+  (confirmado com `curl`), não `.7z`, e montar um `.dmg` não tem rota simples
+  em Go puro.
+- Verificado nesta sessão: `go build`/`go vet`/`go test ./...` verdes
+  (compilação cruzada Windows/macOS incluída), e o AppImage extraído
+  **roda de verdade** (`--version` devolveu
+  `RetroArch - Frontend for libretro / Version: 1.22.2`).
+- **Ainda falta:** lançar um jogo de verdade pelo RetroArch bundled (cai
+  dentro do D11); macOS; trocar o alias móvel `RetroArch.7z` por uma versão
+  datada fixa quando o Douglas cortar uma versão do ZeuX (ADR 0012 pede
+  versão pinada, não "sempre a mais nova").
+
+**Bug real achado e corrigido em 2026-08-04, instalando o `.deb` de
+verdade:** a tela de Emuladores continuava mostrando "não instalado" mesmo
+depois do RetroArch empacotado — `ZEUX_BUNDLED_RETROARCH_DIR` (e
+`ZEUX_BUNDLED_CORES_DIR`, mesmo bug, nunca percebido porque só roda na hora de
+lançar um jogo) apontava para `<resource_dir>/retroarch/...`, mas
+`"resources": ["resources/"]` em `tauri.conf.json` preserva o nome da pasta —
+os arquivos ficam em `<resource_dir>/resources/retroarch/...`. Faltava o
+segmento `resources/` em `src-tauri/src/lib.rs`. Achado comparando a env var
+de um processo `zeuxd` real (`/proc/<pid>/environ`) contra o caminho real dos
+arquivos instalados — confirmado com `installed: true, managed: true` em
+`GET /emulators` depois da correção, e visualmente na tela.
+
+**Armadilha própria desta sessão, registrada para não repetir:** ao testar a
+correção acima, compilei só `cargo build --release` manualmente (sem passar
+pelo `npm run tauri build`) para ser mais rápido que refazer o instalador
+inteiro. O binário resultante ficou com `http://localhost:1420` (URL de
+desenvolvimento) embutido em vez do frontend empacotado — o `tauri build`
+seta variáveis de ambiente que fazem essa diferença, e pular esse comando
+quebra o app mesmo com o binário "funcionando". Lição: nunca substituir
+`/usr/bin/zeux` por um `cargo build` avulso; sempre pelo `tauri build`
+(pode-se restringir a `--bundles deb` para ser mais rápido em teste local —
+~2min contra ~26min do `.rpm`).
+
+**Lacuna real achada testando um jogo de GB de verdade (2026-08-04):**
+autoconfiguração (clicar "Jogar" sem escolher opções) usa o core do tier
+"ótimo" do catálogo — que para GB/GBC recomenda `sameboy`, não `gambatte`
+(o default/empacotado). Hardware bom o bastante para esse tier recebia
+"instale pelo Online Updater" em vez de simplesmente jogar — pior experiência
+que hardware mediano. Achados 4 cores nessa situação (recomendados por algum
+tier do catálogo, mas fora da lista original de 20): `sameboy` (GB/GBC
+ótimo), `bsnes` (SNES ótimo), `parallel n64` (N64 ótimo), `yabause` (Saturn,
+tier de fallback). Os 4 confirmados existentes no buildbot com `curl`,
+adicionados a `scripts/download-retroarch-cores.mjs` e ao ADR 0012 — lista
+passou de 20 para 24 cores (~cresce o instalador em alguns MB por core;
+não medido o total ainda).
+
+**Segundo bug real de caminho, mais antigo que os de cima — achado só ao
+lançar o jogo de GB de verdade (2026-08-04):** mesmo com o AppImage do
+RetroArch reconhecido e os 24 cores presentes no pacote, o lançamento
+continuava falhando com "core não encontrado". Causa: `ensureBundledCoresAvailable`
+(`internal/emulator/bundled_cores.go`) fazia `filepath.Join(bundledDir,
+"retroarch", "cores")` em cima de uma `ZEUX_BUNDLED_CORES_DIR` que **já**
+apontava para a pasta de cores — produzindo um caminho duplicado
+(`.../resources/retroarch/cores/retroarch/cores`) que nunca existiu. Esse bug
+é anterior à sessão de hoje: existia desde a implementação original do ADR
+0012, invisível porque o erro só virava log de aviso, nunca travava o
+daemon — e ninguém tinha lançado um jogo de verdade usando os cores bundled
+até agora. Corrigido removendo o join duplicado; cobrido por
+`internal/emulator/bundled_cores_test.go` (não existia teste nenhum para essa
+função antes). **Confirmado pelo Douglas: os 3 testes passaram** — RetroArch
+"instalado pelo ZeuX", jogo de GB abre com o core `sameboy`.
+
+**Nova rota `GET /api/v1/retroarch/cores` e botão "Ver cores" (2026-08-04):**
+depois do bug acima, ficou claro que não havia nenhuma forma de ver quais
+cores estavam de fato instalados sem tentar lançar um jogo e torcer. Nova
+rota lista todo core conhecido (`internal/emulator/retroarch.go`,
+`RetroArchCoreStatus`) com `installed`/`path`; a tela de Emuladores ganhou um
+botão "Ver cores" na linha do RetroArch que mostra a lista com o que falta.
+
+**Seletor nativo de pasta na tela de Biblioteca (2026-08-04):** o campo de
+"apontar pasta" exigia digitar o caminho à mão — o próprio código já
+registrava isso como decisão pendente. Adicionado `@tauri-apps/plugin-dialog`
+(npm) + `tauri-plugin-dialog` (crate Rust) + permissão `dialog:allow-open`.
+Botão "Escolher pasta" abre o diálogo nativo, preenche o campo (que continua
+editável). Backend não mudou.
+
+**Windows e macOS: código deveria funcionar, não foi testado rodando.**
+Tudo confirmado nesta sessão foi Linux local, de ponta a ponta (build,
+instalação, abertura, os 3 testes acima). Para Windows: a estrutura real do
+pacote do buildbot foi inspecionada de verdade (baixado e listado —
+`retroarch.exe` + ~65 DLLs, ~147MB — o código já copia tudo, não só o
+`.exe`), e as correções de hoje são todas Go/Rust multiplataforma, sem nada
+específico de SO — mas ninguém rodou `npm run tauri build` numa máquina
+Windows real, nem os workflows `build-windows.yml`/`release.yml` desde essas
+mudanças. Para macOS: os cores baixam normalmente, mas **o binário do
+RetroArch em si não é empacotado** — decisão deliberada (buildbot distribui
+`.dmg`, sem rota simples em Go puro), documentada no ADR 0012; no Mac, o
+RetroArch segue pedindo instalação manual como antes desta sessão.
+**Próximo passo sugerido:** `gh workflow run build-windows.yml` (ou
+`build-macos.yml`) na branch atual, via `workflow_dispatch` — não precisa
+mesclar na main para gerar um instalador de teste real.
+
+**Seletor nativo de pasta na tela de Biblioteca (2026-08-04):** o campo de
+"apontar pasta" exigia digitar o caminho à mão — o próprio código já
+registrava isso como decisão pendente (`src/screens/LibraryScreen.tsx`,
+comentário citando que `@tauri-apps/plugin-dialog` era "fora do escopo" até
+uma decisão explícita). Adicionado `@tauri-apps/plugin-dialog` (npm) +
+`tauri-plugin-dialog` (crate Rust) + permissão `dialog:allow-open` em
+`src-tauri/capabilities/default.json`. Um botão "Escolher pasta" abre o
+diálogo nativo do SO e preenche o campo de texto, que continua editável
+(colar/ajustar manualmente ainda funciona). Backend não mudou — já aceitava
+caminho absoluto, que é o que o diálogo nativo devolve.
+
 **Build do instalador Windows via GitHub Actions (2026-08-02):**
 `.github/workflows/build-windows.yml` roda num runner `windows-latest` (que já
 tem toolchain nativa) a cada push em `src/`, `src-tauri/`, `internal/`,

@@ -104,6 +104,17 @@ func (m *Manager) Start(adapterID string) (*Job, error) {
 			source.Name, source.Homepage, source.Reason)
 	}
 
+	if source.Kind == KindBundled {
+		// Não deveria aparecer um botão de instalar para isto — Locate()
+		// já encontra a cópia empacotada (ver EnsureBundledRetroArchAvailable).
+		// Chegar aqui mesmo assim significa que a cópia falhou ou ainda não
+		// rodou; a mensagem diz a verdade em vez de repetir instruções de
+		// download que não fazem mais sentido para este emulador.
+		return nil, fmt.Errorf(
+			"o %s já vem empacotado com o ZeuX; não há nada para baixar. %s",
+			source.Name, source.Reason)
+	}
+
 	if _, ok := source.PatternForHost(); !ok {
 		return nil, fmt.Errorf("o %s não publica pacote para este sistema operacional", source.Name)
 	}

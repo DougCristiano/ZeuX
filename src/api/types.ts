@@ -151,6 +151,16 @@ export type EmulatorEntry = {
   installation?: Installation;
 };
 
+// --- Cores do RetroArch (GET /api/v1/retroarch/cores) ---
+
+export type RetroArchCoreStatus = {
+  name: string;
+  filename: string;
+  installed: boolean;
+  /** Só presente quando `installed` é `true`. */
+  path?: string;
+};
+
 export type CustomDefinition = {
   id: string;
   name: string;

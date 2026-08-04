@@ -22,6 +22,12 @@ src-tauri/binaries/
 src-tauri/resources/retroarch/cores/*
 !src-tauri/resources/retroarch/cores/.gitkeep
 
+# App do RetroArch em si, baixado do buildbot por cmd/download-retroarch-app
+# (extensão do ADR 0012, 2026-08-04) — mesmo motivo dos cores acima: binário
+# grande, baixado a cada build, um por plataforma.
+src-tauri/resources/retroarch/bin/*
+!src-tauri/resources/retroarch/bin/.gitkeep
+
 # Cache e configuração local de ferramentas
 .mise.local.toml
 *.local

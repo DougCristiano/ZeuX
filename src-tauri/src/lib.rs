@@ -89,6 +89,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(DaemonState(Mutex::new(None)))
         .manage(PortConflict(Mutex::new(false)))
         .invoke_handler(tauri::generate_handler![zeuxd_port_conflict])
@@ -111,11 +112,38 @@ pub fn run() {
                     // Calcular caminho de cores bundled para o daemon (ADR 0012).
                     // Se não existir, daemon silenciosamente ignora (cores podem vir
                     // do Online Updater do RetroArch).
+                    //
+                    // O prefixo "resources/" é necessário: resource_dir() devolve a
+                    // raiz de instalação do app (ex.: /usr/lib/zeux no .deb), e
+                    // "resources": ["resources/"] em tauri.conf.json preserva esse
+                    // nome de pasta no destino — os arquivos ficam em
+                    // <resource_dir>/resources/retroarch/..., não
+                    // <resource_dir>/retroarch/... Bug real, presente desde a
+                    // implementação original do ADR 0012: sem o prefixo, a env var
+                    // sempre apontava para um caminho inexistente, e
+                    // ensureBundledCoresAvailable() falhava silenciosamente (só
+                    // logava, nunca travava o daemon) — nunca foi percebido porque
+                    // só roda de verdade na hora de lançar um jogo (D11, ainda
+                    // pendente). Achado e corrigido em 2026-08-04 verificando a env
+                    // var de um processo real (/proc/<pid>/environ) contra o
+                    // caminho real dos arquivos instalados.
                     let bundled_cores_dir = app
                         .path()
                         .resource_dir()
                         .ok()
-                        .and_then(|p| p.join("retroarch/cores").to_str().map(String::from));
+                        .and_then(|p| p.join("resources/retroarch/cores").to_str().map(String::from));
+
+                    // Idem para o app do RetroArch em si (extensão do ADR 0012 —
+                    // o ADR original só cobria os cores; o executável ficou de
+                    // fora até 2026-08-04, quando a tela de emuladores mostrou
+                    // "não instalado" mesmo com os cores presentes). Ausente em
+                    // macOS por enquanto (cmd/download-retroarch-app ainda não
+                    // sabe empacotar o .dmg do RetroArch para lá).
+                    let bundled_retroarch_dir = app
+                        .path()
+                        .resource_dir()
+                        .ok()
+                        .and_then(|p| p.join("resources/retroarch/bin").to_str().map(String::from));
 
                     let mut sidecar = app
                         .shell()
@@ -125,6 +153,9 @@ pub fn run() {
                     // Passar ZEUX_BUNDLED_CORES_DIR se cores empacotados existem
                     if let Some(cores_dir) = bundled_cores_dir {
                         sidecar = sidecar.env("ZEUX_BUNDLED_CORES_DIR", cores_dir);
+                    }
+                    if let Some(retroarch_dir) = bundled_retroarch_dir {
+                        sidecar = sidecar.env("ZEUX_BUNDLED_RETROARCH_DIR", retroarch_dir);
                     }
 
                     let (mut events, child) = sidecar

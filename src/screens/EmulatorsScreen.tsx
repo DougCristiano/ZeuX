@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
-import type { EmulatorEntry, InstallJob } from "../api/types";
+import type { EmulatorEntry, InstallJob, RetroArchCoreStatus } from "../api/types";
 import { Badge, Button, Card, ProgressBar } from "../components/ui";
 
 // Item B10 (docs/sprint-b-plano.md): instalar com ressalva de hardware. O
@@ -23,8 +23,49 @@ function percentOf(job: InstallJob): number | null {
   return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
 }
 
+// Achado em 2026-08-04: um core podia estar ausente por um bug silencioso
+// (log de aviso, nunca erro) e nada avisava até o usuário tentar lançar um
+// jogo e receber "core não encontrado" na cara — só o RetroArch carrega
+// cores plugáveis, então isto só aparece na linha dele.
+function RetroArchCoresList() {
+  const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .getRetroArchCores()
+      .then((res) => setCores(res.cores))
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os cores."));
+  }, []);
+
+  if (error) return <p className="text-sm text-danger">{error}</p>;
+  if (!cores) return <p className="text-sm text-muted">Carregando cores...</p>;
+
+  const missing = cores.filter((c) => !c.installed);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm text-muted">
+        {cores.length - missing.length} de {cores.length} cores instalados
+        {missing.length > 0 && ` — faltam: ${missing.map((c) => c.name).join(", ")}`}
+      </p>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm sm:grid-cols-3">
+        {cores.map((core) => (
+          <li key={core.name} className="flex items-center gap-1.5">
+            <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
+            <span className="truncate text-ink" title={core.path ?? core.filename}>
+              {core.name}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function EmulatorRow({ entry, onChanged }: { entry: EmulatorEntry; onChanged: () => void }) {
   const [state, setState] = useState<RowState>({ kind: "idle" });
+  const [showCores, setShowCores] = useState(false);
 
   async function pollJob(jobId: string) {
     try {
@@ -104,6 +145,19 @@ function EmulatorRow({ entry, onChanged }: { entry: EmulatorEntry; onChanged: ()
         )}
 
         {state.kind === "error" && <p className="mt-2 max-w-sm text-sm text-danger">{state.message}</p>}
+
+        {entry.adapter_id === "retroarch" && (
+          <div className="mt-2">
+            <Button type="button" variant="ghost" onClick={() => setShowCores((v) => !v)}>
+              {showCores ? "Ocultar cores" : "Ver cores"}
+            </Button>
+            {showCores && (
+              <div className="mt-2 max-w-md">
+                <RetroArchCoresList />
+              </div>
+            )}
+          </div>
+        )}
       </td>
       <td className="px-3 py-3 align-top">
         {entry.installed || state.kind === "installing" || state.kind === "done" ? null : state.kind === "confirm-hardware" ? (
