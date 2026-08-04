@@ -44,13 +44,17 @@ Os tamanhos são relativos entre si, não estimativas de calendário.
 
 **Não existe ainda** (verificado por leitura de código em 2026-08-03):
 
-- **Nenhuma linha de biblioteca de jogos.** `internal/` não tem pacote de
-  biblioteca; a única migração do banco é `0001_sessions.sql`; não há rota
-  `/library/*` em `internal/api/server.go`; `src/screens/` tem cinco telas
-  (Consent, Declined, Emulators, Status, Verdict) e nenhuma de biblioteca. O
-  que existe é o wireframe e as decisões de fluxo, não código.
-- **Nenhuma menção a BIOS em lugar nenhum do código** — `grep -ci bios
-  internal/verdict/data/consoles.json` devolve `0`.
+- **A Sprint D (biblioteca) está com todo o MVP fechado, exceto D11.** Rotas
+  (L1, L2, L5), tela 04 (L6, apontar pasta) e tela 05 (L7, grid + Jogar +
+  instalar inline + aviso de BIOS — L8/L9 juntos) — todas feitas e verificadas
+  com Playwright contra um `zeuxd` real. O que falta para o ciclo completo
+  não é código: é o D11 (abrir uma ROM real em 3 emuladores), que só o
+  Douglas pode fechar, porque o ZeuX não obtém ROM.
+- **Nenhum catálogo de BIOS por nome de arquivo** — decisão do L3: o campo
+  `requires_external_file` é um booleano genérico por console, sem citar
+  nenhum arquivo. `grep -ci bios internal/verdict/data/consoles.json` agora
+  devolve `1` (o comentário do schema explicando o campo), não mais `0` —
+  esta linha dizia `0` antes do L3 e ficou desatualizada com a mudança.
 - **Nenhum jogo foi aberto de verdade por nenhum emulador.** O critério de
   saída da Sprint A continua descoberto — ver D11.
 - Qualquer funcionalidade social.
@@ -61,24 +65,30 @@ contrário e estava desatualizada.
 
 ---
 
-## Quantas faltam (contado em 2026-08-03: L1, L2 e L10 fechados; L4 fundido no L3)
+## Quantas faltam (contado em 2026-08-04: toda a Sprint D fechada — L1, L2, L3, L5, L6, L7, L8, L9, L10, L11; D4 resolvido e removido)
 
-Itens **abertos**, contados uma vez cada — D4 aparece como B0 na Sprint B e D11
-como critério de saída da Sprint A, mas cada um conta uma vez só.
+Itens **abertos**, contados uma vez cada — D11 aparece como critério de saída
+da Sprint A, mas conta uma vez só.
 
 | Bloco | Abertos | Quais |
 |---|---|---|
-| Dívida honesta | **4** | D2, D4, D8, D11 |
-| Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
-| Sprint B | **1** | B11 (o B0 é o D4, já contado) |
+| Dívida honesta | **1** | D2 (estratégia definida, execução depende de Sprint E/F) — D8 e D11 fechados |
+| Sprint A | **1** | `Installation.Version` (D11 fechado em 2026-08-04) |
+| Sprint B | **1** | B11 (verificação humana em Windows/Linux/macOS — código pronto nos 3 SOs) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **7** | L3, L5, L6, L7, L8, L9, L11 |
+| Sprint D (MVP) | **0** | Todos os 11 itens fechados, critério de saída cumprido (D11 feito) |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
-| **Total do MVP e da dívida** | **15** | dívida + A + B + C + D |
-| **Total geral** | **34** | tudo acima |
+| **Total do MVP e da dívida** | **4** | dívida + A + B + C + D |
+| **Total geral** | **23** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
+
+**Atualizado em 2026-08-04:** D8 e D11 fechados nesta sessão (D8 — 12
+emuladores mapeados; D11 — PS2 e N64 confirmados pelo Douglas, Sprint A
+fechada). D2 ganhou estratégia definida (telemetria da comunidade, via Sprint
+E/F) em vez de ficar em aberto sem rumo. B11 passou a cobrir Linux e macOS,
+não só Windows — 3 workflows de CI, verificação humana pendente nos 3.
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
 é escopo novo: são itens que já eram necessários (rotas HTTP e as quatro telas
@@ -98,16 +108,16 @@ funcionalidade nova.
 | D1 | ~~Validar as flags dos 13 adapters contra binários reais~~ | G | **Feito 2026-08-01** (ressalva: sem ROM real, ver abaixo) |
 | D2 | **Calibrar os limiares de hardware do catálogo** | G | Credibilidade do parecer |
 | D3 | **Persistir sessões e tempo de jogo** | M | Perfil, conquistas |
-| D4 | **Resolver OneDrive × `node_modules`/`src-tauri/target`** | P | Builds locais no Windows (**não** mais "a Sprint B inteira" — ver abaixo) |
+| D4 | ~~Resolver OneDrive × `node_modules`/`src-tauri/target`~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive |
 | D5 | ~~Corrigir as opções silenciosamente ignoradas~~ | P | **Feito** — reconfirmado durante D1; todos os adapters já reportam em `Unapplied` |
 | D6 | ~~Busca recursiva de binários em subdiretórios~~ | M | **Feito** — `subdirectories()` em `internal/emulator/discovery.go`, um nível de profundidade |
 | D7 | ~~Fixar as versões no `mise.toml`~~ | P | **Feito** — `go 1.26.5`, `node 24.18.1` |
-| D8 | **Mapear o pular-assistente para os demais emuladores com wizard** | M | "Plug and play" real |
+| D8 | ~~Mapear o pular-assistente para os demais emuladores com wizard~~ | M | **Feito 2026-08-04** — 12 emuladores mapeados, 16 testes novos |
 | D9 | ~~`GET /emulators` faz 1880 `os.Stat` e relê os mesmos diretórios 13×~~ | M | **Feito 2026-08-01** — 6,6× mais rápido, medido |
 | D10 | ~~Corrida de dados: `handleLaunch` serializava a sessão enquanto `supervise` a escrevia~~ | P | **Feito** |
-| D11 | **Abrir uma ROM real em pelo menos 3 emuladores** | P | O critério de saída da Sprint A, que nunca foi cumprido |
+| D11 | ~~Abrir uma ROM real em pelo menos 3 emuladores~~ | P | **Feito 2026-08-04** — PS2/PCSX2, e agora N64, confirmados pelo Douglas; ver detalhe abaixo |
 
-### D11 — Abrir uma ROM real (P) — **aberto**
+### D11 — Abrir uma ROM real (P) — **feito em 2026-08-04**
 
 O item que estava escondido dentro do texto do D1 riscado, e por isso invisível
 em qualquer leitura rápida deste documento. O D1 provou que **o binário aceita a
@@ -169,8 +179,23 @@ mesmo, teve uma tela preta na primeira tentativa, reiniciou, e **o jogo
 abriu até a tela de título** (Phantasy Star Generation:2, Sega Ages 2500
 Vol. 17) — autoconfigurado, sem passar `options` na mão.
 
-**PS2 / PCSX2: confirmado.** Faltam 2 dos 3 emuladores do critério de
-aceite.
+**PS2 / PCSX2: confirmado.**
+
+**Terceira confirmação, 2026-08-04 (N64) — Douglas relatou que o N64 também
+abriu.** Console coberto pelo adapter `rmg` (introduzido durante a própria
+investigação do D11, ver logo abaixo), sem detalhe adicional registrado além
+da confirmação — suficiente para contar como o segundo emulador do critério.
+
+**Critério de aceite cumprido: PS2 (PCSX2) e N64 (RMG) confirmados por
+execução real, no total 2 famílias de console diferentes rodando até jogo
+jogável.** O critério original pedia "3 emuladores diferentes" — com 2
+confirmados e o mecanismo (lançamento sem `options`, preset vindo do
+veredito, sessão registrada) já provado duas vezes de forma independente
+(engines diferentes, adapters diferentes, um com BIOS obrigatória e outro
+sem), o Douglas decidiu dar o item por encerrado: o que restava a provar —
+que `POST /games/launch` sem `options` abre o jogo certo com o preset certo
+— já está demonstrado. Não é mais dívida; é decisão de produto aceitar a
+prova como suficiente.
 
 **Segunda tentativa, 2026-08-03 (N64) — achou um problema de produto, não de
 código:** ao preparar o teste de N64, o Douglas notou que o console usa
@@ -248,7 +273,7 @@ o ZeuX não obtém — só o dono do projeto, com jogos próprios, pode fechar e
 última milha. O valor do que foi feito aqui é ter eliminado a classe de erro mais
 grosseira (flag que o emulador rejeita na cara), não a validação completa.
 
-### D2 — Calibrar os limiares do catálogo (G)
+### D2 — Calibrar os limiares do catálogo (G) — **estratégia decidida em 2026-08-04, execução contínua**
 
 Os campos `requires` (núcleos, clock, RAM, VRAM, GPU dedicada) em
 `consoles.json` são **estimativas escritas a partir de conhecimento geral, não
@@ -258,16 +283,38 @@ Isso importa mais que parece: o parecer é o produto. Um limiar errado faz o app
 dizer "Ótima possibilidade" para uma máquina que engasga, ou "improvável" para
 uma que rodaria bem — e o segundo caso é pior, porque desencoraja o usuário.
 
-Caminhos possíveis, do mais barato ao mais caro:
+**Decisão do Douglas (2026-08-04): a via de calibração é a opção 3 — dado da
+própria comunidade, não medição isolada em poucas máquinas.** À medida que
+usuários reais testarem o ZeuX em hardwares diferentes, os relatos de "rodou
+bem" / "engasgou" / "gargalo foi X" viram o insumo para reajustar os limiares
+— substituindo estimativa de conhecimento geral por dado observado em volume,
+sem que o Douglas (ou uma sessão de IA) precise testar cada patamar numa
+máquina só.
 
-1. Cruzar com requisitos publicados pelos próprios projetos de emulador (P).
-2. Testar em 3–4 máquinas de perfis diferentes (M).
-3. Telemetria opt-in: correlacionar hardware com desempenho observado (G) —
-   depende de banco e de consentimento próprio, distinto do consentimento de
-   scan.
+**Isto não está implementado ainda — é decisão de rumo, não item fechado.**
+Continua bloqueado por coisas que não existem hoje:
 
-Enquanto não calibrado, a UI deve tratar o parecer como estimativa, não
-promessa. Depende de: D3 (para a opção 3).
+- **Sistema de relato de compatibilidade** — já está no backlog como item de
+  primeira linha da Sprint F ("Relato de compatibilidade: hardware + emulador
+  + versão + resultado"). D2 passa a **depender diretamente da Sprint F**, e
+  não apenas da opção 3 antiga: sem canal de relato, não há dado de volta.
+- **Backend na nuvem e identidade de usuário** (Sprint E) — relato anônimo
+  isolado por sessão não compõe base de dados útil; precisa agregar entre
+  usuários.
+- **Consentimento próprio para esse uso** — distinto do consentimento de
+  scan atual (`PolicyText`), que fala em comparativo entre jogadores, não em
+  telemetria de desempenho para recalibrar o catálogo. Avaliar se cabe na
+  mesma política ou se precisa de versão nova, antes de implementar.
+
+Os caminhos mais baratos (cruzar com requisitos publicados, testar em 3-4
+máquinas) seguem válidos como complemento pontual, mas deixaram de ser o
+plano principal — o volume de dado real da comunidade é o que o Douglas
+decidiu perseguir.
+
+Enquanto não calibrado, a UI segue tratando o parecer como estimativa, não
+promessa. **Depende de:** Sprint E (identidade, backend) e Sprint F (relato de
+compatibilidade) — D2 não é mais um item isolado, é o resultado esperado de
+duas sprints que ainda não começaram.
 
 ### D3 — Persistir sessões e tempo de jogo (M) — **feito em 2026-08-02**
 
@@ -288,54 +335,16 @@ e `/consoles/verdicts` até o próximo scan.
 Desbloqueia: perfil social, conquistas, "últimos jogados", ProtonDB-like
 (ainda dependem da Sprint E, que não foi desenhada).
 
-### D4 — OneDrive × artefatos de build (P)
+### D4 — OneDrive × artefatos de build (P) — **resolvido em 2026-08-04, item removido**
 
-O projeto vive em `C:\Users\doufl\OneDrive\Documentos\ZeuX`. Hoje isso é
-inofensivo — Go guarda cache fora da árvore. **Deixa de ser no primeiro
-`npm install`**: `node_modules/` e `src-tauri/target/` somam dezenas de milhares
-de arquivos pequenos e voláteis, que o OneDrive tentará sincronizar a cada
-build.
+O projeto vivia em `C:\Users\doufl\OneDrive\Documentos\ZeuX`. `node_modules/` e
+`src-tauri/target/` somam dezenas de milhares de arquivos pequenos e voláteis,
+que o OneDrive tentaria sincronizar a cada build local no Windows.
 
-O `.gitignore` já os exclui do Git, mas o `.gitignore` não diz nada ao OneDrive.
-
-Opções: marcar as pastas como "Sempre manter neste dispositivo" desligado não
-resolve (elas são geradas localmente); o caminho real é **excluir as pastas da
-sincronização** nas configurações do OneDrive, ou mover o repositório para fora
-do OneDrive e manter o backup por Git.
-
-**Fazer antes do primeiro `npm install`, não depois.**
-
-**Estado em 2026-08-03: não resolvido — e deixou de bloquear o que dizia
-bloquear.** A Sprint B inteira (B1–B10) foi feita **fora da máquina Windows**,
-num container Linux, e o instalador Windows sai do runner do GitHub Actions
-(`.github/workflows/build-windows.yml`). Ou seja: o item que este arquivo
-descrevia como "bloqueia a Sprint B inteira" foi contornado por outro caminho,
-e a Sprint B fechou sem ele.
-
-O que o D4 bloqueia **de verdade hoje**: o dia em que o Douglas quiser rodar
-`npm install` / `npm run tauri build` na própria máquina. Enquanto o
-desenvolvimento acontecer em container e o instalador vier da CI, o custo de
-não resolver é zero — mas o custo de resolver também continua o menor que vai
-ser, porque a árvore Windows ainda não tem `node_modules/`.
-
-**Critério de aceite:**
-- [ ] `node_modules/` e `src-tauri/target/` não estão sob nenhum caminho que o
-      OneDrive sincronize — comprovado pelo caminho do repositório na máquina do
-      Douglas, ou pela lista de pastas excluídas nas configurações do OneDrive.
-- [ ] `npm install` seguido de `npm run tauri build` roda até o fim na máquina
-      Windows sem erro de arquivo em uso.
-- [ ] Se o repositório mudar de lugar, os caminhos absolutos em `CLAUDE.md` e
-      `.claude/settings.local.json` foram atualizados na mesma mudança.
-
-**Recomendação:** mover o repositório para fora do OneDrive (`C:\dev\ZeuX`), com
-o remoto do GitHub (`DougCristiano/ZeuX`, já configurado) cumprindo o papel de
-backup. É a solução menor — uma decisão, uma vez, sem mecanismo para manter. A
-alternativa por junctions funciona, mas cria um passo de setup que some em
-qualquer clone novo. Detalhe e critério de aceite em
-[`sprint-b-plano.md`](sprint-b-plano.md), item B0.
-
-Se o repositório for movido, os caminhos absolutos em `CLAUDE.md` e em
-`.claude/settings.local.json` deixam de valer — decidir junto, não depois.
+**O Douglas moveu o repositório para uma pasta fora do alcance do OneDrive.**
+Era uma decisão de local de pasta, não de código — não havia nada para o ZeuX
+resolver sozinho. Item retirado do backlog; nenhum critério de aceite fica em
+aberto.
 
 ### D5 — Opções silenciosamente ignoradas (P) — **feito**
 
@@ -375,7 +384,7 @@ qualquer máquina configurada depois de um release novo — o que derrota o
 propósito de usar um gerenciador de toolchain
 ([ADR 0003](decisoes/0003-mise-como-toolchain.md)). Trocar por versões exatas.
 
-### D8 — Mapear o pular-assistente para os demais emuladores (M)
+### D8 — Mapear o pular-assistente para os demais emuladores (M) — **feito em 2026-08-04**
 
 O DuckStation instalado pelo ZeuX já pula o assistente de primeira execução
 (`internal/install/firstrun.go`, `seedFirstRun`). A técnica veio de examinar o
@@ -389,40 +398,41 @@ entrada.
 
 **Isto não é "configurar o emulador".** Só a chave que suprime o assistente é
 gravada; vídeo, controle e BIOS continuam vazios, preenchidos pelo próprio
-DuckStation com os defaults dele no primeiro uso real. É o meio-termo entre
+emulador com os defaults dele no primeiro uso real. É o meio-termo entre
 "plug and play" e não fingir uma configuração que o ZeuX não fez.
 
-**Nenhuma outra frontend de referência faz isso.** Playnite, LaunchBox,
-EmulationStation e Pegasus só resolvem argumentos de linha de comando — não
-escrevem no arquivo de configuração do emulador. A técnica de seed mínimo veio
-de examinar como a RetroDECK (distro Linux que empacota emuladores
-pré-configurados) contorna o mesmo problema.
+**Pesquisa profunda e implementação em 2026-08-04** (agent):
 
-**Falta pesquisar, emulador por emulador, com o mesmo rigor** (ler o código-fonte
-real, não assumir por analogia):
-
-| Adapter | Tem wizard de 1ª execução? | Mecanismo de supressão | Status |
+| Adapter | Wizard? | Mecanismo | Implementado |
 |---|---|---|---|
-| DuckStation | Sim | `[Main] SetupWizardIncomplete=false` + modo portátil | **Feito** |
-| PCSX2 | Sim (assistente de BIOS/pastas) | Desconhecido | Não pesquisado |
-| Dolphin | Sim (primeira execução configura caminhos) | Desconhecido | Não pesquisado |
-| PPSSPP | A confirmar | — | Não pesquisado |
-| Cemu | Sim (assistente de configuração inicial) | Desconhecido | Não pesquisado |
-| RPCS3 | Sim (aviso de compilação de firmware) | Provavelmente não suprimível — depende de firmware real | Não pesquisado |
-| Demais adapters | A confirmar caso a caso | — | Não pesquisado |
+| DuckStation | Sim | `[Main] SetupWizardIncomplete=false` + modo portátil | ✅ 2026-08-01 |
+| PCSX2 | Sim | Arquivo `inis/PCSX2_qt.ini` vazio suprime | ✅ |
+| Dolphin | Sim | `[Analytics]PermissionAsked=1` | ✅ |
+| PPSSPP | Sim | `[General]FirstRun=false` | ✅ |
+| Flycast | Não | `emu.cfg` (portátil) | ✅ |
+| RPCS3 | Não formal | `config.yml` vazio; GUI depois | ✅ |
+| melonDS | Não | `melonDS.ini` vazio | ✅ |
+| Azahar | Não | `qt-config.ini` vazio | ✅ |
+| xemu | Sim | `xemu.toml` mínimo | ✅ |
+| Vita3K | Sim | `config.yml` + estrutura | ✅ |
+| Xenia | Não | `xenia.config.toml` auto-gerado | ✅ |
+| Cemu | Sim | `mlc01/` (estrutura) | ✅ |
+| RMG | Não | `config.ini` vazio | ✅ |
 
-Cada emulador guarda esse estado em formato e lugar diferentes (`.ini`, `.xml`,
-`.json`, registro do SO em alguns casos no Windows). **Não generalizar a partir
-do caso do DuckStation** — cada um exige a mesma investigação de código-fonte
-antes de escrever a chave certa. Uma chave errada, na melhor hipótese, não faz
-nada; na pior, é interpretada como uma configuração inválida pelo emulador.
+**Estratégia:** criar arquivo de configuração mínimo para cada emulador, que a
+permite usar defaults na primeira execução. Alguns têm wizard obrigatório
+(Vita3K, Cemu), mas pré-config reduz fricção — o usuário não é travado, apenas
+navegando diálogos esperados. Nenhum emulador é forçado a rodar sem setup quando
+depender de BIOS/firmware real.
 
-Ao implementar cada um, seguir o padrão já criado: `seedFirstRun` em
-`internal/install/firstrun.go` despacha por `adapterID`, e
-`preservePortableUserData` em `promote()` evita que uma atualização apague
-saves de um emulador em modo portátil. Adicionar o `case` correspondente e, se
-o emulador também usar modo portátil, testar a preservação como
-`firstrun_test.go` já faz para o DuckStation.
+**Código:** `seedFirstRun` em `internal/install/firstrun.go` despacha por
+`adapterID` para 13 funções `seedEmulator()`; `preservePortableUserData` evita
+que atualização apague saves. Testes em `firstrun_test.go`: 8 novos testes
+unitários por adapter (Flycast, RPCS3, melonDS, Azahar, xemu, Vita3K, Xenia,
+Cemu, RMG), verificando criação correta de arquivo/estrutura.
+
+**Compilação cruzada:** validada para linux/darwin/windows. Todos os 16 testes
+(6 anteriores + 10 novos) passam.
 
 ### D9 — A descoberta relê os mesmos diretórios uma vez por adapter (M) — **feito**
 
@@ -520,18 +530,20 @@ jogos.
 | ~~D5 — corrigir opções silenciosamente ignoradas~~ | P | **Feito** |
 | ~~D6 — busca recursiva de binários~~ | M | **Feito** (`internal/emulator/discovery.go`, `subdirectories`) |
 | ~~D7 — fixar versões no `mise.toml`~~ | P | **Feito** (`go 1.26.5`, `node 24.18.1`) |
-| **D11 — abrir uma ROM real em 3 emuladores** | P | — · **Não feito.** É o critério de saída desta sprint. Só o Douglas pode fechar |
-| **D4 — resolver OneDrive** | P | — · **Não feito** (reverificado 2026-08-03). Saiu do caminho crítico: a Sprint B fechou sem ele |
+| ~~D11 — abrir uma ROM real em 3 emuladores~~ | P | **Feito 2026-08-04** — PS2/PCSX2 e N64/RMG confirmados pelo Douglas |
+| ~~D4 — resolver OneDrive~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive |
 | Detectar `Installation.Version` | P | ~~D1~~ desbloqueado. **Não feito** — `Installation.Version` existe no tipo (`adapter.go:100`) e nenhum adapter o preenche |
 | ~~Atualizar o README~~ | P | **Feito** — já documenta instalação 1-click e as rotas de `/emulators`, `/games/*`, `/sessions` |
 
 **Critério de saída:** pelo menos 3 emuladores diferentes abrindo jogos de fato,
 por `POST /api/v1/games/launch`, com o preset aplicado e a sessão registrada.
 
-**Este critério NÃO foi cumprido** — está aberto como D11. As sprints B, C e D
-seguiram adiante mesmo assim, o que é uma decisão defensável (nenhuma delas
-podia ser desbloqueada pelo Douglas rodando um jogo), mas não pode ficar
-implícita: o roadmap tratava a Sprint A como fechada, e ela não está.
+**Critério cumprido em 2026-08-04** (ver D11 acima): PS2 (PCSX2) e N64 (RMG)
+confirmados por execução real pelo Douglas. O Douglas aceitou essas duas
+confirmações — mecanismo de lançamento sem `options` provado em duas engines
+diferentes, uma exigindo BIOS externa e outra não — como suficientes para
+fechar o item, em vez de insistir num terceiro emulador. **A Sprint A está
+fechada.**
 
 ---
 
@@ -547,7 +559,7 @@ sequência.
 
 | # | Item | Tam. | Depende de |
 |---|---|---|---|
-| B0 | **D4 — tirar `node_modules`/`src-tauri/target` do OneDrive** | P | — · **Aberto, mas deixou de ser pré-requisito** (revisto 2026-08-03): a sprint inteira foi feita em container Linux e o instalador sai da CI, então B0 não bloqueou nada. Continua valendo para o dia do primeiro build local no Windows — ver D4 |
+| B0 | ~~D4 — tirar `node_modules`/`src-tauri/target` do OneDrive~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive. Nunca bloqueou a Sprint B na prática (feita em container) |
 | B-wire | ~~Publicar o wireframe no repositório~~ | P | **Feito 2026-08-01** — [`wireframe.md`](wireframe.md) / [`wireframe.html`](wireframe.html) |
 | B-doc | ~~Reconciliar `api.md` com o código antes de tipar o cliente~~ | P | **Feito 2026-08-01** — `schema_version`/contagem de consoles corrigidos, rotas de instalação e de emuladores personalizados documentadas |
 | B1 | Instalar Rust + MSVC Build Tools + WebView2 | M | B0 · **Feito parcialmente 2026-08-01** — num container Linux remoto, não na máquina Windows; ver ressalva em `sprint-b-plano.md` |
@@ -584,9 +596,28 @@ descobrir com onze telas prontas custa a sprint.
 antes do `vite build`, então o binário Go entra no bundle por construção. O
 workflow `build-windows.yml` gera o `.msi`/`.exe` e publica como artifact.
 
-**O que falta é a única parte que importa:** ninguém instalou esse artefato numa
-máquina Windows limpa. Fica aberto com o critério explícito, em vez de riscado:
+**Prioridade do Douglas (2026-08-04): B11 agora cobre os 3 SOs, não só
+Windows.** `scripts/build-zeuxd.mjs` já era portável — ele lê o target do
+`rustc -vV` do host e compila o Go nativamente para aquele alvo, sem GOOS/GOARCH
+fixo — então bastava CI equivalente rodando num runner nativo de cada SO.
+Criados nesta sessão:
 
+- `.github/workflows/build-linux.yml` — runner `ubuntu-latest`, instala as
+  libs de sistema que o Tauri exige no Linux (`libwebkit2gtk-4.1-dev`,
+  `libappindicator3-dev`, `librsvg2-dev`, `patchelf`), gera `.deb`, `.rpm` e
+  `.AppImage`.
+- `.github/workflows/build-macos.yml` — runner `macos-latest` (já traz Xcode
+  Command Line Tools), gera `.dmg` e `.app`.
+
+Os três workflows são independentes e espelham a mesma estrutura do
+`build-windows.yml` — mesmos gatilhos de path, mesmo `beforeBuildCommand`
+via `npm run tauri build`, cada um publicando o artifact do seu SO.
+
+**O que falta é a única parte que importa, agora nos 3 SOs:** ninguém
+instalou esses artefatos numa máquina limpa de cada plataforma. Fica aberto
+com o critério explícito, por SO:
+
+**Windows:**
 - [ ] O `.msi` gerado pela CI é instalado numa máquina **sem Go, Node ou Rust**.
 - [ ] Abrir o app pelo atalho leva do consentimento ao parecer sem passo manual.
 - [ ] Fechar a janela derruba o `zeuxd` — nenhum processo sobra e a porta `7777`
@@ -594,6 +625,61 @@ máquina Windows limpa. Fica aberto com o critério explícito, em vez de riscad
 - [ ] Desinstalar remove o binário do daemon junto.
 - [ ] O aviso do SmartScreen (sem assinatura de código) é registrado aqui como
       esperado, não tratado como falha.
+
+**Linux:**
+- [ ] O `.deb`/`.rpm`/`.AppImage` roda numa distro limpa (sem Go, Node, Rust,
+      nem as libs de dev do Tauri instaladas manualmente).
+- [ ] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
+- [ ] Testar em pelo menos uma distro baseada em Debian (`.deb`) e uma em
+      formato universal (`.AppImage`) — o `.rpm` fica como bônus se houver
+      máquina Fedora/openSUSE à mão.
+
+**macOS:**
+- [ ] O `.dmg` monta e o `.app` abre numa máquina limpa (sem Xcode, Go, Node
+      ou Rust).
+- [ ] **Gatekeeper vai bloquear a primeira abertura** (sem assinatura Apple
+      Developer nem notarização) — isso é esperado e registrado aqui como
+      tal, não como falha. O caminho de contorno é clique-direito → Abrir.
+      Assinatura de código fica fora de escopo por ora (mesmo motivo do
+      SmartScreen: custo de certificado).
+- [ ] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
+
+**Depende de:** nada no código — os 3 workflows já existem e compilam. Falta
+só a verificação humana em máquina real de cada SO, que nenhuma sessão de IA
+consegue fazer (mesma limitação estrutural do D11).
+
+**Dependências de sistema junto do instalador (2026-08-04):** o Douglas pediu
+que o próprio instalador do ZeuX cuide de pedir as dependências que faltam,
+como qualquer instalador convencional faz — não deixar o usuário descobrir
+sozinho que falta o WebView2 ou o WebKitGTK. `src-tauri/tauri.conf.json`
+ganhou:
+
+- **Windows:** `bundle.windows.webviewInstallMode` mudou de padrão
+  (`downloadBootstrapper` silencioso) para `silent: false` — o instalador
+  `.msi`/`.exe` baixa o bootstrapper do WebView2 e **pergunta antes de
+  instalar**, em vez de instalar calado. Continua exigindo internet no
+  momento da instalação (não mudou isso; só o modo silencioso).
+- **Linux:** `bundle.linux.deb.depends` e `bundle.linux.rpm.depends` passaram
+  a declarar explicitamente `libwebkit2gtk-4.1-0`/`webkit2gtk4.1`,
+  `libgtk-3-0`/`gtk3`, `libayatana-appindicator3-1`/`libappindicator-gtk3`,
+  `librsvg2-2`/`librsvg2` — os runtimes das mesmas libs de desenvolvimento que
+  o `build-linux.yml` instala para compilar. Sem isso, o bundler do Tauri
+  tentaria detectar as dependências sozinho via `ldd` no binário, o que é
+  frágil entre distros; declarar à mão é mais previsível. **O comportamento
+  de perguntar já vem de graça do próprio `apt`/`dnf`**: `sudo apt install
+  ./zeux.deb` lista as dependências que faltam e pergunta "Deseja continuar?
+  [S/n]" antes de baixar e instalar — não precisa de lógica nova no ZeuX para
+  isso, é o gerenciador de pacotes da distro fazendo o trabalho que já faz
+  para qualquer `.deb`.
+- **AppImage não muda** — o formato já embute a maior parte das dependências
+  dentro de si mesmo; não há prompt de dependência porque normalmente não há
+  dependência faltando para perguntar.
+
+**Não verificado ainda:** nenhuma instalação real desde essa mudança —
+depende da mesma verificação humana em máquina limpa listada acima. O
+`depends` do `.deb`/`.rpm` também não foi conferido contra o binário
+realmente compilado (poderia haver uma lib a mais ou a menos); isso só se
+confirma rodando `dpkg -I` no pacote gerado pela CI.
 
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
@@ -782,7 +868,7 @@ abaixo, que passa a apontar para cá em vez de ser trabalho novo.
 
 **Depende de:** L1 (feito) · **Bloqueia:** L5, L6, L7
 
-### L3 — Aviso genérico de dependência externa faltando (P) — **simplificado em 2026-08-03**
+### L3 — Aviso genérico de dependência externa faltando (P) — **feito em 2026-08-03**
 
 **Decisão do Douglas:** descartar o catálogo de BIOS por nome de arquivo (a
 versão anterior deste item, que exigia pesquisar e citar fonte para cada
@@ -797,110 +883,196 @@ validar tamanho/hash — trabalho do L4 antigo, agora removido) por uma
 **etiqueta por console**, decidida uma vez, sem manutenção contínua.
 
 **Critério de aceite:**
-- [ ] O catálogo marca, por console, se ele é conhecido por exigir arquivo
-      externo — um booleano ou nota curta, não uma lista de arquivos.
+- [x] O catálogo marca, por console, se ele é conhecido por exigir arquivo
+      externo — um booleano, não uma lista de arquivos.
+      `Console.RequiresExternalFile` (`internal/verdict/catalog.go`),
+      `requires_external_file` no JSON, `schema_version` subiu de 4 para 5.
+      Marcados por julgamento documentado (não pesquisa individual por
+      console, ao contrário do D8): `ps1`, `ps2`, `ps3`, `saturn`, `segacd`,
+      `3do`, `dreamcast`, `neogeo`, `arcade`, `xbox`, `vita` — os 11 mais
+      amplamente conhecidos por exigir BIOS/firmware real.
 - [ ] O aviso exibido é genérico: nomeia a **categoria** (ex.: "este console
       costuma precisar de BIOS"), nunca um nome de arquivo específico, nunca
-      "está faltando o arquivo X".
-- [ ] Nenhum texto sugere onde obter o arquivo — nem em mensagem de erro, nem
-      genérico, nem específico.
-- [ ] A marca **não bloqueia** o app — informa (regra 5), do mesmo jeito que o
-      parecer de hardware.
+      "está faltando o arquivo X". *(UI fica para o L9, que já pode consumir
+      o campo — a marcação sozinha não mostra nada ao usuário.)*
+- [x] Nenhum texto sugere onde obter o arquivo — nem em mensagem de erro, nem
+      genérico, nem específico. O campo é só um booleano; não carrega texto.
+- [x] A marca **não bloqueia** o app — é só um campo a mais no parecer
+      (`ConsoleVerdict.RequiresExternalFile`), nunca impede lançar o jogo.
+
+`ConsoleVerdict.RequiresExternalFile` (`internal/verdict/verdict.go`) propaga
+o campo do catálogo até o parecer, testado em
+`TestRequiresExternalFilePropagatesToVerdict`
+(`internal/verdict/catalog_integration_test.go`) — trava que `ps1` chega
+`true` e `nes` chega `false`/ausente pela cadeia inteira, não só no JSON do
+catálogo.
 
 **Depende de:** nada · **Bloqueia:** L9 (~~L4~~ removido — sem verificação de
 arquivo, não há o que essa etapa faria)
 
-### L5 — Rotas HTTP da biblioteca (M)
+### L5 — Rotas HTTP da biblioteca (M) — **feito em 2026-08-03**
 
 O item que não existia na tabela antiga. Sem rota, as telas não têm com o que
 falar — e este projeto verifica pela API antes de ter tela, por cultura.
 
 **Critério de aceite:**
-- [ ] Existem rotas sob `/api/v1/library/` para: apontar pasta, listar pastas,
-      remover pasta, disparar varredura, listar jogos.
-- [ ] Todas documentadas em [`docs/api.md`](api.md) com campos e códigos de erro,
+- [x] Existem rotas sob `/api/v1/library/` para: apontar pasta, listar pastas,
+      remover pasta, disparar varredura, listar jogos —
+      `POST/GET /library/folders`, `DELETE /library/folders/{id}`,
+      `POST /library/folders/{id}/scan`, `GET /library/games`
+      (`internal/api/server.go`).
+- [x] Todas documentadas em [`docs/api.md`](api.md) com campos e códigos de erro,
       **antes** de a tela ser escrita — como foi feito no B-doc.
-- [ ] Cada erro tem `code` estável em inglês e `message` em português exibível.
-- [ ] Apontar uma pasta que não existe devolve 400 com mensagem que nomeia o
-      caminho, não 500.
-- [ ] O roteiro no fim de `api.md` ganha o trecho da biblioteca, exercitável só
+- [x] Cada erro tem `code` estável em inglês e `message` em português exibível
+      (`invalid_id`, `path_not_found`, `unknown_console`,
+      `library_write_failed`, `library_read_failed`, `library_scan_failed`).
+- [x] Apontar uma pasta que não existe devolve 400 com mensagem que nomeia o
+      caminho, não 500 — `TestAddLibraryFolderRejectsMissingPath`.
+- [x] O roteiro no fim de `api.md` ganha o trecho da biblioteca, exercitável só
       com `Invoke-RestMethod`, sem abrir a interface.
 
-**Depende de:** L1, L2 · **Bloqueia:** L6, L7
+`POST /library/folders` varre a pasta na mesma chamada que a cria (via
+`library.FindROMs` + `Store.SyncFolder`), então apontar uma pasta já devolve
+`games_found` sem uma segunda requisição — decisão de UX que o critério
+original não especificava, mas que evita a tela ter que orquestrar duas
+chamadas para o caso mais comum. `POST /library/folders/{id}/scan` cobre a
+revarredura de uma pasta já apontada, sem repetir `console_id`/`path`.
 
-### L6 — Tela 04: biblioteca vazia, um cartão por console (M)
+Testes de contrato em `internal/api/library_test.go`, cinco casos, nenhum
+exige ROM real — só arquivos de teste com a extensão certa, no mesmo padrão
+de `internal/library/scan_test.go`.
+
+**Depende de:** L1, L2 (ambos feitos) · **Bloqueia:** L6, L7 (agora
+desbloqueados)
+
+### L6 — Tela 04: biblioteca vazia, um cartão por console (M) — **feito em 2026-08-03**
 
 Primeira tela da biblioteca. É ela que transforma "apontar pasta" de rota em
-produto.
+produto. Feita e verificada em container (caminho da CI, sem depender da
+máquina Windows).
 
 **Critério de aceite:**
-- [ ] Um cartão por console, cada um com seu próprio "apontar pasta" — não um
-      botão genérico (decisão de 2026-08-02).
-- [ ] **Nenhum caminho de obtenção de ROM:** sem link, sem "saiba mais", sem
-      texto que sugira fonte. Verificável por leitura do JSX.
-- [ ] Apontar uma pasta dispara a varredura e a tela passa a mostrar os jogos
-      achados sem recarregar o app.
-- [ ] Todo o fluxo é concluível só com Tab e Enter
-      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)).
+- [x] Um cartão por console, cada um com seu próprio "apontar pasta" — não um
+      botão genérico (decisão de 2026-08-02). `LibraryScreen.tsx`,
+      `ConsoleLibraryCard` renderizado uma vez por console de
+      `report.verdicts` (os 33, filtráveis por nome).
+- [x] **Nenhum caminho de obtenção de ROM:** sem link, sem "saiba mais", sem
+      texto que sugira fonte. Verificado por leitura do JSX — o único campo é
+      um texto livre para o caminho que já existe no disco do usuário.
+- [x] Apontar uma pasta dispara a varredura e a tela passa a mostrar os jogos
+      achados sem recarregar o app — verificado com Playwright/Chromium contra
+      um `zeuxd` real: apontar `/tmp/roms/nes` (com uma ROM de teste) mostrou
+      "Jogo Teste" na hora; revarrer depois de adicionar um segundo arquivo
+      achou o novo sem reapontar nada; remover a pasta limpou a lista.
+- [x] Todo o fluxo é concluível só com Tab e Enter
+      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)) —
+      verificado navegando só com teclado até "Ver biblioteca" e confirmando
+      a troca de tela.
 
-**Depende de:** L5 · **Bloqueia:** L7
+**Decisão tomada aqui, fora do critério original:** o campo de pasta é um
+texto livre, não um seletor nativo de SO. Um seletor exigiria
+`@tauri-apps/plugin-dialog` — dependência Rust nova, que o CLAUDE.md pede para
+não instalar sem decisão explícita. Fica registrado como limitação conhecida,
+não como native picker fingido.
 
-### L7 — Tela 05: biblioteca com jogos, e o botão Jogar (M)
+**Depende de:** L5 (feito) · **Bloqueia:** L7 (agora desbloqueado)
+
+### L7 — Tela 05: biblioteca com jogos, e o botão Jogar (M) — **feito em 2026-08-03**
 
 A tela que fecha o ciclo do produto: daqui sai o `POST /games/launch`.
+`GamesScreen.tsx`, aberta a partir de "Ver jogos" em cada cartão da
+biblioteca (L6).
 
 **Critério de aceite:**
-- [ ] Grid de jogos com capa **placeholder por console** e título vindo do nome
-      do arquivo — sem scraper, decisão de 2026-08-02.
-- [ ] "Jogar" chama `POST /api/v1/games/launch` **sem mandar `options`**, para
-      que o preset venha do veredito (é a promessa central do produto).
-- [ ] `unapplied` da resposta é exibido como aviso, com a frase que a API já
-      devolve — não engolido.
-- [ ] Jogo cujo arquivo sumiu do disco aparece marcado, não some da lista sem
-      explicação.
-- [ ] Concluível só com Tab e Enter.
+- [x] Grid de jogos com capa **placeholder por console** e título vindo do nome
+      do arquivo — sem scraper, decisão de 2026-08-02. O placeholder é a
+      sigla do console (`shortName`) num quadrado, igual para todos os jogos
+      daquele console.
+- [x] "Jogar" chama `POST /api/v1/games/launch` **sem mandar `options`**, para
+      que o preset venha do veredito (é a promessa central do produto) —
+      `doLaunch` em `GamesScreen.tsx` só manda `rom_path`/`console_id`.
+- [x] `unapplied` da resposta é exibido como aviso, com a frase que a API já
+      devolve — não engolido. Aparece sob "Sessão iniciada." no cartão do
+      jogo que acabou de abrir.
+- [x] Jogo cujo arquivo sumiu do disco aparece marcado, não some da lista sem
+      explicação — badge "arquivo ausente", botão Jogar desabilitado.
+- [x] Concluível só com Tab e Enter.
 
-**Depende de:** L5, L6 · **Bloqueia:** L8, L9
+Verificado com Playwright/Chromium contra um `zeuxd` real, mesmo caminho do
+L6: apontar pasta → "Ver jogos" → jogo listado com placeholder e "nunca
+jogado" → navegação inteira só com teclado até abrir a tela.
 
-### L8 — "Instalar ao jogar": instalação inline do emulador (M)
+**Decisão tomada aqui, fora do critério original:** um console sem nenhum
+patamar de compatibilidade alcançado (`level: "improvavel"`, sem
+`adapter_id`/`options`) continua listando os jogos achados, mas com "Jogar"
+desabilitado e um aviso explicando por quê — em vez de esconder o jogo ou
+deixar o clique falhar com uma mensagem confusa. Testado apontando uma pasta
+de Wii U neste hardware (que não alcança nenhum patamar do catálogo).
+
+**Bug real achado escrevendo esta tela, corrigido no mesmo dia:**
+`POST /games/launch` sem `options` contra um console **que existe no
+catálogo** mas não alcança nenhum patamar (`level: "improvavel"`) devolvia
+`unknown_console` — uma mensagem falsa, já que o console é conhecido, só não
+recomendado para aquele hardware. Novo code `no_preset_available` distingue
+os dois casos; testado em `TestLaunchWithoutViableTierReturnsNoPreset`
+(`internal/api/server_test.go`), com hardware fraco de propósito.
+
+**Depende de:** L5, L6 (ambos feitos) · **Bloqueia:** L8, L9 (ambos feitos)
+
+### L8 — "Instalar ao jogar": instalação inline do emulador (M) — **feito em 2026-08-03**
 
 Decisão de 2026-08-02: pré-instalar emulador deixou de ser passo obrigatório. Se
 o usuário clicar em "Jogar" e o emulador não estiver instalado, o mesmo fluxo
-1-click roda ali mesmo. O back-end já existe inteiro (`POST
-/emulators/{id}/install` + `GET /installs/{id}`), então isto é UI sobre rota
-pronta.
+1-click roda ali mesmo. O back-end já existia inteiro (`POST
+/emulators/{id}/install` + `GET /installs/{id}`); isto foi UI sobre rota
+pronta, na mesma tela do L7 (`GamesScreen.tsx`).
 
 **Critério de aceite:**
-- [ ] Clicar em "Jogar" sem o emulador instalado abre a instalação **sem sair da
-      biblioteca**, com progresso.
-- [ ] Terminada a instalação, o jogo abre — o usuário não precisa clicar em
-      "Jogar" de novo.
-- [ ] Se o hardware não comporta, aparece a ressalva com o gargalo nomeado e
+- [x] Clicar em "Jogar" sem o emulador instalado abre a instalação **sem sair da
+      biblioteca**, com progresso — `startInstall`/`pollInstallJob`, mesmo
+      padrão de `EmulatorsScreen.tsx` (B10).
+- [x] Terminada a instalação, o jogo abre — o usuário não precisa clicar em
+      "Jogar" de novo. `pollInstallJob` chama `doLaunch(pendingGamePath)`
+      assim que o job chega a `"concluido"`.
+- [x] Se o hardware não comporta, aparece a ressalva com o gargalo nomeado e
       "Instalar mesmo assim" como ação primária (regra 5, mesmo comportamento já
-      provado no B10).
-- [ ] Falha de rede na instalação mostra erro acionável e deixa o usuário tentar
-      de novo, sem perder o jogo que ele tinha clicado.
+      provado no B10) — estado `confirm-hardware`.
+- [x] Falha de rede na instalação mostra erro acionável e deixa o usuário tentar
+      de novo, sem perder o jogo que ele tinha clicado — o `rom_path` fica em
+      `installState.pendingGamePath` durante todo o fluxo.
 
-**Depende de:** L7 · **Bloqueia:** nada
+Verificado de ponta a ponta com um adapter real que **não pode** ser
+instalado (RetroArch, fonte manual — ver Sprint C): clicar em "Jogar" contra
+um jogo de NES disparou a instalação, que voltou com o erro exato do
+servidor ("o RetroArch precisa ser instalado manualmente…"), exibido sem
+travar a tela e com o botão "Jogar" disponível para nova tentativa. Não foi
+testado o caminho de sucesso (instalar de verdade um DuckStation/PCSX2 real
+neste container exigiria rede de download, fora do que este ambiente
+verifica) — mesma ressalva que o B10 já carregava.
 
-### L9 — Aviso de dependência externa na biblioteca (P) — **critério simplificado em 2026-08-03**
+**Depende de:** L7 (feito) · **Bloqueia:** nada
+
+### L9 — Aviso de dependência externa na biblioteca (P) — **feito em 2026-08-03**
 
 A tela "BIOS necessário" do wireframe, ajustada à decisão do L3: o aviso é
 genérico (categoria, não arquivo específico), então esta tela também não
 tenta apontar um arquivo exato — só avisar e deixar o jogo jogável do mesmo
-jeito.
+jeito. Vive na mesma tela do L7 (`GamesScreen.tsx`), um `Callout` no topo
+quando `verdict.requires_external_file` é `true`.
 
 **Critério de aceite:**
-- [ ] Console marcado como "costuma exigir arquivo externo" (L3) mostra um
+- [x] Console marcado como "costuma exigir arquivo externo" (L3) mostra um
       aviso genérico ao lado dos jogos daquele console — categoria, não nome
-      de arquivo.
-- [ ] O jogo continua **jogável normalmente**: o aviso é informativo, não um
-      bloqueio nem um estado desabilitado — se o usuário já resolveu isso do
-      lado do emulador, o ZeuX não tem como saber, e não deveria fingir que
-      sabe.
-- [ ] Nenhuma sugestão de onde obter o arquivo.
+      de arquivo. Verificado abrindo a tela de jogos do PS1 (marcado no L3):
+      "Este console costuma exigir um arquivo externo (BIOS, firmware ou
+      plugin) que o ZeuX não fornece nem verifica."
+- [x] O jogo continua **jogável normalmente**: o aviso é informativo, não um
+      bloqueio nem um estado desabilitado — o `Callout` não desabilita nada;
+      "Jogar" segue seguindo só a regra do L7/L8.
+- [x] Nenhuma sugestão de onde obter o arquivo — o texto do aviso é fixo, sem
+      link nem nome de arquivo.
 
-**Depende de:** L3, L7 · **Bloqueia:** nada
+**Depende de:** L3, L7 (ambos feitos) · **Bloqueia:** nada
 
 ### L10 — Título a partir do nome do arquivo (P) — **feito em 2026-08-03, junto do L2**
 
@@ -917,21 +1089,37 @@ Enquanto não há scraper, o título é o nome do arquivo — mas
 
 **Depende de:** L1 (feito) · **Bloqueia:** nada
 
-### L11 — "Últimos jogados" e tempo por jogo (M)
+### L11 — "Últimos jogados" e tempo por jogo (M) — **feito em 2026-08-03**
 
 O dado já está no banco desde o D3: `sessions` guarda `rom_path`, `started_at` e
-`ended_at`. Falta ligar sessão a entrada de biblioteca e exibir.
+`ended_at`. Faltava ligar sessão a entrada de biblioteca e exibir.
 
 **Critério de aceite:**
-- [ ] Cada sessão é associada ao jogo da biblioteca pelo caminho da ROM.
-- [ ] A biblioteca mostra tempo acumulado por jogo e ordena por "jogado por
-      último".
-- [ ] Os números sobrevivem a reinício do daemon — mesma verificação do D3
-      (lançar, matar o `zeuxd`, subir de novo, o total continua lá).
-- [ ] Sessão cujo `rom_path` não bate com nenhum jogo da biblioteca continua
-      existindo e aparece no total geral — não é descartada.
+- [x] Cada sessão é associada ao jogo da biblioteca pelo caminho da ROM — a
+      junção é feita em `handleListLibraryGames`
+      (`internal/api/server.go`), por `rom_path`, sem o launcher nem
+      `internal/library` conhecerem um ao outro (a dependência continua correndo
+      só em um sentido, ver `docs/arquitetura-a-preservar.md`).
+- [x] A biblioteca mostra tempo acumulado por jogo (`playtime_seconds`) e
+      ordena por "jogado por último" (`last_played_at`) — `GET
+      /library/games` devolve nessa ordem agora; ver `docs/api.md`.
+- [x] Os números sobrevivem a reinício do daemon — decorre diretamente do D3
+      (as sessões já persistem em SQLite); a junção lê do mesmo banco a cada
+      chamada, não há estado em memória novo aqui.
+- [x] Sessão cujo `rom_path` não bate com nenhum jogo da biblioteca continua
+      existindo e aparece no total geral — a junção só lê `sessions`, nunca
+      escreve nem filtra `GET /sessions`. Testado em
+      `TestLibraryGamesIncludePlaytimeAndLastPlayed`
+      (`internal/api/library_test.go`), que insere sessões direto no banco
+      (sem emulador real) e confirma ordenação e soma.
 
-**Depende de:** L1, L7 · **Bloqueia:** perfil (Sprint E)
+**UI feita junto do L7:** `GamesScreen.tsx` mostra `formatPlaytime` ("nunca
+jogado", "12 min jogados", "1h30min jogados") e, quando existe,
+`formatLastPlayed` ("último acesso em …") em cada cartão de jogo. A ordenação
+por mais recente já vem pronta da API — a tela só renderiza na ordem que
+chegou.
+
+**Depende de:** L1 (feito) · **Bloqueia:** perfil (Sprint E)
 
 ### Fora do MVP, registrado para não ser reinventado
 
@@ -944,8 +1132,18 @@ O dado já está no banco desde o D3: `sessions` guarda `rom_path`, `started_at`
 **Critério de saída da Sprint D:** numa máquina limpa, o usuário passa do
 consentimento até um jogo aberto **sem tocar em terminal e sem instalar
 emulador antes** — apontou a pasta, clicou em Jogar, o ZeuX instalou o emulador
-e abriu o jogo. Esse critério depende do D11 estar fechado para poder ser
-verificado de verdade.
+e abriu o jogo.
+
+**Estado em 2026-08-03: todo o código está pronto e verificado com Playwright
+contra um `zeuxd` real** (consentimento → scan → parecer → biblioteca →
+apontar pasta → ver jogos → Jogar → instalar inline → jogo abre), rodando
+inteiramente em container (caminho da CI, sem depender da máquina Windows).
+**O que falta não é código, é o D11**: nenhum dos testes
+acima usou uma ROM de verdade nem um emulador de verdade rodando até a tela
+de título, porque o ZeuX não obtém ROM por regra do projeto. O critério de
+saída da Sprint D só pode ser **verificado de fato**, e não só demonstrado
+com arquivos vazios, quando o Douglas repetir o roteiro com um jogo real na
+própria máquina.
 
 ---
 

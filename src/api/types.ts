@@ -109,6 +109,14 @@ export type ConsoleVerdict = {
    */
   bottlenecks?: string[];
   precision: Precision;
+  /**
+   * `true` para consoles amplamente conhecidos por exigir BIOS/firmware
+   * externo (PS1, PS2, PS3, Saturn, Sega CD, 3DO, Dreamcast, Neo Geo,
+   * Arcade, Xbox, Vita) — nunca varia por patamar. Ausente (nunca `false`)
+   * nos demais. Usado pela biblioteca (L9) para um aviso genérico, nunca um
+   * nome de arquivo.
+   */
+  requires_external_file?: boolean;
 };
 
 export type Report = {
@@ -256,4 +264,32 @@ export type HealthStatus = {
   status: string;
   schema_version: number;
   consoles: number;
+};
+
+// --- Biblioteca (L5, docs/roadmap.md) ---
+
+export type LibraryFolder = {
+  id: number;
+  console_id: string;
+  path: string;
+  added_at: string;
+};
+
+export type LibraryGame = {
+  id: number;
+  folder_id: number;
+  console_id: string;
+  path: string;
+  title: string;
+  added_at: string;
+  /** `true` quando a última varredura não achou mais o arquivo neste caminho —
+   * a entrada continua existindo (o tempo de jogo referencia o caminho), só
+   * marcada. Nunca some da lista sozinha. */
+  missing: boolean;
+  /** Soma de todas as sessões deste jogo (L11). `0` quando nunca foi jogado —
+   * sempre presente, nunca ausente. */
+  playtime_seconds: number;
+  /** Ausente (nunca `""`) quando `playtime_seconds` é `0`. GET /library/games
+   * já devolve os jogos ordenados por este campo, mais recente primeiro. */
+  last_played_at?: string;
 };

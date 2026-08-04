@@ -12,6 +12,8 @@ import type {
   HealthStatus,
   InstallJob,
   LaunchBody,
+  LibraryFolder,
+  LibraryGame,
   PreviewResult,
   Report,
   Session,
@@ -111,4 +113,17 @@ export const api = {
   launch: (body: LaunchBody) => postJSON<Session>("/games/launch", body),
 
   getSessions: () => request<SessionsResponse>("/sessions"),
+
+  addLibraryFolder: (consoleId: string, path: string) =>
+    postJSON<{ folder: LibraryFolder; games_found: number }>("/library/folders", {
+      console_id: consoleId,
+      path,
+    }),
+  getLibraryFolders: () => request<{ folders: LibraryFolder[] }>("/library/folders"),
+  removeLibraryFolder: (id: number) =>
+    request<{ removed: number }>(`/library/folders/${id}`, { method: "DELETE" }),
+  rescanLibraryFolder: (id: number) =>
+    request<{ games_found: number }>(`/library/folders/${id}/scan`, { method: "POST" }),
+  getLibraryGames: (consoleId: string) =>
+    request<{ games: LibraryGame[] }>(`/library/games?console_id=${encodeURIComponent(consoleId)}`),
 };

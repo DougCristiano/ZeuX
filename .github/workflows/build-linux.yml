@@ -1,0 +1,74 @@
+name: Build Linux
+
+# Mesma razão do build-windows.yml: gerar um instalador de teste sem exigir
+# que o Douglas monte a toolchain completa (Rust + libs do WebKitGTK) na
+# própria máquina. Um runner ubuntu-latest já tem o necessário depois de
+# instaladas as dependências de sistema do Tauri para Linux.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "internal/**"
+      - "cmd/**"
+      - "package.json"
+      - "package-lock.json"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/build-linux.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.1"
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # O Tauri para Linux embrulha o WebView do sistema (WebKitGTK), não traz
+      # o próprio motor — sem essas libs de sistema o "tauri build" falha na
+      # etapa de link do binário Rust, não na de empacotamento.
+      - name: Instalar dependências de sistema do Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            file
+
+      - name: Instalar dependências do front-end
+        run: npm ci
+
+      # beforeBuildCommand (src-tauri/tauri.conf.json) já roda
+      # "npm run build:daemon && npm run build" antes de empacotar — não
+      # precisa ser repetido aqui.
+      - name: Build do instalador Tauri
+        run: npm run tauri build
+
+      - name: Publicar o instalador como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeux-linux-installer
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error

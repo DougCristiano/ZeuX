@@ -13,6 +13,13 @@ use tauri::{Manager, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
+#[allow(dead_code)]
+#[cfg(target_os = "windows")]
+const BUNDLED_CORES_RELATIVE_PATH: &str = r"retroarch\cores";
+#[allow(dead_code)]
+#[cfg(not(target_os = "windows"))]
+const BUNDLED_CORES_RELATIVE_PATH: &str = "retroarch/cores";
+
 const ZEUXD_ADDR: &str = "127.0.0.1:7777";
 
 /// Guarda o processo do zeuxd que este app subiu, para poder derrubá-lo junto
@@ -101,10 +108,26 @@ pub fn run() {
                     *app.state::<PortConflict>().0.lock().unwrap() = true;
                 }
                 PortState::Free => {
-                    let (mut events, child) = app
+                    // Calcular caminho de cores bundled para o daemon (ADR 0012).
+                    // Se não existir, daemon silenciosamente ignora (cores podem vir
+                    // do Online Updater do RetroArch).
+                    let bundled_cores_dir = app
+                        .path()
+                        .resource_dir()
+                        .ok()
+                        .and_then(|p| p.join("retroarch/cores").to_str().map(String::from));
+
+                    let mut sidecar = app
                         .shell()
                         .sidecar("zeuxd")
-                        .expect("binário zeuxd não foi encontrado no pacote — rode `npm run build:daemon` antes de `tauri dev`/`tauri build`")
+                        .expect("binário zeuxd não foi encontrado no pacote — rode `npm run build:daemon` antes de `tauri dev`/`tauri build`");
+
+                    // Passar ZEUX_BUNDLED_CORES_DIR se cores empacotados existem
+                    if let Some(cores_dir) = bundled_cores_dir {
+                        sidecar = sidecar.env("ZEUX_BUNDLED_CORES_DIR", cores_dir);
+                    }
+
+                    let (mut events, child) = sidecar
                         .args(["--addr", ZEUXD_ADDR])
                         .spawn()
                         .expect("falha ao iniciar o processo do zeuxd");

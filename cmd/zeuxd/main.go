@@ -19,6 +19,7 @@ import (
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
 	"github.com/doufl/zeux/internal/install"
+	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/store"
 	"github.com/doufl/zeux/internal/verdict"
 )
@@ -88,9 +89,11 @@ func run(addr string, logger *slog.Logger) error {
 	}
 	installer := install.NewManager(sources, logger)
 
+	libraryStore := library.NewStore(db)
+
 	server := api.NewServer(
 		hardware.NewProbe(), catalog, consentStore,
-		registry, customStore, launcher, installer, logger)
+		registry, customStore, launcher, installer, libraryStore, logger)
 
 	// Só quem está rodando o front em modo desenvolvimento (`npm run tauri
 	// dev`) define esta variável — o instalador nunca a define, então o

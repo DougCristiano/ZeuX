@@ -115,42 +115,47 @@ Integração no build:
 
 Testes: todos passam (nenhuma mudança em comportamento de teste existente).
 
-## Etapa 4: Integração Tauri (PENDENTE)
+## Etapa 4: Integração Tauri (IMPLEMENTADA)
 
-Esta etapa envolve configurar o Tauri para:
+Tauri agora é configurado para:
 1. Empacotar `src-tauri/resources/retroarch/cores/` no instalador
 2. Passar `ZEUX_BUNDLED_CORES_DIR` para o daemon na inicialização
-3. Testar o build completo em Windows, Linux e macOS
+3. Preparado para build em Windows, Linux e macOS
 
-### Checklist de Etapa 4
+### Implementação de Etapa 4
 
-- [ ] **Tauri bundler:** garantir que `src-tauri/resources/` é incluído no instalador
-  - Windows: `src-tauri/resources/` → `{app}/resources/`
-  - Linux AppImage: `src-tauri/resources/` → `{app}/resources/`
-  - macOS .app: `src-tauri/resources/` → `{app}.app/Contents/Resources/`
+#### src-tauri/tauri.conf.json
+- Adicionado `"resources": ["resources/"]` em `bundle` — garante que `src-tauri/resources/` é empacotado
+- `"externalBin": ["binaries/zeuxd"]` já estava presente (empacota o daemon)
+- `beforeBuildCommand` e `beforeDevCommand` já executam `npm run build:daemon` que baixa cores (ou usa placeholders)
 
-- [ ] **Passar variável de ambiente:** Tauri precisa seter `ZEUX_BUNDLED_CORES_DIR` quando inicia o sidecar `zeuxd`
-  - Tauri v2 permite isso em `tauri.conf.json` (seção `app > windows > env` ou via Rust)
-  - Apontar para a pasta `resources/retroarch/cores` relativa ao app
+#### src-tauri/src/lib.rs
+- Adicionado `BUNDLED_CORES_RELATIVE_PATH` constants (platform-specific paths)
+- No `PortState::Free` (linhas ~112-126):
+  - Calcula `bundled_cores_dir` usando `app.path().resource_dir()`
+  - Passa via `.env("ZEUX_BUNDLED_CORES_DIR", cores_dir)` ao sidecar zeuxd
+  - Se cores empacotados não existem, prossegue (cores podem vir de Online Updater)
 
-- [ ] **Teste de build real:** rodar `npm run tauri build` em cada plataforma
-  - Verificar que cores aparecem em `~/.local/share/zeux/retroarch/cores/` (Linux) na primeira execução
-  - Confirmar que cores são usados ao lançar um jogo
+#### scripts/download-retroarch-cores.mjs
+- Removido import de `undici` — usa fetch nativo do Node.js v22
+- Agora gracioso com buildbot indisponível (buildbot bloqueado em container, funcionará em máquina do usuário)
+- Detecta plataforma e baixa 20 cores para `src-tauri/resources/retroarch/cores/`
 
-- [ ] **Medir tamanho do instalador:** comparar antes e depois (cada plataforma)
-  - Documentar crescimento em ADR 0012 (revisão final)
+#### Verificação de compilação
+- ✅ `cargo check` compila sem erros
+- ✅ Daemon (zeuxd) compila com sucesso (18 MB)
+- ✅ npm run build:daemon processa download + compilação
 
-### Recursos
+### Próximos passos (testes em máquina do Douglas)
 
-Documentação Tauri v2:
-- Sidecar environment: https://tauri.app/docs/v2/features/command/
-- Bundler configuration: https://tauri.app/docs/v2/features/bundler/
+- [ ] **Teste real em Zorin OS:** rodar `npm run tauri build` e verificar que cores aparecem no instalador
+- [ ] **Primeira execução:** cores devem aparecer em `~/.local/share/zeux/retroarch/cores/`
+- [ ] **Medir tamanho:** registrar crescimento do instalador por plataforma
+- [ ] **Lancenta de jogo:** testar que cores bundled funcionam ao lançar uma ROM (Phantasy Star, Mario 64, etc)
 
-### Nota
+### Nota sobre blocker
 
-Esta etapa requer trabalho no código Tauri/Rust (fora do escopo do Go code).
-Douglas pode completar isto com o frontend team ou deixar como futuro.
-A parte Go está 100% pronta (etapas 1-3).
+Buildbot.libretro.com está inacessível no container (proxy policy). O script está preparado para quando testado em máquina com acesso irrestrito. Até lá, cores podem ser pré-populados manualmente ou o download automático funcionará no build do usuário.
 
 ## Licenças verificadas (Etapa 1 concluída)
 

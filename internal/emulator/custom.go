@@ -227,14 +227,6 @@ func (s *CustomStore) loadLocked() ([]CustomDefinition, error) {
 	return definitions, nil
 }
 
-// Save grava a lista completa de forma atômica.
-func (s *CustomStore) Save(definitions []CustomDefinition) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	return s.saveLocked(definitions)
-}
-
 func (s *CustomStore) saveLocked(definitions []CustomDefinition) error {
 	if definitions == nil {
 		definitions = []CustomDefinition{}
@@ -249,6 +241,20 @@ func (s *CustomStore) saveLocked(definitions []CustomDefinition) error {
 	if err := os.WriteFile(temp, data, 0o644); err != nil {
 		return fmt.Errorf("gravando emuladores personalizados: %w", err)
 	}
+
+	// fsync garante que o arquivo está no disco antes do rename — resiste a
+	// queda de energia no meio da operação.
+	file, err := os.Open(temp)
+	if err != nil {
+		os.Remove(temp)
+		return fmt.Errorf("reabrindo para fsync: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		file.Close()
+		os.Remove(temp)
+		return fmt.Errorf("sincronizando ao disco: %w", err)
+	}
+	file.Close()
 
 	if err := os.Rename(temp, s.path); err != nil {
 		os.Remove(temp)

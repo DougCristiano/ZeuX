@@ -76,6 +76,11 @@ está em português e já pode ser exibida ao usuário como está.
 | POST | `/api/v1/games/preview` | Monta a linha de comando sem executar |
 | POST | `/api/v1/games/launch` | Executa o jogo |
 | GET | `/api/v1/sessions` | Histórico de sessões + tempo de jogo |
+| POST | `/api/v1/library/folders` | Aponta uma pasta a um console e varre na hora |
+| GET | `/api/v1/library/folders` | Lista as pastas apontadas |
+| DELETE | `/api/v1/library/folders/{id}` | Remove a referência à pasta (não apaga arquivo) |
+| POST | `/api/v1/library/folders/{id}/scan` | Revarre uma pasta já apontada |
+| GET | `/api/v1/library/games` | Lista os jogos achados para um console |
 
 ---
 
@@ -284,7 +289,7 @@ O parecer completo: resumo do hardware em prosa + um veredito por console.
 curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 ```
 
-**200 OK** (recortado — a lista real traz os 13 consoles):
+**200 OK** (recortado — a lista real traz os 33 consoles):
 
 ```json
 {
@@ -359,6 +364,7 @@ curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 | `next_level` | string | O patamar imediatamente acima do alcançado. Ausente quando o console já está no melhor patamar. |
 | `bottlenecks` | array de string | **O que exatamente barra o `next_level`**, uma frase por requisito não atendido, nomeando o componente. **Ausente** (não `[]`) quando não há gargalo a reportar — `omitempty` no Go remove o campo para uma slice vazia (achado rodando `npm run verificar-api` contra o daemon real, item B6 do [plano da Sprint B](sprint-b-plano.md); esta linha dizia "vazio" antes de ser corrigida). |
 | `precision` | `"completa"` \| `"parcial"` | Deste console especificamente. `"parcial"` quando algum requisito não pôde ser verificado. |
+| `requires_external_file` | bool | `true` quando o console é amplamente conhecido por exigir BIOS/firmware/plugin externo (PS1, PS2, PS3, Saturn, Sega CD, 3DO, Dreamcast, Neo Geo, Arcade, Xbox, Vita). **Não varia por patamar** — vem do catálogo, não da avaliação de hardware. Ausente (nunca `false`) nos demais consoles (item L3, `docs/roadmap.md`). A biblioteca (L9) usa isto para um aviso genérico, nunca um nome de arquivo. |
 
 **404 `no_scan_yet`** — execute o scan antes.
 
@@ -366,7 +372,7 @@ curl http://127.0.0.1:7777/api/v1/consoles/verdicts
 
 ## GET /api/v1/emulators
 
-Varre o disco procurando cada um dos 13 emuladores embutidos, mais os
+Varre o disco procurando cada um dos 14 emuladores embutidos, mais os
 personalizados que o usuário tiver definido (ver `/custom-emulators` abaixo).
 **Não recebe parâmetros.**
 
@@ -728,6 +734,7 @@ foi aplicado (é o caso do Dolphin).
 | 400 | `missing_fields` | `rom_path` ou `console_id` vazios. |
 | 400 | `no_scan_yet` | `options` não veio e não há scan na sessão. |
 | 400 | `unknown_console` | `options` não veio e o `console_id` não está no catálogo. |
+| 400 | `no_preset_available` | `options` não veio, o `console_id` **existe** no catálogo, mas não alcançou nenhum patamar nesta máquina (`level: "improvavel"`). Distinto de `unknown_console`: o catálogo conhece o console, só não recomenda para este hardware. |
 | 400 | `emulator_unavailable` | Adapter desconhecido, adapter que não atende o console, ou nenhum emulador para o console encontrado no disco. |
 | 400 | `command_failed` | `BuildCommand` recusou. O caso mais comum é core do RetroArch ausente no disco — a mensagem nomeia o core faltante. |
 
@@ -780,7 +787,8 @@ nem `is_running` — esses dois só aparecem em `GET /sessions`.
 **Erros**
 
 Os mesmos de `/preview` para decodificação e autoconfiguração
-(`invalid_body`, `missing_fields`, `no_scan_yet`, `unknown_console`), mais:
+(`invalid_body`, `missing_fields`, `no_scan_yet`, `unknown_console`,
+`no_preset_available`), mais:
 
 | Status | `code` | Quando |
 |---|---|---|
@@ -861,6 +869,163 @@ lido. Ver o catálogo de códigos de erro.
 
 ---
 
+## POST /api/v1/library/folders
+
+Aponta uma pasta a um console e varre imediatamente — a resposta já traz
+quantos jogos foram achados, sem exigir uma segunda chamada.
+
+> **Regra legal, não negociável (CLAUDE.md):** esta rota só grava um caminho
+> que já existe no disco do usuário. Nunca copia, move nem lê o conteúdo dos
+> arquivos achados — só extensão e nome, para título e filtro.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/library/folders \
+  -H "Content-Type: application/json" \
+  -d '{"console_id":"nes","path":"C:\\Jogos\\NES"}'
+```
+
+**200 OK**
+
+```json
+{
+  "folder": {
+    "id": 1,
+    "console_id": "nes",
+    "path": "C:\\Jogos\\NES",
+    "added_at": "2026-08-03T20:00:00Z"
+  },
+  "games_found": 12
+}
+```
+
+Apontar a mesma pasta para o mesmo console duas vezes devolve a pasta já
+existente (mesmo `id`), não uma segunda linha — e revarre na mesma chamada.
+
+| Erro | Status | Motivo |
+|---|---|---|
+| `invalid_body` | 400 | JSON malformado. |
+| `missing_fields` | 400 | `console_id` ou `path` vazios. |
+| `unknown_console` | 400 | `console_id` fora do catálogo. |
+| `path_not_found` | 400 | O caminho não existe ou não é uma pasta. Mensagem nomeia o caminho. |
+| `library_write_failed` | 500 | Erro de I/O gravando no banco local. |
+| `library_scan_failed` | 500 | Erro de I/O varrendo a pasta ou gravando os jogos achados. |
+
+---
+
+## GET /api/v1/library/folders
+
+Lista todas as pastas apontadas, das mais recentes para as mais antigas.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/library/folders
+```
+
+**200 OK**
+
+```json
+{
+  "folders": [
+    {"id": 1, "console_id": "nes", "path": "C:\\Jogos\\NES", "added_at": "2026-08-03T20:00:00Z"}
+  ]
+}
+```
+
+---
+
+## DELETE /api/v1/library/folders/{id}
+
+Remove a referência à pasta — nunca o arquivo no disco do usuário. Por
+`ON DELETE CASCADE` (migração `0002_library.sql`), os jogos que vieram dela
+somem junto; os de outras pastas não são afetados.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/library/folders/1
+```
+
+**200 OK** `{"removed": 1}`
+
+**404 `not_found`** — nenhuma pasta com este `id`.
+
+---
+
+## POST /api/v1/library/folders/{id}/scan
+
+Revarre uma pasta já apontada, sem precisar reenviar `console_id`/`path`. Jogo
+novo entra; jogo que sumiu do disco desde a última varredura fica marcado
+`missing: true` em vez de desaparecer da lista — ele pode estar num HD externo
+desconectado, e o tempo de jogo (D3) referencia o jogo por caminho.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/library/folders/1/scan
+```
+
+**200 OK** `{"games_found": 12}` — `games_found` é o total encontrado *nesta*
+varredura, não um delta desde a anterior.
+
+| Erro | Status | Motivo |
+|---|---|---|
+| `invalid_id` | 400 | `{id}` não é numérico. |
+| `not_found` | 404 | Nenhuma pasta com este `id`. |
+| `unknown_console` | 500 | O console desta pasta saiu do catálogo desde que ela foi apontada (dado inconsistente, não erro do usuário). |
+| `library_scan_failed` | 500 | Erro de I/O varrendo a pasta ou reconciliando com o banco. |
+
+---
+
+## GET /api/v1/library/games
+
+Lista os jogos achados para um console, **jogado mais recentemente primeiro**
+— quem nunca foi jogado vai para o fim, na ordem em que foi achado (item L11,
+`docs/roadmap.md`).
+
+> `playtime_seconds` e `last_played_at` vêm de uma junção com `sessions` por
+> `rom_path`, feita nesta rota — nem `internal/library` nem o launcher
+> conhecem um ao outro (ver `docs/arquitetura-a-preservar.md`). Uma sessão
+> cujo `rom_path` não bate com nenhum jogo simplesmente não aparece aqui; ela
+> continua existindo normalmente em `GET /sessions`.
+
+```bash
+curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
+```
+
+**200 OK**
+
+```json
+{
+  "games": [
+    {
+      "id": 5,
+      "folder_id": 1,
+      "console_id": "nes",
+      "path": "C:\\Jogos\\NES\\Jogo (USA).nes",
+      "title": "Jogo",
+      "added_at": "2026-08-03T20:00:00Z",
+      "missing": false,
+      "playtime_seconds": 412,
+      "last_played_at": "2026-08-03T21:10:00Z"
+    },
+    {
+      "id": 6,
+      "folder_id": 1,
+      "console_id": "nes",
+      "path": "C:\\Jogos\\NES\\Outro Jogo.nes",
+      "title": "Outro Jogo",
+      "added_at": "2026-08-03T20:00:00Z",
+      "missing": false,
+      "playtime_seconds": 0
+    }
+  ]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `playtime_seconds` | int | Soma de `duration_seconds` de todas as sessões deste `rom_path`. `0` quando nunca foi jogado — sempre presente, nunca omitido. |
+| `last_played_at` | string | **Ausente** (não `""`) quando `playtime_seconds` é `0`. |
+
+**400 `missing_fields`** — sem `console_id` na query string.
+
+---
+
 ## Catálogo de códigos de erro
 
 | `code` | Status | Rotas | Significado |
@@ -869,7 +1034,9 @@ lido. Ver o catálogo de códigos de erro.
 | `missing_fields` | 400 | `/games/*` | `rom_path` ou `console_id` vazios. |
 | `no_scan_yet` | 404 | GET `/hardware`, `/consoles/verdicts` | Nenhum scan nesta sessão. |
 | `no_scan_yet` | **400** | `/games/*` | Autoconfiguração pediu o scan e não achou. Mesmo `code`, status diferente por rota. |
-| `unknown_console` | 400 | `/games/*` | `console_id` fora do catálogo (só verificado quando `options` não vem). |
+| `unknown_console` | 400 | `/games/*`, POST `/library/folders` | `console_id` fora do catálogo (em `/games/*`, só verificado quando `options` não vem). |
+| `unknown_console` | **500** | POST `/library/folders/{id}/scan` | O console da pasta saiu do catálogo depois de apontada — dado inconsistente, não erro do usuário. |
+| `no_preset_available` | 400 | `/games/*` | `options` não veio; o console existe no catálogo mas não alcançou nenhum patamar nesta máquina. Nunca confundido com `unknown_console` — achado durante o L7, `docs/roadmap.md`. |
 | `consent_required` | 403 | POST `/hardware/scan` | Sem "sim" válido para a política atual. |
 | `consent_read_failed` | 500 | GET/POST `/consent`, POST `/hardware/scan` | Erro de I/O lendo `consent.json`. |
 | `consent_write_failed` | 500 | POST `/consent` | Erro de I/O gravando `consent.json`. |
@@ -883,6 +1050,11 @@ lido. Ver o catálogo de códigos de erro.
 | `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |
 | `install_refused` | 400 | POST `/emulators/{id}/install` | Fonte desconhecida, fonte manual, ou instalação já em andamento para este emulador. |
 | `uninstall_failed` | 400 | DELETE `/emulators/{id}/install` | Nada gerenciado para remover, ou falha ao apagar os arquivos. |
+| `invalid_id` | 400 | DELETE `/library/folders/{id}`, POST `/library/folders/{id}/scan` | `{id}` não é numérico. |
+| `path_not_found` | 400 | POST `/library/folders` | O caminho informado não existe ou não é uma pasta. |
+| `library_write_failed` | 500 | POST `/library/folders` | Erro de I/O gravando a pasta no banco local. |
+| `library_read_failed` | 500 | GET `/library/folders`, `/library/games`, POST `/library/folders/{id}/scan` | Erro de I/O lendo o banco local. |
+| `library_scan_failed` | 500 | POST `/library/folders`, `/library/folders/{id}/scan` | Erro de I/O varrendo a pasta ou gravando os jogos achados. |
 
 ---
 
@@ -905,6 +1077,16 @@ Invoke-RestMethod "$base/consoles/verdicts" | ConvertTo-Json -Depth 6
 Invoke-RestMethod "$base/emulators" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/emulator-sources" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/sessions"
+
+# Biblioteca: aponte uma pasta que exista de verdade na sua máquina
+$folder = Invoke-RestMethod "$base/library/folders" -Method Post `
+  -Body '{"console_id":"nes","path":"C:\Jogos\NES"}' -ContentType "application/json"
+$folder | ConvertTo-Json -Depth 5
+
+Invoke-RestMethod "$base/library/folders" | ConvertTo-Json -Depth 5
+Invoke-RestMethod "$base/library/games?console_id=nes" | ConvertTo-Json -Depth 5
+Invoke-RestMethod "$base/library/folders/$($folder.folder.id)/scan" -Method Post
+Invoke-RestMethod "$base/library/folders/$($folder.folder.id)" -Method Delete
 
 # Revogar também apaga o scan da memória: a próxima linha deve dar 404
 Invoke-RestMethod "$base/consent" -Method Post -Body '{"granted":false}' -ContentType "application/json"

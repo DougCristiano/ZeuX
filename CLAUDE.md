@@ -84,7 +84,10 @@ internal/api/        rotas HTTP e formato de erro
 internal/consent/    consentimento persistido e versionado
 internal/hardware/   detecção de CPU/RAM (gopsutil) e GPU (um arquivo por SO)
 internal/verdict/    catálogo embutido + motor de parecer
-internal/emulator/   adapters, descoberta de binários, launcher e sessões
+internal/emulator/   adapters, descoberta de binários, launcher
+internal/install/    gerenciador de instalação de emuladores
+internal/library/    catálogo de ROMs do usuário (não plugado — L5)
+internal/store/      persistência de preferências (SQLite)
 docs/                esta documentação
 ```
 
@@ -156,8 +159,8 @@ que o usuário lê vem de `Level.Headline()`.
 
 ### Concorrência
 
-- Estado compartilhado no `Server` e no `Launcher` é protegido por
-  `sync.RWMutex`. Mantenha o padrão.
+- Estado compartilhado no `Server` é protegido por `sync.RWMutex`. Mantenha o padrão.
+  (`Launcher` mudou em ADR 0011: sessões foram para SQLite, sem estado mutável local.)
 - **Nunca amarre o processo do emulador ao contexto da requisição HTTP.** O jogo
   precisa sobreviver à resposta. `session.go` usa `context.Background()` de
   propósito.
@@ -247,9 +250,7 @@ descontinuados após ação judicial. Ver
 - ❌ **Não faça `BuildCommand` executar nada** nem tocar o sistema de arquivos
   (com a exceção já existente do RetroArch, que precisa localizar o core).
 - ❌ **Não instale Rust, MSVC Build Tools nem dependências de Node** sem pedir.
-  O adiamento é deliberado ([ADR 0004](docs/decisoes/0004-adiar-rust-e-tauri.md)),
-  e há uma pendência de OneDrive a resolver antes do primeiro `npm install`
-  ([roadmap D4](docs/roadmap.md)).
+  O adiamento é deliberado ([ADR 0004](docs/decisoes/0004-adiar-rust-e-tauri.md)).
 - ❌ **Não presuma que uma funcionalidade do PRD existe.** A maior parte não
   existe. Confira no código antes de afirmar.
 
@@ -264,15 +265,14 @@ Coisas que já custaram tempo e vale saber de antemão:
   `is_running` de `GET /sessions`.
 - **`retroArchAdapter.Consoles()` devolve ordem não determinística** (iteração de
   mapa). `Registry.Survey` ordena antes de expor.
-- **`findBinary` não é recursiva.** Não acha
-  `C:\Program Files\DuckStation\duckstation-qt.exe`. Ver roadmap D6.
+- **`findBinary` desce um nível de diretório.** Em `C:\Program Files\DuckStation\`,
+  encontra `duckstation-qt.exe`. Em `/home`, não entra em subdiretórios além de um.
+  Ver roadmap D6 se precisar de profundidade maior.
 - **`Options.Extra` é anexado depois do caminho da ROM**, o que no PCSX2 o coloca
   depois do separador `--`.
-- **Três adapters ignoram opções sem reportar em `Unapplied`**: RetroArch
-  (`exit_on_close`), Flycast (`renderer`, `exit_on_close`), Cemu
-  (`exit_on_close`). Ver roadmap D5.
 - **`Installation.Version` nunca é preenchido.** Nenhum adapter detecta versão.
-- **`mise.toml` usa `latest`/`lts`, não versões fixas.** Ver roadmap D7.
+- **`mise.toml` usa versões fixas:** `go = "1.26.5"`, `node = "24.18.1"`
+  (não latest/lts). Ver comentário no arquivo sobre por quê.
 - **O `README.md` está desatualizado**: diz que não há lançamento de emulador,
   e não lista as rotas de `/emulators`, `/games/*` e `/sessions`.
 

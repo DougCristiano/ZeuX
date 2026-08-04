@@ -33,19 +33,23 @@ Verificado — o grafo é acíclico e raso:
                     cmd/zeuxd
                         │
                        api
-        ┌───────┬───────┼────────┬─────────┐
-     consent  hardware  verdict  install  emulator
+        ┌───────┬───────┼────────┬─────────┬─────────┐
+     consent  hardware  verdict  install  emulator  library
                         │  │      │
                         │  └──────┼──> emulator
                         └─────────┴──> hardware
 ```
 
-`emulator`, `hardware` e `consent` **não importam nada interno**. São folhas, e
-devem continuar sendo.
+`hardware` e `consent` são folhas (não importam nada interno). `emulator` importa
+`store` (para persistência de customizações), mas **não importa `verdict`**.
+`library` (L1, L2, L5) também importa só `store` — nenhum dos dois pacotes de
+persistência conhece `verdict` ou `emulator`; é a API quem cruza
+`library.NewGame` com `console.Extensions` do catálogo, não o contrário.
 
-**Regra:** `verdict` depende de `emulator`, **nunca** o contrário. O catálogo
+**Regra crítica:** `verdict` depende de `emulator`, **nunca** o contrário. O catálogo
 carrega `emulator.Options` direto, e é isso que permite o parecer devolver um
 preset já aplicável em vez de texto que a interface precisaria reinterpretar.
+Se algum dia `emulator` precisar de `verdict`, é sinal de problema de desenho.
 
 **O que quebra:** se `emulator` passar a precisar de `verdict`, vira ciclo — e o
 ciclo é o sintoma, não a doença. A doença seria o adapter ter começado a decidir

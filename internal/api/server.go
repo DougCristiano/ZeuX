@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +19,7 @@ import (
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
 	"github.com/doufl/zeux/internal/install"
+	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/verdict"
 )
 
@@ -28,6 +32,7 @@ type Server struct {
 	customs   *emulator.CustomStore
 	launcher  *emulator.Launcher
 	installs  *install.Manager
+	library   *library.Store
 	logger    *slog.Logger
 
 	// devOrigin é a origem extra liberada por SetDevOrigin. Só é lido, nunca
@@ -48,6 +53,7 @@ func NewServer(
 	customs *emulator.CustomStore,
 	launcher *emulator.Launcher,
 	installs *install.Manager,
+	libraryStore *library.Store,
 	logger *slog.Logger,
 ) *Server {
 	return &Server{
@@ -58,6 +64,7 @@ func NewServer(
 		customs:   customs,
 		launcher:  launcher,
 		installs:  installs,
+		library:   libraryStore,
 		logger:    logger,
 	}
 }
@@ -89,6 +96,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/games/launch", s.handleLaunch)
 	mux.HandleFunc("POST /api/v1/games/preview", s.handlePreviewLaunch)
 	mux.HandleFunc("GET /api/v1/sessions", s.handleSessions)
+
+	mux.HandleFunc("POST /api/v1/library/folders", s.handleAddLibraryFolder)
+	mux.HandleFunc("GET /api/v1/library/folders", s.handleListLibraryFolders)
+	mux.HandleFunc("DELETE /api/v1/library/folders/{id}", s.handleRemoveLibraryFolder)
+	mux.HandleFunc("POST /api/v1/library/folders/{id}/scan", s.handleScanLibraryFolder)
+	mux.HandleFunc("GET /api/v1/library/games", s.handleListLibraryGames)
 
 	return s.withLogging(s.withCORS(mux))
 }
@@ -207,14 +220,10 @@ func (s *Server) hardwareBlocks(adapterID string) (bool, string) {
 		return false, ""
 	}
 
-	supported := make(map[string]bool)
-	for _, id := range adapter.Consoles() {
-		supported[id] = true
-	}
-
 	var worst []string
-	for _, result := range verdict.Evaluate(s.catalog, info).Verdicts {
-		if !supported[result.ConsoleID] {
+	for _, consoleID := range adapter.Consoles() {
+		result, err := verdict.EvaluateConsole(s.catalog, info, consoleID)
+		if err != nil {
 			continue
 		}
 		if result.Level != verdict.LevelImprovavel {
@@ -349,22 +358,26 @@ func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 		return emulator.LaunchInput{}, fmt.Errorf("no_scan")
 	}
 
-	for _, result := range verdict.Evaluate(s.catalog, info).Verdicts {
-		if result.ConsoleID != body.ConsoleID || result.Options == nil {
-			continue
-		}
-
-		input.Options = *result.Options
-		if input.EmulatorID == "" {
-			input.EmulatorID = result.AdapterID
-		}
-		if input.Core == "" {
-			input.Core = result.Core
-		}
-		return input, nil
+	result, err := verdict.EvaluateConsole(s.catalog, info, body.ConsoleID)
+	if err != nil {
+		return emulator.LaunchInput{}, fmt.Errorf("no_console")
+	}
+	// O console existe, mas nenhum patamar foi alcançado nesta máquina
+	// (level "improvavel") — diferente de console inexistente. Confundir os
+	// dois diria "console desconhecido" para um console que o catálogo
+	// conhece muito bem, só não recomenda para este hardware.
+	if result.Options == nil {
+		return emulator.LaunchInput{}, fmt.Errorf("no_preset")
 	}
 
-	return emulator.LaunchInput{}, fmt.Errorf("no_console")
+	input.Options = *result.Options
+	if input.EmulatorID == "" {
+		input.EmulatorID = result.AdapterID
+	}
+	if input.Core == "" {
+		input.Core = result.Core
+	}
+	return input, nil
 }
 
 func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
@@ -448,6 +461,9 @@ func (s *Server) decodeLaunch(w http.ResponseWriter, r *http.Request) (emulator.
 		case "no_scan":
 			s.writeError(w, http.StatusBadRequest, "no_scan_yet",
 				"Execute o scan de hardware para que o ZeuX escolha a configuração, ou envie o campo options.")
+		case "no_preset":
+			s.writeError(w, http.StatusBadRequest, "no_preset_available",
+				"Este computador não alcançou nenhum patamar de compatibilidade conhecido para este console. Envie o campo options para configurar manualmente.")
 		default:
 			s.writeError(w, http.StatusBadRequest, "unknown_console",
 				"O console informado não está no catálogo do ZeuX.")
@@ -475,6 +491,230 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 		"sessions":         sessions,
 		"playtime_seconds": playtime,
 	})
+}
+
+// addLibraryFolderBody é o pedido para apontar uma pasta de ROM a um console.
+type addLibraryFolderBody struct {
+	ConsoleID string `json:"console_id"`
+	Path      string `json:"path"`
+}
+
+// handleAddLibraryFolder aponta uma pasta a um console e varre imediatamente,
+// para que a resposta já diga quantos jogos foram encontrados — o usuário não
+// deveria precisar de uma segunda chamada só para ver o resultado do que
+// acabou de apontar.
+func (s *Server) handleAddLibraryFolder(w http.ResponseWriter, r *http.Request) {
+	var body addLibraryFolderBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON com {"console_id": "...", "path": "..."}.`)
+		return
+	}
+
+	if body.ConsoleID == "" || body.Path == "" {
+		s.writeError(w, http.StatusBadRequest, "missing_fields",
+			"Os campos console_id e path são obrigatórios.")
+		return
+	}
+
+	console, ok := s.catalog.ConsoleByID(body.ConsoleID)
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "unknown_console",
+			"O console informado não está no catálogo do ZeuX.")
+		return
+	}
+
+	info, err := os.Stat(body.Path)
+	if err != nil || !info.IsDir() {
+		s.writeError(w, http.StatusBadRequest, "path_not_found",
+			fmt.Sprintf("A pasta %q não existe ou não é um diretório.", body.Path))
+		return
+	}
+
+	folder, err := s.library.AddFolder(r.Context(), body.ConsoleID, body.Path)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
+		return
+	}
+
+	found, err := s.syncLibraryFolder(r.Context(), folder, console)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"folder":      folder,
+		"games_found": found,
+	})
+}
+
+func (s *Server) handleListLibraryFolders(w http.ResponseWriter, r *http.Request) {
+	folders, err := s.library.ListFolders(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
+	}
+	if folders == nil {
+		folders = []library.Folder{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"folders": folders})
+}
+
+// handleRemoveLibraryFolder apaga a pasta do banco — nunca o arquivo no disco
+// do usuário, só a referência (ver library.Store.RemoveFolder).
+func (s *Server) handleRemoveLibraryFolder(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id",
+			"O identificador da pasta deve ser numérico.")
+		return
+	}
+
+	if err := s.library.RemoveFolder(r.Context(), id); err != nil {
+		s.writeError(w, http.StatusNotFound, "not_found", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"removed": id})
+}
+
+// handleScanLibraryFolder repete a varredura de uma pasta já apontada —
+// achando jogos novos e marcando como ausentes (library.Game.Missing) os que
+// sumiram do disco desde a última vez.
+func (s *Server) handleScanLibraryFolder(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id",
+			"O identificador da pasta deve ser numérico.")
+		return
+	}
+
+	folder, ok, err := s.library.FolderByID(r.Context(), id)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
+	}
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found",
+			fmt.Sprintf("Nenhuma pasta com o id %d.", id))
+		return
+	}
+
+	console, ok := s.catalog.ConsoleByID(folder.ConsoleID)
+	if !ok {
+		s.writeError(w, http.StatusInternalServerError, "unknown_console",
+			"O console desta pasta não está mais no catálogo do ZeuX.")
+		return
+	}
+
+	found, err := s.syncLibraryFolder(r.Context(), folder, console)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"games_found": found})
+}
+
+// gameWithStats acrescenta tempo de jogo e "jogado por último" (L11,
+// docs/roadmap.md) a um library.Game, sem alterar o tipo de domínio — a
+// junção com sessões é responsabilidade da API, não da biblioteca.
+type gameWithStats struct {
+	library.Game
+	PlaytimeSeconds int    `json:"playtime_seconds"`
+	LastPlayedAt    string `json:"last_played_at,omitempty"`
+}
+
+func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) {
+	consoleID := r.URL.Query().Get("console_id")
+	if consoleID == "" {
+		s.writeError(w, http.StatusBadRequest, "missing_fields",
+			"O parâmetro console_id é obrigatório.")
+		return
+	}
+
+	games, err := s.library.ListGames(r.Context(), consoleID)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
+	}
+
+	// Sessões vêm por rom_path, não por id de jogo — o launcher nunca soube
+	// da biblioteca (a dependência corre num sentido só, ver
+	// docs/arquitetura-a-preservar.md), então a junção é feita aqui. Uma
+	// sessão cujo rom_path não bate com nenhum jogo simplesmente não
+	// contribui para nenhuma linha; ela continua existindo em GET /sessions,
+	// que não passa por este código.
+	sessions, err := s.launcher.Sessions(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
+	}
+
+	type stat struct {
+		seconds int
+		last    time.Time
+	}
+	byPath := make(map[string]stat, len(sessions))
+	for _, session := range sessions {
+		st := byPath[session.ROMPath]
+		st.seconds += session.DurationSeconds
+		if session.StartedAt.After(st.last) {
+			st.last = session.StartedAt
+		}
+		byPath[session.ROMPath] = st
+	}
+
+	result := make([]gameWithStats, 0, len(games))
+	for _, game := range games {
+		gw := gameWithStats{Game: game}
+		if st, ok := byPath[game.Path]; ok {
+			gw.PlaytimeSeconds = st.seconds
+			gw.LastPlayedAt = st.last.Format(time.RFC3339)
+		}
+		result = append(result, gw)
+	}
+
+	// Jogado mais recentemente primeiro; nunca jogado vai para o fim, na
+	// ordem que ListGames já devolveu (mais recém-adicionado primeiro).
+	sort.SliceStable(result, func(i, j int) bool {
+		if result[i].LastPlayedAt == "" {
+			return false
+		}
+		if result[j].LastPlayedAt == "" {
+			return true
+		}
+		return result[i].LastPlayedAt > result[j].LastPlayedAt
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{"games": result})
+}
+
+// syncLibraryFolder varre o disco a partir de folder, usando as extensões do
+// console, e reconcilia o resultado com o banco. Devolve quantos jogos a
+// varredura encontrou desta vez.
+func (s *Server) syncLibraryFolder(ctx context.Context, folder library.Folder, console verdict.Console) (int, error) {
+	paths, err := library.FindROMs(folder.Path, console.Extensions)
+	if err != nil {
+		return 0, err
+	}
+
+	games := make([]library.NewGame, 0, len(paths))
+	for _, path := range paths {
+		games = append(games, library.NewGame{
+			ConsoleID: folder.ConsoleID,
+			Path:      path,
+			Title:     library.TitleFromFilename(path),
+		})
+	}
+
+	if err := s.library.SyncFolder(ctx, folder.ID, games); err != nil {
+		return 0, err
+	}
+
+	return len(games), nil
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

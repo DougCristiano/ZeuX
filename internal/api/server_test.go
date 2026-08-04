@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
 	"github.com/doufl/zeux/internal/install"
+	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/store"
 	"github.com/doufl/zeux/internal/verdict"
 )
@@ -60,6 +62,15 @@ func beefyHardware() hardware.HardwareInfo {
 // diretório temporário exclusivo do teste.
 func newTestServer(t *testing.T, probe hardware.Probe) *api.Server {
 	t.Helper()
+	server, _ := newTestServerWithDB(t, probe)
+	return server
+}
+
+// newTestServerWithDB é igual a newTestServer, mas também devolve o *sql.DB
+// subjacente — para os poucos testes (L11) que precisam inserir uma sessão
+// direto no banco, sem depender de um emulador de verdade rodando.
+func newTestServerWithDB(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB) {
+	t.Helper()
 
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir) // Linux/BSD
@@ -96,7 +107,10 @@ func newTestServer(t *testing.T, probe hardware.Probe) *api.Server {
 	}
 	installer := install.NewManager(sources, silentLogger())
 
-	return api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, silentLogger())
+	libraryStore := library.NewStore(db)
+
+	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, silentLogger())
+	return server, db
 }
 
 func silentLogger() *slog.Logger {
@@ -282,6 +296,37 @@ func TestLaunchUnknownConsoleReturns400(t *testing.T) {
 	}
 	if code := errorCode(decodeBody(t, rec)); code != "unknown_console" {
 		t.Fatalf("code = %q, esperado unknown_console", code)
+	}
+}
+
+// Trava que um console que EXISTE no catálogo, mas não alcança nenhum
+// patamar nesta máquina (level "improvavel"), devolve um code distinto de
+// "console desconhecido" — dizer "unknown_console" para o ps2 seria uma
+// mentira sobre o que o catálogo sabe, só porque o hardware não é bom o
+// bastante. Ver docs/roadmap.md, achado durante a implementação do L7.
+func TestLaunchWithoutViableTierReturnsNoPreset(t *testing.T) {
+	weakHardware := hardware.HardwareInfo{
+		ScannedAt: time.Now().UTC(),
+		OS:        hardware.OSInfo{Platform: "linux", Arch: "amd64"},
+		CPU:       hardware.CPUInfo{Model: "CPU fraca", LogicalCore: 1, BaseClockMHz: 100},
+		Memory:    hardware.MemoryInfo{TotalBytes: 256 * 1024 * 1024},
+		Warnings:  []string{},
+	}
+
+	server := newTestServer(t, fakeProbe{info: weakHardware})
+	handler := server.Routes()
+
+	doJSON(t, handler, http.MethodPost, "/api/v1/consent", map[string]bool{"granted": true})
+	doJSON(t, handler, http.MethodPost, "/api/v1/hardware/scan", nil)
+
+	body := map[string]string{"rom_path": "/tmp/jogo.iso", "console_id": "ps2"}
+	rec := doJSON(t, handler, http.MethodPost, "/api/v1/games/launch", body)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, esperado 400", rec.Code)
+	}
+	if code := errorCode(decodeBody(t, rec)); code != "no_preset_available" {
+		t.Fatalf("code = %q, esperado no_preset_available (não unknown_console)", code)
 	}
 }
 

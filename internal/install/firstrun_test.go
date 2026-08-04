@@ -54,11 +54,12 @@ func TestSeedDuckStationPortableDoesNotOverwriteExistingSettings(t *testing.T) {
 	}
 }
 
-// Trava a regra: emuladores sem mapeamento de first-run não são tocados.
-func TestSeedFirstRunNoOpForUnmappedAdapter(t *testing.T) {
+// Trava a regra: adapters desconhecidos não são tocados.
+func TestSeedFirstRunNoOpForUnknownAdapter(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+	// Usar um adapter que não existe no registry.
+	if err := seedFirstRun(dir, "unknown-emulator"); err != nil {
 		t.Fatalf("seedFirstRun: %v", err)
 	}
 
@@ -67,7 +68,7 @@ func TestSeedFirstRunNoOpForUnmappedAdapter(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(entries) != 0 {
-		t.Errorf("esperava diretório vazio para adapter sem mapeamento, achou %v", entries)
+		t.Errorf("esperava diretório vazio para adapter desconhecido, achou %v", entries)
 	}
 }
 
@@ -153,5 +154,305 @@ func TestPreservePortableUserDataSkipsNonPortableInstalls(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Errorf("não deveria ter copiado nada sem portable.txt, achou %v", entries)
+	}
+}
+
+// Trava a regra: instalar PCSX2 grava a chave que pula o assistente de
+// primeira execução no arquivo de configuração.
+func TestSeedPCSX2WritesWizardSkip(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	iniPath := filepath.Join(dir, "inis", "PCSX2_qt.ini")
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatalf("inis/PCSX2_qt.ini não foi criado: %v", err)
+	}
+
+	want := "[Main]\n"
+	if string(got) != want {
+		t.Errorf("PCSX2_qt.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: um arquivo PCSX2_qt.ini pré-existente nunca é sobrescrito.
+func TestSeedPCSX2DoesNotOverwriteExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	iniDir := filepath.Join(dir, "inis")
+	if err := os.MkdirAll(iniDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	iniPath := filepath.Join(iniDir, "PCSX2_qt.ini")
+	custom := "[Main]\nGPURenderer=Vulkan\n"
+	if err := os.WriteFile(iniPath, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Errorf("PCSX2_qt.ini existente foi alterado: got %q, want %q", got, custom)
+	}
+}
+
+// Trava a regra: instalar Dolphin grava a chave que marca o prompt de
+// analytics como respondido, suppressando o wizard.
+func TestSeedDolphinWritesAnalyticsPermission(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "dolphin"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	iniPath := filepath.Join(dir, "Dolphin.ini")
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatalf("Dolphin.ini não foi criado: %v", err)
+	}
+
+	want := "[Analytics]\nPermissionAsked = 1\n"
+	if string(got) != want {
+		t.Errorf("Dolphin.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: um arquivo Dolphin.ini pré-existente nunca é sobrescrito.
+func TestSeedDolphinDoesNotOverwriteExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	iniPath := filepath.Join(dir, "Dolphin.ini")
+
+	custom := "[Analytics]\nPermissionAsked = 1\nID = someid\n"
+	if err := os.WriteFile(iniPath, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := seedFirstRun(dir, "dolphin"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Errorf("Dolphin.ini existente foi alterado: got %q, want %q", got, custom)
+	}
+}
+
+// Trava a regra: instalar PPSSPP grava a chave FirstRun=false, suppressando
+// o wizard de primeira execução.
+func TestSeedPPSSPPWritesFirstRunFlag(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "ppsspp"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	iniPath := filepath.Join(dir, "ppsspp.ini")
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatalf("ppsspp.ini não foi criado: %v", err)
+	}
+
+	want := "[General]\nFirstRun = false\n"
+	if string(got) != want {
+		t.Errorf("ppsspp.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: um arquivo ppsspp.ini pré-existente nunca é sobrescrito.
+func TestSeedPPSSPPDoesNotOverwriteExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	iniPath := filepath.Join(dir, "ppsspp.ini")
+
+	custom := "[General]\nFirstRun = false\nInternalResolution=2\n"
+	if err := os.WriteFile(iniPath, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := seedFirstRun(dir, "ppsspp"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Errorf("ppsspp.ini existente foi alterado: got %q, want %q", got, custom)
+	}
+}
+
+// Trava a regra: instalar Flycast grava o arquivo de configuração mínimo.
+func TestSeedFlycastWritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "flycast"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "emu.cfg")
+	got, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("emu.cfg não foi criado: %v", err)
+	}
+
+	want := "[config]\n"
+	if string(got) != want {
+		t.Errorf("emu.cfg = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: instalar RPCS3 grava o arquivo config.yml.
+func TestSeedRPCS3WritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "rpcs3"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "config.yml")
+	_, err := os.Stat(cfgPath)
+	if err != nil {
+		t.Fatalf("config.yml não foi criado: %v", err)
+	}
+}
+
+// Trava a regra: instalar melonDS grava o arquivo de configuração mínimo.
+func TestSeedMelonDSWritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "melonds"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "melonDS.ini")
+	got, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("melonDS.ini não foi criado: %v", err)
+	}
+
+	want := "[General]\n"
+	if string(got) != want {
+		t.Errorf("melonDS.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: instalar Azahar grava o arquivo de configuração mínimo.
+func TestSeedAzaharWritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "azahar"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "qt-config.ini")
+	got, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("qt-config.ini não foi criado: %v", err)
+	}
+
+	want := "[General]\n"
+	if string(got) != want {
+		t.Errorf("qt-config.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: instalar xemu grava o arquivo de configuração TOML.
+func TestSeedXemuWritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "xemu"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "xemu.toml")
+	got, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("xemu.toml não foi criado: %v", err)
+	}
+
+	want := "[general]\nbootrom_path = \"\"\nflash_path = \"\"\nhdd_path = \"\"\n"
+	if string(got) != want {
+		t.Errorf("xemu.toml = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: instalar Vita3K grava o arquivo de configuração.
+func TestSeedVita3KWritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "vita3k"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "config.yml")
+	_, err := os.Stat(cfgPath)
+	if err != nil {
+		t.Fatalf("config.yml não foi criado: %v", err)
+	}
+}
+
+// Trava a regra: instalar Xenia grava o arquivo de configuração TOML.
+func TestSeedXeniaWritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "xenia"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "xenia.config.toml")
+	got, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("xenia.config.toml não foi criado: %v", err)
+	}
+
+	want := "[General]\ngpu = \"vulkan\"\nvsync = false\n"
+	if string(got) != want {
+		t.Errorf("xenia.config.toml = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: instalar Cemu cria a estrutura de diretórios necessária.
+func TestSeedCemuCreatesDirectoryStructure(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "cemu"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	mlcPath := filepath.Join(dir, "mlc01")
+	if _, err := os.Stat(mlcPath); err != nil {
+		t.Fatalf("mlc01 não foi criado: %v", err)
+	}
+}
+
+// Trava a regra: instalar RMG grava o arquivo de configuração mínimo.
+func TestSeedRMGWritesConfigFile(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "rmg"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	cfgPath := filepath.Join(dir, "config.ini")
+	got, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("config.ini não foi criado: %v", err)
+	}
+
+	want := "[General]\n"
+	if string(got) != want {
+		t.Errorf("config.ini = %q, want %q", got, want)
 	}
 }

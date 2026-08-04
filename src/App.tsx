@@ -6,6 +6,8 @@ import { ThemePicker } from "./components/ThemePicker";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
+import { GamesScreen } from "./screens/GamesScreen";
+import { LibraryScreen } from "./screens/LibraryScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
 import { VerdictScreen } from "./screens/VerdictScreen";
 
@@ -25,7 +27,9 @@ type Phase =
   | "scanning"
   | "scan-error"
   | "verdict"
-  | "emulators";
+  | "emulators"
+  | "library"
+  | "games";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("checking-port");
@@ -37,6 +41,9 @@ function App() {
   // do parecer quanto da tela de recusa (docs/sprint-b-plano.md, B8: "recusar
   // não pode ser beco sem saída"). Guarda de onde veio para "Voltar" certo.
   const [cameFromDeclined, setCameFromDeclined] = useState(false);
+  const [selectedConsole, setSelectedConsole] = useState<{ id: string; name: string; shortName: string } | null>(
+    null,
+  );
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
@@ -189,7 +196,10 @@ function App() {
     case "verdict":
       screen = (
         <main className="min-h-screen bg-paper">
-          <div className="mx-auto flex max-w-3xl justify-end px-6 pt-16">
+          <div className="mx-auto flex max-w-3xl justify-end gap-2 px-6 pt-16">
+            <Button variant="secondary" onClick={() => setPhase("library")}>
+              Ver biblioteca
+            </Button>
             <Button
               variant="secondary"
               onClick={() => {
@@ -207,6 +217,31 @@ function App() {
 
     case "emulators":
       screen = <EmulatorsScreen onBack={() => setPhase(cameFromDeclined ? "declined" : "verdict")} />;
+      break;
+
+    case "library":
+      screen = (
+        <LibraryScreen
+          report={report!}
+          onBack={() => setPhase("verdict")}
+          onOpenGames={(id, name, shortName) => {
+            setSelectedConsole({ id, name, shortName });
+            setPhase("games");
+          }}
+        />
+      );
+      break;
+
+    case "games":
+      screen = (
+        <GamesScreen
+          consoleId={selectedConsole!.id}
+          consoleName={selectedConsole!.name}
+          shortName={selectedConsole!.shortName}
+          report={report!}
+          onBack={() => setPhase("library")}
+        />
+      );
       break;
   }
 

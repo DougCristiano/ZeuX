@@ -88,6 +88,14 @@ type Console struct {
 	// fonte de verdade sobre um console — mesmo raciocínio de Options.
 	Extensions []string `json:"extensions"`
 
+	// RequiresExternalFile marca consoles amplamente conhecidos por exigir
+	// BIOS, firmware ou plugin externo que o ZeuX não fornece nem verifica —
+	// julgamento documentado em docs/roadmap.md (item L3), não pesquisa
+	// individual por console como o D8. A UI deve mostrar um aviso genérico
+	// por categoria, nunca nomear um arquivo específico (regra legal: mesmo
+	// risco de facilitar obtenção de ROM).
+	RequiresExternalFile bool `json:"requires_external_file,omitempty"`
+
 	Tiers []Tier `json:"tiers"`
 }
 
@@ -96,6 +104,19 @@ type Catalog struct {
 	SchemaVersion int       `json:"schema_version"`
 	UpdatedAt     string    `json:"updated_at"`
 	Consoles      []Console `json:"consoles"`
+}
+
+// ConsoleByID procura um console pelo identificador. Devolve false quando o
+// catálogo não conhece esse id — quem chama decide se isso é erro do usuário
+// (console inexistente) ou dado desatualizado (console removido do catálogo
+// depois de já referenciado em outro lugar, como uma pasta de biblioteca).
+func (c *Catalog) ConsoleByID(id string) (Console, bool) {
+	for _, console := range c.Consoles {
+		if console.ID == id {
+			return console, true
+		}
+	}
+	return Console{}, false
 }
 
 // LoadCatalog lê o dicionário embutido no binário. Embutir garante que o app
