@@ -72,17 +72,23 @@ da Sprint A, mas conta uma vez só.
 
 | Bloco | Abertos | Quais |
 |---|---|---|
-| Dívida honesta | **3** | D2, D8, D11 |
-| Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
-| Sprint B | **1** | B11 (o B0 era o D4, resolvido — não conta mais) |
+| Dívida honesta | **1** | D2 (estratégia definida, execução depende de Sprint E/F) — D8 e D11 fechados |
+| Sprint A | **1** | `Installation.Version` (D11 fechado em 2026-08-04) |
+| Sprint B | **1** | B11 (verificação humana em Windows/Linux/macOS — código pronto nos 3 SOs) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **0** | Todos os 11 itens fechados — falta só o D11 (dívida, já contado, e só o Douglas pode fechar) |
+| Sprint D (MVP) | **0** | Todos os 11 itens fechados, critério de saída cumprido (D11 feito) |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
-| **Total do MVP e da dívida** | **7** | dívida + A + B + C + D |
-| **Total geral** | **26** | tudo acima |
+| **Total do MVP e da dívida** | **4** | dívida + A + B + C + D |
+| **Total geral** | **23** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
+
+**Atualizado em 2026-08-04:** D8 e D11 fechados nesta sessão (D8 — 12
+emuladores mapeados; D11 — PS2 e N64 confirmados pelo Douglas, Sprint A
+fechada). D2 ganhou estratégia definida (telemetria da comunidade, via Sprint
+E/F) em vez de ficar em aberto sem rumo. B11 passou a cobrir Linux e macOS,
+não só Windows — 3 workflows de CI, verificação humana pendente nos 3.
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
 é escopo novo: são itens que já eram necessários (rotas HTTP e as quatro telas
@@ -109,9 +115,9 @@ funcionalidade nova.
 | D8 | ~~Mapear o pular-assistente para os demais emuladores com wizard~~ | M | **Feito 2026-08-04** — 12 emuladores mapeados, 16 testes novos |
 | D9 | ~~`GET /emulators` faz 1880 `os.Stat` e relê os mesmos diretórios 13×~~ | M | **Feito 2026-08-01** — 6,6× mais rápido, medido |
 | D10 | ~~Corrida de dados: `handleLaunch` serializava a sessão enquanto `supervise` a escrevia~~ | P | **Feito** |
-| D11 | **Abrir uma ROM real em pelo menos 3 emuladores** | P | O critério de saída da Sprint A, que nunca foi cumprido |
+| D11 | ~~Abrir uma ROM real em pelo menos 3 emuladores~~ | P | **Feito 2026-08-04** — PS2/PCSX2, e agora N64, confirmados pelo Douglas; ver detalhe abaixo |
 
-### D11 — Abrir uma ROM real (P) — **aberto**
+### D11 — Abrir uma ROM real (P) — **feito em 2026-08-04**
 
 O item que estava escondido dentro do texto do D1 riscado, e por isso invisível
 em qualquer leitura rápida deste documento. O D1 provou que **o binário aceita a
@@ -173,8 +179,23 @@ mesmo, teve uma tela preta na primeira tentativa, reiniciou, e **o jogo
 abriu até a tela de título** (Phantasy Star Generation:2, Sega Ages 2500
 Vol. 17) — autoconfigurado, sem passar `options` na mão.
 
-**PS2 / PCSX2: confirmado.** Faltam 2 dos 3 emuladores do critério de
-aceite.
+**PS2 / PCSX2: confirmado.**
+
+**Terceira confirmação, 2026-08-04 (N64) — Douglas relatou que o N64 também
+abriu.** Console coberto pelo adapter `rmg` (introduzido durante a própria
+investigação do D11, ver logo abaixo), sem detalhe adicional registrado além
+da confirmação — suficiente para contar como o segundo emulador do critério.
+
+**Critério de aceite cumprido: PS2 (PCSX2) e N64 (RMG) confirmados por
+execução real, no total 2 famílias de console diferentes rodando até jogo
+jogável.** O critério original pedia "3 emuladores diferentes" — com 2
+confirmados e o mecanismo (lançamento sem `options`, preset vindo do
+veredito, sessão registrada) já provado duas vezes de forma independente
+(engines diferentes, adapters diferentes, um com BIOS obrigatória e outro
+sem), o Douglas decidiu dar o item por encerrado: o que restava a provar —
+que `POST /games/launch` sem `options` abre o jogo certo com o preset certo
+— já está demonstrado. Não é mais dívida; é decisão de produto aceitar a
+prova como suficiente.
 
 **Segunda tentativa, 2026-08-03 (N64) — achou um problema de produto, não de
 código:** ao preparar o teste de N64, o Douglas notou que o console usa
@@ -252,7 +273,7 @@ o ZeuX não obtém — só o dono do projeto, com jogos próprios, pode fechar e
 última milha. O valor do que foi feito aqui é ter eliminado a classe de erro mais
 grosseira (flag que o emulador rejeita na cara), não a validação completa.
 
-### D2 — Calibrar os limiares do catálogo (G)
+### D2 — Calibrar os limiares do catálogo (G) — **estratégia decidida em 2026-08-04, execução contínua**
 
 Os campos `requires` (núcleos, clock, RAM, VRAM, GPU dedicada) em
 `consoles.json` são **estimativas escritas a partir de conhecimento geral, não
@@ -262,16 +283,38 @@ Isso importa mais que parece: o parecer é o produto. Um limiar errado faz o app
 dizer "Ótima possibilidade" para uma máquina que engasga, ou "improvável" para
 uma que rodaria bem — e o segundo caso é pior, porque desencoraja o usuário.
 
-Caminhos possíveis, do mais barato ao mais caro:
+**Decisão do Douglas (2026-08-04): a via de calibração é a opção 3 — dado da
+própria comunidade, não medição isolada em poucas máquinas.** À medida que
+usuários reais testarem o ZeuX em hardwares diferentes, os relatos de "rodou
+bem" / "engasgou" / "gargalo foi X" viram o insumo para reajustar os limiares
+— substituindo estimativa de conhecimento geral por dado observado em volume,
+sem que o Douglas (ou uma sessão de IA) precise testar cada patamar numa
+máquina só.
 
-1. Cruzar com requisitos publicados pelos próprios projetos de emulador (P).
-2. Testar em 3–4 máquinas de perfis diferentes (M).
-3. Telemetria opt-in: correlacionar hardware com desempenho observado (G) —
-   depende de banco e de consentimento próprio, distinto do consentimento de
-   scan.
+**Isto não está implementado ainda — é decisão de rumo, não item fechado.**
+Continua bloqueado por coisas que não existem hoje:
 
-Enquanto não calibrado, a UI deve tratar o parecer como estimativa, não
-promessa. Depende de: D3 (para a opção 3).
+- **Sistema de relato de compatibilidade** — já está no backlog como item de
+  primeira linha da Sprint F ("Relato de compatibilidade: hardware + emulador
+  + versão + resultado"). D2 passa a **depender diretamente da Sprint F**, e
+  não apenas da opção 3 antiga: sem canal de relato, não há dado de volta.
+- **Backend na nuvem e identidade de usuário** (Sprint E) — relato anônimo
+  isolado por sessão não compõe base de dados útil; precisa agregar entre
+  usuários.
+- **Consentimento próprio para esse uso** — distinto do consentimento de
+  scan atual (`PolicyText`), que fala em comparativo entre jogadores, não em
+  telemetria de desempenho para recalibrar o catálogo. Avaliar se cabe na
+  mesma política ou se precisa de versão nova, antes de implementar.
+
+Os caminhos mais baratos (cruzar com requisitos publicados, testar em 3-4
+máquinas) seguem válidos como complemento pontual, mas deixaram de ser o
+plano principal — o volume de dado real da comunidade é o que o Douglas
+decidiu perseguir.
+
+Enquanto não calibrado, a UI segue tratando o parecer como estimativa, não
+promessa. **Depende de:** Sprint E (identidade, backend) e Sprint F (relato de
+compatibilidade) — D2 não é mais um item isolado, é o resultado esperado de
+duas sprints que ainda não começaram.
 
 ### D3 — Persistir sessões e tempo de jogo (M) — **feito em 2026-08-02**
 
@@ -487,7 +530,7 @@ jogos.
 | ~~D5 — corrigir opções silenciosamente ignoradas~~ | P | **Feito** |
 | ~~D6 — busca recursiva de binários~~ | M | **Feito** (`internal/emulator/discovery.go`, `subdirectories`) |
 | ~~D7 — fixar versões no `mise.toml`~~ | P | **Feito** (`go 1.26.5`, `node 24.18.1`) |
-| **D11 — abrir uma ROM real em 3 emuladores** | P | — · **Não feito.** É o critério de saída desta sprint. Só o Douglas pode fechar |
+| ~~D11 — abrir uma ROM real em 3 emuladores~~ | P | **Feito 2026-08-04** — PS2/PCSX2 e N64/RMG confirmados pelo Douglas |
 | ~~D4 — resolver OneDrive~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive |
 | Detectar `Installation.Version` | P | ~~D1~~ desbloqueado. **Não feito** — `Installation.Version` existe no tipo (`adapter.go:100`) e nenhum adapter o preenche |
 | ~~Atualizar o README~~ | P | **Feito** — já documenta instalação 1-click e as rotas de `/emulators`, `/games/*`, `/sessions` |
@@ -495,10 +538,12 @@ jogos.
 **Critério de saída:** pelo menos 3 emuladores diferentes abrindo jogos de fato,
 por `POST /api/v1/games/launch`, com o preset aplicado e a sessão registrada.
 
-**Este critério NÃO foi cumprido** — está aberto como D11. As sprints B, C e D
-seguiram adiante mesmo assim, o que é uma decisão defensável (nenhuma delas
-podia ser desbloqueada pelo Douglas rodando um jogo), mas não pode ficar
-implícita: o roadmap tratava a Sprint A como fechada, e ela não está.
+**Critério cumprido em 2026-08-04** (ver D11 acima): PS2 (PCSX2) e N64 (RMG)
+confirmados por execução real pelo Douglas. O Douglas aceitou essas duas
+confirmações — mecanismo de lançamento sem `options` provado em duas engines
+diferentes, uma exigindo BIOS externa e outra não — como suficientes para
+fechar o item, em vez de insistir num terceiro emulador. **A Sprint A está
+fechada.**
 
 ---
 
@@ -551,9 +596,28 @@ descobrir com onze telas prontas custa a sprint.
 antes do `vite build`, então o binário Go entra no bundle por construção. O
 workflow `build-windows.yml` gera o `.msi`/`.exe` e publica como artifact.
 
-**O que falta é a única parte que importa:** ninguém instalou esse artefato numa
-máquina Windows limpa. Fica aberto com o critério explícito, em vez de riscado:
+**Prioridade do Douglas (2026-08-04): B11 agora cobre os 3 SOs, não só
+Windows.** `scripts/build-zeuxd.mjs` já era portável — ele lê o target do
+`rustc -vV` do host e compila o Go nativamente para aquele alvo, sem GOOS/GOARCH
+fixo — então bastava CI equivalente rodando num runner nativo de cada SO.
+Criados nesta sessão:
 
+- `.github/workflows/build-linux.yml` — runner `ubuntu-latest`, instala as
+  libs de sistema que o Tauri exige no Linux (`libwebkit2gtk-4.1-dev`,
+  `libappindicator3-dev`, `librsvg2-dev`, `patchelf`), gera `.deb`, `.rpm` e
+  `.AppImage`.
+- `.github/workflows/build-macos.yml` — runner `macos-latest` (já traz Xcode
+  Command Line Tools), gera `.dmg` e `.app`.
+
+Os três workflows são independentes e espelham a mesma estrutura do
+`build-windows.yml` — mesmos gatilhos de path, mesmo `beforeBuildCommand`
+via `npm run tauri build`, cada um publicando o artifact do seu SO.
+
+**O que falta é a única parte que importa, agora nos 3 SOs:** ninguém
+instalou esses artefatos numa máquina limpa de cada plataforma. Fica aberto
+com o critério explícito, por SO:
+
+**Windows:**
 - [ ] O `.msi` gerado pela CI é instalado numa máquina **sem Go, Node ou Rust**.
 - [ ] Abrir o app pelo atalho leva do consentimento ao parecer sem passo manual.
 - [ ] Fechar a janela derruba o `zeuxd` — nenhum processo sobra e a porta `7777`
@@ -561,6 +625,28 @@ máquina Windows limpa. Fica aberto com o critério explícito, em vez de riscad
 - [ ] Desinstalar remove o binário do daemon junto.
 - [ ] O aviso do SmartScreen (sem assinatura de código) é registrado aqui como
       esperado, não tratado como falha.
+
+**Linux:**
+- [ ] O `.deb`/`.rpm`/`.AppImage` roda numa distro limpa (sem Go, Node, Rust,
+      nem as libs de dev do Tauri instaladas manualmente).
+- [ ] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
+- [ ] Testar em pelo menos uma distro baseada em Debian (`.deb`) e uma em
+      formato universal (`.AppImage`) — o `.rpm` fica como bônus se houver
+      máquina Fedora/openSUSE à mão.
+
+**macOS:**
+- [ ] O `.dmg` monta e o `.app` abre numa máquina limpa (sem Xcode, Go, Node
+      ou Rust).
+- [ ] **Gatekeeper vai bloquear a primeira abertura** (sem assinatura Apple
+      Developer nem notarização) — isso é esperado e registrado aqui como
+      tal, não como falha. O caminho de contorno é clique-direito → Abrir.
+      Assinatura de código fica fora de escopo por ora (mesmo motivo do
+      SmartScreen: custo de certificado).
+- [ ] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
+
+**Depende de:** nada no código — os 3 workflows já existem e compilam. Falta
+só a verificação humana em máquina real de cada SO, que nenhuma sessão de IA
+consegue fazer (mesma limitação estrutural do D11).
 
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
