@@ -309,7 +309,26 @@ func (m *Manager) promote(stagingDir, adapterID string) error {
 }
 
 // Uninstall remove uma instalação gerenciada pelo ZeuX.
+//
+// Fontes "bundled" (hoje só o RetroArch, ver KindBundled) nunca podem ser
+// removidas por aqui: o binário vem dentro do próprio instalador do ZeuX, não
+// foi baixado por Start(), e apagá-lo quebraria os 24 consoles que dependem
+// dele sem nenhuma forma simples de reinstalar (não é "clique em Instalar de
+// novo" como os outros — precisaria reinstalar o ZeuX inteiro). O guard fica
+// no Manager, não só escondendo o botão na interface, para valer mesmo se
+// alguém chamar a rota direto.
+//
+// Os cores do RetroArch nunca passam por Uninstall — eles vivem em
+// bundledCoreDirsForWrite() (internal/emulator/bundled_cores.go), fora da
+// árvore que managedDirFor resolve, então já são naturalmente intocáveis por
+// esta função.
 func (m *Manager) Uninstall(adapterID string) error {
+	if source, ok := m.catalog.ByAdapter(adapterID); ok && source.Kind == KindBundled {
+		return fmt.Errorf(
+			"o %s vem empacotado com o ZeuX e não pode ser removido por aqui — faz parte do próprio instalador do app, não uma instalação separada",
+			source.Name)
+	}
+
 	root, err := emulator.ManagedRoot()
 	if err != nil {
 		return err

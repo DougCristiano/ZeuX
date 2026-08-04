@@ -3,6 +3,7 @@ package emulator
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -102,6 +103,20 @@ type Status struct {
 
 	// Installation vem preenchida apenas quando Installed é verdadeiro.
 	Installation *Installation `json:"installation,omitempty"`
+
+	// BiosDir vem preenchida só quando alguém já verificou de verdade onde
+	// este emulador lê o BIOS/firmware — ver BiosDir() em bios_dir.go.
+	// Ausente (não "") na maioria dos adapters: a interface não deve mostrar
+	// um botão de pasta que ninguém confirmou estar certo.
+	BiosDir string `json:"bios_dir,omitempty"`
+
+	// BiosDirEmpty só é significativo quando BiosDir está preenchida. Achado
+	// em 2026-08-04: o botão "Jogar" continuava disponível mesmo com a pasta
+	// de BIOS vazia, e diferente de hardware fraco (que pode rodar mal, mas
+	// roda), sem BIOS o jogo nunca abre — a interface usa este campo para
+	// confirmar antes de tentar, em vez de deixar o usuário descobrir só
+	// depois de clicar.
+	BiosDirEmpty bool `json:"bios_dir_empty,omitempty"`
 }
 
 // Survey verifica quais emuladores estão instalados na máquina.
@@ -131,6 +146,13 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 		if install, ok := adapter.Locate(ctx); ok {
 			status.Installed = true
 			status.Installation = &install
+
+			if dir, ok := BiosDir(adapter.ID(), install); ok {
+				status.BiosDir = dir
+				if entries, err := os.ReadDir(dir); err == nil {
+					status.BiosDirEmpty = len(entries) == 0
+				}
+			}
 		}
 
 		statuses = append(statuses, status)

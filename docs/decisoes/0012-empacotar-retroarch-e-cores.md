@@ -58,7 +58,7 @@ como padrão quando o usuário não especifica um:
 mesen, snes9x, gambatte, mgba, mupen64plus-next, melonds, beetle vb,
 genesis plus gx, picodrive, beetle saturn, flycast, beetle psx hw, ppsspp,
 beetle pce, beetle ngp, beetle cygne, opera, stella, mame, fbneo,
-sameboy, bsnes, parallel n64, yabause
+sameboy, bsnes, parallel n64, yabause, swanstation
 ```
 
 **Revisado em 2026-08-04, depois de um erro real:** a frase original aqui dizia

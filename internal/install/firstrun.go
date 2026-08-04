@@ -71,6 +71,15 @@ func seedFirstRun(installDir, adapterID string) error {
 // InitializeFoldersAndConfig). Gravar SetupWizardIncomplete=false já é
 // suficiente — não precisamos simular SettingsVersion.
 //
+// Um segundo diálogo, diferente do assistente, aparece na primeira execução
+// como AppImage no Linux: "Would you like to create a launcher shortcut?"
+// (QtHost::CheckDesktopFile, src/duckstation-qt/qthost.cpp — só dispara
+// quando a variável de ambiente APPIMAGE existe). Achado testando de verdade
+// em 2026-08-04: o ZeuX instala como AppImage no Linux, então esse prompt
+// sempre apareceria sem esta chave. Suprimido gravando
+// "NoDesktopFile = true" — a mesma chave que o próprio DuckStation grava se
+// o usuário marcar "Don't ask again" e clicar "Não".
+//
 // O modo portátil (portable.txt ao lado do executável) é necessário para que
 // o DuckStation leia esse settings.ini em vez do de %APPDATA%\DuckStation,
 // que pertence a uma instalação manual do usuário e não deve ser tocado.
@@ -90,7 +99,7 @@ func seedDuckStationPortable(installDir string) error {
 		return nil
 	}
 
-	const seed = "[Main]\nSetupWizardIncomplete = false\n"
+	const seed = "[Main]\nSetupWizardIncomplete = false\nNoDesktopFile = true\n"
 	if err := os.WriteFile(settingsPath, []byte(seed), 0o644); err != nil {
 		return fmt.Errorf("criando settings.ini: %w", err)
 	}

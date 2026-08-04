@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
-import { Badge, Button, Callout, Card, ProgressBar } from "../components/ui";
+import { Badge, Button, Callout, Card, ErrorModal, ProgressBar } from "../components/ui";
 
 type RowStatus =
   | { kind: "idle" }
@@ -16,6 +17,10 @@ type RowStatus =
 type InstallState =
   | { kind: "idle" }
   | { kind: "confirm-hardware"; message: string; pendingGamePath: string }
+  // Achado em 2026-08-04: diferente de hardware fraco (que pode rodar mal,
+  // mas roda), sem BIOS o jogo nunca abre — confirma antes de tentar, em vez
+  // de deixar clicar "Jogar" e só descobrir depois que falhou.
+  | { kind: "confirm-bios"; pendingGamePath: string }
   | { kind: "installing"; job: InstallJob; pendingGamePath: string }
   | { kind: "error"; message: string };
 
@@ -67,8 +72,19 @@ export function GamesScreen({
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({});
   const [installState, setInstallState] = useState<InstallState>({ kind: "idle" });
+  // Erro de lançamento vira modal, não texto discreto na linha do jogo —
+  // achado em 2026-08-04, um texto inline passava despercebido.
+  const [launchError, setLaunchError] = useState<string | null>(null);
 
   const verdict = report.verdicts.find((v) => v.console_id === consoleId);
+
+  async function openBiosFolder(dir: string) {
+    try {
+      await openPath(dir);
+    } catch (err) {
+      setError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   async function loadGames() {
     try {
@@ -103,10 +119,9 @@ export function GamesScreen({
       setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "launched", session } }));
       loadGames(); // atualiza playtime_seconds/last_played_at sem recarregar a tela
     } catch (err) {
-      setRowStatus((prev) => ({
-        ...prev,
-        [game.id]: { kind: "error", message: err instanceof ApiError ? err.message : "Não foi possível abrir o jogo." },
-      }));
+      const message = err instanceof ApiError ? err.message : "Não foi possível abrir o jogo.";
+      setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
+      setLaunchError(message);
     }
   }
 
@@ -161,11 +176,20 @@ export function GamesScreen({
       return;
     }
 
+    if (adapterEntry?.bios_dir && adapterEntry.bios_dir_empty) {
+      setInstallState({ kind: "confirm-bios", pendingGamePath: game.path });
+      return;
+    }
+
     doLaunch(game.path);
   }
 
   return (
     <div className="mx-auto max-w-3xl px-6 pt-16 pb-10">
+      {launchError && (
+        <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={() => setLaunchError(null)} />
+      )}
+
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">{consoleName}</h1>
         <Button variant="secondary" onClick={onBack}>
@@ -174,12 +198,24 @@ export function GamesScreen({
       </div>
 
       {/* L9: aviso genérico de dependência externa, nunca nomeando arquivo,
-          nunca bloqueando o jogo — só informa (regra 5). */}
+          nunca bloqueando o jogo — só informa (regra 5). O botão "Abrir
+          pasta" só aparece quando adapterEntry.bios_dir veio preenchido —
+          ou seja, quando alguém já testou de verdade onde este emulador
+          específico lê o arquivo (ver BiosDir, internal/emulator/bios_dir.go).
+          Sem isso, o aviso genérico continua sozinho — apontar uma pasta
+          errada seria pior que nenhuma. */}
       {verdict?.requires_external_file && (
         <div className="mb-4">
           <Callout label="Dependência externa">
             Este console costuma exigir um arquivo externo (BIOS, firmware ou plugin) que o ZeuX não fornece nem
             verifica. Se o jogo não abrir, confira essa configuração diretamente no emulador.
+            {adapterEntry?.bios_dir && (
+              <div className="mt-2">
+                <Button type="button" variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
+                  Abrir pasta do BIOS
+                </Button>
+              </div>
+            )}
           </Callout>
         </div>
       )}
@@ -206,7 +242,9 @@ export function GamesScreen({
           {games.map((game) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =
-              (installState.kind === "installing" || installState.kind === "confirm-hardware") &&
+              (installState.kind === "installing" ||
+                installState.kind === "confirm-hardware" ||
+                installState.kind === "confirm-bios") &&
               installState.pendingGamePath === game.path;
 
             return (
@@ -238,6 +276,33 @@ export function GamesScreen({
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Button variant="primary" onClick={() => startInstall(true, game.path)}>
                         Instalar mesmo assim
+                      </Button>
+                      <Button variant="secondary" onClick={() => setInstallState({ kind: "idle" })}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {isPendingInstall && installState.kind === "confirm-bios" && (
+                  <div className="rounded border border-dashed border-line-strong p-2">
+                    <p className="text-sm text-ink">
+                      A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {adapterEntry?.bios_dir && (
+                        <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
+                          Abrir pasta do BIOS
+                        </Button>
+                      )}
+                      <Button
+                        variant="primary"
+                        onClick={() => {
+                          setInstallState({ kind: "idle" });
+                          doLaunch(game.path);
+                        }}
+                      >
+                        Jogar mesmo assim
                       </Button>
                       <Button variant="secondary" onClick={() => setInstallState({ kind: "idle" })}>
                         Cancelar

@@ -16,7 +16,10 @@ type RowState =
   | { kind: "confirm-hardware"; message: string }
   | { kind: "installing"; job: InstallJob }
   | { kind: "done"; job: InstallJob }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  | { kind: "confirm-remove" }
+  | { kind: "removing" }
+  | { kind: "remove-error"; message: string };
 
 function percentOf(job: InstallJob): number | null {
   if (job.total_bytes <= 0) return null;
@@ -109,6 +112,30 @@ function EmulatorRow({ entry, onChanged }: { entry: EmulatorEntry; onChanged: ()
     }
   }
 
+  async function remove() {
+    setState({ kind: "removing" });
+    try {
+      await api.uninstallEmulator(entry.adapter_id);
+      onChanged();
+    } catch (err) {
+      setState({
+        kind: "remove-error",
+        // err.message já vem do servidor (ex.: "o RetroArch vem empacotado
+        // com o ZeuX e não pode ser removido por aqui") — nunca reescrita
+        // aqui, mesma regra do resto da tela.
+        message: err instanceof ApiError ? err.message : "Não foi possível remover este emulador.",
+      });
+    }
+  }
+
+  // O RetroArch nunca oferece remoção nesta tela — ele vem empacotado com o
+  // próprio instalador do ZeuX (ADR 0012), não foi baixado por um clique em
+  // "Instalar", e removê-lo quebraria os 24 consoles que dependem dele sem
+  // uma forma simples de reinstalar. O backend (internal/install/manager.go,
+  // Uninstall) já recusa mesmo que esse botão apareça por engano — esconder
+  // aqui é só para não convidar o clique.
+  const canRemove = entry.installed && entry.installation?.managed && entry.adapter_id !== "retroarch";
+
   return (
     <tr className="border-b border-line">
       <td className="px-3 py-3 align-top">
@@ -145,6 +172,7 @@ function EmulatorRow({ entry, onChanged }: { entry: EmulatorEntry; onChanged: ()
         )}
 
         {state.kind === "error" && <p className="mt-2 max-w-sm text-sm text-danger">{state.message}</p>}
+        {state.kind === "remove-error" && <p className="mt-2 max-w-sm text-sm text-danger">{state.message}</p>}
 
         {entry.adapter_id === "retroarch" && (
           <div className="mt-2">
@@ -160,7 +188,27 @@ function EmulatorRow({ entry, onChanged }: { entry: EmulatorEntry; onChanged: ()
         )}
       </td>
       <td className="px-3 py-3 align-top">
-        {entry.installed || state.kind === "installing" || state.kind === "done" ? null : state.kind === "confirm-hardware" ? (
+        {entry.installed ? (
+          canRemove &&
+          (state.kind === "confirm-remove" ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary" autoFocus onClick={remove}>
+                Remover mesmo assim
+              </Button>
+              <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={state.kind === "removing"}
+              onClick={() => setState({ kind: "confirm-remove" })}
+            >
+              {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
+            </Button>
+          ))
+        ) : state.kind === "installing" || state.kind === "done" ? null : state.kind === "confirm-hardware" ? (
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" autoFocus onClick={() => install(true)}>
               Instalar mesmo assim
@@ -185,10 +233,11 @@ function EmulatorRow({ entry, onChanged }: { entry: EmulatorEntry; onChanged: ()
 
 /**
  * Tela de emuladores (wireframe 06/07 combinadas): lista o que o `GET
- * /emulators` conhece, e cada linha carrega seu próprio fluxo de instalação.
- * Escopo deliberadamente menor que o wireframe completo: sem remoção, sem
- * cadastro manual (nenhum dos dois é exigido pelo B10) — só o necessário para
- * a ressalva de hardware ser testável de verdade.
+ * /emulators` conhece, e cada linha carrega seu próprio fluxo de instalação
+ * e remoção (2026-08-04 — remoção nunca oferecida para o RetroArch, que vem
+ * empacotado no instalador do ZeuX, nem para emulador que já estava na
+ * máquina antes do ZeuX). Sem cadastro manual (não exigido pelo B10) — só o
+ * necessário para a ressalva de hardware ser testável de verdade.
  */
 export function EmulatorsScreen({ onBack }: { onBack: () => void }) {
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);

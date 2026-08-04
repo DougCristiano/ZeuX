@@ -6,8 +6,11 @@ import (
 	"testing"
 )
 
-// Trava a regra: instalar o DuckStation grava portable.txt e a chave que
-// pula o assistente de primeira execução, sem tocar em mais nada.
+// Trava a regra: instalar o DuckStation grava portable.txt e as chaves que
+// pulam o assistente de primeira execução e o prompt de criar atalho de
+// launcher (este último só dispara rodando como AppImage no Linux —
+// QtHost::CheckDesktopFile, achado incomodando o Douglas de verdade em
+// 2026-08-04), sem tocar em mais nada.
 func TestSeedDuckStationPortableWritesWizardSkip(t *testing.T) {
 	dir := t.TempDir()
 
@@ -24,7 +27,7 @@ func TestSeedDuckStationPortableWritesWizardSkip(t *testing.T) {
 		t.Fatalf("settings.ini não foi criado: %v", err)
 	}
 
-	want := "[Main]\nSetupWizardIncomplete = false\n"
+	want := "[Main]\nSetupWizardIncomplete = false\nNoDesktopFile = true\n"
 	if string(got) != want {
 		t.Errorf("settings.ini = %q, want %q", got, want)
 	}

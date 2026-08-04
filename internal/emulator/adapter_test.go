@@ -365,6 +365,14 @@ func TestRejectsEmptyROMPath(t *testing.T) {
 // Sem core instalado o RetroArch abriria no menu, sem explicação. Falhar com o
 // nome do core faltante é mais útil.
 func TestRetroArchFailsWithCoreNameWhenCoreMissing(t *testing.T) {
+	// Isola HOME: sem isso, o teste passa a falhar de propósito errado numa
+	// máquina que já tenha o core mesen instalado de verdade (ex.: sessão de
+	// 2026-08-04, que testou o download/cópia de cores bundled de ponta a
+	// ponta na máquina real do Douglas) — coreDirs() acharia o core
+	// genuíno e BuildCommand não devolveria mais o erro que este teste
+	// trava.
+	t.Setenv("HOME", t.TempDir())
+
 	_, err := newRetroArch().BuildCommand(
 		install("retroarch", "/opt/retroarch/retroarch"),
 		Request{ROMPath: "/roms/mario.nes", ConsoleID: "nes"},
