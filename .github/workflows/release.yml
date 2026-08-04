@@ -100,6 +100,8 @@ jobs:
       - name: Instalar Rust
         uses: dtolnay/rust-toolchain@stable
 
+      # Ver build-linux.yml: libdbus-1-dev e pkg-config faltavam aqui até
+      # 2026-08-04, achado testando build local numa Ubuntu limpa.
       - name: Instalar dependências de sistema do Tauri
         run: |
           sudo apt-get update
@@ -107,6 +109,8 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            libdbus-1-dev \
+            pkg-config \
             patchelf \
             build-essential \
             file
