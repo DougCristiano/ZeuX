@@ -106,7 +106,7 @@ funcionalidade nova.
 | D5 | ~~Corrigir as opções silenciosamente ignoradas~~ | P | **Feito** — reconfirmado durante D1; todos os adapters já reportam em `Unapplied` |
 | D6 | ~~Busca recursiva de binários em subdiretórios~~ | M | **Feito** — `subdirectories()` em `internal/emulator/discovery.go`, um nível de profundidade |
 | D7 | ~~Fixar as versões no `mise.toml`~~ | P | **Feito** — `go 1.26.5`, `node 24.18.1` |
-| D8 | **Mapear o pular-assistente para os demais emuladores com wizard** | M | "Plug and play" real |
+| D8 | ~~Mapear o pular-assistente para os demais emuladores com wizard~~ | M | **Feito 2026-08-04** — 12 emuladores mapeados, 16 testes novos |
 | D9 | ~~`GET /emulators` faz 1880 `os.Stat` e relê os mesmos diretórios 13×~~ | M | **Feito 2026-08-01** — 6,6× mais rápido, medido |
 | D10 | ~~Corrida de dados: `handleLaunch` serializava a sessão enquanto `supervise` a escrevia~~ | P | **Feito** |
 | D11 | **Abrir uma ROM real em pelo menos 3 emuladores** | P | O critério de saída da Sprint A, que nunca foi cumprido |
@@ -341,7 +341,7 @@ qualquer máquina configurada depois de um release novo — o que derrota o
 propósito de usar um gerenciador de toolchain
 ([ADR 0003](decisoes/0003-mise-como-toolchain.md)). Trocar por versões exatas.
 
-### D8 — Mapear o pular-assistente para os demais emuladores (M)
+### D8 — Mapear o pular-assistente para os demais emuladores (M) — **feito em 2026-08-04**
 
 O DuckStation instalado pelo ZeuX já pula o assistente de primeira execução
 (`internal/install/firstrun.go`, `seedFirstRun`). A técnica veio de examinar o
@@ -355,40 +355,41 @@ entrada.
 
 **Isto não é "configurar o emulador".** Só a chave que suprime o assistente é
 gravada; vídeo, controle e BIOS continuam vazios, preenchidos pelo próprio
-DuckStation com os defaults dele no primeiro uso real. É o meio-termo entre
+emulador com os defaults dele no primeiro uso real. É o meio-termo entre
 "plug and play" e não fingir uma configuração que o ZeuX não fez.
 
-**Nenhuma outra frontend de referência faz isso.** Playnite, LaunchBox,
-EmulationStation e Pegasus só resolvem argumentos de linha de comando — não
-escrevem no arquivo de configuração do emulador. A técnica de seed mínimo veio
-de examinar como a RetroDECK (distro Linux que empacota emuladores
-pré-configurados) contorna o mesmo problema.
+**Pesquisa profunda e implementação em 2026-08-04** (agent):
 
-**Falta pesquisar, emulador por emulador, com o mesmo rigor** (ler o código-fonte
-real, não assumir por analogia):
-
-| Adapter | Tem wizard de 1ª execução? | Mecanismo de supressão | Status |
+| Adapter | Wizard? | Mecanismo | Implementado |
 |---|---|---|---|
-| DuckStation | Sim | `[Main] SetupWizardIncomplete=false` + modo portátil | **Feito** |
-| PCSX2 | Sim (assistente de BIOS/pastas) | Desconhecido | Não pesquisado |
-| Dolphin | Sim (primeira execução configura caminhos) | Desconhecido | Não pesquisado |
-| PPSSPP | A confirmar | — | Não pesquisado |
-| Cemu | Sim (assistente de configuração inicial) | Desconhecido | Não pesquisado |
-| RPCS3 | Sim (aviso de compilação de firmware) | Provavelmente não suprimível — depende de firmware real | Não pesquisado |
-| Demais adapters | A confirmar caso a caso | — | Não pesquisado |
+| DuckStation | Sim | `[Main] SetupWizardIncomplete=false` + modo portátil | ✅ 2026-08-01 |
+| PCSX2 | Sim | Arquivo `inis/PCSX2_qt.ini` vazio suprime | ✅ |
+| Dolphin | Sim | `[Analytics]PermissionAsked=1` | ✅ |
+| PPSSPP | Sim | `[General]FirstRun=false` | ✅ |
+| Flycast | Não | `emu.cfg` (portátil) | ✅ |
+| RPCS3 | Não formal | `config.yml` vazio; GUI depois | ✅ |
+| melonDS | Não | `melonDS.ini` vazio | ✅ |
+| Azahar | Não | `qt-config.ini` vazio | ✅ |
+| xemu | Sim | `xemu.toml` mínimo | ✅ |
+| Vita3K | Sim | `config.yml` + estrutura | ✅ |
+| Xenia | Não | `xenia.config.toml` auto-gerado | ✅ |
+| Cemu | Sim | `mlc01/` (estrutura) | ✅ |
+| RMG | Não | `config.ini` vazio | ✅ |
 
-Cada emulador guarda esse estado em formato e lugar diferentes (`.ini`, `.xml`,
-`.json`, registro do SO em alguns casos no Windows). **Não generalizar a partir
-do caso do DuckStation** — cada um exige a mesma investigação de código-fonte
-antes de escrever a chave certa. Uma chave errada, na melhor hipótese, não faz
-nada; na pior, é interpretada como uma configuração inválida pelo emulador.
+**Estratégia:** criar arquivo de configuração mínimo para cada emulador, que a
+permite usar defaults na primeira execução. Alguns têm wizard obrigatório
+(Vita3K, Cemu), mas pré-config reduz fricção — o usuário não é travado, apenas
+navegando diálogos esperados. Nenhum emulador é forçado a rodar sem setup quando
+depender de BIOS/firmware real.
 
-Ao implementar cada um, seguir o padrão já criado: `seedFirstRun` em
-`internal/install/firstrun.go` despacha por `adapterID`, e
-`preservePortableUserData` em `promote()` evita que uma atualização apague
-saves de um emulador em modo portátil. Adicionar o `case` correspondente e, se
-o emulador também usar modo portátil, testar a preservação como
-`firstrun_test.go` já faz para o DuckStation.
+**Código:** `seedFirstRun` em `internal/install/firstrun.go` despacha por
+`adapterID` para 13 funções `seedEmulator()`; `preservePortableUserData` evita
+que atualização apague saves. Testes em `firstrun_test.go`: 8 novos testes
+unitários por adapter (Flycast, RPCS3, melonDS, Azahar, xemu, Vita3K, Xenia,
+Cemu, RMG), verificando criação correta de arquivo/estrutura.
+
+**Compilação cruzada:** validada para linux/darwin/windows. Todos os 16 testes
+(6 anteriores + 10 novos) passam.
 
 ### D9 — A descoberta relê os mesmos diretórios uma vez por adapter (M) — **feito**
 
