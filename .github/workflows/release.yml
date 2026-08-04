@@ -22,7 +22,27 @@ permissions:
   contents: write
 
 jobs:
+  # Cria a Release (vazia) antes de qualquer build. Os 3 jobs de build rodam
+  # em paralelo entre si depois disso, mas nenhum deles cria a Release — só
+  # anexam assets a uma que já existe. Sem este job, os 3 builds tentariam
+  # criar a mesma Release ao mesmo tempo ao terminar, e o primeiro a chegar
+  # "vence"; o(s) outro(s) recebe(m) conflito da API do GitHub e falha(m)
+  # sem deixar óbvio que faltou um instalador.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Criar a Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+
   build-windows:
+    needs: create-release
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -59,6 +79,7 @@ jobs:
           fail_on_unmatched_files: true
 
   build-linux:
+    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -107,6 +128,7 @@ jobs:
           fail_on_unmatched_files: true
 
   build-macos:
+    needs: create-release
     runs-on: macos-latest
     steps:
       - name: Checkout
