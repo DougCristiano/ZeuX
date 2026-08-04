@@ -1362,7 +1362,40 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
 | ~~Emulador dedicado 1-click para os consoles que hoje só têm RetroArch~~ | G | **Substituído em 2026-08-03** pela decisão do [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — em vez de um adapter dedicado por console, empacotar o RetroArch + cores selecionados dentro do próprio instalador do ZeuX. N64 continua com o `rmg` como adapter dedicado (não foi desfeito), mas os outros 23 consoles vão pelo empacotamento, não por pesquisa individual |
-| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — implementação em andamento (2026-08-03). Feito: `internal/emulator/retroarch.go` procura cores bundled como primeira opção, `bundledCoreDirs()` aponta para `~/.local/share/zeux/retroarch/cores` (Linux/macOS) ou `%APPDATA%\ZeuX\RetroArch\cores` (Windows); `docs/THIRD-PARTY-LICENSES.md` lista licenças dos 20 cores. Falta: mecanismo de empacotamento no Tauri, download/setup dos cores, medir tamanho do instalador, integração de build |
+| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado e confirmado em 2026-08-04**, ver detalhe abaixo. Falta: integrar no build do Tauri de ponta a ponta, medir tamanho final do instalador com os cores dentro, e confirmar que o RetroArch empacotado acha os cores sem baixar nada na primeira execução |
+
+**Download dos cores do RetroArch desbloqueado em 2026-08-04 — dois bugs reais
+achados e corrigidos, verificados pelo Douglas numa máquina com acesso ao
+buildbot** (este ambiente de sessão de IA segue sem acesso ao
+`buildbot.libretro.com` por política de rede — o mesmo bloqueio que motivou
+registrar este item como "bloqueado" na Sprint C original):
+
+1. **URL errada.** `scripts/download-retroarch-cores.mjs` montava
+   `.../latest/<plataforma>/cores/<arquivo>` — devolvia `404` nos 20 cores.
+   A estrutura real do buildbot é `.../nightly/<plataforma>/latest/<arquivo>`
+   ("nightly" fixo antes da plataforma, "latest" só no fim, sem o segmento
+   `/cores/`). Confirmado com `curl -I` batendo `200` antes de rodar o
+   script inteiro.
+2. **Uso errado da lib `unzipper`.** Depois da URL corrigida, os 20
+   downloads funcionavam mas a extração falhava com `Extract.file is not a
+   function` — `unzipper` não expõe esse método; a API certa pra abrir um
+   `.zip` já em disco é `Open.file(caminho)`, que devolve uma Promise
+   resolvendo num objeto com `.extract({ path })`. Validado localmente com
+   um `.zip` de teste antes de pedir nova confirmação ao Douglas.
+
+**Resultado, 2026-08-04, máquina real do Douglas: `20/20 sucesso`.** Os dois
+bugs eram a causa raiz do bloqueio — não era rede além do que já se sabia
+(este ambiente de sessão de IA não alcança o host; a máquina do Douglas
+alcança normalmente).
+
+**O que ainda falta, agora que o download funciona:**
+- [ ] Rodar `npm run tauri build` de ponta a ponta com os cores presentes em
+      `src-tauri/resources/retroarch/cores/` e confirmar que o instalador
+      final os inclui.
+- [ ] Medir o tamanho final do instalador com os 20 cores dentro (podem
+      somar dezenas de MB — vale registrar aqui quando medido).
+- [ ] Instalar e confirmar que `bundledCoreDirs()` acha os cores certos sem
+      o RetroArch precisar baixar nada na primeira execução.
 
 **Build do instalador Windows via GitHub Actions (2026-08-02):**
 `.github/workflows/build-windows.yml` roda num runner `windows-latest` (que já
