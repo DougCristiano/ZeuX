@@ -1408,11 +1408,20 @@ sem depender de `rpmbuild` do sistema), e o core do MAME (415MB, o maior dos
 20 de longe) domina esse tempo. Não é um problema de "rpmbuild ausente";
 instalar o `rpmbuild` do sistema não mudaria nada, o binário não é chamado.
 
+**Instalação de verdade confirmada em 2026-08-04 (máquina do Douglas,
+Ubuntu):** `sudo apt install` no `.deb` gerado acima instalou sem erro
+(`/usr/bin/zeux` + `/usr/bin/zeuxd`). Abrindo o app: `zeuxd` sobe como sidecar
+em `127.0.0.1:7777`, `GET /health` responde `{"consoles":33,...,"status":"ok"}`,
+e a tela mostra o resumo do scan de hardware real (Ryzen 9 7900X, RTX 3060 Ti,
+30.4GB RAM) com pareceres por console — onboarding, consentimento, scan e
+motor de parecer funcionando a partir do pacote instalado, não de ambiente de
+dev.
+
 **O que ainda falta:**
-- [ ] Instalar o `.deb`/`.rpm`/`.AppImage` de verdade e confirmar que
-      `bundledCoreDirs()` acha os cores certos sem o RetroArch precisar baixar
-      nada na primeira execução — isso não foi testado nesta sessão, só a
-      presença dos arquivos dentro do pacote.
+- [ ] Confirmar que `bundledCoreDirs()` acha os cores certos sem o RetroArch
+      precisar baixar nada **ao abrir um jogo de verdade** — o teste acima
+      cobriu onboarding/parecer, não o fluxo de lançamento com os cores
+      empacotados.
 - [ ] Repetir a confirmação em Windows e macOS (os workflows
       `build-windows.yml`/`build-macos.yml`/`release.yml` já existem e cobrem
       os três SOs, mas não há evidência de um run bem-sucedido registrado
