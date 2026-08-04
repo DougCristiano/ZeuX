@@ -42,7 +42,7 @@ mkdirSync(coresDir, { recursive: true });
  * - version: identificador de versão/build no buildbot (ex: "2.5.2" ou "latest")
  *
  * Versões são pinadas manualmente. Para atualizar:
- * 1. Visitar buildbot.libretro.com/latest/linux/x86_64/cores/
+ * 1. Visitar buildbot.libretro.com/nightly/linux/x86_64/latest/
  * 2. Procurar pelo core (ex: mesen_libretro.so.zip)
  * 3. Atualizar version aqui (e testar download)
  * 4. Commit com mensagem "cores: bump X to Y"
@@ -190,8 +190,12 @@ async function downloadCore(coreName, config) {
   const filename = `${config.filename}${ext}`;
   const zipFilename = `${filename}.zip`;
 
-  // URL do buildbot: https://buildbot.libretro.com/latest/linux/x86_64/cores/mesen_libretro.so.zip
-  const url = `https://buildbot.libretro.com/${config.version}/${platform}/cores/${zipFilename}`;
+  // URL real do buildbot: https://buildbot.libretro.com/nightly/linux/x86_64/latest/mesen_libretro.so.zip
+  // (a estrutura antiga, .../latest/<plataforma>/cores/<arquivo>, devolvia 404
+  // em todo core — confirmado pelo Douglas rodando numa máquina com acesso
+  // real ao host, 2026-08-04. "nightly" é fixo; config.version continua
+  // valendo "latest" só que agora no fim do caminho, antes do arquivo.)
+  const url = `https://buildbot.libretro.com/nightly/${platform}/${config.version}/${zipFilename}`;
 
   const tempZip = path.join(coresDir, zipFilename);
   const finalBinary = path.join(coresDir, filename);
