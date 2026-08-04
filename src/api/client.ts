@@ -16,6 +16,7 @@ import type {
   LibraryGame,
   PreviewResult,
   Report,
+  RetroArchCoreStatus,
   Session,
   SessionsResponse,
 } from "./types";
@@ -89,6 +90,7 @@ export const api = {
   getVerdicts: () => request<Report>("/consoles/verdicts"),
 
   getEmulators: () => request<{ emulators: EmulatorEntry[] }>("/emulators"),
+  getRetroArchCores: () => request<{ cores: RetroArchCoreStatus[] }>("/retroarch/cores"),
 
   getCustomEmulators: () => request<CustomEmulatorsResponse>("/custom-emulators"),
   upsertCustomEmulator: (def: CustomDefinition) =>

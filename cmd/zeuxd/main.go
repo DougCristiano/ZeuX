@@ -56,6 +56,15 @@ func run(addr string, logger *slog.Logger) error {
 
 	registry := emulator.NewRegistry()
 
+	// Copia o RetroArch empacotado no instalador (extensão do ADR 0012) para o
+	// diretório gerenciado antes de qualquer Locate(): precisa estar lá já na
+	// primeira requisição a /emulators, não só na hora de lançar um jogo (ver
+	// bundled_retroarch.go). Sem ZEUX_BUNDLED_RETROARCH_DIR (build de
+	// desenvolvimento fora do Tauri), não faz nada — não é erro fatal.
+	if err := emulator.EnsureBundledRetroArchAvailable(); err != nil {
+		logger.Warn("não foi possível preparar o RetroArch empacotado", "erro", err)
+	}
+
 	customStore, err := emulator.NewCustomStore()
 	if err != nil {
 		return err

@@ -7,13 +7,15 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "download:retroarch-cores": "node scripts/download-retroarch-cores.mjs",
-    "build:daemon": "npm run download:retroarch-cores && node scripts/build-zeuxd.mjs",
+    "download:retroarch-app": "go run ./cmd/download-retroarch-app",
+    "build:daemon": "npm run download:retroarch-cores && npm run download:retroarch-app && node scripts/build-zeuxd.mjs",
     "verificar-api": "node scripts/verify-api.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-opener": "^2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

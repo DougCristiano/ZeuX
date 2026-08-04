@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { LibraryFolder, LibraryGame, Report } from "../api/types";
 import { Badge, Button, Card } from "../components/ui";
@@ -53,6 +54,13 @@ function ConsoleLibraryCard({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handlePickFolder() {
+    // open(null) no diálogo cancelado — não sobrescreve o que a pessoa já
+    // tinha digitado à mão nesse caso.
+    const picked = await open({ directory: true, multiple: false });
+    if (typeof picked === "string") setPath(picked);
   }
 
   async function handleRescan(folderId: number) {
@@ -111,11 +119,12 @@ function ConsoleLibraryCard({
         </ul>
       )}
 
-      {/* Caminho digitado, não um seletor nativo de pasta: este projeto ainda
-          não decidiu adotar @tauri-apps/plugin-dialog (dependência Rust nova,
-          fora do escopo desta rota — CLAUDE.md pede decisão explícita antes
-          disso). O usuário aponta um caminho que já existe na própria
-          máquina; nunca um link ou sugestão de onde conseguir arquivos. */}
+      {/* O diálogo nativo (@tauri-apps/plugin-dialog) só escolhe o caminho;
+          quem aponta a pasta pro backend continua sendo handleAddFolder, sem
+          mudança de formato. O campo de texto fica editável mesmo depois de
+          escolher — cola ou ajuste manual continuam funcionando. O usuário
+          aponta um caminho que já existe na própria máquina; nunca um link
+          ou sugestão de onde conseguir arquivos. */}
       <form className="flex gap-2" onSubmit={handleAddFolder}>
         <input
           type="text"
@@ -125,6 +134,9 @@ function ConsoleLibraryCard({
           className={inputClass}
           disabled={busy}
         />
+        <Button type="button" variant="secondary" disabled={busy} onClick={handlePickFolder}>
+          Escolher pasta
+        </Button>
         <Button type="submit" variant="primary" disabled={busy}>
           Apontar pasta
         </Button>

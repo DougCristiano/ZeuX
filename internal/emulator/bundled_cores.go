@@ -11,23 +11,32 @@ import (
 // ensureBundledCoresAvailable copia cores bundled do instalador para o
 // diretório de dados do usuário na primeira execução (ADR 0012).
 //
-// Tauri seta ZEUX_BUNDLED_CORES_DIR para o caminho do diretório de recursos
-// que contém cores. Se a variável não existir, ignora silenciosamente (cores
-// bundled podem não estar disponíveis, ex.: build local do desenvolvedor).
+// Tauri (src-tauri/src/lib.rs) já seta ZEUX_BUNDLED_CORES_DIR apontando
+// diretamente para a pasta que contém os arquivos de core (não para uma raiz
+// de recursos genérica) — este código não deve acrescentar "retroarch/cores"
+// de novo em cima. Bug real, presente desde a implementação original do ADR
+// 0012 até 2026-08-04: um `filepath.Join(bundledDir, "retroarch", "cores")`
+// aqui produzia um caminho duplicado
+// (".../resources/retroarch/cores/retroarch/cores") que nunca existiu —
+// silencioso porque o erro só vira log de aviso, nunca trava o daemon.
+// Passou despercebido até o Douglas lançar um jogo de verdade e receber
+// "core não encontrado" mesmo com o core presente no pacote.
+//
+// Se a variável não existir, ignora silenciosamente (cores bundled podem não
+// estar disponíveis, ex.: build local do desenvolvedor).
 //
 // Comportamento:
-// - Lê cores de $ZEUX_BUNDLED_CORES_DIR/retroarch/cores/
+// - Lê cores de $ZEUX_BUNDLED_CORES_DIR
 // - Copia para ~/.local/share/zeux/retroarch/cores (Linux), etc
 // - Idempotente: se arquivo já existe, não copia duas vezes
 // - Erros de cópia são registrados mas não bloqueiam o daemon
 func ensureBundledCoresAvailable() error {
-	bundledDir := os.Getenv("ZEUX_BUNDLED_CORES_DIR")
-	if bundledDir == "" {
+	bundledCoresPath := os.Getenv("ZEUX_BUNDLED_CORES_DIR")
+	if bundledCoresPath == "" {
 		// Cores bundled não estão disponíveis neste ambiente.
 		return nil
 	}
 
-	bundledCoresPath := filepath.Join(bundledDir, "retroarch", "cores")
 	userCoresDir := bundledCoreDirsForWrite()[0]
 
 	// Criar diretório de destino se não existir

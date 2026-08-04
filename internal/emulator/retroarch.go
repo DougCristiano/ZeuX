@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -285,4 +286,62 @@ func bundledCoreDirs() []string {
 		}
 	}
 	return []string{}
+}
+
+// CoreStatus é o estado de um core do RetroArch conhecido pelo ZeuX: se está
+// instalado (achado em algum dos diretórios de coreDirs) e, se sim, onde.
+type CoreStatus struct {
+	Name      string `json:"name"`
+	Filename  string `json:"filename"`
+	Installed bool   `json:"installed"`
+	Path      string `json:"path,omitempty"`
+}
+
+// RetroArchCoreStatus lista todo core que o ZeuX sabe usar (retroArchCores),
+// em ordem alfabética, com o estado de instalação de cada um. Existe para que
+// a interface consiga mostrar "quais dos cores empacotados/baixados
+// realmente estão no lugar certo" — sem isto, a única forma de descobrir que
+// um core está faltando era tentar lançar um jogo e receber o erro
+// (achado 2026-08-04: um core inteiro podia estar ausente por um bug de
+// caminho, e nada na tela avisava até o lançamento falhar).
+func RetroArchCoreStatus(ctx context.Context) []CoreStatus {
+	// Mesmo gatilho de locateCore: garante que cores bundled foram copiados
+	// antes de reportar o que está instalado, senão a primeira consulta a
+	// esta rota mostraria tudo como ausente até o primeiro lançamento.
+	bundledCoresInitOnce.Do(func() {
+		if err := ensureBundledCoresAvailable(); err != nil {
+			fmt.Fprintf(os.Stderr, "aviso ao copiar cores bundled: %v\n", err)
+		}
+	})
+
+	binaryPath := ""
+	if install, ok := (retroArchAdapter{}).Locate(ctx); ok {
+		binaryPath = install.BinaryPath
+	}
+
+	names := make([]string, 0, len(retroArchCores))
+	for name := range retroArchCores {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	dirs := coreDirs(binaryPath)
+	statuses := make([]CoreStatus, 0, len(names))
+	for _, name := range names {
+		file := retroArchCores[name] + coreExtension()
+		status := CoreStatus{Name: name, Filename: file}
+
+		for _, dir := range dirs {
+			candidate := filepath.Join(dir, file)
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				status.Installed = true
+				status.Path = candidate
+				break
+			}
+		}
+
+		statuses = append(statuses, status)
+	}
+
+	return statuses
 }

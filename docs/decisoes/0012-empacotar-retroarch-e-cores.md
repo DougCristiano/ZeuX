@@ -57,13 +57,23 @@ como padrão quando o usuário não especifica um:
 ```
 mesen, snes9x, gambatte, mgba, mupen64plus-next, melonds, beetle vb,
 genesis plus gx, picodrive, beetle saturn, flycast, beetle psx hw, ppsspp,
-beetle pce, beetle ngp, beetle cygne, opera, stella, mame, fbneo
+beetle pce, beetle ngp, beetle cygne, opera, stella, mame, fbneo,
+sameboy, bsnes, parallel n64, yabause
 ```
 
-(Os cores de patamar "ótimo" que não são o padrão — bsnes, ParaLLEl N64,
-Beetle Saturn de alta precisão, etc. — continuam exigindo o Online Updater do
-próprio RetroArch, como hoje. Bundlar só o necessário para o caso comum evita
-inflar o instalador com todos os cores do catálogo libretro.)
+**Revisado em 2026-08-04, depois de um erro real:** a frase original aqui dizia
+que os cores de patamar "ótimo" que não são o padrão (bsnes, ParaLLEl N64,
+etc.) continuariam exigindo o Online Updater. Na prática isso quebrava a
+autoconfiguração em hardware bom: o catálogo (`internal/verdict/data/consoles.json`)
+recomenda `sameboy` para o tier "ótimo" de GB/GBC, `bsnes` para SNES, `parallel
+n64` para N64 e `yabause` para um tier de Saturn — nenhum desses 4 estava na
+lista original, e um hardware que atingisse esse patamar recebia "instale pelo
+Online Updater" só para abrir um jogo, pior experiência que hardware mediano
+(que cai nos cores padrão, esses sim empacotados). **Os 4 cores extras foram
+adicionados** à lista abaixo por isso — o critério deixou de ser só
+"`defaultCoreByConsole`" e passou a ser "todo core que algum tier do catálogo
+pode recomendar via RetroArch", para que a autoconfiguração nunca esbarre
+nessa mensagem.
 
 ## O que este ADR **não** decide — segue em aberto para quando a implementação começar
 
@@ -71,11 +81,14 @@ inflar o instalador com todos os cores do catálogo libretro.)
   core do libretro tem a própria licença (a maioria GPL/MIT-like, mas isso
   precisa ser conferido core a core antes de empacotar — mesmo rigor do D1,
   não presumir que "é libretro, logo é GPL").
-- **Mecanismo técnico de empacotamento.** Se via recurso do Tauri
-  (`tauri.conf.json`, semelhante ao `externalBin` do `zeuxd`) ou outro
-  caminho. Também não decidido: onde `retroarch` (`Locate` em
-  `internal/emulator/retroarch.go`) passa a procurar essa cópia empacotada,
-  além dos lugares que já verifica.
+- ~~**Mecanismo técnico de empacotamento.**~~ **Resolvido em 2026-08-04** (ver
+  `docs/adr-0012-implementation.md`, Etapa 5): recurso do Tauri
+  (`"resources": ["resources/"]` em `tauri.conf.json`, mesmo padrão do
+  `externalBin` do `zeuxd`). `Locate()` não precisou de nenhuma mudança — a
+  cópia bundled cai no mesmo diretório gerenciado que uma instalação 1-click
+  usaria, e `findBinary` já sabia procurar lá.
+  **Ressalva:** só cobre Linux e Windows por enquanto; macOS (`.dmg`, não
+  `.7z`) ficou de fora, decisão de escopo registrada na mesma etapa.
 - **Tamanho medido do instalador** depois de empacotar — cada plataforma
   (Windows/Linux/macOS) só carrega o RetroArch + cores do próprio SO, do mesmo
   jeito que `build-zeuxd.mjs` só compila para o alvo do runner, então o

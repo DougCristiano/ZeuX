@@ -87,8 +87,14 @@ da Sprint A, mas conta uma vez só.
 **Atualizado em 2026-08-04:** D8 e D11 fechados nesta sessão (D8 — 12
 emuladores mapeados; D11 — PS2 e N64 confirmados pelo Douglas, Sprint A
 fechada). D2 ganhou estratégia definida (telemetria da comunidade, via Sprint
-E/F) em vez de ficar em aberto sem rumo. B11 passou a cobrir Linux e macOS,
-não só Windows — 3 workflows de CI, verificação humana pendente nos 3.
+E/F) em vez de ficar em aberto sem rumo — mais dois candidatos concretos de
+recalibração registrados (PS3 `logical_cores`, SNES "otimo"), pendentes de
+confirmação. B11 passou a cobrir Linux e macOS, não só Windows — 3 workflows
+de CI, mais um workflow de Release por tag — **e a v0.1.0 foi publicada de
+verdade, com os 6 instaladores (Windows `.msi`/`.exe`, Linux
+`.deb`/`.rpm`/`.AppImage`, macOS `.dmg`) na aba Releases do GitHub**. O
+`.dmg` saiu só `aarch64` (Apple Silicon) — sem cobertura de Mac Intel ainda.
+Verificação humana em máquina limpa segue pendente nos 3 SOs.
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
 é escopo novo: são itens que já eram necessários (rotas HTTP e as quatro telas
@@ -315,6 +321,37 @@ Enquanto não calibrado, a UI segue tratando o parecer como estimativa, não
 promessa. **Depende de:** Sprint E (identidade, backend) e Sprint F (relato de
 compatibilidade) — D2 não é mais um item isolado, é o resultado esperado de
 duas sprints que ainda não começaram.
+
+**Candidatos a recalibração, achados em 2026-08-04 cruzando `consoles.json`
+contra um documento de terceiros sobre requisitos de emulação** (tratado como
+pista, não como fonte primária — é uma síntese gerada por IA, não
+documentação oficial dos projetos de emulador; ver ressalva abaixo):
+
+- **PS3/RPCS3 — ambiguidade `logical_cores` vs núcleos físicos.** O tier
+  "bom" (`consoles.json`, bloco `ps3`) pede `logical_cores: 8`. A comunidade
+  do RPCS3 fala em **núcleos físicos**, não threads — os 7 SPEs do Cell são
+  unidades reais, não se beneficiam de Hyper-Threading do jeito que outra
+  carga de trabalho se beneficiaria. Um notebook com CPU de 4 núcleos
+  físicos + HT (8 threads) passaria no nosso teto de `logical_cores: 8`,
+  mas é exatamente o perfil que a comunidade descreve sofrendo "fome de
+  threads" no RPCS3. **Precisa verificar**: o que `internal/hardware`
+  reporta em `logical_cores` — threads (SMT incluído) ou núcleos físicos?
+  Se for threads, o nome do campo é enganoso e o limiar do PS3 pode estar
+  liberando hardware que não aguenta.
+- **SNES "otimo" (core bsnes, ciclo-a-ciclo) — possivelmente baixo demais.**
+  Tier pede só `logical_cores: 4, clock_mhz: 2000` — qualquer notebook de
+  10 anos atende. Emulação ciclo-exato sem JIT é cara mesmo num console de
+  16-bit; vale considerar subir esse patamar, em especial para jogos com
+  coprocessador adicional (SuperFX, SA-1) sob o modo ciclo-a-ciclo.
+
+**Ressalva sobre a fonte:** os dois pontos acima vieram de um relatório
+compartilhado com o Douglas, de origem e rigor não verificados — tem
+qualidade de leitura alta mas não é a documentação oficial do RPCS3 nem do
+bsnes. Serve para **apontar onde olhar**, não para copiar números direto no
+catálogo. A ação concreta continua dependendo do canal de relato real
+(Sprint F) — estes dois candidatos só entram no catálogo se o relato da
+comunidade confirmar o padrão, ou se alguém checar a documentação oficial
+dos projetos.
 
 ### D3 — Persistir sessões e tempo de jogo (M) — **feito em 2026-08-02**
 
@@ -742,9 +779,52 @@ linha de comando (`apt install ./zeux.deb`, `dnf install ./zeux.rpm`, ou
 visual no Linux, e isso não é uma limitação do ZeuX, é como o ecossistema
 funciona.
 
-**Não verificado ainda:** nenhuma tag foi empurrada — o workflow nunca
-rodou. Antes da primeira tag real, vale rodar via `workflow_dispatch` apontando
-para uma tag de teste, ou aceitar que a primeira tag real é o próprio teste.
+**v0.1.0 publicada em 2026-08-04 — a primeira tag real já foi o teste.** O
+Douglas publicou a Release pela interface do GitHub (que cria a tag
+automaticamente ao clicar "Publish release", disparando o `push: tags:` do
+`release.yml` sem precisar do `git push` de tag na linha de comando — a
+sessão de IA está proibida de empurrar tags neste ambiente por política do
+próprio backend de push, então essa rota pela UI acabou sendo o caminho
+real, não só uma alternativa).
+
+Workflow terminou com `conclusion: success`, sem nenhum job falhando. Os 6
+assets confirmados na Release
+(https://github.com/DougCristiano/ZeuX/releases/tag/v0.1.0):
+
+| Arquivo | SO |
+|---|---|
+| `zeux_0.1.0_x64_en-US.msi` | Windows |
+| `zeux_0.1.0_x64-setup.exe` | Windows (NSIS) |
+| `zeux_0.1.0_amd64.deb` | Linux |
+| `zeux-0.1.0-1.x86_64.rpm` | Linux |
+| `zeux_0.1.0_amd64.AppImage` | Linux |
+| `zeux_0.1.0_aarch64.dmg` | macOS |
+
+O job `create-release` rodou primeiro e sozinho, sem os 3 builds disputarem
+a criação da Release — a correção do `needs:` (feita na revisão do PR #3)
+funcionou como desenhado.
+
+**Achado não previsto: o `.dmg` saiu `aarch64`, não `x86_64`.** O runner
+`macos-latest` do GitHub hoje é Apple Silicon nativo, e `tauri build` sem
+`--target` compila só para a arquitetura do próprio runner. Isso significa
+que **quem tiver um Mac Intel não consegue rodar este instalador** — falta
+cobertura, não é um bug de configuração errada. Para cobrir os dois, o
+`build-macos`/`release.yml` precisaria compilar como *universal binary*
+(`--target universal-apple-darwin`), o que aproximadamente dobra o tempo do
+job (compila duas vezes, uma por arquitetura, antes de unir os binários).
+**Não implementado ainda** — decisão de custo/benefício em aberto: vale a
+pena dobrar o tempo de CI para cobrir uma fatia de usuários com Mac Intel
+(cada vez menor, já que a Apple não vende mais essas máquinas desde 2023),
+ou aceitar `aarch64`-only até haver sinal de demanda real?
+
+**Ainda faltando, mesmo com a v0.1.0 publicada:** nenhum dos 6 instaladores
+foi testado numa máquina limpa de verdade — os checkboxes de Windows/Linux/
+macOS no início desta seção continuam abertos. O teste feito nesta sessão
+(Linux, ver acima) usou um `.deb` compilado localmente, não o artifact
+oficial da Release. Rodar exatamente o `zeux_0.1.0_amd64.deb` publicado, em
+vez de uma compilação local equivalente, é o próximo passo mais barato —
+mesmo binário, zero surpresa esperada, mas fecha a lacuna "testei uma coisa
+parecida" vs "testei o artefato que o usuário final vai baixar".
 
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
@@ -1282,7 +1362,201 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
 | ~~Emulador dedicado 1-click para os consoles que hoje só têm RetroArch~~ | G | **Substituído em 2026-08-03** pela decisão do [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — em vez de um adapter dedicado por console, empacotar o RetroArch + cores selecionados dentro do próprio instalador do ZeuX. N64 continua com o `rmg` como adapter dedicado (não foi desfeito), mas os outros 23 consoles vão pelo empacotamento, não por pesquisa individual |
-| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — implementação em andamento (2026-08-03). Feito: `internal/emulator/retroarch.go` procura cores bundled como primeira opção, `bundledCoreDirs()` aponta para `~/.local/share/zeux/retroarch/cores` (Linux/macOS) ou `%APPDATA%\ZeuX\RetroArch\cores` (Windows); `docs/THIRD-PARTY-LICENSES.md` lista licenças dos 20 cores. Falta: mecanismo de empacotamento no Tauri, download/setup dos cores, medir tamanho do instalador, integração de build |
+| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 20 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. Falta: confirmar em Windows/macOS e testar a instalação de verdade (o RetroArch empacotado achar os cores sem baixar nada na primeira execução) |
+
+**Download dos cores do RetroArch desbloqueado em 2026-08-04 — dois bugs reais
+achados e corrigidos, verificados pelo Douglas numa máquina com acesso ao
+buildbot** (este ambiente de sessão de IA segue sem acesso ao
+`buildbot.libretro.com` por política de rede — o mesmo bloqueio que motivou
+registrar este item como "bloqueado" na Sprint C original):
+
+1. **URL errada.** `scripts/download-retroarch-cores.mjs` montava
+   `.../latest/<plataforma>/cores/<arquivo>` — devolvia `404` nos 20 cores.
+   A estrutura real do buildbot é `.../nightly/<plataforma>/latest/<arquivo>`
+   ("nightly" fixo antes da plataforma, "latest" só no fim, sem o segmento
+   `/cores/`). Confirmado com `curl -I` batendo `200` antes de rodar o
+   script inteiro.
+2. **Uso errado da lib `unzipper`.** Depois da URL corrigida, os 20
+   downloads funcionavam mas a extração falhava com `Extract.file is not a
+   function` — `unzipper` não expõe esse método; a API certa pra abrir um
+   `.zip` já em disco é `Open.file(caminho)`, que devolve uma Promise
+   resolvendo num objeto com `.extract({ path })`. Validado localmente com
+   um `.zip` de teste antes de pedir nova confirmação ao Douglas.
+
+**Resultado, 2026-08-04, máquina real do Douglas: `20/20 sucesso`.** Os dois
+bugs eram a causa raiz do bloqueio — não era rede além do que já se sabia
+(este ambiente de sessão de IA não alcança o host; a máquina do Douglas
+alcança normalmente).
+
+**`npm run tauri build` de ponta a ponta, confirmado em 2026-08-04 (build
+Linux local, sessão de IA):** rodou sem erros — os únicos ajustes necessários
+foram de ambiente, não de código: instalar os pacotes de sistema que o Tauri
+exige para compilar no Linux (`libwebkit2gtk-4.1-dev`,
+`libjavascriptcoregtk-4.1-dev`, `libgtk-3-dev`, `libayatana-appindicator3-dev`,
+`librsvg2-dev`, `build-essential`, `libsoup-3.0-dev` — nenhum estava presente
+neste ambiente). `download:retroarch-cores` tentou rebaixar os cores (rede
+segue bloqueada nesta sessão de IA) mas não falhou o build, como já esperado
+pelo próprio script — os 20 cores presentes em disco desde a etapa anterior
+foram usados. Gerou os três formatos Linux: `.deb` (178M), `.rpm` (178M),
+`.AppImage` (224M). Inspecionado com `dpkg-deb -c`: **os 20 cores e o sidecar
+`zeuxd` estão de fato dentro do `.deb`**, em
+`usr/lib/zeux/resources/retroarch/cores/`.
+
+**Nota de tempo:** o empacotamento do `.rpm` sozinho levou ~26min neste
+ambiente — o Tauri v2 comprime `.rpm` com uma lib Rust nativa (crate `rpm`,
+sem depender de `rpmbuild` do sistema), e o core do MAME (415MB, o maior dos
+20 de longe) domina esse tempo. Não é um problema de "rpmbuild ausente";
+instalar o `rpmbuild` do sistema não mudaria nada, o binário não é chamado.
+
+**Instalação de verdade confirmada em 2026-08-04 (máquina do Douglas,
+Ubuntu):** `sudo apt install` no `.deb` gerado acima instalou sem erro
+(`/usr/bin/zeux` + `/usr/bin/zeuxd`). Abrindo o app: `zeuxd` sobe como sidecar
+em `127.0.0.1:7777`, `GET /health` responde `{"consoles":33,...,"status":"ok"}`,
+e a tela mostra o resumo do scan de hardware real (Ryzen 9 7900X, RTX 3060 Ti,
+30.4GB RAM) com pareceres por console — onboarding, consentimento, scan e
+motor de parecer funcionando a partir do pacote instalado, não de ambiente de
+dev.
+
+**O que ainda falta:**
+- [ ] Confirmar que `bundledCoreDirs()` acha os cores certos sem o RetroArch
+      precisar baixar nada **ao abrir um jogo de verdade** — o teste acima
+      cobriu onboarding/parecer, não o fluxo de lançamento com os cores
+      empacotados.
+- [ ] Repetir a confirmação em Windows e macOS (os workflows
+      `build-windows.yml`/`build-macos.yml`/`release.yml` já existem e cobrem
+      os três SOs, mas não há evidência de um run bem-sucedido registrado
+      aqui ainda).
+
+**Lacuna real achada e corrigida em 2026-08-04: o ADR 0012 nunca empacotou o
+executável do RetroArch, só os cores.** Testando o `.deb` instalado de
+verdade, a tela de Emuladores mostrava "RetroArch não instalado" mesmo com os
+20 cores dentro do pacote — `Locate()` nunca teve um lugar bundled para
+procurar o binário (só os cores tinham `bundledCoreDirs()`). Detalhe completo
+em `docs/adr-0012-implementation.md`, Etapa 5, e no ADR 0012 atualizado.
+Resumo do que mudou:
+
+- Novo comando `cmd/download-retroarch-app`, chamado por
+  `npm run download:retroarch-app` (encadeado em `build:daemon`), baixa o app
+  do RetroArch do buildbot **de verdade** (esta sessão teve acesso pontual ao
+  host, confirmado com `curl`) e extrai só o necessário: no Linux, um único
+  AppImage autocontido (~11MB); no Windows, `retroarch.exe` + ~65 DLLs
+  (~147MB) — sem elas o executável não abre. Extração em Go puro
+  (`github.com/bodgit/sevenzip`, já usado pelo projeto), sem dependência nova
+  nem binário `7z` de sistema.
+- `internal/emulator/bundled_retroarch.go` copia isso para o mesmo diretório
+  gerenciado que uma instalação 1-click usaria — **nenhuma mudança em
+  `retroArchAdapter.Locate()`** foi necessária, `findBinary` já sabia
+  procurar lá (inclusive com detecção de `*.AppImage` único).
+  `cmd/zeuxd/main.go` chama isso cedo, antes de qualquer requisição a
+  `/emulators`.
+- `internal/install/sources.go`: novo `KindBundled`; a entrada do RetroArch
+  em `sources.json` deixou de ser `"kind": "manual"` (texto do buildbot,
+  desatualizado) e virou `"kind": "bundled"`.
+- **macOS ficou de fora por decisão explícita**, não esquecimento: o buildbot
+  distribui o app do RetroArch para macOS como `.dmg`
+  (confirmado com `curl`), não `.7z`, e montar um `.dmg` não tem rota simples
+  em Go puro.
+- Verificado nesta sessão: `go build`/`go vet`/`go test ./...` verdes
+  (compilação cruzada Windows/macOS incluída), e o AppImage extraído
+  **roda de verdade** (`--version` devolveu
+  `RetroArch - Frontend for libretro / Version: 1.22.2`).
+- **Ainda falta:** lançar um jogo de verdade pelo RetroArch bundled (cai
+  dentro do D11); macOS; trocar o alias móvel `RetroArch.7z` por uma versão
+  datada fixa quando o Douglas cortar uma versão do ZeuX (ADR 0012 pede
+  versão pinada, não "sempre a mais nova").
+
+**Bug real achado e corrigido em 2026-08-04, instalando o `.deb` de
+verdade:** a tela de Emuladores continuava mostrando "não instalado" mesmo
+depois do RetroArch empacotado — `ZEUX_BUNDLED_RETROARCH_DIR` (e
+`ZEUX_BUNDLED_CORES_DIR`, mesmo bug, nunca percebido porque só roda na hora de
+lançar um jogo) apontava para `<resource_dir>/retroarch/...`, mas
+`"resources": ["resources/"]` em `tauri.conf.json` preserva o nome da pasta —
+os arquivos ficam em `<resource_dir>/resources/retroarch/...`. Faltava o
+segmento `resources/` em `src-tauri/src/lib.rs`. Achado comparando a env var
+de um processo `zeuxd` real (`/proc/<pid>/environ`) contra o caminho real dos
+arquivos instalados — confirmado com `installed: true, managed: true` em
+`GET /emulators` depois da correção, e visualmente na tela.
+
+**Armadilha própria desta sessão, registrada para não repetir:** ao testar a
+correção acima, compilei só `cargo build --release` manualmente (sem passar
+pelo `npm run tauri build`) para ser mais rápido que refazer o instalador
+inteiro. O binário resultante ficou com `http://localhost:1420` (URL de
+desenvolvimento) embutido em vez do frontend empacotado — o `tauri build`
+seta variáveis de ambiente que fazem essa diferença, e pular esse comando
+quebra o app mesmo com o binário "funcionando". Lição: nunca substituir
+`/usr/bin/zeux` por um `cargo build` avulso; sempre pelo `tauri build`
+(pode-se restringir a `--bundles deb` para ser mais rápido em teste local —
+~2min contra ~26min do `.rpm`).
+
+**Lacuna real achada testando um jogo de GB de verdade (2026-08-04):**
+autoconfiguração (clicar "Jogar" sem escolher opções) usa o core do tier
+"ótimo" do catálogo — que para GB/GBC recomenda `sameboy`, não `gambatte`
+(o default/empacotado). Hardware bom o bastante para esse tier recebia
+"instale pelo Online Updater" em vez de simplesmente jogar — pior experiência
+que hardware mediano. Achados 4 cores nessa situação (recomendados por algum
+tier do catálogo, mas fora da lista original de 20): `sameboy` (GB/GBC
+ótimo), `bsnes` (SNES ótimo), `parallel n64` (N64 ótimo), `yabause` (Saturn,
+tier de fallback). Os 4 confirmados existentes no buildbot com `curl`,
+adicionados a `scripts/download-retroarch-cores.mjs` e ao ADR 0012 — lista
+passou de 20 para 24 cores (~cresce o instalador em alguns MB por core;
+não medido o total ainda).
+
+**Segundo bug real de caminho, mais antigo que os de cima — achado só ao
+lançar o jogo de GB de verdade (2026-08-04):** mesmo com o AppImage do
+RetroArch reconhecido e os 24 cores presentes no pacote, o lançamento
+continuava falhando com "core não encontrado". Causa: `ensureBundledCoresAvailable`
+(`internal/emulator/bundled_cores.go`) fazia `filepath.Join(bundledDir,
+"retroarch", "cores")` em cima de uma `ZEUX_BUNDLED_CORES_DIR` que **já**
+apontava para a pasta de cores — produzindo um caminho duplicado
+(`.../resources/retroarch/cores/retroarch/cores`) que nunca existiu. Esse bug
+é anterior à sessão de hoje: existia desde a implementação original do ADR
+0012, invisível porque o erro só virava log de aviso, nunca travava o
+daemon — e ninguém tinha lançado um jogo de verdade usando os cores bundled
+até agora. Corrigido removendo o join duplicado; cobrido por
+`internal/emulator/bundled_cores_test.go` (não existia teste nenhum para essa
+função antes). **Confirmado pelo Douglas: os 3 testes passaram** — RetroArch
+"instalado pelo ZeuX", jogo de GB abre com o core `sameboy`.
+
+**Nova rota `GET /api/v1/retroarch/cores` e botão "Ver cores" (2026-08-04):**
+depois do bug acima, ficou claro que não havia nenhuma forma de ver quais
+cores estavam de fato instalados sem tentar lançar um jogo e torcer. Nova
+rota lista todo core conhecido (`internal/emulator/retroarch.go`,
+`RetroArchCoreStatus`) com `installed`/`path`; a tela de Emuladores ganhou um
+botão "Ver cores" na linha do RetroArch que mostra a lista com o que falta.
+
+**Seletor nativo de pasta na tela de Biblioteca (2026-08-04):** o campo de
+"apontar pasta" exigia digitar o caminho à mão — o próprio código já
+registrava isso como decisão pendente. Adicionado `@tauri-apps/plugin-dialog`
+(npm) + `tauri-plugin-dialog` (crate Rust) + permissão `dialog:allow-open`.
+Botão "Escolher pasta" abre o diálogo nativo, preenche o campo (que continua
+editável). Backend não mudou.
+
+**Windows e macOS: código deveria funcionar, não foi testado rodando.**
+Tudo confirmado nesta sessão foi Linux local, de ponta a ponta (build,
+instalação, abertura, os 3 testes acima). Para Windows: a estrutura real do
+pacote do buildbot foi inspecionada de verdade (baixado e listado —
+`retroarch.exe` + ~65 DLLs, ~147MB — o código já copia tudo, não só o
+`.exe`), e as correções de hoje são todas Go/Rust multiplataforma, sem nada
+específico de SO — mas ninguém rodou `npm run tauri build` numa máquina
+Windows real, nem os workflows `build-windows.yml`/`release.yml` desde essas
+mudanças. Para macOS: os cores baixam normalmente, mas **o binário do
+RetroArch em si não é empacotado** — decisão deliberada (buildbot distribui
+`.dmg`, sem rota simples em Go puro), documentada no ADR 0012; no Mac, o
+RetroArch segue pedindo instalação manual como antes desta sessão.
+**Próximo passo sugerido:** `gh workflow run build-windows.yml` (ou
+`build-macos.yml`) na branch atual, via `workflow_dispatch` — não precisa
+mesclar na main para gerar um instalador de teste real.
+
+**Seletor nativo de pasta na tela de Biblioteca (2026-08-04):** o campo de
+"apontar pasta" exigia digitar o caminho à mão — o próprio código já
+registrava isso como decisão pendente (`src/screens/LibraryScreen.tsx`,
+comentário citando que `@tauri-apps/plugin-dialog` era "fora do escopo" até
+uma decisão explícita). Adicionado `@tauri-apps/plugin-dialog` (npm) +
+`tauri-plugin-dialog` (crate Rust) + permissão `dialog:allow-open` em
+`src-tauri/capabilities/default.json`. Um botão "Escolher pasta" abre o
+diálogo nativo do SO e preenche o campo de texto, que continua editável
+(colar/ajustar manualmente ainda funciona). Backend não mudou — já aceitava
+caminho absoluto, que é o que o diálogo nativo devolve.
 
 **Build do instalador Windows via GitHub Actions (2026-08-02):**
 `.github/workflows/build-windows.yml` roda num runner `windows-latest` (que já

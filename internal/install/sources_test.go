@@ -29,9 +29,9 @@ func TestLoadCatalog(t *testing.T) {
 			if len(source.Assets) == 0 {
 				t.Errorf("%s: fonte do GitHub sem nenhum padrão de pacote", source.AdapterID)
 			}
-		case KindManual:
+		case KindManual, KindBundled:
 			if source.Reason == "" {
-				t.Errorf("%s: fonte manual precisa explicar por que não é automatizável", source.AdapterID)
+				t.Errorf("%s: fonte manual/bundled precisa explicar o porquê (não automatizável, ou já vem empacotada)", source.AdapterID)
 			}
 		default:
 			t.Errorf("%s: tipo de fonte desconhecido %q", source.AdapterID, source.Kind)
@@ -207,10 +207,30 @@ func TestManualSourceRefusesWithLink(t *testing.T) {
 
 	manager := NewManager(catalog, discardLogger())
 
-	if _, err := manager.Start("retroarch"); err == nil {
+	if _, err := manager.Start("dolphin"); err == nil {
 		t.Fatal("fonte manual não deveria iniciar instalação automática")
-	} else if !strings.Contains(err.Error(), "retroarch.com") {
+	} else if !strings.Contains(err.Error(), "dolphin-emu.org") {
 		t.Errorf("o erro deveria apontar a página oficial: %v", err)
+	}
+}
+
+// RetroArch (kind bundled, ADR 0012) não deve oferecer instalação automática:
+// já vem dentro do instalador. Chegar em Start() mesmo assim (o normal é
+// Locate() já mostrar "instalado" e a interface nem exibir o botão) precisa
+// recusar com uma mensagem que reflete a realidade, não instruções de
+// download que não fazem mais sentido para este emulador.
+func TestBundledSourceRefusesStart(t *testing.T) {
+	catalog, err := LoadCatalog()
+	if err != nil {
+		t.Fatalf("carregando catálogo: %v", err)
+	}
+
+	manager := NewManager(catalog, discardLogger())
+
+	if _, err := manager.Start("retroarch"); err == nil {
+		t.Fatal("fonte bundled não deveria iniciar instalação automática")
+	} else if !strings.Contains(err.Error(), "já vem empacotado") {
+		t.Errorf("o erro deveria explicar que o RetroArch já vem empacotado: %v", err)
 	}
 }
 

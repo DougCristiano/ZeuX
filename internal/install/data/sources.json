@@ -180,10 +180,10 @@
     {
       "adapter_id": "retroarch",
       "name": "RetroArch",
-      "kind": "manual",
+      "kind": "bundled",
       "homepage": "https://www.retroarch.com/?page=platforms",
       "license": "GPL-3.0",
-      "reason": "O RetroArch distribui pelo buildbot próprio, e não publica os binários nas releases do GitHub. A instalação automática exigiria acompanhar a estrutura de diretórios do buildbot, que muda sem aviso."
+      "reason": "O RetroArch (e os 20 cores padrão) já vem dentro do instalador do ZeuX (ADR 0012) — não precisa ser baixado. Versão fixa até uma nova versão do ZeuX ser cortada; atualizações do RetroArch em si continuam manuais pelo Online Updater, dentro do próprio RetroArch."
     },
     {
       "adapter_id": "dolphin",

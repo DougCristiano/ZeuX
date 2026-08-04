@@ -20,7 +20,7 @@ import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import Extract from "unzipper";
+import unzipper from "unzipper";
 
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), "../..");
 const coresDir = path.join(
@@ -42,7 +42,7 @@ mkdirSync(coresDir, { recursive: true });
  * - version: identificador de versão/build no buildbot (ex: "2.5.2" ou "latest")
  *
  * Versões são pinadas manualmente. Para atualizar:
- * 1. Visitar buildbot.libretro.com/latest/linux/x86_64/cores/
+ * 1. Visitar buildbot.libretro.com/nightly/linux/x86_64/latest/
  * 2. Procurar pelo core (ex: mesen_libretro.so.zip)
  * 3. Atualizar version aqui (e testar download)
  * 4. Commit com mensagem "cores: bump X to Y"
@@ -128,6 +128,31 @@ const coresManifest = {
     filename: "fbneo_libretro",
     version: "latest",
   },
+
+  // Os 4 abaixo não são o core padrão de nenhum console
+  // (defaultCoreByConsole, internal/emulator/retroarch.go), mas são o core
+  // de precisão máxima que o catálogo (internal/verdict/data/consoles.json)
+  // recomenda para o tier "ótimo" de gb/gbc, snes, n64 e um tier de saturn —
+  // achado em 2026-08-04 lançando um jogo de GB de verdade: hardware bom
+  // demais recomendava "sameboy", que não estava empacotado, e o RetroArch
+  // recusava com "instale pelo Online Updater". Sem estes 4, autoconfiguração
+  // em hardware forte falhava — pior experiência que hardware mediano.
+  sameboy: {
+    filename: "sameboy_libretro",
+    version: "latest",
+  },
+  bsnes: {
+    filename: "bsnes_libretro",
+    version: "latest",
+  },
+  "parallel n64": {
+    filename: "parallel_n64_libretro",
+    version: "latest",
+  },
+  yabause: {
+    filename: "yabause_libretro",
+    version: "latest",
+  },
 };
 
 /**
@@ -190,8 +215,12 @@ async function downloadCore(coreName, config) {
   const filename = `${config.filename}${ext}`;
   const zipFilename = `${filename}.zip`;
 
-  // URL do buildbot: https://buildbot.libretro.com/latest/linux/x86_64/cores/mesen_libretro.so.zip
-  const url = `https://buildbot.libretro.com/${config.version}/${platform}/cores/${zipFilename}`;
+  // URL real do buildbot: https://buildbot.libretro.com/nightly/linux/x86_64/latest/mesen_libretro.so.zip
+  // (a estrutura antiga, .../latest/<plataforma>/cores/<arquivo>, devolvia 404
+  // em todo core — confirmado pelo Douglas rodando numa máquina com acesso
+  // real ao host, 2026-08-04. "nightly" é fixo; config.version continua
+  // valendo "latest" só que agora no fim do caminho, antes do arquivo.)
+  const url = `https://buildbot.libretro.com/nightly/${platform}/${config.version}/${zipFilename}`;
 
   const tempZip = path.join(coresDir, zipFilename);
   const finalBinary = path.join(coresDir, filename);
@@ -213,9 +242,13 @@ async function downloadCore(coreName, config) {
     // 2. Extrair .zip
     // Buildbot zippa apenas o arquivo binário (sem diretórios),
     // então ele sai direto na raiz do arquivo.
-    await new Promise((resolve, reject) => {
-      Extract.file({ file: tempZip, dir: coresDir }).on("close", resolve).on("error", reject);
-    });
+    // `unzipper` não expõe `Extract.file()` (isso não existe na lib — erro
+    // achado 2026-08-04 rodando de verdade: "Extract.file is not a
+    // function"). A API correta para abrir um .zip já em disco é
+    // `Open.file(caminho)`, que devolve uma Promise resolvendo num objeto
+    // com `.extract({ path })`.
+    const zip = await unzipper.Open.file(tempZip);
+    await zip.extract({ path: coresDir });
 
     // 3. Verificar que o arquivo foi extraído
     try {

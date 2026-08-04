@@ -80,6 +80,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/hardware", s.handleGetHardware)
 	mux.HandleFunc("GET /api/v1/consoles/verdicts", s.handleVerdicts)
 	mux.HandleFunc("GET /api/v1/emulators", s.handleEmulators)
+	// Rota própria em vez de embutir em /emulators: cores só existem para o
+	// RetroArch (nenhum outro adapter carrega bibliotecas plugáveis), e
+	// listar 20+ cores dentro da resposta de /emulators infiltraria esse
+	// detalhe em toda tela que só quer saber "instalado sim/não" por
+	// emulador.
+	mux.HandleFunc("GET /api/v1/retroarch/cores", s.handleRetroArchCores)
 	// Os emuladores personalizados ficam num prefixo próprio, e não sob
 	// /emulators/, porque "custom" colidiria com o {id} de
 	// /emulators/{id}/install — o roteador do Go recusa registrar padrões em
@@ -163,6 +169,18 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 func (s *Server) handleEmulators(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"emulators": s.emulators.Survey(r.Context()),
+	})
+}
+
+// handleRetroArchCores lista todo core que o ZeuX conhece, com o estado de
+// instalação de cada um — não só "RetroArch instalado" (handleEmulators já
+// diz isso), mas quais das bibliotecas de emulação individuais estão de
+// fato no lugar certo. Existe porque um core podia estar ausente por um bug
+// silencioso (log de aviso, nunca erro) e nada avisava até o usuário tentar
+// lançar um jogo e receber "core não encontrado" na cara.
+func (s *Server) handleRetroArchCores(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"cores": emulator.RetroArchCoreStatus(r.Context()),
 	})
 }
 

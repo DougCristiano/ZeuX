@@ -43,6 +43,14 @@ jobs:
       # O Tauri para Linux embrulha o WebView do sistema (WebKitGTK), não traz
       # o próprio motor — sem essas libs de sistema o "tauri build" falha na
       # etapa de link do binário Rust, não na de empacotamento.
+      #
+      # libdbus-1-dev e pkg-config faltavam aqui até 2026-08-04: o runner
+      # ubuntu-latest do GitHub já vem com as duas pré-instaladas, então o
+      # build passava por sorte, sem ninguém perceber a falta. Só apareceu
+      # quando o Douglas tentou `npm run tauri build` numa Ubuntu recém
+      # instalada (crate libdbus-sys, usada pelo tray icon do Tauri, falha
+      # o link sem dbus-1.pc) — sem esse teste local, o buraco continuaria
+      # invisível até alguém tentar compilar numa distro limpa de verdade.
       - name: Instalar dependências de sistema do Tauri
         run: |
           sudo apt-get update
@@ -50,6 +58,11 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            libdbus-1-dev \
+            libglib2.0-dev \
+            libssl-dev \
+            libxdo-dev \
+            pkg-config \
             patchelf \
             build-essential \
             file
