@@ -87,8 +87,14 @@ da Sprint A, mas conta uma vez só.
 **Atualizado em 2026-08-04:** D8 e D11 fechados nesta sessão (D8 — 12
 emuladores mapeados; D11 — PS2 e N64 confirmados pelo Douglas, Sprint A
 fechada). D2 ganhou estratégia definida (telemetria da comunidade, via Sprint
-E/F) em vez de ficar em aberto sem rumo. B11 passou a cobrir Linux e macOS,
-não só Windows — 3 workflows de CI, verificação humana pendente nos 3.
+E/F) em vez de ficar em aberto sem rumo — mais dois candidatos concretos de
+recalibração registrados (PS3 `logical_cores`, SNES "otimo"), pendentes de
+confirmação. B11 passou a cobrir Linux e macOS, não só Windows — 3 workflows
+de CI, mais um workflow de Release por tag — **e a v0.1.0 foi publicada de
+verdade, com os 6 instaladores (Windows `.msi`/`.exe`, Linux
+`.deb`/`.rpm`/`.AppImage`, macOS `.dmg`) na aba Releases do GitHub**. O
+`.dmg` saiu só `aarch64` (Apple Silicon) — sem cobertura de Mac Intel ainda.
+Verificação humana em máquina limpa segue pendente nos 3 SOs.
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
 é escopo novo: são itens que já eram necessários (rotas HTTP e as quatro telas
@@ -315,6 +321,37 @@ Enquanto não calibrado, a UI segue tratando o parecer como estimativa, não
 promessa. **Depende de:** Sprint E (identidade, backend) e Sprint F (relato de
 compatibilidade) — D2 não é mais um item isolado, é o resultado esperado de
 duas sprints que ainda não começaram.
+
+**Candidatos a recalibração, achados em 2026-08-04 cruzando `consoles.json`
+contra um documento de terceiros sobre requisitos de emulação** (tratado como
+pista, não como fonte primária — é uma síntese gerada por IA, não
+documentação oficial dos projetos de emulador; ver ressalva abaixo):
+
+- **PS3/RPCS3 — ambiguidade `logical_cores` vs núcleos físicos.** O tier
+  "bom" (`consoles.json`, bloco `ps3`) pede `logical_cores: 8`. A comunidade
+  do RPCS3 fala em **núcleos físicos**, não threads — os 7 SPEs do Cell são
+  unidades reais, não se beneficiam de Hyper-Threading do jeito que outra
+  carga de trabalho se beneficiaria. Um notebook com CPU de 4 núcleos
+  físicos + HT (8 threads) passaria no nosso teto de `logical_cores: 8`,
+  mas é exatamente o perfil que a comunidade descreve sofrendo "fome de
+  threads" no RPCS3. **Precisa verificar**: o que `internal/hardware`
+  reporta em `logical_cores` — threads (SMT incluído) ou núcleos físicos?
+  Se for threads, o nome do campo é enganoso e o limiar do PS3 pode estar
+  liberando hardware que não aguenta.
+- **SNES "otimo" (core bsnes, ciclo-a-ciclo) — possivelmente baixo demais.**
+  Tier pede só `logical_cores: 4, clock_mhz: 2000` — qualquer notebook de
+  10 anos atende. Emulação ciclo-exato sem JIT é cara mesmo num console de
+  16-bit; vale considerar subir esse patamar, em especial para jogos com
+  coprocessador adicional (SuperFX, SA-1) sob o modo ciclo-a-ciclo.
+
+**Ressalva sobre a fonte:** os dois pontos acima vieram de um relatório
+compartilhado com o Douglas, de origem e rigor não verificados — tem
+qualidade de leitura alta mas não é a documentação oficial do RPCS3 nem do
+bsnes. Serve para **apontar onde olhar**, não para copiar números direto no
+catálogo. A ação concreta continua dependendo do canal de relato real
+(Sprint F) — estes dois candidatos só entram no catálogo se o relato da
+comunidade confirmar o padrão, ou se alguém checar a documentação oficial
+dos projetos.
 
 ### D3 — Persistir sessões e tempo de jogo (M) — **feito em 2026-08-02**
 
@@ -742,9 +779,52 @@ linha de comando (`apt install ./zeux.deb`, `dnf install ./zeux.rpm`, ou
 visual no Linux, e isso não é uma limitação do ZeuX, é como o ecossistema
 funciona.
 
-**Não verificado ainda:** nenhuma tag foi empurrada — o workflow nunca
-rodou. Antes da primeira tag real, vale rodar via `workflow_dispatch` apontando
-para uma tag de teste, ou aceitar que a primeira tag real é o próprio teste.
+**v0.1.0 publicada em 2026-08-04 — a primeira tag real já foi o teste.** O
+Douglas publicou a Release pela interface do GitHub (que cria a tag
+automaticamente ao clicar "Publish release", disparando o `push: tags:` do
+`release.yml` sem precisar do `git push` de tag na linha de comando — a
+sessão de IA está proibida de empurrar tags neste ambiente por política do
+próprio backend de push, então essa rota pela UI acabou sendo o caminho
+real, não só uma alternativa).
+
+Workflow terminou com `conclusion: success`, sem nenhum job falhando. Os 6
+assets confirmados na Release
+(https://github.com/DougCristiano/ZeuX/releases/tag/v0.1.0):
+
+| Arquivo | SO |
+|---|---|
+| `zeux_0.1.0_x64_en-US.msi` | Windows |
+| `zeux_0.1.0_x64-setup.exe` | Windows (NSIS) |
+| `zeux_0.1.0_amd64.deb` | Linux |
+| `zeux-0.1.0-1.x86_64.rpm` | Linux |
+| `zeux_0.1.0_amd64.AppImage` | Linux |
+| `zeux_0.1.0_aarch64.dmg` | macOS |
+
+O job `create-release` rodou primeiro e sozinho, sem os 3 builds disputarem
+a criação da Release — a correção do `needs:` (feita na revisão do PR #3)
+funcionou como desenhado.
+
+**Achado não previsto: o `.dmg` saiu `aarch64`, não `x86_64`.** O runner
+`macos-latest` do GitHub hoje é Apple Silicon nativo, e `tauri build` sem
+`--target` compila só para a arquitetura do próprio runner. Isso significa
+que **quem tiver um Mac Intel não consegue rodar este instalador** — falta
+cobertura, não é um bug de configuração errada. Para cobrir os dois, o
+`build-macos`/`release.yml` precisaria compilar como *universal binary*
+(`--target universal-apple-darwin`), o que aproximadamente dobra o tempo do
+job (compila duas vezes, uma por arquitetura, antes de unir os binários).
+**Não implementado ainda** — decisão de custo/benefício em aberto: vale a
+pena dobrar o tempo de CI para cobrir uma fatia de usuários com Mac Intel
+(cada vez menor, já que a Apple não vende mais essas máquinas desde 2023),
+ou aceitar `aarch64`-only até haver sinal de demanda real?
+
+**Ainda faltando, mesmo com a v0.1.0 publicada:** nenhum dos 6 instaladores
+foi testado numa máquina limpa de verdade — os checkboxes de Windows/Linux/
+macOS no início desta seção continuam abertos. O teste feito nesta sessão
+(Linux, ver acima) usou um `.deb` compilado localmente, não o artifact
+oficial da Release. Rodar exatamente o `zeux_0.1.0_amd64.deb` publicado, em
+vez de uma compilação local equivalente, é o próximo passo mais barato —
+mesmo binário, zero surpresa esperada, mas fecha a lacuna "testei uma coisa
+parecida" vs "testei o artefato que o usuário final vai baixar".
 
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
