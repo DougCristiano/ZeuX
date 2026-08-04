@@ -20,7 +20,7 @@ import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import Extract from "unzipper";
+import unzipper from "unzipper";
 
 const repoRoot = path.resolve(fileURLToPath(import.meta.url), "../..");
 const coresDir = path.join(
@@ -217,9 +217,13 @@ async function downloadCore(coreName, config) {
     // 2. Extrair .zip
     // Buildbot zippa apenas o arquivo binário (sem diretórios),
     // então ele sai direto na raiz do arquivo.
-    await new Promise((resolve, reject) => {
-      Extract.file({ file: tempZip, dir: coresDir }).on("close", resolve).on("error", reject);
-    });
+    // `unzipper` não expõe `Extract.file()` (isso não existe na lib — erro
+    // achado 2026-08-04 rodando de verdade: "Extract.file is not a
+    // function"). A API correta para abrir um .zip já em disco é
+    // `Open.file(caminho)`, que devolve uma Promise resolvendo num objeto
+    // com `.extract({ path })`.
+    const zip = await unzipper.Open.file(tempZip);
+    await zip.extract({ path: coresDir });
 
     // 3. Verificar que o arquivo foi extraído
     try {
