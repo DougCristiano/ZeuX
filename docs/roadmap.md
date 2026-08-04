@@ -675,11 +675,76 @@ ganhou:
   dentro de si mesmo; não há prompt de dependência porque normalmente não há
   dependência faltando para perguntar.
 
-**Não verificado ainda:** nenhuma instalação real desde essa mudança —
-depende da mesma verificação humana em máquina limpa listada acima. O
-`depends` do `.deb`/`.rpm` também não foi conferido contra o binário
-realmente compilado (poderia haver uma lib a mais ou a menos); isso só se
-confirma rodando `dpkg -I` no pacote gerado pela CI.
+**Verificado de verdade em 2026-08-04, mesmo dia da mudança** — não numa
+máquina limpa separada (isso segue pendente), mas com o `.deb` **real da CI**
+compilado e instalado via `apt-get install` no ambiente onde esta sessão
+roda:
+
+- `dpkg-deb -I` no pacote gerado mostrou o `Depends` **duplicado**:
+  `libwebkit2gtk-4.1-0` e `libgtk-3-0` apareciam duas vezes — o
+  `tauri-bundler` já os autodetecta via `ldd` no binário compilado, e a
+  declaração explícita se somava por cima, em vez de substituir. Não quebra
+  a instalação (`dpkg`/`apt` toleram duplicata), mas é sujeira desnecessária.
+  **Corrigido**: `deb.depends`/`rpm.depends` agora declaram só
+  `libayatana-appindicator3-1`/`libappindicator-gtk3` e
+  `librsvg2-2`/`librsvg2` — as duas que o `ldd` não pega sozinho (não são
+  linkadas diretamente, o app as carrega em runtime). WebKitGTK e GTK3
+  seguem cobertos pela autodetecção, sem duplicar.
+- `apt-get install -y ./zeux_0.1.0_amd64.deb` rodou a resolução de
+  dependência de verdade: como o pacote pede `libayatana-appindicator3-1` e
+  este ambiente só tinha o `libappindicator3-1` mais antigo instalado, o
+  `apt` **removeu o pacote antigo e instalou o novo automaticamente** —
+  prova de que a declaração de `depends` produz o comportamento nativo
+  esperado (o prompt de confirmação some só porque rodei com `-y`; sem essa
+  flag, `apt install ./zeux.deb` pergunta antes, como já era esperado).
+- Binário instalado em `/usr/bin/zeux` e `/usr/bin/zeuxd`, ícone e
+  `zeux.desktop` no lugar certo (`/usr/share/applications/`).
+- Rodando o app sob um display virtual (`xvfb-run`, já que este ambiente não
+  tem GPU real): **o `zeuxd` sobe sozinho como processo filho do `zeux`**
+  (confirmando o sidecar do Tauri) e responde no `GET /api/v1/health` com os
+  33 consoles — a mesma prova que o B5 já tinha feito, agora contra o
+  binário empacotado de verdade, não o `tauri dev`.
+- Matando o processo `zeux`, a porta `7777` fica livre e não sobra `zeuxd`
+  rodando — confirmando o critério "fechar a janela derruba o daemon" sem
+  precisar de janela real.
+- `apt-get remove zeux` desinstalou limpo.
+- **Ressalva:** houve avisos `libEGL`/DRI3 ("Could not get DRI3 device") ao
+  renderizar o WebView — esperado neste container, que não tem GPU passada
+  para dentro dele. Isso não é um problema do pacote; é limitação do
+  ambiente de teste, e não substitui rodar numa máquina Linux desktop real
+  com GPU de verdade (a próxima verificação pendente da lista acima).
+
+**Ainda pendente:** os checkboxes acima seguem em aberto porque nenhum foi
+testado numa distro **limpa** (sem as libs de dev já instaladas por este
+container ter sido usado para compilar CI localmente) nem numa máquina com
+GPU real. O que foi provado aqui é que o mecanismo de dependência funciona
+como desenhado — a prova completa em ambiente limpo continua com o Douglas.
+
+**Distribuição: Releases, não só artifact de CI (2026-08-04).** O Douglas
+notou que os instaladores só existiam como artifact de workflow — que expira
+(~90 dias), fica atrás de login no GitHub e exige entrar no Actions e achar
+o run certo. Isso é aceitável para depuração de CI, mas não é como um
+usuário final baixa o app.
+
+`.github/workflows/release.yml` publica os 3 instaladores como assets de uma
+GitHub Release de verdade, disparado por **tag** (`v*`), não por push na
+`main` — uma release é um checkpoint deliberado, não "toda mudança de código
+virou versão oficial". Reusa os mesmos passos de build dos workflows de CI
+(sem duplicar a lógica de setup, só o próprio comando `npm run tauri build`
+seguido de `softprops/action-gh-release` publicando os arquivos certos por
+SO). Também aceita `workflow_dispatch` com uma tag existente, para
+republicar assets sem precisar recriar a tag.
+
+**Confirma a leitura do Douglas sobre o Linux:** o `.deb`/`.rpm`/`.AppImage`
+vão para a Release igual aos outros, mas a instalação continua sendo por
+linha de comando (`apt install ./zeux.deb`, `dnf install ./zeux.rpm`, ou
+`chmod +x` + executar o `.AppImage`) — não há duplo-clique com assistente
+visual no Linux, e isso não é uma limitação do ZeuX, é como o ecossistema
+funciona.
+
+**Não verificado ainda:** nenhuma tag foi empurrada — o workflow nunca
+rodou. Antes da primeira tag real, vale rodar via `workflow_dispatch` apontando
+para uma tag de teste, ou aceitar que a primeira tag real é o próprio teste.
 
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
