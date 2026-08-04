@@ -648,6 +648,39 @@ com o critério explícito, por SO:
 só a verificação humana em máquina real de cada SO, que nenhuma sessão de IA
 consegue fazer (mesma limitação estrutural do D11).
 
+**Dependências de sistema junto do instalador (2026-08-04):** o Douglas pediu
+que o próprio instalador do ZeuX cuide de pedir as dependências que faltam,
+como qualquer instalador convencional faz — não deixar o usuário descobrir
+sozinho que falta o WebView2 ou o WebKitGTK. `src-tauri/tauri.conf.json`
+ganhou:
+
+- **Windows:** `bundle.windows.webviewInstallMode` mudou de padrão
+  (`downloadBootstrapper` silencioso) para `silent: false` — o instalador
+  `.msi`/`.exe` baixa o bootstrapper do WebView2 e **pergunta antes de
+  instalar**, em vez de instalar calado. Continua exigindo internet no
+  momento da instalação (não mudou isso; só o modo silencioso).
+- **Linux:** `bundle.linux.deb.depends` e `bundle.linux.rpm.depends` passaram
+  a declarar explicitamente `libwebkit2gtk-4.1-0`/`webkit2gtk4.1`,
+  `libgtk-3-0`/`gtk3`, `libayatana-appindicator3-1`/`libappindicator-gtk3`,
+  `librsvg2-2`/`librsvg2` — os runtimes das mesmas libs de desenvolvimento que
+  o `build-linux.yml` instala para compilar. Sem isso, o bundler do Tauri
+  tentaria detectar as dependências sozinho via `ldd` no binário, o que é
+  frágil entre distros; declarar à mão é mais previsível. **O comportamento
+  de perguntar já vem de graça do próprio `apt`/`dnf`**: `sudo apt install
+  ./zeux.deb` lista as dependências que faltam e pergunta "Deseja continuar?
+  [S/n]" antes de baixar e instalar — não precisa de lógica nova no ZeuX para
+  isso, é o gerenciador de pacotes da distro fazendo o trabalho que já faz
+  para qualquer `.deb`.
+- **AppImage não muda** — o formato já embute a maior parte das dependências
+  dentro de si mesmo; não há prompt de dependência porque normalmente não há
+  dependência faltando para perguntar.
+
+**Não verificado ainda:** nenhuma instalação real desde essa mudança —
+depende da mesma verificação humana em máquina limpa listada acima. O
+`depends` do `.deb`/`.rpm` também não foi conferido contra o binário
+realmente compilado (poderia haver uma lib a mais ou a menos); isso só se
+confirma rodando `dpkg -I` no pacote gerado pela CI.
+
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
 `internal/api/server.go`). Por isso a linha "aviso quando o hardware não
