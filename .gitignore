@@ -14,6 +14,14 @@ src-tauri/target/
 # cada build, por plataforma — não faz sentido versionar.
 src-tauri/binaries/
 
+# Cores do RetroArch baixados do buildbot.libretro.com
+# (scripts/download-retroarch-cores.mjs, ADR 0012). São binários grandes
+# (.so/.dll/.dylib) baixados a cada build, um por plataforma — mesmo motivo
+# de não versionar src-tauri/binaries/. O .gitkeep mantém a pasta vazia no
+# clone, pro script ter onde escrever.
+src-tauri/resources/retroarch/cores/*
+!src-tauri/resources/retroarch/cores/.gitkeep
+
 # Cache e configuração local de ferramentas
 .mise.local.toml
 *.local
