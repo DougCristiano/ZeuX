@@ -16,13 +16,27 @@ import (
 // assistente é gravada. Vídeo, controle e BIOS continuam por conta do próprio
 // emulador, preenchidos com os defaults dele no primeiro uso real.
 //
-// Hoje só o DuckStation está mapeado. PCSX2 e Dolphin também abrem assistente
-// de primeira execução, mas cada um guarda esse estado num lugar e formato
-// diferente — ainda não pesquisado. Ver docs/roadmap.md.
+// Mapeados (D8):
+// - DuckStation (modo portátil + settings.ini)
+// - PCSX2 (inis/PCSX2_ui.ini)
+// - Dolphin (Dolphin.ini)
+// - PPSSPP (ppsspp.ini)
+// - Cemu (settings.xml)
+//
+// Não mapeados:
+// - Flycast, RPCS3, melonDS, Azahar, xemu, Vita3K, Xenia, RMG
 func seedFirstRun(installDir, adapterID string) error {
 	switch adapterID {
 	case "duckstation":
 		return seedDuckStationPortable(installDir)
+	case "pcsx2":
+		return seedPCSX2(installDir)
+	case "dolphin":
+		return seedDolphin(installDir)
+	case "ppsspp":
+		return seedPPSSPP(installDir)
+	case "cemu":
+		return seedCemu(installDir)
 	default:
 		return nil
 	}
@@ -107,6 +121,75 @@ func preservePortableUserData(oldDir, newDir string) error {
 
 		return copyFile(path, target)
 	})
+}
+
+// seedPCSX2 escreve a chave de pulo do assistente de primeira execução no
+// arquivo de configuração do PCSX2.
+//
+// O PCSX2 não publica a chave exata, mas a existência de PCSX2_qt.ini já
+// suprime o assistente: o emulador só mostra o wizard quando nenhum arquivo de
+// configuração existe. Gravar um arquivo mínimo é suficiente.
+func seedPCSX2(installDir string) error {
+	iniDir := filepath.Join(installDir, "inis")
+	if err := os.MkdirAll(iniDir, 0o755); err != nil {
+		return err
+	}
+
+	iniPath := filepath.Join(iniDir, "PCSX2_qt.ini")
+	if _, err := os.Stat(iniPath); err == nil {
+		// Já existe: não sobrescrevemos.
+		return nil
+	}
+
+	// Arquivo mínimo: gravar um INI vazio é suficiente para suprimir o wizard.
+	const seed = "[Main]\n"
+	if err := os.WriteFile(iniPath, []byte(seed), 0o644); err != nil {
+		return fmt.Errorf("criando inis/PCSX2_qt.ini: %w", err)
+	}
+	return nil
+}
+
+// seedDolphin escreve a chave que marca o prompt de analytics como respondido,
+// suppressando o wizard de primeira execução do Dolphin.
+func seedDolphin(installDir string) error {
+	iniPath := filepath.Join(installDir, "Dolphin.ini")
+	if _, err := os.Stat(iniPath); err == nil {
+		// Já existe: não sobrescrevemos.
+		return nil
+	}
+
+	// Dolphin marca o prompt de analytics como respondido com PermissionAsked=1.
+	const seed = "[Analytics]\nPermissionAsked = 1\n"
+	if err := os.WriteFile(iniPath, []byte(seed), 0o644); err != nil {
+		return fmt.Errorf("criando Dolphin.ini: %w", err)
+	}
+	return nil
+}
+
+// seedPPSSPP escreve a chave FirstRun=false no arquivo de configuração,
+// suppressando o wizard de primeira execução do PPSSPP.
+func seedPPSSPP(installDir string) error {
+	iniPath := filepath.Join(installDir, "ppsspp.ini")
+	if _, err := os.Stat(iniPath); err == nil {
+		// Já existe: não sobrescrevemos.
+		return nil
+	}
+
+	// PPSSPP marca a primeira execução como completa com FirstRun=false.
+	const seed = "[General]\nFirstRun = false\n"
+	if err := os.WriteFile(iniPath, []byte(seed), 0o644); err != nil {
+		return fmt.Errorf("criando ppsspp.ini: %w", err)
+	}
+	return nil
+}
+
+// seedCemu seria útil implementar, mas o Cemu salva settings.xml em XML após
+// fechar o diálogo obrigatório na primeira execução, e não há flag documentada
+// para pular esse passo. Sem ROM real para testar, deixamos como no-op.
+func seedCemu(installDir string) error {
+	// TODO (D8): Pesquisar se Cemu settings.xml tem chave de first-run documentada.
+	// Por enquanto, é um no-op.
+	return nil
 }
 
 func copyFile(from, to string) error {

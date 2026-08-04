@@ -58,7 +58,8 @@ func TestSeedDuckStationPortableDoesNotOverwriteExistingSettings(t *testing.T) {
 func TestSeedFirstRunNoOpForUnmappedAdapter(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+	// Usar um adapter que não está mapeado (flycast, rpcs3, etc.)
+	if err := seedFirstRun(dir, "flycast"); err != nil {
 		t.Fatalf("seedFirstRun: %v", err)
 	}
 
@@ -153,5 +154,141 @@ func TestPreservePortableUserDataSkipsNonPortableInstalls(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Errorf("não deveria ter copiado nada sem portable.txt, achou %v", entries)
+	}
+}
+
+// Trava a regra: instalar PCSX2 grava a chave que pula o assistente de
+// primeira execução no arquivo de configuração.
+func TestSeedPCSX2WritesWizardSkip(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	iniPath := filepath.Join(dir, "inis", "PCSX2_qt.ini")
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatalf("inis/PCSX2_qt.ini não foi criado: %v", err)
+	}
+
+	want := "[Main]\n"
+	if string(got) != want {
+		t.Errorf("PCSX2_qt.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: um arquivo PCSX2_qt.ini pré-existente nunca é sobrescrito.
+func TestSeedPCSX2DoesNotOverwriteExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	iniDir := filepath.Join(dir, "inis")
+	if err := os.MkdirAll(iniDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	iniPath := filepath.Join(iniDir, "PCSX2_qt.ini")
+	custom := "[Main]\nGPURenderer=Vulkan\n"
+	if err := os.WriteFile(iniPath, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Errorf("PCSX2_qt.ini existente foi alterado: got %q, want %q", got, custom)
+	}
+}
+
+// Trava a regra: instalar Dolphin grava a chave que marca o prompt de
+// analytics como respondido, suppressando o wizard.
+func TestSeedDolphinWritesAnalyticsPermission(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "dolphin"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	iniPath := filepath.Join(dir, "Dolphin.ini")
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatalf("Dolphin.ini não foi criado: %v", err)
+	}
+
+	want := "[Analytics]\nPermissionAsked = 1\n"
+	if string(got) != want {
+		t.Errorf("Dolphin.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: um arquivo Dolphin.ini pré-existente nunca é sobrescrito.
+func TestSeedDolphinDoesNotOverwriteExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	iniPath := filepath.Join(dir, "Dolphin.ini")
+
+	custom := "[Analytics]\nPermissionAsked = 1\nID = someid\n"
+	if err := os.WriteFile(iniPath, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := seedFirstRun(dir, "dolphin"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Errorf("Dolphin.ini existente foi alterado: got %q, want %q", got, custom)
+	}
+}
+
+// Trava a regra: instalar PPSSPP grava a chave FirstRun=false, suppressando
+// o wizard de primeira execução.
+func TestSeedPPSSPPWritesFirstRunFlag(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := seedFirstRun(dir, "ppsspp"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	iniPath := filepath.Join(dir, "ppsspp.ini")
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatalf("ppsspp.ini não foi criado: %v", err)
+	}
+
+	want := "[General]\nFirstRun = false\n"
+	if string(got) != want {
+		t.Errorf("ppsspp.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a regra: um arquivo ppsspp.ini pré-existente nunca é sobrescrito.
+func TestSeedPPSSPPDoesNotOverwriteExistingSettings(t *testing.T) {
+	dir := t.TempDir()
+	iniPath := filepath.Join(dir, "ppsspp.ini")
+
+	custom := "[General]\nFirstRun = false\nInternalResolution=2\n"
+	if err := os.WriteFile(iniPath, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := seedFirstRun(dir, "ppsspp"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	got, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != custom {
+		t.Errorf("ppsspp.ini existente foi alterado: got %q, want %q", got, custom)
 	}
 }
