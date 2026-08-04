@@ -720,6 +720,32 @@ container ter sido usado para compilar CI localmente) nem numa máquina com
 GPU real. O que foi provado aqui é que o mecanismo de dependência funciona
 como desenhado — a prova completa em ambiente limpo continua com o Douglas.
 
+**Distribuição: Releases, não só artifact de CI (2026-08-04).** O Douglas
+notou que os instaladores só existiam como artifact de workflow — que expira
+(~90 dias), fica atrás de login no GitHub e exige entrar no Actions e achar
+o run certo. Isso é aceitável para depuração de CI, mas não é como um
+usuário final baixa o app.
+
+`.github/workflows/release.yml` publica os 3 instaladores como assets de uma
+GitHub Release de verdade, disparado por **tag** (`v*`), não por push na
+`main` — uma release é um checkpoint deliberado, não "toda mudança de código
+virou versão oficial". Reusa os mesmos passos de build dos workflows de CI
+(sem duplicar a lógica de setup, só o próprio comando `npm run tauri build`
+seguido de `softprops/action-gh-release` publicando os arquivos certos por
+SO). Também aceita `workflow_dispatch` com uma tag existente, para
+republicar assets sem precisar recriar a tag.
+
+**Confirma a leitura do Douglas sobre o Linux:** o `.deb`/`.rpm`/`.AppImage`
+vão para a Release igual aos outros, mas a instalação continua sendo por
+linha de comando (`apt install ./zeux.deb`, `dnf install ./zeux.rpm`, ou
+`chmod +x` + executar o `.AppImage`) — não há duplo-clique com assistente
+visual no Linux, e isso não é uma limitação do ZeuX, é como o ecossistema
+funciona.
+
+**Não verificado ainda:** nenhuma tag foi empurrada — o workflow nunca
+rodou. Antes da primeira tag real, vale rodar via `workflow_dispatch` apontando
+para uma tag de teste, ou aceitar que a primeira tag real é o próprio teste.
+
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
 `internal/api/server.go`). Por isso a linha "aviso quando o hardware não
