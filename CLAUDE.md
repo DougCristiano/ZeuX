@@ -250,9 +250,7 @@ descontinuados após ação judicial. Ver
 - ❌ **Não faça `BuildCommand` executar nada** nem tocar o sistema de arquivos
   (com a exceção já existente do RetroArch, que precisa localizar o core).
 - ❌ **Não instale Rust, MSVC Build Tools nem dependências de Node** sem pedir.
-  O adiamento é deliberado ([ADR 0004](docs/decisoes/0004-adiar-rust-e-tauri.md)),
-  e há uma pendência de OneDrive a resolver antes do primeiro `npm install`
-  ([roadmap D4](docs/roadmap.md)).
+  O adiamento é deliberado ([ADR 0004](docs/decisoes/0004-adiar-rust-e-tauri.md)).
 - ❌ **Não presuma que uma funcionalidade do PRD existe.** A maior parte não
   existe. Confira no código antes de afirmar.
 

@@ -65,23 +65,23 @@ contrário e estava desatualizada.
 
 ---
 
-## Quantas faltam (contado em 2026-08-03: toda a Sprint D fechada — L1, L2, L3, L5, L6, L7, L8, L9, L10, L11)
+## Quantas faltam (contado em 2026-08-04: toda a Sprint D fechada — L1, L2, L3, L5, L6, L7, L8, L9, L10, L11; D4 resolvido e removido)
 
-Itens **abertos**, contados uma vez cada — D4 aparece como B0 na Sprint B e D11
-como critério de saída da Sprint A, mas cada um conta uma vez só.
+Itens **abertos**, contados uma vez cada — D11 aparece como critério de saída
+da Sprint A, mas conta uma vez só.
 
 | Bloco | Abertos | Quais |
 |---|---|---|
-| Dívida honesta | **4** | D2, D4, D8, D11 |
+| Dívida honesta | **3** | D2, D8, D11 |
 | Sprint A | **1** | `Installation.Version` (o D11 já está contado acima) |
-| Sprint B | **1** | B11 (o B0 é o D4, já contado) |
+| Sprint B | **1** | B11 (o B0 era o D4, resolvido — não conta mais) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
 | Sprint D (MVP) | **0** | Todos os 11 itens fechados — falta só o D11 (dívida, já contado, e só o Douglas pode fechar) |
 | Sprint E | **7** | — |
 | Sprint F | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
-| **Total do MVP e da dívida** | **8** | dívida + A + B + C + D |
-| **Total geral** | **27** | tudo acima |
+| **Total do MVP e da dívida** | **7** | dívida + A + B + C + D |
+| **Total geral** | **26** | tudo acima |
 | Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
 
 O número da Sprint D **subiu** de 8 para 11 na revisão de 2026-08-03, e isso não
@@ -102,7 +102,7 @@ funcionalidade nova.
 | D1 | ~~Validar as flags dos 13 adapters contra binários reais~~ | G | **Feito 2026-08-01** (ressalva: sem ROM real, ver abaixo) |
 | D2 | **Calibrar os limiares de hardware do catálogo** | G | Credibilidade do parecer |
 | D3 | **Persistir sessões e tempo de jogo** | M | Perfil, conquistas |
-| D4 | **Resolver OneDrive × `node_modules`/`src-tauri/target`** | P | Builds locais no Windows (**não** mais "a Sprint B inteira" — ver abaixo) |
+| D4 | ~~Resolver OneDrive × `node_modules`/`src-tauri/target`~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive |
 | D5 | ~~Corrigir as opções silenciosamente ignoradas~~ | P | **Feito** — reconfirmado durante D1; todos os adapters já reportam em `Unapplied` |
 | D6 | ~~Busca recursiva de binários em subdiretórios~~ | M | **Feito** — `subdirectories()` em `internal/emulator/discovery.go`, um nível de profundidade |
 | D7 | ~~Fixar as versões no `mise.toml`~~ | P | **Feito** — `go 1.26.5`, `node 24.18.1` |
@@ -292,54 +292,16 @@ e `/consoles/verdicts` até o próximo scan.
 Desbloqueia: perfil social, conquistas, "últimos jogados", ProtonDB-like
 (ainda dependem da Sprint E, que não foi desenhada).
 
-### D4 — OneDrive × artefatos de build (P)
+### D4 — OneDrive × artefatos de build (P) — **resolvido em 2026-08-04, item removido**
 
-O projeto vive em `C:\Users\doufl\OneDrive\Documentos\ZeuX`. Hoje isso é
-inofensivo — Go guarda cache fora da árvore. **Deixa de ser no primeiro
-`npm install`**: `node_modules/` e `src-tauri/target/` somam dezenas de milhares
-de arquivos pequenos e voláteis, que o OneDrive tentará sincronizar a cada
-build.
+O projeto vivia em `C:\Users\doufl\OneDrive\Documentos\ZeuX`. `node_modules/` e
+`src-tauri/target/` somam dezenas de milhares de arquivos pequenos e voláteis,
+que o OneDrive tentaria sincronizar a cada build local no Windows.
 
-O `.gitignore` já os exclui do Git, mas o `.gitignore` não diz nada ao OneDrive.
-
-Opções: marcar as pastas como "Sempre manter neste dispositivo" desligado não
-resolve (elas são geradas localmente); o caminho real é **excluir as pastas da
-sincronização** nas configurações do OneDrive, ou mover o repositório para fora
-do OneDrive e manter o backup por Git.
-
-**Fazer antes do primeiro `npm install`, não depois.**
-
-**Estado em 2026-08-03: não resolvido — e deixou de bloquear o que dizia
-bloquear.** A Sprint B inteira (B1–B10) foi feita **fora da máquina Windows**,
-num container Linux, e o instalador Windows sai do runner do GitHub Actions
-(`.github/workflows/build-windows.yml`). Ou seja: o item que este arquivo
-descrevia como "bloqueia a Sprint B inteira" foi contornado por outro caminho,
-e a Sprint B fechou sem ele.
-
-O que o D4 bloqueia **de verdade hoje**: o dia em que o Douglas quiser rodar
-`npm install` / `npm run tauri build` na própria máquina. Enquanto o
-desenvolvimento acontecer em container e o instalador vier da CI, o custo de
-não resolver é zero — mas o custo de resolver também continua o menor que vai
-ser, porque a árvore Windows ainda não tem `node_modules/`.
-
-**Critério de aceite:**
-- [ ] `node_modules/` e `src-tauri/target/` não estão sob nenhum caminho que o
-      OneDrive sincronize — comprovado pelo caminho do repositório na máquina do
-      Douglas, ou pela lista de pastas excluídas nas configurações do OneDrive.
-- [ ] `npm install` seguido de `npm run tauri build` roda até o fim na máquina
-      Windows sem erro de arquivo em uso.
-- [ ] Se o repositório mudar de lugar, os caminhos absolutos em `CLAUDE.md` e
-      `.claude/settings.local.json` foram atualizados na mesma mudança.
-
-**Recomendação:** mover o repositório para fora do OneDrive (`C:\dev\ZeuX`), com
-o remoto do GitHub (`DougCristiano/ZeuX`, já configurado) cumprindo o papel de
-backup. É a solução menor — uma decisão, uma vez, sem mecanismo para manter. A
-alternativa por junctions funciona, mas cria um passo de setup que some em
-qualquer clone novo. Detalhe e critério de aceite em
-[`sprint-b-plano.md`](sprint-b-plano.md), item B0.
-
-Se o repositório for movido, os caminhos absolutos em `CLAUDE.md` e em
-`.claude/settings.local.json` deixam de valer — decidir junto, não depois.
+**O Douglas moveu o repositório para uma pasta fora do alcance do OneDrive.**
+Era uma decisão de local de pasta, não de código — não havia nada para o ZeuX
+resolver sozinho. Item retirado do backlog; nenhum critério de aceite fica em
+aberto.
 
 ### D5 — Opções silenciosamente ignoradas (P) — **feito**
 
@@ -525,7 +487,7 @@ jogos.
 | ~~D6 — busca recursiva de binários~~ | M | **Feito** (`internal/emulator/discovery.go`, `subdirectories`) |
 | ~~D7 — fixar versões no `mise.toml`~~ | P | **Feito** (`go 1.26.5`, `node 24.18.1`) |
 | **D11 — abrir uma ROM real em 3 emuladores** | P | — · **Não feito.** É o critério de saída desta sprint. Só o Douglas pode fechar |
-| **D4 — resolver OneDrive** | P | — · **Não feito** (reverificado 2026-08-03). Saiu do caminho crítico: a Sprint B fechou sem ele |
+| ~~D4 — resolver OneDrive~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive |
 | Detectar `Installation.Version` | P | ~~D1~~ desbloqueado. **Não feito** — `Installation.Version` existe no tipo (`adapter.go:100`) e nenhum adapter o preenche |
 | ~~Atualizar o README~~ | P | **Feito** — já documenta instalação 1-click e as rotas de `/emulators`, `/games/*`, `/sessions` |
 
@@ -551,7 +513,7 @@ sequência.
 
 | # | Item | Tam. | Depende de |
 |---|---|---|---|
-| B0 | **D4 — tirar `node_modules`/`src-tauri/target` do OneDrive** | P | — · **Aberto, mas deixou de ser pré-requisito** (revisto 2026-08-03): a sprint inteira foi feita em container Linux e o instalador sai da CI, então B0 não bloqueou nada. Continua valendo para o dia do primeiro build local no Windows — ver D4 |
+| B0 | ~~D4 — tirar `node_modules`/`src-tauri/target` do OneDrive~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive. Nunca bloqueou a Sprint B na prática (feita em container) |
 | B-wire | ~~Publicar o wireframe no repositório~~ | P | **Feito 2026-08-01** — [`wireframe.md`](wireframe.md) / [`wireframe.html`](wireframe.html) |
 | B-doc | ~~Reconciliar `api.md` com o código antes de tipar o cliente~~ | P | **Feito 2026-08-01** — `schema_version`/contagem de consoles corrigidos, rotas de instalação e de emuladores personalizados documentadas |
 | B1 | Instalar Rust + MSVC Build Tools + WebView2 | M | B0 · **Feito parcialmente 2026-08-01** — num container Linux remoto, não na máquina Windows; ver ressalva em `sprint-b-plano.md` |
@@ -867,7 +829,7 @@ desbloqueados)
 
 Primeira tela da biblioteca. É ela que transforma "apontar pasta" de rota em
 produto. Feita e verificada em container (caminho da CI, sem depender da
-máquina Windows) — ver nota sobre D4/OneDrive abaixo.
+máquina Windows).
 
 **Critério de aceite:**
 - [x] Um cartão por console, cada um com seu próprio "apontar pasta" — não um
@@ -1055,8 +1017,8 @@ e abriu o jogo.
 **Estado em 2026-08-03: todo o código está pronto e verificado com Playwright
 contra um `zeuxd` real** (consentimento → scan → parecer → biblioteca →
 apontar pasta → ver jogos → Jogar → instalar inline → jogo abre), rodando
-inteiramente em container (caminho da CI, sem depender da máquina Windows —
-ver nota sobre D4). **O que falta não é código, é o D11**: nenhum dos testes
+inteiramente em container (caminho da CI, sem depender da máquina Windows).
+**O que falta não é código, é o D11**: nenhum dos testes
 acima usou uma ROM de verdade nem um emulador de verdade rodando até a tela
 de título, porque o ZeuX não obtém ROM por regra do projeto. O critério de
 saída da Sprint D só pode ser **verificado de fato**, e não só demonstrado
