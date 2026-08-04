@@ -110,6 +110,9 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             libdbus-1-dev \
+            libglib2.0-dev \
+            libssl-dev \
+            libxdo-dev \
             pkg-config \
             patchelf \
             build-essential \
