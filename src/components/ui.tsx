@@ -84,6 +84,40 @@ export function PartialNotice({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Modal de erro: para falhas que merecem atenção explícita do usuário (ex.:
+ * lançar um jogo falhou) em vez de um texto discreto que passa despercebido
+ * na tela — achado em 2026-08-04, quando "Não foi possível abrir o jogo"
+ * apareceu como texto inline e o Douglas pediu algo mais visível. Fecha só
+ * pelo botão ou pela tecla Esc, nunca clicando fora — erro não deveria
+ * desaparecer sem o usuário perceber que leu.
+ */
+export function ErrorModal({ title, message, onClose }: { title: string; message: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="error-modal-title"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      <div className="w-full max-w-md rounded border border-line bg-fill p-5">
+        <h2 id="error-modal-title" className="mb-2 text-lg font-semibold text-danger">
+          {title}
+        </h2>
+        <p className="text-base text-ink">{message}</p>
+        <div className="mt-4 flex justify-end">
+          <Button variant="primary" autoFocus onClick={onClose}>
+            Entendi
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Barra de progresso — mesmo vocabulário do wireframe (`.bar`/`.bar span`).
  * `percent` ausente (tamanho total desconhecido, `Job.total_bytes === 0`)
  * mostra a barra indeterminada em vez de fingir 0% ou 100%.

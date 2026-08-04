@@ -149,6 +149,14 @@ export type EmulatorEntry = {
   installed: boolean;
   /** Só presente quando `installed` é `true`. */
   installation?: Installation;
+  /**
+   * Só presente quando alguém já verificou de verdade onde este emulador lê
+   * o BIOS/firmware (ver BiosDir em internal/emulator/bios_dir.go) — ausente
+   * na maioria dos emuladores de propósito, nunca um palpite por convenção.
+   */
+  bios_dir?: string;
+  /** Só significativo quando `bios_dir` está presente. */
+  bios_dir_empty?: boolean;
 };
 
 // --- Cores do RetroArch (GET /api/v1/retroarch/cores) ---

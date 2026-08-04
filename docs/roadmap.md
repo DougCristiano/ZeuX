@@ -1524,6 +1524,26 @@ rota lista todo core conhecido (`internal/emulator/retroarch.go`,
 `RetroArchCoreStatus`) com `installed`/`path`; a tela de Emuladores ganhou um
 botão "Ver cores" na linha do RetroArch que mostra a lista com o que falta.
 
+**Quinto core extra achado pelo próprio Douglas usando a tela nova
+(2026-08-04):** `swanstation` aparecia "faltando" mesmo depois dos 4 cores
+acima — ele não é recomendado por nenhum tier do catálogo (só está em
+`retroArchCores` como um core que o ZeuX sabe resolver se alguém pedir
+explicitamente), mas como a rota nova lista *todo* core conhecido, ele
+aparecia permanentemente ausente sem nenhuma ação possível. Empacotado
+também, por consistência — lista foi de 24 para 25 cores.
+
+**Gerenciar/remover emuladores instalados, exceto RetroArch (2026-08-04):**
+o backend já tinha `DELETE /api/v1/emulators/{id}/install`
+(`internal/install/manager.go Uninstall`) desde antes, mas a tela nunca
+oferecia botão nenhum para removê-los. Adicionado botão "Remover" (com
+confirmação, mesmo padrão do fluxo de instalação) para emuladores instalados
+pelo ZeuX. **RetroArch nunca aparece removível**: além de a UI esconder o
+botão, `Manager.Uninstall` agora recusa explicitamente qualquer fonte
+`KindBundled` (defesa em profundidade — vale mesmo se a rota for chamada
+direto). Os cores nunca passavam por `Uninstall` de qualquer forma — vivem
+numa pasta separada (`bundledCoreDirsForWrite()`), fora da árvore que
+`Uninstall` resolve.
+
 **Seletor nativo de pasta na tela de Biblioteca (2026-08-04):** o campo de
 "apontar pasta" exigia digitar o caminho à mão — o próprio código já
 registrava isso como decisão pendente. Adicionado `@tauri-apps/plugin-dialog`
@@ -1587,6 +1607,99 @@ falhava neste ambiente (Linux) desde antes desta sessão. Causa real: `safeJoin`
 literais, em vez de duas pastas. Corrigido trocando `\` por `/` explicitamente
 antes de `filepath.Clean`, independente do SO em que a extração roda — os
 pacotes vêm de builds Windows mesmo quando o ZeuX está rodando em Linux/macOS.
+
+**Prompt de atalho de launcher do DuckStation suprimido (2026-08-04):**
+diferente do assistente de configuração (D8, já suprimido), a primeira
+execução do DuckStation como AppImage no Linux mostra um segundo diálogo:
+"Would you like to create a launcher shortcut?" — achado pelo Douglas
+incomodando de verdade. Causa raiz confirmada lendo o código-fonte real do
+DuckStation (`src/duckstation-qt/qthost.cpp`, `QtHost::CheckDesktopFile`): só
+dispara quando a variável de ambiente `APPIMAGE` existe (ou seja, sempre que
+o ZeuX instala via AppImage), e é suprimido gravando `NoDesktopFile = true`
+em `[Main]` — a mesma chave que o próprio DuckStation grava se o usuário
+marcar "Don't ask again". `seedDuckStationPortable`
+(`internal/install/firstrun.go`) agora grava essa chave junto com
+`SetupWizardIncomplete = false` em toda instalação nova. Instalação já
+existente do Douglas recebeu a chave manualmente (o seed nunca sobrescreve um
+`settings.ini` já existente, de propósito — instalações anteriores a esta
+correção precisam da mesma edição manual, ou clicar "Don't ask again" uma
+vez).
+
+**Botão "Abrir pasta do BIOS" — só onde verificado ao vivo (2026-08-04):**
+o Douglas pediu um botão que leva direto à pasta certa, para todo console que
+exige BIOS. Nova função `BiosDir` (`internal/emulator/bios_dir.go`), exposta
+como `bios_dir` em `GET /api/v1/emulators`, devolve um caminho **só** quando
+alguém já testou de verdade onde aquele emulador específico lê o arquivo —
+nunca um palpite por convenção. Cobertura desta sessão:
+
+- **PS1 (DuckStation):** `<pasta onde o ZeuX instalou>/bios/` — só quando
+  `Managed` (instalação de terceiros pode não estar em modo portátil).
+- **PS2 (PCSX2): achado um bug real do próprio PCSX2**, não do ZeuX. Mesmo
+  com `portable.txt` presente no diretório certo e a variável `$APPIMAGE`
+  corretamente setada pelo processo de bootstrap do AppImage, o binário real
+  do PCSX2 (rodando dentro do squashfs montado) **não herda essa variável**
+  — confirmado lendo `/proc/<pid>/environ` do processo real, não do
+  bootstrap. Resultado: o PCSX2 sempre grava/lê de
+  `~/.config/PCSX2/` (Linux), nunca da pasta gerenciada pelo ZeuX,
+  independente de `Managed`. `BiosDir` aponta para onde ele **realmente**
+  olha (o diretório global), não para onde "deveria" olhar — apontar errado
+  seria pior que não apontar. Não investigado mais a fundo porque exigiria
+  apagar a configuração global real do PCSX2 do Douglas (onde está o BIOS
+  dele) para testar do zero — decisão que não é da sessão de IA tomar
+  sozinha. Só verificado no Linux; Windows usa outra convenção (Documentos,
+  não AppData) nunca confirmada.
+- **PS3 (RPCS3): sem botão, de propósito.** Lendo o código-fonte real do
+  RPCS3 (`main_window::InstallPup`), o firmware (`PS3UPDAT.PUP`) não é
+  "colocado numa pasta" — é processado pelo próprio instalador do RPCS3
+  (`Arquivo → Install Firmware`), que abre um diálogo de arquivo e
+  extrai/decifra internamente. Não existe pasta correta para apontar; o
+  aviso genérico já existente ("confira essa configuração diretamente no
+  emulador") continua sendo a orientação certa.
+- **PS4: não existe no catálogo do ZeuX** — nenhum console, nenhum adapter.
+  Pedido pelo Douglas junto com PS1/PS2/PS3, mas não há nada para apontar
+  porque a funcionalidade em si não existe ainda.
+
+Implementação: `Callout` de "Dependência externa" em `GamesScreen.tsx` ganhou
+um botão "Abrir pasta do BIOS" condicional a `bios_dir` estar presente —
+usa `openPath` de `@tauri-apps/plugin-opener` (já instalado, só faltava a
+permissão `opener:allow-open-path`, adicionada a `capabilities/default.json`).
+`BiosDir` cria a pasta se ainda não existir (best-effort), para que o botão
+sempre tenha algo para abrir mesmo num emulador que nunca rodou.
+
+**Efeito colateral corrigido:** `TestRetroArchFailsWithCoreNameWhenCoreMissing`
+(pré-existente, não escrito nesta sessão) nunca isolava `HOME` — passou a
+falhar de propósito errado nesta máquina porque a sessão de hoje baixou e
+copiou cores de verdade para `~/.local/share/zeux/retroarch/cores/` (efeito
+colateral do próprio trabalho de bundling). Corrigido isolando `HOME` no
+teste, mesmo padrão já usado em todo o resto do pacote.
+
+**Bug real do próprio Tauri achado testando o botão "Abrir pasta do BIOS"
+(2026-08-04):** o primeiro clique falhou com "Not allowed to open path". A
+permissão `opener:allow-open-path` sozinha não basta — o plugin também exige
+um escopo de caminhos explícito (`scope.is_path_allowed`, lido no
+código-fonte real do `tauri-plugin-opener`), e sem nenhuma entrada de escopo
+a checagem recusa **todo** caminho por padrão (a descrição da permissão,
+"without any pre-configured scope", engana: significa que a permissão não
+vem com escopo pronto, não que dispensa escopo). Primeira tentativa de
+correção (`{"path": "$HOME/**"}`) ainda falhou pelo mesmo motivo — glob
+patterns não cobrem componentes de caminho que começam com ponto
+(`.config`) por padrão, mesmo motivo de `ls *` não mostrar dotfiles.
+Corrigido com `{"path": "$HOME/.config/**"}`, que inclui o componente
+literal.
+
+**Botão "Jogar" com pasta de BIOS vazia agora confirma antes (2026-08-04):**
+o Douglas notou que o botão continuava ativo mesmo com a pasta de BIOS vazia
+— diferente de hardware fraco (que pode rodar mal, mas roda), sem BIOS o
+jogo nunca abre. Novo campo `bios_dir_empty` em `GET /api/v1/emulators`
+(`internal/emulator/registry.go`, `os.ReadDir` sobre `BiosDir`); clicar
+"Jogar" nessa condição mostra confirmação com "Jogar mesmo assim"/"Abrir
+pasta do BIOS"/"Cancelar", mesmo padrão já usado para hardware insuficiente.
+
+**Modal de erro de lançamento (2026-08-04):** erro de lançar um jogo
+aparecia como texto discreto na linha do jogo — fácil de não perceber. Novo
+componente `ErrorModal` (`src/components/ui.tsx`), usado em `GamesScreen`
+para qualquer falha de `POST /games/launch`, com a mensagem completa do
+servidor (nunca reescrita).
 
 ---
 

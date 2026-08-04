@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/doufl/zeux/internal/emulator"
@@ -103,5 +104,24 @@ func TestUninstallRemovesFromTheSameFolderPromoteUsed(t *testing.T) {
 	dir := filepath.Join(root, "ps1", "emuladores", "duckstation")
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Errorf("esperava %s removido, stat = %v", dir, err)
+	}
+}
+
+// O RetroArch (kind bundled, ADR 0012) nunca pode ser removido por Uninstall:
+// não foi baixado por Start(), vem dentro do próprio instalador, e apagá-lo
+// quebraria os 24 consoles que dependem dele sem uma forma simples de
+// reinstalar. O guard precisa recusar mesmo sem nenhuma instalação promovida
+// no disco — a rota pode ser chamada direto, sem passar pela tela.
+func TestUninstallRefusesBundledSource(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	manager := NewManager(mustCatalog(t), discardLogger())
+
+	err := manager.Uninstall("retroarch")
+	if err == nil {
+		t.Fatal("esperava recusa ao tentar remover uma fonte bundled")
+	}
+	if !strings.Contains(err.Error(), "empacotado com o ZeuX") {
+		t.Errorf("mensagem deveria explicar que é bundled: %v", err)
 	}
 }

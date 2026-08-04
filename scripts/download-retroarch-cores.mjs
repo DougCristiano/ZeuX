@@ -153,6 +153,18 @@ const coresManifest = {
     filename: "yabause_libretro",
     version: "latest",
   },
+
+  // Diferente dos 4 acima, este não é recomendado por nenhum tier do
+  // catálogo — está em retroArchCores (internal/emulator/retroarch.go)
+  // apenas como um core que o ZeuX sabe resolver caso alguém peça
+  // explicitamente. Empacotado mesmo assim (2026-08-04, a pedido do
+  // Douglas) para que GET /api/v1/retroarch/cores nunca mostre um "faltando"
+  // sem nenhuma ação possível — a lista passou a listar todo core conhecido,
+  // não só os recomendáveis.
+  swanstation: {
+    filename: "swanstation_libretro",
+    version: "latest",
+  },
 };
 
 /**

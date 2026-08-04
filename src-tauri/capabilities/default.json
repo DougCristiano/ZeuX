@@ -6,6 +6,10 @@
   "permissions": [
     "core:default",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "$HOME/.config/**" }]
+    },
     "dialog:allow-open",
     {
       "identifier": "shell:allow-execute",
