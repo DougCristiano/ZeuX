@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // ensureBundledCoresAvailable copia cores bundled do instalador para o
@@ -53,6 +54,11 @@ func ensureBundledCoresAvailable() error {
 	// Copiar cada core
 	for _, entry := range entries {
 		if entry.IsDir() {
+			continue
+		}
+		// .gitkeep versiona a pasta vazia (ver .gitignore) — nunca um core de
+		// verdade. Mesma classe de bug corrigida em bundled_retroarch.go.
+		if strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 
