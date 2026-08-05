@@ -56,15 +56,6 @@ func run(addr string, logger *slog.Logger) error {
 
 	registry := emulator.NewRegistry()
 
-	// Copia o RetroArch empacotado no instalador (extensão do ADR 0012) para o
-	// diretório gerenciado antes de qualquer Locate(): precisa estar lá já na
-	// primeira requisição a /emulators, não só na hora de lançar um jogo (ver
-	// bundled_retroarch.go). Sem ZEUX_BUNDLED_RETROARCH_DIR (build de
-	// desenvolvimento fora do Tauri), não faz nada — não é erro fatal.
-	if err := emulator.EnsureBundledRetroArchAvailable(); err != nil {
-		logger.Warn("não foi possível preparar o RetroArch empacotado", "erro", err)
-	}
-
 	customStore, err := emulator.NewCustomStore()
 	if err != nil {
 		return err
@@ -129,6 +120,18 @@ func run(addr string, logger *slog.Logger) error {
 		logger.Info("daemon no ar", "endereco", "http://"+addr, "consoles", len(catalog.Consoles))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
+		}
+	}()
+
+	// A cópia do RetroArch empacotado (Windows: exe + ~65 DLLs) pode levar
+	// vários segundos na primeira abertura. Se rodar antes do Listen, a UI
+	// esgota as tentativas de GET /consent e mostra "O zeuxd não respondeu"
+	// mesmo com o daemon ainda vivo (issue #6). Consentimento, health e scan
+	// não dependem desse binário; /emulators pode ver "não instalado" por um
+	// instante na primeira execução — aceitável frente a travar o onboarding.
+	go func() {
+		if err := emulator.EnsureBundledRetroArchAvailable(); err != nil {
+			logger.Warn("não foi possível preparar o RetroArch empacotado", "erro", err)
 		}
 	}()
 

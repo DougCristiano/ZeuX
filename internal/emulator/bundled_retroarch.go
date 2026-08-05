@@ -25,10 +25,12 @@ import (
 // emuladores passa a mostrar "instalado pelo ZeuX", que é a badge certa
 // (Managed: true).
 //
-// Chamada uma vez, cedo, na subida do daemon (cmd/zeuxd/main.go) — não sob
-// demanda como ensureBundledCoresAvailable faz com os cores, porque aqui
-// Locate() precisa achar o binário antes da primeira requisição a
-// /emulators, não só na hora de montar um comando de lançamento.
+// Chamada uma vez na subida do daemon (cmd/zeuxd/main.go), em paralelo com
+// o Listen — não sob demanda como ensureBundledCoresAvailable faz com os
+// cores. Rodar antes do Listen bloqueava a porta enquanto copiava ~65 DLLs
+// no Windows e a UI esgotava o GET /consent (issue #6). /emulators pode
+// ver o RetroArch ausente por um instante na primeira abertura; na
+// seguinte já está no diretório gerenciado (idempotente).
 func EnsureBundledRetroArchAvailable() error {
 	bundledDir := os.Getenv("ZEUX_BUNDLED_RETROARCH_DIR")
 	if bundledDir == "" {
