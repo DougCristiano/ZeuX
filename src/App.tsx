@@ -57,11 +57,17 @@ function App() {
   // 2. Com a porta liberada, busca o consentimento. O sidecar é iniciado em
   // paralelo com a janela (B5) e pode levar um instante a mais para aceitar
   // conexões — por isso as novas tentativas, em vez de falhar na primeira.
+  // Orçamento ~20 s (40 × 500 ms): na primeira abertura o zeuxd ainda pode
+  // estar abrindo o SQLite ou o AV do Windows varrendo o binário; 10 × 300 ms
+  // (~3 s) era curto demais e produzia "O zeuxd não respondeu" com o daemon
+  // ainda subindo (issue #6).
   useEffect(() => {
     if (phase !== "connecting") return;
 
     let cancelled = false;
     let attempt = 0;
+    const maxAttempts = 40;
+    const retryDelayMs = 500;
 
     async function tryLoad() {
       try {
@@ -75,14 +81,14 @@ function App() {
         }
       } catch (err) {
         attempt += 1;
-        if (attempt >= 10) {
+        if (attempt >= maxAttempts) {
           if (!cancelled) {
             setErrorMessage(err instanceof ApiError ? err.message : "O zeuxd não respondeu.");
             setPhase("daemon-unreachable");
           }
           return;
         }
-        setTimeout(tryLoad, 300);
+        setTimeout(tryLoad, retryDelayMs);
       }
     }
 

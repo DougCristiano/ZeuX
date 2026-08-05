@@ -127,11 +127,16 @@ pub fn run() {
                     // pendente). Achado e corrigido em 2026-08-04 verificando a env
                     // var de um processo real (/proc/<pid>/environ) contra o
                     // caminho real dos arquivos instalados.
-                    let bundled_cores_dir = app
-                        .path()
-                        .resource_dir()
-                        .ok()
-                        .and_then(|p| p.join("resources/retroarch/cores").to_str().map(String::from));
+                    //
+                    // Só passa a env var se o diretório existir de verdade —
+                    // apontar para um caminho fantasma fazia o daemon logar
+                    // aviso em toda abertura de `tauri dev` sem resources/.
+                    let bundled_cores_dir = app.path().resource_dir().ok().and_then(|p| {
+                        let dir = p.join("resources/retroarch/cores");
+                        dir.is_dir()
+                            .then(|| dir.to_str().map(String::from))
+                            .flatten()
+                    });
 
                     // Idem para o app do RetroArch em si (extensão do ADR 0012 —
                     // o ADR original só cobria os cores; o executável ficou de
@@ -139,11 +144,12 @@ pub fn run() {
                     // "não instalado" mesmo com os cores presentes). Ausente em
                     // macOS por enquanto (cmd/download-retroarch-app ainda não
                     // sabe empacotar o .dmg do RetroArch para lá).
-                    let bundled_retroarch_dir = app
-                        .path()
-                        .resource_dir()
-                        .ok()
-                        .and_then(|p| p.join("resources/retroarch/bin").to_str().map(String::from));
+                    let bundled_retroarch_dir = app.path().resource_dir().ok().and_then(|p| {
+                        let dir = p.join("resources/retroarch/bin");
+                        dir.is_dir()
+                            .then(|| dir.to_str().map(String::from))
+                            .flatten()
+                    });
 
                     let mut sidecar = app
                         .shell()
@@ -156,6 +162,16 @@ pub fn run() {
                     }
                     if let Some(retroarch_dir) = bundled_retroarch_dir {
                         sidecar = sidecar.env("ZEUX_BUNDLED_RETROARCH_DIR", retroarch_dir);
+                    }
+
+                    // Em `tauri dev` o WebView vem de http://localhost:1420
+                    // (devUrl). Sem ZEUX_DEV_ORIGIN o CORS recusa o fetch e a
+                    // UI fica em "lendo o consentimento…" até esgotar retries
+                    // (issue #6). cfg!(dev) só é true no sidecar de
+                    // desenvolvimento — o instalador nunca leva essa env.
+                    #[cfg(dev)]
+                    {
+                        sidecar = sidecar.env("ZEUX_DEV_ORIGIN", "http://localhost:1420");
                     }
 
                     let (mut events, child) = sidecar

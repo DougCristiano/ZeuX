@@ -119,9 +119,10 @@ func (s *Server) Routes() http.Handler {
 // WebView recusa entregar a resposta ao JS) quanto no POST com
 // Content-Type: application/json (o preflight OPTIONS não tem rota registrada
 // no mux, cai em 405, e a requisição real nunca sai). "tauri://localhost" é o
-// origin do build de produção rodando num container Linux; "http://tauri.localhost"
-// é o documentado pelo Tauri para builds de produção no Windows — ainda não
-// verificado numa máquina Windows real.
+// origin do build de produção em Linux/macOS; "http://tauri.localhost" é o
+// padrão do WebView2 no Windows (useHttpsScheme=false). "https://tauri.localhost"
+// cobre o caso em que useHttpsScheme=true — mesma origem documentada pelo
+// Tauri 2, só com esquema HTTPS.
 //
 // O ADR 0001 já aceita que qualquer processo local alcança esta porta; CORS
 // aqui não é a defesa contra isso — é só o que destrava o fetch do WebView.
@@ -129,8 +130,9 @@ func (s *Server) Routes() http.Handler {
 // tornaria trivial para uma página maliciosa aberta num navegador comum ler a
 // resposta desta API, o que hoje não é possível sem essa reflexão.
 var allowedOrigins = map[string]bool{
-	"tauri://localhost":      true,
-	"http://tauri.localhost": true,
+	"tauri://localhost":       true,
+	"http://tauri.localhost":  true,
+	"https://tauri.localhost": true,
 }
 
 // SetDevOrigin libera uma origem extra no CORS, além de allowedOrigins — pensada

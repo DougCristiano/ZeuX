@@ -52,7 +52,13 @@ function isErrorBody(value: unknown): value is ErrorBody {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  // Sem timeout próprio, um fetch pendurado (TCP aceito sem resposta HTTP)
+  // deixava a UI em "lendo o consentimento…" até o WebView desistir sozinho —
+  // StatusScreen promete que o loading não gira para sempre; isso só vale se
+  // a falha for limitada. 30 s cobre scan de hardware e instalações curtas;
+  // a fase connecting em App.tsx ainda falha rápido via connection refused.
+  const signal = init?.signal ?? AbortSignal.timeout(30_000);
+  const res = await fetch(`${API_BASE}${path}`, { ...init, signal });
 
   // 404/405 de rota inexistente ou método errado vêm em texto puro do
   // próprio ServeMux do Go, não no formato de erro do ZeuX — ver docs/api.md,
@@ -81,7 +87,9 @@ function postJSON<T>(path: string, payload: unknown): Promise<T> {
 export const api = {
   health: () => request<HealthStatus>("/health"),
 
-  getConsent: () => request<ConsentStatus>("/consent"),
+  // Timeout curto: na fase connecting a UI tenta dezenas de vezes; cada
+  // tentativa não pode ficar 30 s presa se a porta aceitar TCP sem HTTP.
+  getConsent: () => request<ConsentStatus>("/consent", { signal: AbortSignal.timeout(2_000) }),
   setConsent: (granted: boolean) => postJSON<ConsentStatus>("/consent", { granted }),
 
   scanHardware: () => request<HardwareInfo>("/hardware/scan", { method: "POST" }),

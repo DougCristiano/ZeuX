@@ -23,8 +23,10 @@ de emuladores personalizados; corrigido nesta passada).
 - Todas as respostas são `application/json; charset=utf-8`.
 - **Não há autenticação.** O bind em `127.0.0.1` é a única fronteira.
 - **CORS está configurado com lista fechada de origens** (`allowedOrigins` em
-  `internal/api/server.go`): `tauri://localhost` e `http://tauri.localhost`,
-  as origens do WebView do Tauri em produção. Uma origem fora da lista nunca
+  `internal/api/server.go`): `tauri://localhost`, `http://tauri.localhost` e
+  `https://tauri.localhost` (origens do WebView do Tauri em produção), mais
+  uma origem extra via `ZEUX_DEV_ORIGIN` só em desenvolvimento. Uma origem
+  fora da lista nunca
   recebe `Access-Control-Allow-Origin` — nunca `*`. Verificado em 2026-08-01
   contra um build de produção real do Tauri (item B2/B3 do
   [plano da Sprint B](sprint-b-plano.md)): sem essa lista, o WebView falha

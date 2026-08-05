@@ -437,16 +437,22 @@ func TestCORSPreflightRejectsUnknownOrigin(t *testing.T) {
 func TestCORSAllowsSimpleRequestFromKnownOrigin(t *testing.T) {
 	server := newTestServer(t, fakeProbe{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
-	req.Header.Set("Origin", "http://tauri.localhost")
-	rec := httptest.NewRecorder()
-	server.Routes().ServeHTTP(rec, req)
+	for _, origin := range []string{
+		"http://tauri.localhost",
+		"https://tauri.localhost",
+		"tauri://localhost",
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+		req.Header.Set("Origin", origin)
+		rec := httptest.NewRecorder()
+		server.Routes().ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, esperado 200", rec.Code)
-	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://tauri.localhost" {
-		t.Fatalf("Access-Control-Allow-Origin = %q, esperado a origem ecoada", got)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("origin %s: status = %d, esperado 200", origin, rec.Code)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != origin {
+			t.Fatalf("origin %s: Access-Control-Allow-Origin = %q, esperado a origem ecoada", origin, got)
+		}
 	}
 }
 
