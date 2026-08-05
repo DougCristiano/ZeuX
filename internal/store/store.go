@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 
@@ -114,7 +115,11 @@ func migrate(db *sql.DB) error {
 			continue
 		}
 
-		sqlBytes, err := migrationsFS.ReadFile(filepath.Join("migrations", name))
+		// embed.FS (e fs.FS em geral) usa sempre "/", mesmo no Windows.
+		// filepath.Join geraria "migrations\0001_...." e o ReadFile falharia
+		// com "file does not exist" — o zeuxd nunca chegava a escutar a
+		// porta e a UI ficava em "lendo o consentimento…" (issue #6).
+		sqlBytes, err := migrationsFS.ReadFile(path.Join("migrations", name))
 		if err != nil {
 			return err
 		}
