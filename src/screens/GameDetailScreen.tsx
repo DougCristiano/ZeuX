@@ -3,6 +3,7 @@ import { api, ApiError } from "../api";
 import type { LibraryGame } from "../api/types";
 import { Badge, Button, Card, ErrorModal, GameCover } from "../components/ui";
 import { useLaunchGame } from "../hooks/useLaunchGame";
+import { consoleAccentColor } from "../lib/consoleColor";
 
 function formatPlaytime(seconds: number): string {
   if (seconds <= 0) return "nunca jogado";
@@ -76,14 +77,14 @@ export function GameDetailScreen({
 
       <div className="flex flex-col gap-5 sm:flex-row">
         <div className="w-full max-w-[220px]">
-          <GameCover label={shortName} size="lg" />
+          <GameCover label={shortName} consoleId={game.console_id} size="lg" />
         </div>
 
         <div className="flex flex-1 flex-col gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-ink">{game.title}</h1>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <Badge>{consoleName}</Badge>
+              <Badge accentColor={consoleAccentColor(game.console_id)}>{consoleName}</Badge>
               {year !== undefined && <Badge>{year}</Badge>}
               {game.missing && <Badge>arquivo ausente</Badge>}
             </div>

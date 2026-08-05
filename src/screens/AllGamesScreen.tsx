@@ -171,7 +171,12 @@ export function AllGamesScreen({
                     title={game.title}
                     onClick={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
                   >
-                    <GameCover label={shortNameFor(game.console_id)} showPlayOverlay />
+                    <GameCover
+                      label={shortNameFor(game.console_id)}
+                      title={game.title}
+                      consoleId={game.console_id}
+                      showPlayOverlay
+                    />
                   </button>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink" title={game.title}>

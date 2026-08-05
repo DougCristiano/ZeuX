@@ -1,8 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, EmulatorSource, InstallJob, Report, RetroArchCoreStatus } from "../api/types";
-import { Badge, Button, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar, Select } from "../components/ui";
+import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar, Select } from "../components/ui";
+import { consoleAccentColor } from "../lib/consoleColor";
+
+// Categorias de configuração por emulador (2026-08-05) — preview desabilitado
+// a pedido do Douglas: a Sprint H (docs/roadmap.md) ainda não escreve nem lê
+// config de emulador nenhuma, então clicar aqui não faz nada de verdade
+// ainda. Mostrado cinza/sem cursor de propósito, para não prometer o que
+// ainda não existe (regra do CLAUDE.md).
+const CONFIG_CATEGORIES_PREVIEW = ["Vídeo", "Áudio", "Controles", "Avançado"];
 
 const PAGE_SIZE = 6;
 // Quantos ícones de console cabem no card sem esticar a altura entre
@@ -73,14 +81,22 @@ function RetroArchCoresList() {
   );
 }
 
-// Ponto de status: a cor comunica estado real (instalado/erro/não
-// instalado), nunca decoração por índice — diferente do "neon" arbitrário
-// por card do mockup de referência (Sprint 4 do plano de migração visual,
-// 2026-08-04). Verde/accent = pronto para uso; vermelho = algo falhou;
-// cinza = ainda não instalado.
-function StatusDot({ state }: { state: "installed" | "error" | "not-installed" }) {
-  const color = state === "installed" ? "bg-accent" : state === "error" ? "bg-danger" : "bg-muted";
-  return <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${color}`} aria-hidden="true" />;
+// Ponto de identidade (2026-08-05, a pedido do Douglas — reverte a decisão
+// anterior de "cor comunica estado real"): a cor não é mais instalado/erro/
+// não instalado — isso continua visível pelo Badge/texto logo abaixo. Aqui é
+// só a cor do console (consoleAccentColor), pra "padronizar de quem é o
+// jogo" mesmo na tela de Emuladores. Emulador de console único usa a cor
+// desse console; RetroArch e qualquer outro multi-console (sem uma
+// identidade só) cai no cinza neutro — decorar 20+ consoles com uma cor só
+// seria a mesma mentira de escolher uma ao acaso.
+function IdentityDot({ color }: { color: string | undefined }) {
+  return (
+    <span
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
+      style={{ background: color ?? "var(--muted)" }}
+      aria-hidden="true"
+    />
+  );
 }
 
 function EmulatorCard({
@@ -100,6 +116,21 @@ function EmulatorCard({
   const [showCores, setShowCores] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const [biosError, setBiosError] = useState<string | null>(null);
+
+  // "Abrir pasta do BIOS" (2026-08-05): existia só dentro da tela de jogos de
+  // um console (GamesScreen.tsx), a pedido do Douglas em 2026-08-04 — mas aí
+  // é preciso navegar Biblioteca → console → jogos pra achar. GET /emulators
+  // já traz bios_dir/bios_dir_empty por emulador (EmulatorEntry), então o
+  // botão cabe aqui direto, sem esperar ter um jogo pra ver a pasta.
+  async function openBiosFolder(dir: string) {
+    setBiosError(null);
+    try {
+      await openPath(dir);
+    } catch (err) {
+      setBiosError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   // Botão "Configurar" (2026-08-04): abre o emulador sozinho, sem jogo — o
   // ZeuX ainda não grava/aplica configuração nenhuma (backlog separado, ver
@@ -183,19 +214,20 @@ function EmulatorCard({
   // aqui é só para não convidar o clique.
   const canRemove = entry.installed && entry.installation?.managed && entry.adapter_id !== "retroarch";
 
-  const dotState: "installed" | "error" | "not-installed" =
-    state.kind === "error" || state.kind === "remove-error"
-      ? "error"
-      : entry.installed
-        ? "installed"
-        : "not-installed";
+  // Só um console = a cor dele vira a identidade do card inteiro (12 dos 13
+  // adapters embutidos além do RetroArch atendem exatamente 1). Mais de um
+  // (RetroArch) não tem uma identidade só — fica neutro.
+  const identityColor = entry.consoles.length === 1 ? consoleAccentColor(entry.consoles[0]) : undefined;
+  const cardStyle: CSSProperties | undefined = identityColor
+    ? { borderLeftColor: identityColor, borderLeftWidth: 3 }
+    : undefined;
 
   return (
-    <Card className="flex flex-col gap-3">
+    <Card className="flex flex-col gap-3" style={cardStyle}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2">
           <span className="mt-1.5">
-            <StatusDot state={dotState} />
+            <IdentityDot color={identityColor} />
           </span>
           <p className="font-semibold text-ink">{entry.name}</p>
         </div>
@@ -213,6 +245,7 @@ function EmulatorCard({
         {entry.consoles.slice(0, MAX_CONSOLE_ICONS).map((consoleId) => (
           <ConsoleIcon
             key={consoleId}
+            consoleId={consoleId}
             label={verdictById.get(consoleId)?.short_name ?? consoleId}
             onClick={() => onSelectConsole(consoleId)}
           />
@@ -221,6 +254,41 @@ function EmulatorCard({
           <ConsoleMoreBadge count={entry.consoles.length - MAX_CONSOLE_ICONS} />
         )}
       </div>
+
+      {/* Categorias de configuração — preview desabilitado (2026-08-05, ver
+          CONFIG_CATEGORIES_PREVIEW acima): a Sprint H ainda não existe, isto
+          não clica em nada ainda. */}
+      <div className="flex flex-wrap gap-1.5" aria-hidden="true">
+        {CONFIG_CATEGORIES_PREVIEW.map((tab) => (
+          <span
+            key={tab}
+            className="cursor-not-allowed rounded-sm border border-dashed border-line-strong px-1.5 py-0.5 font-pixel text-[8px] tracking-wide text-muted opacity-60"
+            title="Em breve — configuração por categoria ainda não existe no ZeuX."
+          >
+            {tab.toUpperCase()}
+          </span>
+        ))}
+      </div>
+
+      {/* Só aparece quando alguém já verificou de verdade onde ESTE emulador
+          lê o BIOS/firmware (BiosDir, internal/emulator/bios_dir.go) — nunca
+          um palpite por convenção. Cobertura hoje: PS1 (DuckStation) e PS2
+          (PCSX2); PS3 (RPCS3) não tem pasta certa pra apontar de propósito
+          (o firmware é instalado pelo próprio RPCS3, não colocado numa
+          pasta) — ver docs/roadmap.md, D8/L9. */}
+      {entry.bios_dir && (
+        <div className="flex flex-col gap-2">
+          {entry.bios_dir_empty && (
+            <Callout label="BIOS ausente">
+              A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
+            </Callout>
+          )}
+          <Button type="button" variant="secondary" onClick={() => openBiosFolder(entry.bios_dir!)}>
+            Abrir pasta do BIOS
+          </Button>
+          {biosError && <p className="text-sm text-danger">{biosError}</p>}
+        </div>
+      )}
 
       {state.kind === "confirm-hardware" && (
         // Regra: recusar não some com o card nem desabilita o botão de
@@ -468,6 +536,23 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           <Pagination page={page} totalPages={totalPages} onChange={setPage} />
         </>
       )}
+
+      {/* Preview desabilitado (2026-08-05): o backend de emuladores
+          personalizados já existe por inteiro (GET/POST/DELETE
+          /custom-emulators, internal/emulator/custom.go) — só falta a tela
+          (Sprint I1, docs/roadmap.md). Mostrado aqui pra sinalizar que vem
+          aí, sem fingir que já funciona. */}
+      <div className="mt-6">
+        <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar emulador</p>
+        <button
+          type="button"
+          disabled
+          title="Em breve — adicionar emulador manualmente ainda não tem tela no ZeuX."
+          className="w-full cursor-not-allowed rounded border border-dashed border-line-strong px-4 py-3 text-center font-pixel text-[11px] text-muted opacity-60"
+        >
+          + Adicionar emulador manualmente
+        </button>
+      </div>
 
       {modalConsoleId && (
         <ConsoleInfoModal

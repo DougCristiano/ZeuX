@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // EnsureBundledRetroArchAvailable copia o RetroArch empacotado no instalador
@@ -45,7 +46,20 @@ func EnsureBundledRetroArchAvailable() error {
 	if err != nil {
 		return fmt.Errorf("lendo diretório do RetroArch bundled (%s): %w", bundledDir, err)
 	}
-	if len(entries) == 0 {
+	// Ignora .gitkeep (e qualquer outro arquivo oculto) ao decidir se há
+	// algo de verdade — bug real achado em 2026-08-05: um checkout limpo
+	// sempre tem o .gitkeep que versiona esta pasta vazia (ver .gitignore),
+	// então "está vazio" nunca disparava e o .gitkeep acabava copiado como
+	// se fosse o RetroArch. cmd/download-retroarch-app tinha o mesmo bug na
+	// hora de decidir se já tinha baixado, corrigido junto.
+	hasRealFile := false
+	for _, entry := range entries {
+		if !entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			hasRealFile = true
+			break
+		}
+	}
+	if !hasRealFile {
 		return fmt.Errorf("diretório do RetroArch bundled está vazio: %s", bundledDir)
 	}
 
@@ -70,6 +84,9 @@ func EnsureBundledRetroArchAvailable() error {
 			// cmd/download-retroarch-app nunca inclui subpastas de assets —
 			// se uma aparecer aqui é sinal de mudança na estrutura do
 			// pacote, não algo para copiar às cegas.
+			continue
+		}
+		if strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 

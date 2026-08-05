@@ -1,5 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode, SelectHTMLAttributes } from "react";
 import type { ConsoleVerdict } from "../api/types";
+import { consoleAccentColor } from "../lib/consoleColor";
 
 // Componentes primitivos do item B7 (docs/sprint-b-plano.md), construídos
 // sobre os tokens de src/index.css. Cor, tipografia e foco vivem aqui uma vez
@@ -67,11 +68,20 @@ export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSe
   );
 }
 
-export function Card({ children, filled = false, className = "" }: { children: ReactNode; filled?: boolean; className?: string }) {
+export function Card({
+  children,
+  filled = false,
+  className = "",
+  style,
+}: {
+  children: ReactNode;
+  filled?: boolean;
+  className?: string;
+  /** Só para casos dinâmicos de verdade (ex.: cor de identidade por console) — nunca um substituto de classe Tailwind fixa. */
+  style?: CSSProperties;
+}) {
   return (
-    <div
-      className={`rounded border border-line p-4 ${filled ? "bg-fill" : "bg-transparent"} ${className}`}
-    >
+    <div style={style} className={`rounded border border-line p-4 ${filled ? "bg-fill" : "bg-transparent"} ${className}`}>
       {children}
     </div>
   );
@@ -79,11 +89,28 @@ export function Card({ children, filled = false, className = "" }: { children: R
 
 type BadgeVariant = "default" | "solid";
 
-export function Badge({ children, variant = "default" }: { children: ReactNode; variant?: BadgeVariant }) {
+/**
+ * `accentColor` (2026-08-05): sobrepõe borda/texto com uma cor específica —
+ * usado para a cor de identidade por console (`consoleAccentColor`), nunca
+ * para comunicar estado (isso continua sendo `variant`/texto). Sem
+ * `accentColor`, o badge se comporta exatamente como antes.
+ */
+export function Badge({
+  children,
+  variant = "default",
+  accentColor,
+}: {
+  children: ReactNode;
+  variant?: BadgeVariant;
+  accentColor?: string;
+}) {
   const styles =
     variant === "solid" ? "border-accent bg-accent text-accent-ink" : "border-line-strong text-muted";
   return (
-    <span className={`inline-block rounded-sm border px-1.5 py-0.5 font-mono text-xs tracking-wide ${styles}`}>
+    <span
+      className={`inline-block rounded-sm border px-1.5 py-0.5 font-mono text-xs tracking-wide ${accentColor ? "" : styles}`}
+      style={accentColor ? { borderColor: accentColor, color: accentColor, background: `${accentColor}1a` } : undefined}
+    >
       {children}
     </span>
   );
@@ -157,9 +184,16 @@ export function ErrorModal({ title, message, onClose }: { title: string; message
  * opcional). `coverUrl` fica preparado para o dia em que existir capa de
  * jogo de verdade (scraper — já fora do MVP, ver docs/roadmap.md); até lá,
  * nunca é passado.
+ *
+ * `consoleId` (2026-08-05, a pedido do Douglas): cor de identidade por
+ * console (`consoleAccentColor`) no badge de plataforma e no glow de
+ * hover/foco — decorativa, não estado. Sem `consoleId`, cai no cinza neutro
+ * de sempre (nenhuma tela hoje deixa de passar, mas o componente não exige).
  */
 export function GameCover({
   label,
+  title,
+  consoleId,
   size = "md",
   showPlayOverlay = false,
   coverUrl,
@@ -167,6 +201,9 @@ export function GameCover({
 }: {
   /** Sigla do console — único dado real disponível hoje como "capa". */
   label: string;
+  /** Título do jogo, mostrado sobre a arte — cai em `label` quando ausente. */
+  title?: string;
+  consoleId?: string;
   size?: "md" | "lg";
   /** Mostra um ícone de play sobreposto no hover/foco (ex.: card clicável que lança direto). */
   showPlayOverlay?: boolean;
@@ -174,9 +211,17 @@ export function GameCover({
   coverUrl?: string;
   className?: string;
 }) {
+  const accent = consoleId ? consoleAccentColor(consoleId) : undefined;
+  const accentVars = accent ? ({ "--console-accent": accent } as CSSProperties) : undefined;
+
   return (
     <div
-      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border border-line-strong bg-fill ${className}`}
+      style={accentVars}
+      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border bg-fill transition-colors ${
+        accent
+          ? "border-line-strong hover:border-[var(--console-accent)] focus-within:border-[var(--console-accent)]"
+          : "border-line-strong"
+      } ${className}`}
     >
       {coverUrl ? (
         <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -192,13 +237,30 @@ export function GameCover({
       )}
       <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/75 to-transparent" />
-      <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 font-pixel text-[11px] text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
+
+      {/* Badge de plataforma (2026-08-05) — cor de identidade do console,
+          não estado. Substitui a repetição da sigla que existia no centro E
+          no rodapé antes do título entrar aqui. */}
+      <span
+        className="pointer-events-none absolute top-1.5 left-1.5 rounded-sm border px-1.5 py-0.5 font-pixel text-[9px]"
+        style={{ borderColor: accent ?? "var(--line-strong)", color: accent ?? "var(--muted)", background: "rgba(0,0,0,0.7)" }}
+      >
         {label}
+      </span>
+
+      <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 font-pixel text-[11px] text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
+        {title ?? label}
       </div>
       {showPlayOverlay && (
         <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/40 group-hover:flex group-focus-visible:flex">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-accent shadow-[0_0_16px_var(--accent)]">
-            <svg width="14" height="16" viewBox="0 0 14 16" fill="var(--accent)" aria-hidden="true">
+          <div
+            className={`flex h-11 w-11 items-center justify-center rounded-full border-2 ${
+              accent
+                ? "border-[var(--console-accent)] shadow-[0_0_16px_var(--console-accent)]"
+                : "border-accent shadow-[0_0_16px_var(--accent)]"
+            }`}
+          >
+            <svg width="14" height="16" viewBox="0 0 14 16" fill={accent ?? "var(--accent)"} aria-hidden="true">
               <path d="M0 0 L14 8 L0 16 Z" />
             </svg>
           </div>
@@ -312,13 +374,20 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
  * de `GameCover`, que usa a sigla como "capa" em vez de arte inventada).
  * Quadrado com a sigla, clicável, abre `ConsoleInfoModal`.
  */
-export function ConsoleIcon({ label, onClick }: { label: string; onClick: () => void }) {
+/**
+ * `consoleId` (2026-08-05): mesma cor de identidade que `GameCover` usa no
+ * badge de plataforma — decorativa, não estado. `label` continua sendo o que
+ * é exibido (sigla); `consoleId` só resolve a cor.
+ */
+export function ConsoleIcon({ label, consoleId, onClick }: { label: string; consoleId: string; onClick: () => void }) {
+  const accent = consoleAccentColor(consoleId);
   return (
     <button
       type="button"
       onClick={onClick}
       title={label}
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border border-line-strong bg-fill font-pixel text-[8px] leading-none text-muted transition-colors hover:border-accent hover:text-accent ${FOCUS_RING}`}
+      style={{ borderColor: `${accent}66`, color: accent }}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[8px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
       {label.slice(0, 4).toUpperCase()}
     </button>

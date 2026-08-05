@@ -74,9 +74,23 @@ func run() error {
 	// convenção de scripts/build-zeuxd.mjs.
 	destDir := filepath.Join(repoRoot, "src-tauri", "resources", "retroarch", "bin")
 
-	if entries, err := os.ReadDir(destDir); err == nil && len(entries) > 0 {
-		fmt.Println("download-retroarch-app: já presente em", destDir, "— pulando.")
-		return nil
+	// Bug real achado em 2026-08-05, inspecionando o log de um build de
+	// Windows na CI: len(entries) > 0 contava o .gitkeep versionado (ver
+	// .gitignore, "src-tauri/resources/retroarch/bin/*" +
+	// "!.../.gitkeep") como "já baixado" — todo checkout limpo (toda CI,
+	// sempre) tinha exatamente esse 1 arquivo e o download era pulado
+	// silenciosamente, sempre. Só não dava pra notar rodando localmente
+	// porque a pasta deste ambiente já tinha o AppImage de verdade de uma
+	// sessão anterior, escondendo o bug. Corrigido ignorando entradas que
+	// começam com "." ao decidir se já existe algo de verdade.
+	if entries, err := os.ReadDir(destDir); err == nil {
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			fmt.Println("download-retroarch-app: já presente em", destDir, "— pulando.")
+			return nil
+		}
 	}
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return err

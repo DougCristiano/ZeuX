@@ -111,6 +111,56 @@ func TestEnsureBundledRetroArchAvailableCopiesEveryFileInBundledDir(t *testing.T
 	}
 }
 
+// Trava o bug real achado em 2026-08-05: um checkout limpo de
+// src-tauri/resources/retroarch/bin sempre tem o .gitkeep que versiona a
+// pasta vazia (ver .gitignore) — um diretório bundled com só .gitkeep
+// precisa contar como vazio (erro), nunca como "já tem o RetroArch".
+func TestEnsureBundledRetroArchAvailableTreatsOnlyGitkeepAsEmpty(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	bundledDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bundledDir, ".gitkeep"), nil, 0o644); err != nil {
+		t.Fatalf("preparando .gitkeep: %v", err)
+	}
+	t.Setenv("ZEUX_BUNDLED_RETROARCH_DIR", bundledDir)
+
+	if err := EnsureBundledRetroArchAvailable(); err == nil {
+		t.Fatal("esperava erro com o diretório bundled contendo só .gitkeep, veio nil")
+	}
+}
+
+// Mesmo bug, do lado da cópia: um .gitkeep ao lado do RetroArch de verdade
+// (caso real — cmd/download-retroarch-app grava no mesmo diretório que o
+// .gitkeep versiona) não pode ser copiado para o diretório gerenciado.
+func TestEnsureBundledRetroArchAvailableSkipsGitkeep(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	bundledDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bundledDir, ".gitkeep"), nil, 0o644); err != nil {
+		t.Fatalf("preparando .gitkeep: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bundledDir, testBundledFileName()), []byte("fake retroarch"), 0o644); err != nil {
+		t.Fatalf("preparando arquivo bundled falso: %v", err)
+	}
+	t.Setenv("ZEUX_BUNDLED_RETROARCH_DIR", bundledDir)
+
+	if err := EnsureBundledRetroArchAvailable(); err != nil {
+		t.Fatalf("EnsureBundledRetroArchAvailable: %v", err)
+	}
+
+	root, _ := ManagedRoot()
+	managedDir := ManagedEmulatorDir(root, "retroarch", (retroArchAdapter{}).Consoles())
+
+	if _, err := os.Stat(filepath.Join(managedDir, ".gitkeep")); err == nil {
+		t.Error(".gitkeep não deveria ter sido copiado para o diretório gerenciado")
+	}
+	if _, err := os.Stat(filepath.Join(managedDir, testBundledFileName())); err != nil {
+		t.Errorf("esperava o RetroArch de verdade copiado: %v", err)
+	}
+}
+
 // Idempotência: chamar duas vezes não deve falhar nem duplicar trabalho —
 // mesmo padrão exigido de ensureBundledCoresAvailable.
 func TestEnsureBundledRetroArchAvailableIsIdempotent(t *testing.T) {
