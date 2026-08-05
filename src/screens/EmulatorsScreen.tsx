@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, EmulatorSource, InstallJob, Report, RetroArchCoreStatus } from "../api/types";
-import { Badge, Button, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar, Select } from "../components/ui";
+import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar, Select } from "../components/ui";
 import { consoleAccentColor } from "../lib/consoleColor";
 
 // Categorias de configuração por emulador (2026-08-05) — preview desabilitado
@@ -116,6 +116,21 @@ function EmulatorCard({
   const [showCores, setShowCores] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const [biosError, setBiosError] = useState<string | null>(null);
+
+  // "Abrir pasta do BIOS" (2026-08-05): existia só dentro da tela de jogos de
+  // um console (GamesScreen.tsx), a pedido do Douglas em 2026-08-04 — mas aí
+  // é preciso navegar Biblioteca → console → jogos pra achar. GET /emulators
+  // já traz bios_dir/bios_dir_empty por emulador (EmulatorEntry), então o
+  // botão cabe aqui direto, sem esperar ter um jogo pra ver a pasta.
+  async function openBiosFolder(dir: string) {
+    setBiosError(null);
+    try {
+      await openPath(dir);
+    } catch (err) {
+      setBiosError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   // Botão "Configurar" (2026-08-04): abre o emulador sozinho, sem jogo — o
   // ZeuX ainda não grava/aplica configuração nenhuma (backlog separado, ver
@@ -254,6 +269,26 @@ function EmulatorCard({
           </span>
         ))}
       </div>
+
+      {/* Só aparece quando alguém já verificou de verdade onde ESTE emulador
+          lê o BIOS/firmware (BiosDir, internal/emulator/bios_dir.go) — nunca
+          um palpite por convenção. Cobertura hoje: PS1 (DuckStation) e PS2
+          (PCSX2); PS3 (RPCS3) não tem pasta certa pra apontar de propósito
+          (o firmware é instalado pelo próprio RPCS3, não colocado numa
+          pasta) — ver docs/roadmap.md, D8/L9. */}
+      {entry.bios_dir && (
+        <div className="flex flex-col gap-2">
+          {entry.bios_dir_empty && (
+            <Callout label="BIOS ausente">
+              A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
+            </Callout>
+          )}
+          <Button type="button" variant="secondary" onClick={() => openBiosFolder(entry.bios_dir!)}>
+            Abrir pasta do BIOS
+          </Button>
+          {biosError && <p className="text-sm text-danger">{biosError}</p>}
+        </div>
+      )}
 
       {state.kind === "confirm-hardware" && (
         // Regra: recusar não some com o card nem desabilita o botão de
