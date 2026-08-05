@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -366,6 +367,47 @@ func TestCustomEmulatorLifecycle(t *testing.T) {
 	remaining, _ := afterDeleteBody["custom_emulators"].([]any)
 	if len(remaining) != 0 {
 		t.Fatalf("esperava lista vazia após DELETE, corpo = %v", afterDeleteBody)
+	}
+}
+
+// Trava o botão "Configurar" (2026-08-04) ponta a ponta pela rota real:
+// abre o executável do emulador sozinho, sem exigir rom_path nenhum —
+// diferente de /games/launch. /bin/true é usado só por ser um binário real
+// e inofensivo presente em qualquer máquina Unix.
+func TestOpenEmulatorStartsBinaryWithoutROM(t *testing.T) {
+	if _, err := os.Stat("/bin/true"); err != nil {
+		t.Skip("/bin/true não existe neste ambiente")
+	}
+
+	server := newTestServer(t, fakeProbe{})
+	handler := server.Routes()
+
+	def := map[string]any{
+		"id":          "meu-emulador-open",
+		"name":        "Meu Emulador",
+		"consoles":    []string{"ps1"},
+		"binary_path": "/bin/true",
+		"args":        []string{"{rom}"},
+	}
+	upsertRec := doJSON(t, handler, http.MethodPost, "/api/v1/custom-emulators", def)
+	if upsertRec.Code != http.StatusOK {
+		t.Fatalf("POST /custom-emulators status = %d: %s", upsertRec.Code, upsertRec.Body.String())
+	}
+
+	rec := doJSON(t, handler, http.MethodPost, "/api/v1/emulators/meu-emulador-open/open", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /emulators/{id}/open status = %d, esperado 200: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// Emulador desconhecido do ZeuX — mensagem precisa nomear o problema, não
+// um erro genérico.
+func TestOpenEmulatorRejectsUnknownAdapter(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/emulators/emulador-que-nao-existe/open", nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, esperado 400", rec.Code)
 	}
 }
 

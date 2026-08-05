@@ -2,6 +2,8 @@ package emulator
 
 import (
 	"context"
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 )
@@ -111,3 +113,69 @@ func TestLauncherPlaytimeSumsByConsole(t *testing.T) {
 }
 
 func timePtr(t time.Time) *time.Time { return &t }
+
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError + 1}))
+}
+
+// Botão "Configurar" (2026-08-04): recusa adapter que o ZeuX nem conhece —
+// mensagem precisa nomear o id, não um erro genérico.
+func TestLaunchStandaloneRejectsUnknownAdapter(t *testing.T) {
+	launcher := &Launcher{registry: NewRegistry(), logger: discardLogger()}
+
+	err := launcher.LaunchStandalone(context.Background(), "emulador-que-nao-existe")
+	if err == nil {
+		t.Fatal("esperava erro para adapter desconhecido")
+	}
+}
+
+// Recusa quando o adapter é conhecido mas não está instalado nesta máquina
+// — mesma regra de handleLaunch: falha do usuário, mensagem acionável.
+func TestLaunchStandaloneRejectsNotInstalled(t *testing.T) {
+	registry := NewRegistry()
+	def := CustomDefinition{
+		ID:         "custom-nao-instalado",
+		Name:       "Emulador Fake",
+		Consoles:   []string{"nes"},
+		BinaryPath: "/caminho/que/nao/existe/emulador",
+		Args:       []string{PlaceholderROM},
+	}
+	adapter, err := NewCustomAdapter(def)
+	if err != nil {
+		t.Fatalf("NewCustomAdapter: %v", err)
+	}
+	registry.SetCustom([]Adapter{adapter})
+	launcher := &Launcher{registry: registry, logger: discardLogger()}
+
+	if err := launcher.LaunchStandalone(context.Background(), "custom-nao-instalado"); err == nil {
+		t.Fatal("esperava erro para emulador não instalado")
+	}
+}
+
+// Abre de verdade o executável, sem ROM nenhum — /bin/true é usado só
+// porque é um binário real, inofensivo e presente em qualquer máquina Unix,
+// não porque o teste liga para o que ele faz.
+func TestLaunchStandaloneStartsBinaryWithoutROM(t *testing.T) {
+	if _, err := os.Stat("/bin/true"); err != nil {
+		t.Skip("/bin/true não existe neste ambiente")
+	}
+
+	registry := NewRegistry()
+	def := CustomDefinition{
+		ID:         "custom-true",
+		Name:       "Emulador Fake",
+		Consoles:   []string{"nes"},
+		BinaryPath: "/bin/true",
+		Args:       []string{PlaceholderROM},
+	}
+	adapter, err := NewCustomAdapter(def)
+	if err != nil {
+		t.Fatalf("NewCustomAdapter: %v", err)
+	}
+	registry.SetCustom([]Adapter{adapter})
+	launcher := &Launcher{registry: registry, logger: discardLogger()}
+
+	if err := launcher.LaunchStandalone(context.Background(), "custom-true"); err != nil {
+		t.Fatalf("LaunchStandalone: %v", err)
+	}
+}

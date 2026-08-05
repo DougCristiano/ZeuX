@@ -1,9 +1,9 @@
 # Adapters de emulador
 
 Como o ZeuX conversa com emuladores externos: a interface `Adapter`, o que cada
-um dos 8 adapters aceita por linha de comando, e como adicionar um novo.
+um dos 14 adapters aceita por linha de comando, e como adicionar um novo.
 
-Fonte: `internal/emulator/`. Última verificação contra o código: 2026-08-01.
+Fonte: `internal/emulator/`. Última verificação contra o código: 2026-08-04.
 
 ---
 
@@ -50,7 +50,7 @@ e uma `Request` e devolve uma `Command`; quem executa é o `Launcher`.
 
 Consequências diretas:
 
-- Os 8 adapters são testáveis sem nenhum emulador instalado.
+- Os 14 adapters são testáveis sem nenhum emulador instalado.
 - A rota `POST /api/v1/games/preview` existe praticamente de graça — é
   `BuildCommand` sem o `Launch`.
 - Diagnóstico de configuração não exige abrir jogo nenhum.
@@ -347,8 +347,9 @@ O campo existe porque o sistema de compatibilidade comunitário depende dele
 
 ### `Registry`
 
-- `NewRegistry()` — os 8 adapters, nesta ordem: retroarch, duckstation, pcsx2,
-  dolphin, ppsspp, flycast, rpcs3, cemu.
+- `NewRegistry()` — os 14 adapters, nesta ordem: retroarch, duckstation, pcsx2,
+  dolphin, ppsspp, flycast, rpcs3, cemu, melonds, azahar, xemu, vita3k, xenia,
+  rmg.
 - `ByID(id)` / `Adapters()` — busca direta.
 - `ForConsole(id)` — adapters que atendem o console, **com o RetroArch por
   último** (`sort.SliceStable`). Travado por `TestStandalonePreferredOverRetroArch`.
@@ -530,4 +531,27 @@ $env:GOOS = ''
 **Este passo não é opcional e é o único que os testes não substituem.** Instale
 o emulador, use `POST /api/v1/games/preview` para ver a linha de comando exata,
 rode-a à mão no terminal, e só então use `POST /api/v1/games/launch`. Anote o
-resultado — a lista dos 8 adapters atuais ainda está inteira nesta pendência.
+resultado — a lista dos 14 adapters atuais ainda está inteira nesta pendência.
+
+---
+
+## 7. O que a Sprint H vai pedir deste pacote
+
+Hoje `POST /api/v1/emulators/{id}/open` (`Launcher.LaunchStandalone`) só abre o
+binário sozinho — o usuário ajusta a configuração dentro do próprio emulador,
+exatamente como faria sem o ZeuX. A Sprint H do
+[roadmap](roadmap.md#sprint-h--configurar-o-emulador-e-mapear-controles-pelo-zeux-v10)
+pretende que o ZeuX leia e escreva essa configuração direto, sem abrir o
+emulador.
+
+Isso é trabalho novo para `internal/emulator`, não só para a API: o item H1
+prevê que `Adapter` ganhe uma **capacidade opcional de configuração**
+(distinta de `BuildCommand`) — declarando quais opções o adapter sabe
+persistir em disco, em que arquivo, e como escrever sem apagar o que o usuário
+já tinha ajustado à mão (formatos como `.ini` e `retroarch.cfg` têm chaves e
+comentários que o ZeuX não modela e não pode perder). Nenhum adapter atual
+implementa isso ainda; um adapter que não implementar continua funcionando do
+jeito que funciona hoje — é capacidade opcional, não obrigatória. Ver H1 e H5
+no roadmap para o critério de aceite completo, inclusive a exigência de que
+cada adapter diga se foi verificado contra binário real ou só lido em
+documentação — mesmo rigor que este arquivo já cobra no aviso do topo.

@@ -165,6 +165,34 @@ que o usuário lê vem de `Level.Headline()`.
   precisa sobreviver à resposta. `session.go` usa `context.Background()` de
   propósito.
 
+### Layout responsivo (frontend)
+
+O ZeuX é uma janela redimensionável, não uma página web de largura fixa — o
+usuário pode maximizar, encolher ou trocar de monitor a qualquer momento, e o
+layout precisa acompanhar. Regra prática, registrada depois de um bug real
+(2026-08-04: breakpoint `xl:` numa tela cuja área útil já perdia a sidebar e a
+barra de rolagem nunca ativava no tamanho padrão da janela):
+
+- **Container de conteúdo:** `mx-auto max-w-*` + `px-*` é o padrão aceito —
+  `max-w-*` é um **teto**, nunca uma largura fixa; o container sempre encolhe
+  livre até esse teto conforme a janela. Nunca `width`/`w-[NNpx]` fixo em algo
+  que preenche a tela.
+- **Área que divide espaço com a sidebar** (`<main className="flex-1
+  overflow-y-auto">` em `App.tsx`): já é fluida por natureza (`flex-1`); não
+  precisa de `%`/`vw` explícito, só não trave um filho dela em px fixo.
+- **Breakpoints do Tailwind (`sm:`/`lg:`/`xl:`/`2xl:`) medem a largura da
+  *janela inteira*, não da área de conteúdo.** Ao decidir em que breakpoint
+  uma grade ganha mais colunas, desconte mentalmente a sidebar (64px) e a
+  barra de rolagem (~15-17px) da largura de janela alvo — um breakpoint que
+  bate exatamente no tamanho padrão da janela (hoje 1280px, ver
+  `src-tauri/tauri.conf.json`) não vai disparar de verdade. Prefira errar
+  para um breakpoint menor (`lg` em vez de `xl`) a escrever uma grade que só
+  ativa depois que o usuário já maximizou numa tela bem maior que a padrão.
+- Exceções de propósito, que continuam em px fixo: a sidebar (`w-16`, chrome
+  de navegação, não conteúdo) e elementos de ícone/chip pequenos
+  (`ConsoleIcon`, badges) — esses têm tamanho de design fixo por natureza, não
+  representam área que deveria crescer com a janela.
+
 ---
 
 ## Princípios de produto — não negociáveis

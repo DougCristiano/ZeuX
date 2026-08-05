@@ -185,7 +185,7 @@ export function GamesScreen({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 pt-16 pb-10">
+    <div className="mx-auto max-w-5xl px-6 pt-16 pb-10">
       {launchError && (
         <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={() => setLaunchError(null)} />
       )}
@@ -238,7 +238,7 @@ export function GamesScreen({
       )}
 
       {games && games.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {games.map((game) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =

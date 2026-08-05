@@ -183,3 +183,74 @@ func TestListGamesFiltersByConsole(t *testing.T) {
 		t.Errorf("ListGames(ps1) = %+v, esperava só o jogo de ps1", ps1Games)
 	}
 }
+
+// Diferente de ListGames, ListAllGames não filtra por console — é a base da
+// tela "Todos os jogos" (2026-08-04), que lista sem escolher console
+// primeiro.
+func TestListAllGamesIncludesEveryConsole(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	ps1, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder ps1: %v", err)
+	}
+	n64, err := s.AddFolder(ctx, "n64", "/jogos/n64")
+	if err != nil {
+		t.Fatalf("AddFolder n64: %v", err)
+	}
+
+	if err := s.SaveGames(ctx, ps1.ID, []NewGame{{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"}}); err != nil {
+		t.Fatalf("SaveGames ps1: %v", err)
+	}
+	if err := s.SaveGames(ctx, n64.ID, []NewGame{{ConsoleID: "n64", Path: "/jogos/n64/b.z64", Title: "B"}}); err != nil {
+		t.Fatalf("SaveGames n64: %v", err)
+	}
+
+	all, err := s.ListAllGames(ctx, "")
+	if err != nil {
+		t.Fatalf("ListAllGames: %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("ListAllGames = %+v, esperava 2 jogos (um de cada console)", all)
+	}
+}
+
+// Busca por título (2026-08-04, tela "Todos os jogos") filtra sem
+// diferenciar maiúsculas/minúsculas, e curingas de LIKE digitados pelo
+// usuário (%, _) não podem escapar do filtro por acidente.
+func TestListAllGamesFiltersByTitleCaseInsensitive(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	games := []NewGame{
+		{ConsoleID: "ps1", Path: "/jogos/ps1/chrono.bin", Title: "Chrono Trigger"},
+		{ConsoleID: "ps1", Path: "/jogos/ps1/sonic.bin", Title: "Sonic 2"},
+		{ConsoleID: "ps1", Path: "/jogos/ps1/percent.bin", Title: "100% Orange Juice"},
+	}
+	if err := s.SaveGames(ctx, folder.ID, games); err != nil {
+		t.Fatalf("SaveGames: %v", err)
+	}
+
+	found, err := s.ListAllGames(ctx, "chrono")
+	if err != nil {
+		t.Fatalf("ListAllGames: %v", err)
+	}
+	if len(found) != 1 || found[0].Title != "Chrono Trigger" {
+		t.Fatalf("ListAllGames(chrono) = %+v, esperava só Chrono Trigger (busca case-insensitive)", found)
+	}
+
+	// "%" no termo de busca não pode virar curinga solto — sem escapar,
+	// "100%" casaria com qualquer título que comece com "100".
+	percentMatch, err := s.ListAllGames(ctx, "100%")
+	if err != nil {
+		t.Fatalf("ListAllGames: %v", err)
+	}
+	if len(percentMatch) != 1 || percentMatch[0].Title != "100% Orange Juice" {
+		t.Fatalf("ListAllGames(100%%) = %+v, esperava só \"100%% Orange Juice\"", percentMatch)
+	}
+}

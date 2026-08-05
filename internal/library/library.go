@@ -14,6 +14,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -281,6 +282,77 @@ func (s *Store) SyncFolder(ctx context.Context, folderID int64, found []NewGame)
 	}
 
 	return tx.Commit()
+}
+
+// ListAllGames devolve os jogos de todos os consoles juntos, dos mais
+// recentes para os mais antigos, opcionalmente filtrados por título. Existe
+// separado de ListGames porque a tela "Todos os jogos" (2026-08-04) precisa
+// listar sem escolher console primeiro. Sem paginação aqui de propósito: a
+// ordenação que importa para o usuário é por último jogado, não por id —
+// isso só é calculável depois de juntar com as sessões (que este pacote não
+// conhece, ver docs/arquitetura-a-preservar.md), então a paginação de
+// verdade acontece em internal/api, depois dessa junção e ordenação. Paginar
+// aqui, antes da ordenação certa, devolveria páginas com jogos fora de
+// ordem.
+//
+// query vazia devolve todos os jogos; caso contrário filtra por título,
+// sem diferenciar maiúsculas/minúsculas (2026-08-04, busca da tela
+// "Todos os jogos" — precisa achar o jogo em qualquer página, não só na
+// carregada, por isso o filtro é no SQL, não no cliente).
+func (s *Store) ListAllGames(ctx context.Context, query string) ([]Game, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if query == "" {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT id, folder_id, console_id, path, title, added_at, missing
+			FROM library_games
+			ORDER BY id DESC
+		`)
+	} else {
+		rows, err = s.db.QueryContext(ctx, `
+			SELECT id, folder_id, console_id, path, title, added_at, missing
+			FROM library_games
+			WHERE title LIKE ? ESCAPE '\'
+			ORDER BY id DESC
+		`, "%"+escapeLike(query)+"%")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lendo jogos: %w", err)
+	}
+	defer rows.Close()
+
+	var games []Game
+	for rows.Next() {
+		var (
+			game    Game
+			addedAt string
+			missing int
+		)
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing); err != nil {
+			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
+		}
+		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
+		if err != nil {
+			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
+		}
+		game.AddedAt = parsed
+		game.Missing = missing != 0
+		games = append(games, game)
+	}
+
+	return games, rows.Err()
+}
+
+// escapeLike escapa os curingas do SQLite LIKE (`%`, `_`) e o próprio
+// caractere de escape (`\`) num termo de busca digitado pelo usuário, para
+// que um título com "%" ou "_" de verdade não vire um curinga por acidente.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, "%", `\%`)
+	s = strings.ReplaceAll(s, "_", `\_`)
+	return s
 }
 
 // ListGames devolve os jogos de um console, dos mais recentes para os mais

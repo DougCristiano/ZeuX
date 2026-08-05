@@ -2,12 +2,17 @@ name: Release
 
 # Publica os instaladores dos 3 SOs como assets de uma GitHub Release, para
 # que baixar o ZeuX signifique "abrir a aba Releases e clicar", não "entrar
-# no Actions e caçar o artifact do run certo" (o que os artifacts de
-# build-windows.yml/build-linux.yml/build-macos.yml exigem, e que só serve
-# para depuração de CI — eles expiram e ficam atrás de login no GitHub).
+# no Actions e caçar o artifact do run certo" — que expira e fica atrás de
+# login no GitHub, bom só para depuração de CI.
 #
 # Disparo por tag (ex.: v0.1.0), não por push na main: uma release é um
 # checkpoint deliberado, não "toda mudança de código virou versão oficial".
+# Até 2026-08-05 existiam build-windows.yml/build-linux.yml/build-macos.yml
+# rodando a cada push em main só para gerar esse mesmo artifact efêmero —
+# removidos por serem redundantes com este workflow (ver docs/roadmap.md,
+# Sprint B). Para gerar um instalador de teste sem cortar uma tag de
+# verdade, use workflow_dispatch (`gh workflow run release.yml -f
+# tag=<versão>`) numa tag já existente, ou crie uma tag de pré-release.
 on:
   push:
     tags:

@@ -293,6 +293,14 @@ export type LibraryFolder = {
   added_at: string;
 };
 
+/** Uma subpasta reconhecida por POST /library/folders/bulk. */
+export type BulkMatchedFolder = {
+  console_id: string;
+  name: string;
+  path: string;
+  games_found: number;
+};
+
 export type LibraryGame = {
   id: number;
   folder_id: number;

@@ -35,3 +35,10 @@ src-tauri/resources/retroarch/bin/*
 # Sistema operacional
 Thumbs.db
 .DS_Store
+
+# Material de referência para a migração visual (Sprint 0-5, 2026-08-04) — o
+# export do Figma Make usado como inspiração de layout, e o logo original
+# antes do tratamento de transparência. Nenhum dos dois faz parte do app:
+# a versão processada do logo já vive em src/assets/logo-zeux.png.
+/layout/
+/logo_ZeuX.png

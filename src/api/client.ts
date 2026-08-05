@@ -11,6 +11,7 @@ import type {
   HardwareInfo,
   HealthStatus,
   InstallJob,
+  BulkMatchedFolder,
   LaunchBody,
   LibraryFolder,
   LibraryGame,
@@ -116,6 +117,11 @@ export const api = {
     }),
   uninstallEmulator: (id: string) =>
     request<{ removed: string }>(`/emulators/${encodeURIComponent(id)}/install`, { method: "DELETE" }),
+  // Botão "Configurar" (2026-08-04): abre o emulador sozinho, sem jogo — o
+  // ZeuX ainda não grava/aplica configuração nenhuma (backlog separado);
+  // por ora, "configurar" é abrir o próprio emulador pro usuário mexer.
+  openEmulator: (id: string) =>
+    request<{ opened: string }>(`/emulators/${encodeURIComponent(id)}/open`, { method: "POST" }),
   getInstalls: () => request<{ installs: InstallJob[] }>("/installs"),
   getInstallJob: (id: string) => request<InstallJob>(`/installs/${encodeURIComponent(id)}`),
 
@@ -129,6 +135,11 @@ export const api = {
       console_id: consoleId,
       path,
     }),
+  // "Um caminho para todos os jogos" (2026-08-05): uma pasta-raiz com
+  // subpasta por console — o servidor casa cada subpasta pelo nome, nunca
+  // por extensão de arquivo solto (ver handleBulkAddLibraryFolders).
+  bulkAddLibraryFolders: (path: string) =>
+    postJSON<{ matched: BulkMatchedFolder[]; unmatched: string[] }>("/library/folders/bulk", { path }),
   getLibraryFolders: () => request<{ folders: LibraryFolder[] }>("/library/folders"),
   removeLibraryFolder: (id: number) =>
     request<{ removed: number }>(`/library/folders/${id}`, { method: "DELETE" }),
@@ -136,4 +147,12 @@ export const api = {
     request<{ games_found: number }>(`/library/folders/${id}/scan`, { method: "POST" }),
   getLibraryGames: (consoleId: string) =>
     request<{ games: LibraryGame[] }>(`/library/games?console_id=${encodeURIComponent(consoleId)}`),
+  // Sem console_id: modo "todos os jogos" (2026-08-04), paginado — ver
+  // handleListLibraryGames em internal/api/server.go. `query` filtra por
+  // título no servidor (acha o jogo mesmo fora da página atual) — omitido
+  // quando vazio, em vez de mandar `q=`.
+  getAllLibraryGames: (page: number, pageSize: number, query?: string) =>
+    request<{ games: LibraryGame[]; total: number; page: number; page_size: number }>(
+      `/library/games?page=${page}&page_size=${pageSize}${query ? `&q=${encodeURIComponent(query)}` : ""}`,
+    ),
 };

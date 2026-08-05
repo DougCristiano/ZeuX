@@ -11,10 +11,14 @@ mise exec -- go run ./cmd/zeuxd --addr 127.0.0.1:8080
 
 Fonte desta referência: `internal/api/server.go`, `internal/hardware/types.go`,
 `internal/verdict/verdict.go`, `internal/emulator/*.go`, `internal/install/*.go`.
-Última verificação contra o código: 2026-08-01 (item B-doc do
-[plano da Sprint B](sprint-b-plano.md) — este arquivo estava desatualizado em
-`schema_version`, na contagem de consoles e faltavam as rotas de instalação e
-de emuladores personalizados; corrigido nesta passada).
+Última verificação contra o código: 2026-08-04 — faltava
+`POST /api/v1/emulators/{id}/open` (botão "Configurar" da tela de Emuladores)
+e a seção `emulator-sources` documentava `kind: "github_release"`, valor que
+não existe no código (é `"github"`); corrigido nesta passada, mais uma seção
+nova de rotas planejadas para as Sprints G/H. Verificação anterior: 2026-08-01
+(item B-doc do [plano da Sprint B](sprint-b-plano.md) — este arquivo estava
+desatualizado em `schema_version`, na contagem de consoles e faltavam as
+rotas de instalação e de emuladores personalizados).
 
 ---
 
@@ -73,6 +77,7 @@ está em português e já pode ser exibida ao usuário como está.
 | GET | `/api/v1/emulator-sources` | Catálogo de fontes de download conhecidas |
 | POST | `/api/v1/emulators/{id}/install` | Dispara a instalação 1-click |
 | DELETE | `/api/v1/emulators/{id}/install` | Remove uma instalação gerenciada pelo ZeuX |
+| POST | `/api/v1/emulators/{id}/open` | Abre o emulador sozinho, sem ROM (botão "Configurar") |
 | GET | `/api/v1/installs` | Histórico de instalações (jobs) |
 | GET | `/api/v1/installs/{id}` | Acompanha uma instalação em andamento |
 | POST | `/api/v1/games/preview` | Monta a linha de comando sem executar |
@@ -533,17 +538,26 @@ curl http://127.0.0.1:7777/api/v1/emulator-sources
     {
       "adapter_id": "duckstation",
       "name": "DuckStation",
-      "kind": "github_release",
+      "kind": "github",
       "repo": "stenzek/duckstation",
       "homepage": "https://github.com/stenzek/duckstation",
       "license": "GPL-3.0"
     },
     {
-      "adapter_id": "azahar",
-      "name": "Azahar",
+      "adapter_id": "retroarch",
+      "name": "RetroArch",
+      "kind": "bundled",
+      "homepage": "https://www.retroarch.com/?page=platforms",
+      "license": "GPL-3.0",
+      "reason": "Já vem dentro do instalador do ZeuX (ADR 0012) — não precisa ser baixado."
+    },
+    {
+      "adapter_id": "dolphin",
+      "name": "Dolphin",
       "kind": "manual",
-      "homepage": "https://azahar-emu.org/",
-      "reason": "Não publica release automatizável no formato que o instalador reconhece hoje."
+      "homepage": "https://dolphin-emu.org/download/",
+      "license": "GPL-2.0",
+      "reason": "O Dolphin distribui pelo site oficial e não publica os binários como releases do GitHub."
     }
   ]
 }
@@ -551,11 +565,20 @@ curl http://127.0.0.1:7777/api/v1/emulator-sources
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `adapter_id` | string | Mesmo identificador usado em `/emulators/{id}/install`. |
-| `kind` | string | Como o pacote é obtido. `"manual"` significa que `/install` recusa esta fonte — `reason` explica o porquê. |
-| `reason` | string | **Só presente em fontes manuais.** |
+| `adapter_id` | string | Mesmo identificador usado em `/emulators/{id}/install` e `/emulators/{id}/open`. |
+| `name` | string | Nome de exibição. |
+| `kind` | string | Como o pacote é obtido: `"github"` (release resolvida pela API do GitHub), `"bundled"` (já vem dentro do instalador do ZeuX — hoje só o RetroArch, [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md)) ou `"manual"` (`/install` recusa esta fonte — `reason` explica o porquê). Nota: exemplos antigos desta página chegaram a mostrar `"github_release"` — o valor real gravado em `internal/install/sources.go` é `"github"`. |
+| `repo` | string | `owner/repo` no GitHub. Presente nas fontes `"github"`. |
+| `homepage` | string | Site do projeto ou da release. |
+| `license` | string | Licença declarada pelo projeto, quando conhecida. Nem toda fonte traz este campo. |
+| `reason` | string | **Presente em fontes `"manual"`** (por que a automação não é possível) **e em `"bundled"`** (por que não há botão de instalar). Ausente em `"github"`. |
 
 Esta rota não tem caminho de erro.
+
+Hoje o catálogo (`internal/install/data/sources.json`) tem 12 fontes `"github"`,
+1 `"bundled"` (RetroArch) e 1 `"manual"` (Dolphin) — a única fonte manual, o que
+é o que faz a tela de Emuladores trocar o botão "Instalar" por "Abrir site
+oficial" só para o Dolphin (ver [`docs/adapters.md`](adapters.md)).
 
 ---
 
@@ -627,6 +650,37 @@ curl -X DELETE http://127.0.0.1:7777/api/v1/emulators/duckstation/install
 
 **400 `uninstall_failed`** — nada gerenciado para remover, ou falha ao apagar
 os arquivos. A mensagem original do erro vai em `message`.
+
+---
+
+## POST /api/v1/emulators/{id}/open
+
+Abre o executável do emulador **sozinho** — sem ROM, sem `options`, sem passar
+por `BuildCommand`. É o que a tela de Emuladores chama no botão "Configurar"
+(2026-08-04): por ora, "configurar" significa abrir o próprio emulador para o
+usuário mexer na configuração dele diretamente, do jeito que faria sem o ZeuX.
+A Sprint H do [roadmap](roadmap.md) pretende ensinar o ZeuX a ler e escrever
+essa configuração — até lá, é só isto. Ver `Launcher.LaunchStandalone`
+(`internal/emulator/session.go`).
+
+**Não registra sessão.** Abrir para configurar não é uma partida jogada;
+contar isso em `playtime_seconds` distorceria o tempo de jogo real.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/emulators/duckstation/open
+```
+
+**200 OK**
+
+```json
+{ "opened": "duckstation" }
+```
+
+**Erros**
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `open_failed` | `id` desconhecido, emulador não encontrado no disco, ou falha ao iniciar o processo. A mensagem original do erro vai em `message` — mesma convenção de `launch_failed`. |
 
 ---
 
@@ -1052,11 +1106,31 @@ curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
 | `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |
 | `install_refused` | 400 | POST `/emulators/{id}/install` | Fonte desconhecida, fonte manual, ou instalação já em andamento para este emulador. |
 | `uninstall_failed` | 400 | DELETE `/emulators/{id}/install` | Nada gerenciado para remover, ou falha ao apagar os arquivos. |
+| `open_failed` | 400 | POST `/emulators/{id}/open` | `id` desconhecido, emulador não encontrado no disco, ou falha ao iniciar o processo. |
 | `invalid_id` | 400 | DELETE `/library/folders/{id}`, POST `/library/folders/{id}/scan` | `{id}` não é numérico. |
 | `path_not_found` | 400 | POST `/library/folders` | O caminho informado não existe ou não é uma pasta. |
 | `library_write_failed` | 500 | POST `/library/folders` | Erro de I/O gravando a pasta no banco local. |
 | `library_read_failed` | 500 | GET `/library/folders`, `/library/games`, POST `/library/folders/{id}/scan` | Erro de I/O lendo o banco local. |
 | `library_scan_failed` | 500 | POST `/library/folders`, `/library/folders/{id}/scan` | Erro de I/O varrendo a pasta ou gravando os jogos achados. |
+
+---
+
+## Rotas planejadas (ainda não implementadas)
+
+**Nada nesta seção existe hoje.** É o mapa de rotas que as Sprints G e H do
+[roadmap](roadmap.md) — hoje dentro do escopo da v1.0 — vão precisar. Listado
+aqui só para quem for implementar já saber onde a rota provavelmente vai morar
+e o que ela precisa resolver; formato de request/response, quando ainda não foi
+desenhado no roadmap, **não está inventado aqui**. Atualize esta seção (e mova
+a rota para o corpo do documento) só quando o código existir de verdade — igual
+o L5 já fez para a biblioteca.
+
+| Rota (provável) | Para quê | Item do roadmap |
+|---|---|---|
+| `GET /api/v1/library/games` ganha o campo `cover_url` | Capa de jogo, servida como arquivo local já baixado pelo scraper de metadados (IGDB, conta do próprio usuário) — nunca uma URL de terceiro renderizada direto. Ausente quando a capa não foi resolvida; a tela cai no placeholder de sigla que já existe hoje. | [G1](roadmap.md#g1--capas-de-jogo-a-partir-de-um-scraper-de-metadados-g) |
+| `POST`/`DELETE /api/v1/library/games/{id}/favorite` (ou `PATCH` equivalente) | Favoritar/desfavoritar um jogo da biblioteca. `GET /library/games` passa a trazer `favorite` sempre presente (nunca ausente). | [G4](roadmap.md#g4--favoritar-jogo-m) |
+| Configuração de emulador (rota e formato ainda não decididos) | Ler e escrever a configuração persistida de um emulador (resolução interna, renderer, tela cheia) a partir do ZeuX, em vez de só abrir o emulador sozinho (`/emulators/{id}/open`, acima). Depende do H1 definir o modelo antes de a rota existir. | [H1](roadmap.md#h1--modelo-de-configuração-persistente-por-emulador-com-um-piloto-g), [H2](roadmap.md#h2--tela-de-configuração-do-emulador-dentro-do-zeux-m) |
+| `GET /api/v1/controllers` | Lista os controles (joystick/gamepad) conectados nesse momento, com nome legível — base do mapeamento de botões pelo ZeuX. | [H3](roadmap.md#h3--detectar-joystick-e-mapear-botões-g) |
 
 ---
 
@@ -1078,6 +1152,11 @@ Invoke-RestMethod "$base/hardware/scan" -Method Post | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/consoles/verdicts" | ConvertTo-Json -Depth 6
 Invoke-RestMethod "$base/emulators" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/emulator-sources" | ConvertTo-Json -Depth 5
+
+# Abre o emulador sozinho, sem jogo — só funciona se houver algum instalado
+try { Invoke-RestMethod "$base/emulators/duckstation/open" -Method Post -ErrorAction Stop }
+catch { "HTTP $([int]$_.Exception.Response.StatusCode) -> $($_.ErrorDetails.Message)" }
+
 Invoke-RestMethod "$base/sessions"
 
 # Biblioteca: aponte uma pasta que exista de verdade na sua máquina

@@ -1,77 +1,60 @@
 @import "tailwindcss";
 
 /*
- * Tokens de cor do ZeuX. O produto decidiu ir 100% escuro, com três
- * identidades visuais escolhíveis pelo usuário (ThemePicker,
- * src/components/ThemePicker.tsx) em vez de uma única paleta — a mesma
- * decisão que Steam/Epic/GOG tomam (bibliotecas de jogos preferem tons
- * escuros), mas com acento e temperatura próprios em cada uma, evitando o
- * azul da Steam, o roxo da GOG e o preto/branco genérico da Epic.
- *
- * Não existe mais modo claro de propósito: a identidade é escura, e a escolha
- * entre as três é sobre personalidade, não sobre contraste.
- *
- * `data-theme` no elemento raiz decide qual conjunto vale; `fosforo` é o
- * padrão quando o atributo ainda não foi aplicado (ver index.html, que
- * grava a escolha salva antes do React montar, para não haver flash).
+ * Fontes self-hospedadas via @fontsource — nunca `@import
+ * url('https://fonts.googleapis.com/...')`. Um app desktop Tauri precisa
+ * continuar legível sem rede depois de instalado; buscar fonte por CDN em
+ * runtime falharia silenciosamente nesse caso (fallback pro system-ui,
+ * quebrando o clima da identidade visual). Achado revisando o mockup de
+ * referência em layout/ (Figma Make), que carrega assim e não funcionaria
+ * offline.
  */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/press-start-2p/400.css";
 
-:root,
-:root[data-theme="fosforo"] {
-  /* Fósforo — terminal CRT: preto com fundo esverdeado, acento verde-fósforo. */
-  --paper: #0a0f0c;
-  --panel: #101811;
-  --ink: #d9f2e2;
-  --muted: #6f9481;
-  --line: #223129;
-  --line-strong: #35493c;
-  --fill: #16201a;
-  --fill-strong: #1e2b22;
-  --accent: #3fe08a;
-  --accent-hover: #5eeaa0;
-  --accent-ink: #04140b;
-  --amber: #e0b465;
-  --amber-bg: #201c0f;
-  --amber-line: #4a3d1e;
-  --danger: #ef7a68;
-}
+/*
+ * Tokens de cor do ZeuX — identidade neon única (2026-08-04, ver ADR 0013).
+ * Substituiu os três temas escolhíveis (fósforo/cartucho/sala) por uma
+ * paleta só, inspirada no mockup em layout/ (Figma Make): fundo quase-preto
+ * azulado, acento roxo neon.
+ *
+ * `--accent-secondary` (ciano) é decorativo — nunca reaproveitado para foco
+ * ou interação primária. Documentado aqui de propósito: o próprio mockup em
+ * layout/ define um `--secondary` e quase não usa, um sinal de que a
+ * distinção "cor de interação" vs. "cor decorativa" precisa ficar explícita,
+ * não implícita.
+ *
+ * Contraste verificado (WCAG, fórmula de luminância relativa) contra
+ * `--paper` (#080C17): roxo `--accent` 4.62:1 (passa AA para texto normal,
+ * ≥4.5:1 — importante porque ADR 0009 exige foco perceptível por teclado),
+ * ciano 12.7:1, laranja `--amber` 6.85:1.
+ */
+:root {
+  /* Tema único, sempre escuro (sem toggle claro/escuro) — sem isto, o
+     dropdown nativo de <select> (o popup de opções, que o navegador desenha
+     fora do nosso controle de CSS) renderia com o esquema de cores claro do
+     SO/WebView, texto escuro sobre fundo branco, destoando do resto da UI. */
+  color-scheme: dark;
 
-:root[data-theme="cartucho"] {
-  /* Cartucho — plástico envelhecido: preto com fundo acastanhado, acento laranja-queimado. */
-  --paper: #130f0b;
-  --panel: #1c1610;
-  --ink: #f1e6d6;
-  --muted: #a08b6f;
-  --line: #372a1c;
-  --line-strong: #4d3c28;
-  --fill: #1c1610;
-  --fill-strong: #2a2015;
-  --accent: #e07b3a;
-  --accent-hover: #ec9257;
-  --accent-ink: #1a0e04;
-  --amber: #e0b465;
-  --amber-bg: #241b0f;
-  --amber-line: #4a3a1e;
-  --danger: #e2685a;
-}
-
-:root[data-theme="sala"] {
-  /* Sala escura — brilho de TV: preto azulado, acento âmbar quente. */
-  --paper: #0b0d13;
-  --panel: #12151d;
-  --ink: #e9ebf3;
-  --muted: #838aa0;
-  --line: #232838;
-  --line-strong: #333a4f;
-  --fill: #12151d;
-  --fill-strong: #1b2030;
-  --accent: #f0a94a;
-  --accent-hover: #f5bd6c;
-  --accent-ink: #1c1103;
-  --amber: #f0a94a;
-  --amber-bg: #241c10;
-  --amber-line: #4a3a20;
-  --danger: #e6786c;
+  --paper: #080c17;
+  --panel: #0f1629;
+  --ink: #e2e8f0;
+  --muted: #64748b;
+  --line: #1e2d4f;
+  --line-strong: #2c3f66;
+  --fill: #0f1629;
+  --fill-strong: #131d35;
+  --accent: #9d4eff;
+  --accent-hover: #b174ff;
+  --accent-ink: #ffffff;
+  --accent-secondary: #00e5ff;
+  --amber: #ff6b1a;
+  --amber-bg: #241a0f;
+  --amber-line: #4a3320;
+  --danger: #f0554a;
 }
 
 @theme {
@@ -86,10 +69,22 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
+  --color-accent-secondary: var(--accent-secondary);
   --color-amber: var(--amber);
   --color-amber-bg: var(--amber-bg);
   --color-amber-line: var(--amber-line);
   --color-danger: var(--danger);
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  /*
+   * Fonte pixel — restrita de propósito a chrome de navegação (labels da
+   * sidebar, títulos de seção curtos, badges/contadores). Nunca parágrafo,
+   * descrição ou mensagem de erro/aviso: o mockup em layout/ usa Press
+   * Start 2P a partir de 5.5px em corpo de texto, ilegível fora de uma tela
+   * de design. `text-size-pixel-min` é o piso de tamanho para qualquer uso
+   * dela — nada abaixo de 11px.
+   */
+  --font-pixel: "Press Start 2P", monospace;
 
   /*
    * Escala tipográfica única (item B7): tudo na interface usa um destes seis
@@ -106,5 +101,25 @@
 body {
   background: var(--paper);
   color: var(--ink);
-  transition: background-color .15s ease, color .15s ease;
+  font-family: var(--font-sans);
+}
+
+/*
+ * Capa de jogo (GameCover, src/components/ui.tsx — Sprint 2 do plano de
+ * migração visual, 2026-08-04). Glow de borda no hover/foco, inspirado no
+ * mockup em layout/ (GameCard), mas como classe CSS reutilizando --accent em
+ * vez de inline style com hex fixo por card.
+ */
+.game-cover {
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.game-cover:hover,
+.game-cover:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.game-cover-scanline {
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
 }
