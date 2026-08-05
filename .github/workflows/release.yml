@@ -10,9 +10,13 @@ name: Release
 # Até 2026-08-05 existiam build-windows.yml/build-linux.yml/build-macos.yml
 # rodando a cada push em main só para gerar esse mesmo artifact efêmero —
 # removidos por serem redundantes com este workflow (ver docs/roadmap.md,
-# Sprint B). Para gerar um instalador de teste sem cortar uma tag de
-# verdade, use workflow_dispatch (`gh workflow run release.yml -f
-# tag=<versão>`) numa tag já existente, ou crie uma tag de pré-release.
+# Sprint B). Para gerar um instalador sem passar pelo terminal local, use
+# workflow_dispatch (`gh workflow run release.yml -f tag=<versão>`, ou pela
+# aba Actions) — funciona tanto para republicar assets de uma tag que já
+# existe quanto para cortar uma tag nova em cima do commit que disparou o
+# run (ver create-release abaixo). Criar a tag manualmente
+# (`git tag vX.Y.Z && git push origin vX.Y.Z`) tem o mesmo efeito, disparando
+# pelo `push: tags:` acima.
 on:
   push:
     tags:
@@ -20,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag existente para republicar os assets (ex.: v0.1.0)"
+        description: "Tag a publicar — reaproveitada se já existir, criada no commit atual se não existir (ex.: v0.1.0)"
         required: true
 
 permissions:
@@ -35,16 +39,39 @@ jobs:
   # sem deixar óbvio que faltou um instalador.
   create-release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
     steps:
+      # Checkout no ref que disparou o run (branch, no caso de
+      # workflow_dispatch) — nunca direto na tag do input, que pode ainda
+      # não existir. Isso é o que travava antes: apontar o `ref:` do
+      # checkout pra uma tag inexistente faz o `git fetch` falhar tentando
+      # buscar uma ref que não está no remoto (exit code 1, "create-release"
+      # em 2026-08-05). fetch-depth: 0 porque `git tag`/`git rev-parse`
+      # abaixo precisam enxergar as tags existentes, não só o commit raso.
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolver a tag (cria em cima do commit atual se ainda não existir)
+        id: resolve
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG já existe — reaproveitando o commit dela."
+          else
+            echo "Tag $TAG não existe — criando em cima de $(git rev-parse --short HEAD)."
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Criar a Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ steps.resolve.outputs.tag }}
 
   build-windows:
     needs: create-release
@@ -53,7 +80,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ needs.create-release.outputs.tag }}
 
       - name: Instalar Go
         uses: actions/setup-go@v5
@@ -77,7 +104,7 @@ jobs:
       - name: Publicar assets na Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ needs.create-release.outputs.tag }}
           files: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
@@ -90,7 +117,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ needs.create-release.outputs.tag }}
 
       - name: Instalar Go
         uses: actions/setup-go@v5
@@ -132,7 +159,7 @@ jobs:
       - name: Publicar assets na Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ needs.create-release.outputs.tag }}
           files: |
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/rpm/*.rpm
@@ -146,7 +173,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: ${{ needs.create-release.outputs.tag }}
 
       - name: Instalar Go
         uses: actions/setup-go@v5
@@ -170,7 +197,7 @@ jobs:
       - name: Publicar assets na Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ needs.create-release.outputs.tag }}
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
           fail_on_unmatched_files: true

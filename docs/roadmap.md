@@ -706,8 +706,20 @@ motivação de existir. `release.yml` (disparado por tag `v*`, não por push)
 já faz o build completo dos 3 SOs e publica os instaladores como asset de
 Release de verdade; três builds inteiros a cada commit em `main` não
 compravam nada que a release não desse. `gh workflow run release.yml -f
-tag=<versão> --ref <branch>` continua sendo o caminho pra gerar um instalador
-de teste sem cortar uma tag de verdade, se for preciso antes de uma release.
+tag=<versão>` continua sendo o caminho pra gerar um instalador sem passar
+pelo terminal local — inclusive cortando uma tag nova que ainda não existe
+(ver o achado logo abaixo, corrigido no mesmo dia).
+
+**Bug real achado rodando o `workflow_dispatch` pela primeira vez (2026-08-05):**
+disparar com uma tag que ainda não existia (`v0.1.1`) falhava no `checkout` do
+job `create-release` com `git fetch` retornando exit code 1 — o passo apontava
+`ref:` direto para a tag do input, e `git fetch` não acha uma ref que não está
+no remoto. Corrigido: o checkout agora usa o ref que disparou o run (a branch,
+não a tag), e um passo novo (`Resolver a tag`) cria e empurra a tag em cima do
+commit atual **só se ela ainda não existir** — se já existir, reaproveita o
+commit dela (mesmo comportamento de antes, "republicar assets"). Os jobs de
+build passaram a ler a tag resolvida via `needs.create-release.outputs.tag`,
+não mais recalculando a mesma expressão em cada um.
 
 **O que falta é a única parte que importa, agora nos 3 SOs:** ninguém
 instalou esses artefatos numa máquina limpa de cada plataforma. Fica aberto
