@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
-import { Button } from "./components/ui";
-import { ThemePicker } from "./components/ThemePicker";
+import { Sidebar, type NavID } from "./components/Sidebar";
+import type { LibraryGame } from "./api/types";
+import { AllGamesScreen } from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
+import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { GamesScreen } from "./screens/GamesScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
@@ -26,10 +28,16 @@ type Phase =
   | "declined"
   | "scanning"
   | "scan-error"
+  // "all-games" é a tela inicial depois do parecer pronto (2026-08-04, a
+  // pedido do Douglas — "clicar direto e começar a jogar"), não "verdict".
+  // O parecer de compatibilidade continua existindo, alcançável a partir
+  // daqui.
+  | "all-games"
   | "verdict"
   | "emulators"
   | "library"
-  | "games";
+  | "games"
+  | "game-detail";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("checking-port");
@@ -44,6 +52,18 @@ function App() {
   const [selectedConsole, setSelectedConsole] = useState<{ id: string; name: string; shortName: string } | null>(
     null,
   );
+  // De onde "games" foi aberto, para o botão "Voltar" de GamesScreen saber
+  // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
+  // a tela por console (LibraryScreen) continua existindo.
+  const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library">("all-games");
+  // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04) — sempre veio de
+  // AllGamesScreen hoje, então "Voltar" sempre volta pra lá.
+  const [selectedGame, setSelectedGame] = useState<{
+    game: LibraryGame;
+    consoleName: string;
+    shortName: string;
+    year?: number;
+  } | null>(null);
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
@@ -108,7 +128,7 @@ function App() {
       await api.scanHardware();
       const nextReport = await api.getVerdicts();
       setReport(nextReport);
-      setPhase("verdict");
+      setPhase("all-games");
     } catch (err) {
       setErrorMessage(err instanceof ApiError ? err.message : "Não foi possível ler este computador.");
       setPhase("scan-error");
@@ -139,6 +159,15 @@ function App() {
       setPhase("daemon-unreachable");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function navigateSidebar(id: NavID) {
+    if (id === "library") setPhase("all-games");
+    if (id === "verdict") setPhase("verdict");
+    if (id === "emulators") {
+      setCameFromDeclined(false);
+      setPhase("emulators");
     }
   }
 
@@ -199,39 +228,50 @@ function App() {
       screen = <ErrorScreen message={errorMessage} onRetry={runScan} />;
       break;
 
-    case "verdict":
+    case "all-games":
       screen = (
-        <main className="min-h-screen bg-paper">
-          <div className="mx-auto flex max-w-3xl justify-end gap-2 px-6 pt-16">
-            <Button variant="secondary" onClick={() => setPhase("library")}>
-              Ver biblioteca
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setCameFromDeclined(false);
-                setPhase("emulators");
-              }}
-            >
-              Ver emuladores
-            </Button>
-          </div>
-          <VerdictScreen report={report!} />
-        </main>
+        <AllGamesScreen
+          report={report!}
+          onOpenLibrary={() => setPhase("library")}
+          onOpenGame={(game, consoleName, shortName) => {
+            const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
+            setSelectedGame({ game, consoleName, shortName, year });
+            setPhase("game-detail");
+          }}
+        />
       );
       break;
 
+    case "game-detail":
+      screen = (
+        <GameDetailScreen
+          game={selectedGame!.game}
+          consoleName={selectedGame!.consoleName}
+          shortName={selectedGame!.shortName}
+          year={selectedGame!.year}
+          onBack={() => setPhase("all-games")}
+        />
+      );
+      break;
+
+    case "verdict":
+      screen = <VerdictScreen report={report!} />;
+      break;
+
     case "emulators":
-      screen = <EmulatorsScreen onBack={() => setPhase(cameFromDeclined ? "declined" : "verdict")} />;
+      screen = (
+        <EmulatorsScreen report={report ?? undefined} onBack={cameFromDeclined ? () => setPhase("declined") : undefined} />
+      );
       break;
 
     case "library":
       screen = (
         <LibraryScreen
           report={report!}
-          onBack={() => setPhase("verdict")}
+          onBack={() => setPhase("all-games")}
           onOpenGames={(id, name, shortName) => {
             setSelectedConsole({ id, name, shortName });
+            setGamesOrigin("library");
             setPhase("games");
           }}
         />
@@ -245,18 +285,29 @@ function App() {
           consoleName={selectedConsole!.name}
           shortName={selectedConsole!.shortName}
           report={report!}
-          onBack={() => setPhase("library")}
+          onBack={() => setPhase(gamesOrigin)}
         />
       );
       break;
   }
 
-  return (
-    <>
-      <ThemePicker />
-      {screen}
-    </>
-  );
+  // Sidebar (2026-08-04, Sprint 1): shell fixo para as fases pós-onboarding
+  // que já têm um parecer carregado. "emulators" alcançado a partir de
+  // DeclinedScreen (sem consentimento, sem report ainda) continua tela
+  // cheia, sem sidebar — ver EmulatorsScreen.onBack.
+  if (report && SIDEBAR_PHASES.includes(phase)) {
+    const active: NavID = phase === "verdict" ? "verdict" : phase === "emulators" ? "emulators" : "library";
+    return (
+      <div className="flex h-screen">
+        <Sidebar active={active} onNav={navigateSidebar} />
+        <main className="flex-1 overflow-y-auto">{screen}</main>
+      </div>
+    );
+  }
+
+  return screen;
 }
+
+const SIDEBAR_PHASES: Phase[] = ["all-games", "verdict", "emulators", "library", "games", "game-detail"];
 
 export default App;

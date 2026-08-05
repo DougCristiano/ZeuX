@@ -5,7 +5,30 @@ Backlog organizado em sprints, derivado do PRD e do estado real do código.
 **Tamanho relativo:** P (poucas horas) · M (alguns dias) · G (uma sprint ou mais).
 Os tamanhos são relativos entre si, não estimativas de calendário.
 
-Última verificação contra o código: 2026-08-03.
+Última verificação contra o código: 2026-08-04.
+
+---
+
+## Corte de versão: o que é v1.0 e o que é v2.0
+
+**Decisão do Douglas, 2026-08-04.** Até aqui o roadmap tinha sprints em ordem
+(A→F) sem dizer onde ficava a linha de "produto lançável". Agora ela existe:
+
+| | Sprints | O que caracteriza |
+|---|---|---|
+| **v1.0** | A, B, C, D (feitas) + **G**, **H**, **I** | Tudo roda **local**, sem backend do ZeuX na nuvem e sem dado de outro usuário. Ressalva pontual: G1 (capas via IGDB) pede a conta **de terceiro** do próprio usuário — decidido em 2026-08-04 para não estourar cota compartilhada — mas nada disso vira conta ou identidade do ZeuX. |
+| **v2.0** | **E** (perfil e social), **F** (compatibilidade comunitária e compartilhamento) | Exige identidade de usuário, backend na nuvem e sincronização — nada disso existe nem foi desenhado. |
+
+O critério não é empolgação, é dependência: E e F **inteiras** dependem de um
+backend na nuvem que não tem uma linha de código nem um desenho. Manter as duas
+misturadas com o resto do backlog fazia o roadmap parecer que faltava pouco para
+"o ZeuX completo", quando na verdade falta um produto inteiro (servidor,
+identidade, moderação, política de privacidade nova).
+
+**Consequência que precisa ficar visível:** o **D2** (calibrar os limiares do
+catálogo) depende da Sprint F, que agora é v2.0. Ou seja, **a v1.0 sai com os
+limiares do parecer ainda não calibrados**, e a UI segue tratando o parecer como
+estimativa, não promessa. Isso é uma dívida assumida, não resolvida — ver D2.
 
 ---
 
@@ -63,6 +86,18 @@ A tela de emuladores **existe** (`src/screens/EmulatorsScreen.tsx`, telas 06/07
 do wireframe, fechadas no B10) — a linha anterior deste documento dizia o
 contrário e estava desatualizada.
 
+**Migração visual, registrada com atraso (2026-08-04).** Este documento não
+tinha uma linha sobre ela, e o app já mudou bastante: os três temas escolhíveis
+foram substituídos por uma identidade neon única
+([ADR 0013](decisoes/0013-tema-neon-unico.md)), e nasceram telas e componentes
+que nenhum item de sprint prevê — `AllGamesScreen.tsx` (biblioteca única, com
+busca servida pelo backend via `?q=`), `GameDetailScreen.tsx`, `Pagination`,
+`GameCover`, `ConsoleIcon`, `ConsoleInfoModal`, `ErrorModal`. Escrever isso aqui
+não é log por capricho: **a Sprint G abaixo se apoia diretamente nesses
+componentes** (`GameCover` já tem o campo `coverUrl` preparado e nunca
+preenchido), e planejar sem saber que eles existem produziria trabalho
+duplicado.
+
 ---
 
 ## Quantas faltam (contado em 2026-08-04: toda a Sprint D fechada — L1, L2, L3, L5, L6, L7, L8, L9, L10, L11; D4 resolvido e removido)
@@ -77,12 +112,24 @@ da Sprint A, mas conta uma vez só.
 | Sprint B | **1** | B11 (verificação humana em Windows/Linux/macOS — código pronto nos 3 SOs) |
 | Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
 | Sprint D (MVP) | **0** | Todos os 11 itens fechados, critério de saída cumprido (D11 feito) |
-| Sprint E | **7** | — |
-| Sprint F | **6** | — |
+| **Sprint G (v1.0)** | **5** | G1–G5 — biblioteca visual: capas, favoritos, ícone de console |
+| **Sprint H (v1.0)** | **5** | H1–H5 — configuração de emulador e mapeamento de controles |
+| **Sprint I (v1.0)** | **3** | I1–I3 — arestas: emulador manual na UI, busca faltante, teclado |
+| Sprint E (**v2.0**) | **7** | — |
+| Sprint F (**v2.0**) | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
 | **Total do MVP e da dívida** | **4** | dívida + A + B + C + D |
-| **Total geral** | **23** | tudo acima |
-| Fora do MVP, registrado | 3 | scraper, cache de capas, identificação por hash |
+| **Total para fechar a v1.0** | **17** | os 4 acima + G + H + I |
+| **Total geral** | **36** | tudo acima, v1.0 + v2.0 |
+| Fora do MVP, registrado | 1 | identificação por hash (scraper e cache de capas **saíram desta lista** — reabertos como G1/G2) |
+
+**Reorganização de 2026-08-04:** as sprints E e F foram rotuladas como **v2.0**
+e três sprints novas (G, H, I) entraram para a **v1.0**, a partir da direção
+dada pelo Douglas. O número total subiu de 23 para 36, e isso **não é escopo
+inflado por conta própria**: é escopo que estava sendo pedido em uma frase
+("mexer nas configurações de cada emulador", "mapear os controles") e que nunca
+tinha sido escrito com tamanho ao lado. Contar 23 era mais confortável e menos
+verdadeiro — mesmo motivo do ajuste de 8→11 na Sprint D.
 
 **Atualizado em 2026-08-04:** D8 e D11 fechados nesta sessão (D8 — 12
 emuladores mapeados; D11 — PS2 e N64 confirmados pelo Douglas, Sprint A
@@ -649,6 +696,18 @@ Criados nesta sessão:
 Os três workflows são independentes e espelham a mesma estrutura do
 `build-windows.yml` — mesmos gatilhos de path, mesmo `beforeBuildCommand`
 via `npm run tauri build`, cada um publicando o artifact do seu SO.
+
+**Os três (`build-windows.yml`/`build-linux.yml`/`build-macos.yml`) foram
+removidos em 2026-08-05, a pedido do Douglas — redundantes com
+`release.yml`.** Eles rodavam a cada push em `main`, cada um empacotando os 3
+SOs de novo, só para um artifact efêmero que expira e fica atrás de login no
+GitHub — o próprio comentário de `release.yml` já registrava isso como
+motivação de existir. `release.yml` (disparado por tag `v*`, não por push)
+já faz o build completo dos 3 SOs e publica os instaladores como asset de
+Release de verdade; três builds inteiros a cada commit em `main` não
+compravam nada que a release não desse. `gh workflow run release.yml -f
+tag=<versão> --ref <branch>` continua sendo o caminho pra gerar um instalador
+de teste sem cortar uma tag de verdade, se for preciso antes de uma release.
 
 **O que falta é a única parte que importa, agora nos 3 SOs:** ninguém
 instalou esses artefatos numa máquina limpa de cada plataforma. Fica aberto
@@ -1270,9 +1329,24 @@ chegou.
 
 | Item | Tam. | Nota |
 |---|---|---|
-| Scraper de metadados: IGDB e/ou ScreenScraper | G | Fora do MVP por decisão de 2026-08-02. Busca **metadado**, jamais o jogo |
-| Cache local de capas e metadados | M | Só faz sentido com o scraper |
-| Identificação de jogo por hash (em vez de nome) | M | Pré-requisito de scraper confiável; o MVP usa o nome (L10) |
+| ~~Scraper de metadados: IGDB e/ou ScreenScraper~~ | G | Fora do MVP por decisão de 2026-08-02. Busca **metadado**, jamais o jogo. **Decisão reaberta em 2026-08-04** — virou o G1, dentro da v1.0 |
+| ~~Cache local de capas e metadados~~ | M | Só faz sentido com o scraper. **Reaberto junto, 2026-08-04** — virou o G2 |
+| Identificação de jogo por hash (em vez de nome) | M | Pré-requisito de scraper confiável; o MVP usa o nome (L10). **Continua fora** — ver G3, que registra por que |
+
+**Por que a decisão de 2026-08-02 foi reaberta, e o que ela dizia.** O texto
+original está preservado acima, riscado, de propósito: em 2026-08-02 decidiu-se
+que o MVP mostraria capa *placeholder* (a sigla do console) e título vindo do
+nome do arquivo, porque scraper é trabalho grande e o MVP precisava provar o
+ciclo "apontar pasta → jogar", não ficar bonito.
+
+Isso continua correto **para o MVP**. O que mudou é o alvo: em 2026-08-04 o
+Douglas definiu que a **v1.0** — não o MVP — precisa das capas de ROM
+aparecendo. São dois cortes diferentes de produto, e o MVP já foi entregue
+(Sprint D fechada, v0.1.0 publicada). A decisão antiga não estava errada; ela
+estava respondendo a outra pergunta.
+
+Ver **G1** para o item de verdade, com critério de aceite e com a regra legal
+tratada como critério, não como rodapé.
 
 **Critério de saída da Sprint D:** numa máquina limpa, o usuário passa do
 consentimento até um jogo aberto **sem tocar em terminal e sem instalar
@@ -1292,7 +1366,471 @@ própria máquina.
 
 ---
 
-## Sprint E — Perfil e camada social
+## v1.0 — princípio contínuo: reduzir gaps e estranheza da interface
+
+**Pedido do Douglas, 2026-08-04:** "continuar melhorando o design para manter
+menores gaps e estranheza."
+
+**Isto não vira sprint, e a recusa é deliberada.** Um item de backlog precisa de
+critério de saída verificável; "o design está bom" não tem. Transformar isso em
+sprint criaria um item que nunca fecha — a pior coisa que este documento pode
+conter, porque contamina a contagem de "quantas faltam" com um item eterno.
+
+É trabalho **contínuo**, mesmo tratamento que o D2 recebe: acompanha toda tela
+nova e toda tela tocada. As regras que valem em cada toque, essas sim são
+verificáveis, e são as que já existem:
+
+- Nenhuma ação só em hover, nenhuma ação só em clique direito, foco é estado de
+  primeira classe ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)).
+- Tokens da paleta neon única, nunca hex fixo inline
+  ([ADR 0013](decisoes/0013-tema-neon-unico.md)).
+- Texto sobre hardware é descritivo, nunca julgador.
+- Toda tela nova é concluível só com Tab e Enter.
+
+Quando um ajuste de design for grande o bastante para ter critério próprio
+("a lista de jogos precisa de paginação porque 2000 itens travam a rolagem"),
+ele vira item numerado — como qualquer outro. Enquanto for polimento, é parte do
+custo de cada item, não uma linha à parte.
+
+---
+
+## Sprint G — Biblioteca visual: capas, favoritos e identidade de console (v1.0)
+
+Objetivo: a biblioteca parece uma biblioteca de jogos, não uma lista de arquivos
+com sigla em cima.
+
+Hoje `GameCover` (`src/components/ui.tsx`) já desenha o cartão certo — scanline,
+glow de foco, overlay de play — e já tem o campo `coverUrl` preparado. **Nenhuma
+tela passa esse campo, porque não existe fonte de capa.** Esta sprint é
+essencialmente preencher esse campo, mais o favorito que não existe em lugar
+nenhum.
+
+**Regra legal, que aqui é critério de aceite e não rodapé:** o scraper busca
+**metadado** — título canônico, ano, gênero, imagem de capa. Ele **não tem como**
+devolver um arquivo de jogo, e essa impossibilidade precisa ser estrutural
+(o cliente só sabe falar com endpoints de metadado, e o único arquivo que ele
+grava em disco é imagem), não uma promessa em comentário.
+
+### G1 — Capas de jogo a partir de um scraper de metadados (G)
+
+O usuário abre a biblioteca e reconhece os jogos pela arte, como reconhece numa
+prateleira. Hoje ele vê a mesma sigla repetida em todos os cartões do mesmo
+console.
+
+**Reabre a decisão de 2026-08-02** ("scraper fora do MVP") — ver a nota na seção
+"Fora do MVP" da Sprint D, onde o texto original está preservado.
+
+**Critério de aceite:**
+- [ ] Existe uma rota `GET /api/v1/library/games` (ou campo novo nela) que
+      devolve `cover_url` apontando para um arquivo **local** já baixado —
+      nunca uma URL de terceiro renderizada direto pelo WebView (offline
+      quebraria a tela, e cada render viraria uma requisição de rede).
+- [ ] Um jogo sem capa encontrada devolve o campo **ausente**, e a tela cai no
+      placeholder de sigla que já existe — nunca uma capa errada de um jogo
+      parecido. Dado que não pôde ser obtido é declarado desconhecido, mesma
+      regra do parecer parcial.
+- [ ] `grep` no cliente do scraper mostra que os únicos endpoints chamados são
+      de metadado/imagem. **Nenhum caminho de código baixa, referencia ou
+      exibe link de arquivo de jogo** — verificável por leitura, e travado por
+      um teste que falha se a lista de hosts/endpoints permitidos crescer.
+- [ ] A busca acontece **sob demanda ou em lote explícito**, com o usuário
+      sabendo que está saindo para a internet — não uma varredura silenciosa
+      mandando os nomes dos arquivos dele para um terceiro no primeiro
+      `POST /library/folders`.
+- [ ] Falha de rede não quebra a biblioteca: a tela continua listando tudo com
+      placeholder, e o erro é acionável ("tentar de novo"), não silencioso.
+- [ ] Um teste roda **sem rede**, contra um servidor de mentira, e cobre:
+      achou / não achou / erro de rede / resposta malformada.
+
+**Fonte decidida em 2026-08-04: IGDB.** Cobertura mais ampla (inclui variantes
+modernas, não só retro) pesou mais que a identificação por hash do
+ScreenScraper — G3 (hash) já ficou fora da v1.0 mesmo, então essa vantagem do
+ScreenScraper não estava em jogo.
+
+**Decidido em 2026-08-04: cada usuário conecta a própria conta IGDB.** Evita
+cota compartilhada estourando com o uso real de todo mundo que instalar o
+ZeuX, ao custo de um passo de "conectar conta" — que precisa existir em algum
+lugar acessível (configurações ou o primeiro momento em que G1 seria útil,
+provavelmente a primeira abertura da Biblioteca), nunca bloqueando o resto do
+app: sem conta conectada, a biblioteca continua funcionando com o placeholder
+de sigla, nunca uma tela vazia ou travada esperando login.
+
+**Critério de aceite adicional, por causa dessa decisão:**
+- [ ] Existe uma tela/fluxo para o usuário informar `client_id`/`client_secret`
+      (ou o fluxo OAuth que o IGDB documentar), guardado localmente (mesmo
+      princípio de `consent.Store`: nunca hardcoded, nunca no repositório).
+- [ ] Sem credencial conectada, G1 não roda — nem tenta, nem mostra erro de
+      rede — a biblioteca simplesmente não busca capa, mesma aparência de hoje.
+
+**Depende de:** nada (decisão fechada) · **Bloqueia:** G2, G3
+
+### G2 — Cache local de capas e metadados (M)
+
+Sem cache, cada abertura da biblioteca refaz a busca — lento, estoura cota de
+API, e não funciona offline. Um app desktop precisa abrir igual com e sem rede.
+
+**Critério de aceite:**
+- [ ] As imagens ficam em disco numa pasta gerenciada pelo ZeuX (mesma raiz de
+      `ManagedRoot()`, ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)),
+      e o banco guarda **caminho**, nunca o binário da imagem — mesma regra que
+      o L1 já trava para ROM.
+- [ ] Abrir a biblioteca com a rede desligada mostra todas as capas já baixadas.
+      Verificável: derrubar a rede, reiniciar o `zeuxd`, abrir a tela.
+- [ ] Uma segunda abertura da mesma tela **não faz nenhuma requisição externa**
+      para jogos já resolvidos — medível pelo log do `--debug`.
+- [ ] Existe uma forma de limpar/reconsultar um jogo específico cuja capa veio
+      errada, sem apagar o cache inteiro.
+- [ ] Remover a pasta da biblioteca não deixa imagem órfã acumulando para sempre.
+
+**Depende de:** G1 · **Bloqueia:** nada
+
+### G3 — Identificação por hash em vez de nome de arquivo (M) — **fica fora da v1.0**
+
+`TitleFromFilename` (L10) acerta em `Crash Bandicoot (USA).bin` e erra feio em
+`crash1.bin`. Hash resolve isso de vez.
+
+**Registrado aqui, e deliberadamente não puxado para a v1.0.** Ele só compra
+precisão *a mais* em cima do G1 — que já vai acertar a maioria dos casos, porque
+nome de arquivo de ROM é razoavelmente padronizado. Se depois do G1 a taxa de
+acerto medida for ruim, este item sobe; medir antes de construir é mais barato
+que construir para descobrir.
+
+**Critério para reavaliar (não é critério de aceite — é gatilho):** se, numa
+biblioteca real do Douglas, mais de ~20% dos jogos ficarem sem capa ou com capa
+errada depois do G1, este item entra na v1.0.
+
+**Depende de:** G1 · **Bloqueia:** nada
+
+### G4 — Favoritar jogo (M)
+
+Quem tem 300 ROMs joga 8. Sem favorito, os 8 ficam perdidos no meio dos 300 —
+e "jogado por último" (L11) não resolve, porque ordena por acaso recente, não
+por escolha do usuário.
+
+**Verificado em 2026-08-04: não existe nada.** `library.Game`
+(`internal/library/library.go`) e `LibraryGame` (`src/api/types.ts`) não têm
+campo de favorito; `grep -ri favorit internal/ src/` devolve vazio.
+
+**Critério de aceite:**
+- [ ] Migração nova em `internal/store/migrations/` (a próxima depois de
+      `0003_library_games_missing.sql`) acrescenta o favorito à entrada de jogo.
+      Rodar o daemon numa base antiga migra sem perder nada.
+- [ ] Rota que marca e desmarca — `POST` e `DELETE
+      /api/v1/library/games/{id}/favorite`, ou um `PATCH` equivalente —
+      documentada em [`docs/api.md`](api.md) **antes** da tela, como o L5 fez.
+- [ ] `GET /api/v1/library/games` devolve `favorite` em toda entrada, sempre
+      presente (nunca ausente quando `false`), e aceita filtrar só os favoritos.
+- [ ] Favoritar um `id` que não existe devolve **404 com `code` estável**, não
+      500 nem 200 silencioso.
+- [ ] Na tela: alternar favorito em `AllGamesScreen`/`GameDetailScreen` atualiza
+      na hora, sem recarregar; o estado sobrevive a reiniciar o app.
+- [ ] O toggle é alcançável **só com Tab e Enter**, e não existe apenas em hover
+      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)) — este é o
+      caso clássico onde a estrelinha que só aparece no hover quebra a regra.
+- [ ] Jogo com `missing: true` continua favoritável (o arquivo pode voltar) —
+      ou, se a decisão for outra, ela fica escrita aqui.
+
+**Depende de:** nada (L1/L5 já entregues) · **Bloqueia:** nada
+
+### G5 — Imagem/identidade visual por console (P) — **decidido em 2026-08-04**
+
+**Decisão do Douglas:** a sigla estilizada é a solução definitiva da v1.0, não
+um placeholder. `ConsoleIcon` (`src/components/ui.tsx`) desenha a sigla do
+console num quadrado estilizado, clicável, abrindo `ConsoleInfoModal` — mesmo
+princípio do `GameCover`: **o ZeuX nunca embute marca de terceiro sem fonte
+própria.** Logo real de fabricante (marca registrada viva, mesmo raciocínio que
+tirou o Switch do catálogo — [ADR 0008](decisoes/0008-excluir-switch-do-catalogo.md))
+fica descartado, não só adiado.
+
+**O que falta, então, não é decisão — é polimento:**
+- [ ] Confirmar que todo console do catálogo (33) tem `ConsoleIcon` cobrindo —
+      nenhum cai num estado vazio. Teste no mesmo espírito de
+      `TestEveryConsoleDeclaresAtLeastOneExtension`.
+- [ ] Reavaliar se a sigla de 4 letras basta visualmente para os consoles cujo
+      nome curto colide de perto (ex. "PS1"/"PSP", "GB"/"GBC"/"GBA") — ajuste de
+      contraste/estilo, não de arquitetura.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+**Critério de saída da Sprint G:** abrir a biblioteca numa máquina com rede
+desligada mostra capas reais nos jogos já resolvidos, os favoritos do usuário no
+topo (ou filtráveis), e nenhum jogo desaparecido ou com capa de outro jogo.
+
+---
+
+## Sprint H — Configurar o emulador e mapear controles pelo ZeuX (v1.0)
+
+Objetivo: o usuário ajusta resolução, renderer e botões **sem sair do ZeuX** e
+sem aprender a interface de cada emulador.
+
+Esta é a maior sprint do backlog inteiro, e o pedido dela cabe numa frase —
+motivo pelo qual ela precisa estar escrita com tamanho ao lado, e não estimada
+por instinto.
+
+**O que já existe (verificado em 2026-08-04):**
+
+- Botão **"Configurar"** em `EmulatorsScreen.tsx` que abre o emulador sozinho,
+  sem ROM, para o usuário mexer na configuração **dentro do emulador**. Isso foi
+  feito e documentado no próprio código como provisório — palavras do Douglas na
+  época: "depois vamos pensar em configurar pelo projeto". Esta sprint é o
+  *depois*.
+- `emulator.Options` (`internal/emulator/adapter.go`): `Fullscreen`,
+  `InternalScale`, `Renderer`, `ExitOnClose`, `Extra`. É o vocabulário que o
+  ZeuX já sabe falar — e é por linha de comando, transitório, jamais persistido
+  no emulador.
+- `Command.Unapplied` ([ADR 0006](decisoes/0006-campo-unapplied.md)): a lista do
+  que o preset queria e a linha de comando não conseguiu aplicar. **Essa lista
+  é a lista de trabalho desta sprint.**
+- `internal/install/firstrun.go` (D8): já **escreve** arquivo de configuração de
+  13 emuladores, mas só a chave que suprime o assistente. Prova que o mecanismo
+  de escrita funciona; o que não existe é ler, editar preservando, e modelar.
+
+**O que não existe:** nenhuma leitura de config de emulador, nenhuma detecção de
+joystick (`grep -ri joystick|gamepad|controller internal/` não devolve nada de
+funcional), nenhuma tela de configuração.
+
+### Ambiguidade resolvida em 2026-08-04
+
+O pedido literal foi "mexer nas configurações de cada emulador **por dentro do
+jogo**". Tinha duas leituras: uma tela do ZeuX que edita a config antes de
+lançar, ou um overlay durante a partida (estilo Quick Menu do RetroArch, só
+viável ali — os outros 13 adapters são processos standalone, sem como o ZeuX
+desenhar dentro da janela deles sem injetar overlay em processo alheio).
+
+**O Douglas confirmou a leitura 1: tela do ZeuX, antes de abrir o jogo.** É a
+que esta sprint já assumia para poder escrever critério verificável — segue
+sem mudança de desenho.
+
+### H1 — Modelo de configuração persistente por emulador, com um piloto (G)
+
+Antes de qualquer tela, é preciso um lugar no domínio que saiba: quais opções
+este emulador aceita, em que arquivo elas vivem, e como escrever sem destruir o
+que o usuário ajustou na mão.
+
+**Este é o item que prova a decisão arquitetural desta sprint.** Se a abstração
+não couber em dois emuladores de formatos diferentes, é melhor descobrir aqui
+que depois de cinco.
+
+**Critério de aceite:**
+- [ ] O `Adapter` ganha uma capacidade opcional de configuração — declarando
+      quais opções ele sabe **persistir** (distinto das que sabe passar por
+      linha de comando). Um adapter que não implementa continua funcionando
+      exatamente como hoje: nenhuma regressão em `BuildCommand`.
+- [ ] Implementado de verdade em **dois** emuladores com formatos de arquivo
+      diferentes — por exemplo, um `.ini` (DuckStation/PCSX2) e o
+      `retroarch.cfg`. Dois, não um: um só não prova abstração nenhuma.
+- [ ] **Escrever preserva o que o ZeuX não conhece.** Um teste pega um arquivo
+      de config com 40 chaves das quais o ZeuX modela 3, grava, e confirma que
+      as outras 37 saíram byte a byte iguais — comentários inclusive, se o
+      formato permitir. Este é o critério mais importante do item: config de
+      emulador é do usuário, o ZeuX é visita.
+- [ ] Antes de escrever pela primeira vez, o arquivo original é copiado para um
+      backup dentro da pasta gerenciada, e existe rota/botão de restaurar.
+- [ ] Uma opção que o emulador não suporta **não é inventada** — cai na mesma
+      disciplina do `Unapplied` ([ADR 0006](decisoes/0006-campo-unapplied.md)),
+      declarada como não aplicada em vez de escrita como chave que não existe.
+- [ ] `go test ./internal/emulator/...` passa **sem nenhum emulador instalado** —
+      a leitura/escrita opera sobre caminho, e o teste usa arquivos temporários.
+- [ ] O que foi verificado contra **binário real** e o que foi só lido em
+      documentação fica escrito, adapter por adapter — mesma honestidade que o
+      D1 impôs às flags.
+
+**Depende de:** decisão sobre a ambiguidade acima · **Bloqueia:** H2, H5
+
+### H2 — Tela de configuração do emulador dentro do ZeuX (M)
+
+O H1 sem tela é biblioteca sem consumidor. Aqui o botão "Configurar" deixa de
+abrir o emulador e passa a abrir o ZeuX.
+
+**Critério de aceite:**
+- [ ] A partir da tela de Emuladores (e/ou de um jogo), o usuário altera pelo
+      menos resolução interna, renderer e tela cheia, e o valor sobrevive a
+      fechar o ZeuX e abrir de novo.
+- [ ] Cada campo mostra o valor **efetivo hoje** — lido do arquivo real do
+      emulador, não o default que o ZeuX imagina. Valor que não pôde ser lido
+      aparece como desconhecido, nunca como um chute bonito.
+- [ ] Opção que aquele emulador não suporta **não aparece na tela** ou aparece
+      explicitamente indisponível com o motivo — nunca um campo que finge
+      funcionar.
+- [ ] O botão "Configurar" atual (abrir o emulador sozinho) **continua
+      existindo** como escape, renomeado para o que ele é ("Abrir configurações
+      do emulador"). Informar, não bloquear: o ZeuX nunca vira o único caminho.
+- [ ] "Restaurar padrão" volta ao backup do H1 e é reversível.
+- [ ] Concluível só com Tab e Enter.
+
+**Depende de:** H1 · **Bloqueia:** nada
+
+### H3 — Detectar joystick e mapear botões (G)
+
+Hoje o usuário conecta um controle e vai configurar em cada emulador,
+separadamente, com a interface de cada um. É exatamente o tipo de complexidade
+que o ZeuX existe para eliminar.
+
+**Critério de aceite:**
+- [ ] `GET /api/v1/controllers` lista os controles conectados com nome legível,
+      e a lista muda ao conectar/desconectar sem reiniciar o daemon.
+- [ ] Uma tela de mapeamento mostra "aperte o botão para Cruz/A/Confirmar" e
+      registra o que o usuário apertou — inclusive eixos analógicos e D-pad, que
+      são a parte que quebra em implementação ingênua.
+- [ ] O mapeamento é gravado na config do emulador via H1, e **abrir o jogo
+      respeita esse mapeamento** — verificado com controle físico de verdade,
+      em pelo menos 2 emuladores. Como o D11 e o B11, **esta verificação só o
+      Douglas pode fechar**; nenhuma sessão de IA tem um controle plugado.
+- [ ] Controle não reconhecido não trava a tela: aparece como dispositivo
+      genérico e o mapeamento manual funciona do mesmo jeito.
+- [ ] Nenhuma dependência nova pesada entra sem decisão registrada. Detecção de
+      gamepad em Go puro é limitada — se a resposta for uma lib com CGO, isso
+      **quebra o build sem CGO** que o [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)
+      deliberadamente preservou (`modernc.org/sqlite` foi escolhido por isso).
+      Alternativa: fazer a detecção no lado do WebView, via Gamepad API do
+      navegador, que não custa dependência nenhuma. **Avaliar antes de
+      implementar** — e provavelmente merece ADR.
+
+**Depende de:** H1 · **Bloqueia:** perfis de controle compartilháveis (Sprint F,
+v2.0)
+
+### H4 — Mapear teclado (M)
+
+Metade dos usuários de emulador nunca conectou controle. Teclado é o caminho
+padrão, e hoje o ZeuX não toca nele.
+
+**Critério de aceite:**
+- [ ] Mesma tela do H3, alternando entre "teclado" e o controle conectado.
+- [ ] Conflito de tecla (a mesma tecla em duas ações) é mostrado **antes** de
+      gravar, não descoberto no jogo.
+- [ ] O mapeamento é gravado via H1 e respeitado ao abrir o jogo, verificado em
+      pelo menos 2 emuladores.
+- [ ] Existe "restaurar padrão do emulador" que devolve o layout original.
+
+**Depende de:** H1, H3 (mesma tela) · **Bloqueia:** nada
+
+### H5 — Cobrir os demais emuladores (G, incremental)
+
+O H1 cobre dois. Faltam doze — e cada um tem formato, nome de chave e
+comportamento próprios. Não é trabalho de copiar e colar; é a mesma pesquisa
+individual que o D8 exigiu, emulador por emulador.
+
+**Critério de aceite:**
+- [ ] Uma tabela neste arquivo, no formato da tabela do D8, dizendo por adapter:
+      formato do arquivo, quais opções são persistíveis, mapeamento de controle
+      suportado, e **se foi verificado contra binário real ou só lido em
+      documentação**.
+- [ ] Emulador ainda não coberto **degrada visivelmente**: a tela do H2 diz que
+      aquele emulador ainda é configurado por fora, e mantém o botão de abrir o
+      emulador. Silêncio aqui viraria a pior falha possível — o usuário mexe no
+      controle, nada acontece, e ele não sabe por quê.
+- [ ] Nenhum adapter é marcado como coberto sem um teste que trave o formato
+      dele.
+
+**Depende de:** H1 · **Bloqueia:** nada
+
+**Critério de saída da Sprint H:** numa máquina limpa, o usuário troca a
+resolução interna e remapeia o botão de confirmar em **dois emuladores
+diferentes**, sem abrir nenhum emulador, e o jogo abre respeitando as duas
+mudanças — verificado com controle e jogo reais pelo Douglas.
+
+**Fora de escopo desta sprint, e por quê:** navegar o ZeuX inteiro com controle
+(modo TV / sofá) continua fora, por
+[ADR 0009](decisoes/0009-desktop-agora-controle-depois.md). Mapear botão de
+controle **para o jogo** e navegar a interface **com** controle são coisas
+diferentes; o H3 entrega a primeira e não abre a segunda. Se o modo TV for
+construído, ele merece ADR próprio, como o 0009 já diz.
+
+---
+
+## Sprint I — Arestas que faltam para a v1.0 (v1.0)
+
+Objetivo: fechar as lacunas pequenas que o Douglas listou junto — as que já têm
+backend pronto e só falta tela, e as buscas que faltam.
+
+### I1 — Tela para adicionar emulador manualmente (M)
+
+**O backend está inteiro e nenhuma tela o chama** — verificado em 2026-08-04:
+
+| Camada | Estado |
+|---|---|
+| `internal/emulator/custom.go` | `CustomDefinition`, `CustomStore` com `Upsert`/`Delete` sob lock único |
+| Rotas | `GET`/`POST /api/v1/custom-emulators`, `DELETE /api/v1/custom-emulators/{id}` (`internal/api/server.go`) |
+| Tipos do front | `CustomDefinition` (`src/api/types.ts`) |
+| Cliente do front | `getCustomEmulators`, `upsertCustomEmulator`, `deleteCustomEmulator` (`src/api/client.ts`) |
+| **Tela** | **Não existe.** `grep -rn "getCustomEmulators" src/` só acha a própria definição em `client.ts` |
+
+Isto é o oposto do problema habitual: funcionalidade pronta e invisível. O
+usuário que já tem um emulador instalado fora do padrão hoje não tem como dizer
+isso ao ZeuX pela interface.
+
+**Critério de aceite:**
+- [ ] A tela de Emuladores ganha "Adicionar emulador manualmente", com
+      formulário para os campos de `CustomDefinition`.
+- [ ] O caminho do binário é escolhível pelo **seletor nativo de arquivo**
+      (`@tauri-apps/plugin-dialog`, já instalado e já usado em
+      `LibraryScreen.tsx`), com o campo de texto continuando editável — mesmo
+      padrão do "Escolher pasta".
+- [ ] Emulador adicionado aparece na lista junto dos conhecidos, marcado como
+      personalizado, e **pode lançar um jogo de verdade** — não basta aparecer.
+- [ ] Editar e remover funcionam pela tela, e o erro do servidor aparece
+      completo, sem reescrita.
+- [ ] Caminho que não existe, ou que existe e não é executável, é recusado com
+      mensagem que nomeia o caminho — 400, não 500, e não um sucesso falso que
+      só quebra na hora de jogar.
+- [ ] Concluível só com Tab e Enter.
+
+**Depende de:** nada (backend pronto) · **Bloqueia:** nada
+
+### I2 — Busca dentro da lista de jogos de um console (P)
+
+Auditoria de buscadores em 2026-08-04, contra o código:
+
+| Tela | Busca | Onde |
+|---|---|---|
+| `VerdictScreen` | ✅ "Buscar console..." | client-side |
+| `LibraryScreen` | ✅ "Filtrar por nome do console" | client-side |
+| `EmulatorsScreen` | ✅ "Buscar emulador ou console..." | client-side |
+| `AllGamesScreen` | ✅ "Buscar jogos..." | servidor (`?q=`) |
+| **`GamesScreen`** | ❌ **nenhuma** | — |
+
+`GamesScreen` (os jogos de **um** console) é a única lista de tamanho
+potencialmente grande sem filtro. Uma pasta de arcade ou de NES com centenas de
+ROMs vira rolagem pura.
+
+**Critério de aceite:**
+- [ ] Campo de busca em `GamesScreen`, filtrando por título, reaproveitando o
+      componente já usado em `AllGamesScreen` em vez de escrever outro.
+- [ ] Busca vazia mostra a lista inteira; busca sem resultado mostra estado
+      vazio explícito, não uma tela em branco.
+- [ ] A busca não perde a ordenação por "jogado por último" que o L11 entregou.
+- [ ] Alcançável por Tab.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### I3 — Seleção de pasta: **já feito**, reafirmado aqui (P)
+
+O Douglas pediu "seleção das pastas" junto dos outros itens. **Isso já existe
+desde 2026-08-04** e está registrado mais acima neste documento:
+`@tauri-apps/plugin-dialog` (npm) + `tauri-plugin-dialog` (crate) + permissão
+`dialog:allow-open`; o botão "Escolher pasta" em `LibraryScreen.tsx` abre o
+diálogo nativo do SO e preenche o campo, que continua editável.
+
+**Não vira item novo.** Fica aqui só para não ser reimplementado por alguém
+lendo a lista de pedidos e não a lista de entregas. O que **falta** de seletor
+nativo é o de **arquivo** (binário do emulador), e isso é o I1.
+
+**Depende de:** nada · **Bloqueia:** nada · **Estado:** ~~feito 2026-08-04~~
+
+**Critério de saída da Sprint I:** um usuário com um emulador instalado por
+conta própria consegue registrá-lo, apontar as pastas e achar qualquer jogo da
+biblioteca, sem tocar em terminal e sem editar arquivo de configuração.
+
+---
+
+## Sprint E — Perfil e camada social (**v2.0 — pós-v1.0**)
+
+> **Adiada para a v2.0 por decisão do Douglas, 2026-08-04.** Nada nesta sprint
+> entra na v1.0. O conteúdo abaixo **não foi reescrito** — continua válido como
+> desenho; o que mudou é quando. Todos os itens dependem de um backend na nuvem
+> e de uma identidade de usuário que **não existem nem foram desenhados**, e
+> construir tela social sobre alicerce inexistente foi exatamente o risco que
+> a nota de escopo de 2026-08-02 (abaixo) já apontava.
 
 Objetivo: a promessa social do PRD, agora que há dado para exibir.
 
@@ -1325,7 +1863,18 @@ rodar.
 
 ---
 
-## Sprint F — Compatibilidade comunitária e compartilhamento
+## Sprint F — Compatibilidade comunitária e compartilhamento (**v2.0 — pós-v1.0**)
+
+> **Adiada para a v2.0 junto da Sprint E, 2026-08-04.** Conteúdo preservado, não
+> reescrito. Consequência que precisa ficar visível em vez de descoberta depois:
+> **o D2 (calibrar os limiares do catálogo) depende desta sprint**, então a v1.0
+> sai com o parecer ainda apoiado em estimativa. A UI já trata isso corretamente
+> (aviso permanente de estimativa, feito no B9) — a dívida está declarada, não
+> escondida.
+>
+> O `Installation.Version`, que continua nunca preenchido (Sprint A), é
+> pré-requisito daqui e **pode ser feito na v1.0** sem esperar a nuvem: é um
+> item P, e "rodou bem na versão X" precisa saber qual é X.
 
 Objetivo: o conhecimento coletivo que nenhum emulador isolado tem.
 
@@ -1353,14 +1902,14 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | Item | Tam. | Nota |
 |---|---|---|
 | Atualização do catálogo via nuvem | M | `schema_version` já existe para isso |
-| Escrever nos arquivos de config dos emuladores (reduz `Unapplied`) | G | Invasivo; sobrescreve ajustes do usuário. Diferente de D8: isso aplicaria opções do preset (resolução, renderer), não só pular o assistente |
+| ~~Escrever nos arquivos de config dos emuladores (reduz `Unapplied`)~~ | G | **Promovido em 2026-08-04 para a Sprint H (v1.0)**, itens H1/H2/H5. A ressalva original continua valendo e virou critério de aceite do H1: "invasivo; sobrescreve ajustes do usuário" — por isso o H1 exige preservar byte a byte o que o ZeuX não modela, e fazer backup antes da primeira escrita |
 | Novos consoles: Saturn, 3DS, DS, Game Boy/Color, Master System, Xbox | M cada | Switch fica fora por decisão — [ADR 0008](decisoes/0008-excluir-switch-do-catalogo.md) |
 | ~~Testes de `internal/api` e `internal/consent`~~ | M | **Feito 2026-08-01** — `Probe` mockado via interface; ver nota abaixo |
 | Autenticação da API local | M | Necessário se algo além do Tauri falar com ela |
 | Descoberta dinâmica de porta | P | Evita colisão em `7777` |
 | CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual — ~~build do instalador Windows~~ **feito 2026-08-02**, ver abaixo |
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
-| Suporte a controles: detecção e mapeamento | G | Pré-requisito dos perfis de controle |
+| ~~Suporte a controles: detecção e mapeamento~~ | G | **Promovido em 2026-08-04 para a Sprint H (v1.0)**, itens H3 (joystick) e H4 (teclado). Continua sendo pré-requisito dos perfis de controle compartilháveis (Sprint F, agora v2.0) — a diferença é que agora tem valor próprio na v1.0, sem esperar a nuvem |
 | ~~Emulador dedicado 1-click para os consoles que hoje só têm RetroArch~~ | G | **Substituído em 2026-08-03** pela decisão do [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — em vez de um adapter dedicado por console, empacotar o RetroArch + cores selecionados dentro do próprio instalador do ZeuX. N64 continua com o `rmg` como adapter dedicado (não foi desfeito), mas os outros 23 consoles vão pelo empacotamento, não por pesquisa individual |
 | **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 20 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. Falta: confirmar em Windows/macOS e testar a instalação de verdade (o RetroArch empacotado achar os cores sem baixar nada na primeira execução) |
 
@@ -1707,20 +2256,42 @@ servidor (nunca reescrita).
 
 ```mermaid
 graph LR
-    A["Sprint A<br/>Validar adapters"] --> B["Sprint B<br/>Tauri + UI"]
-    A --> C["Sprint C<br/>Instalação 1-click"]
-    B --> C
-    B --> D["Sprint D<br/>Biblioteca + banco"]
-    C --> D
-    D --> E["Sprint E<br/>Perfil + social"]
-    E --> F["Sprint F<br/>Compatibilidade<br/>+ compartilhamento"]
+    subgraph v1["v1.0 — tudo local, sem conta e sem nuvem"]
+        direction LR
+        A["Sprint A<br/>Validar adapters<br/>(feita)"] --> B["Sprint B<br/>Tauri + UI<br/>(feita)"]
+        A --> C["Sprint C<br/>Instalação 1-click<br/>(feita)"]
+        B --> C
+        B --> D["Sprint D<br/>Biblioteca + banco<br/>(feita)"]
+        C --> D
+        D --> G["Sprint G<br/>Biblioteca visual:<br/>capas + favoritos"]
+        D --> H["Sprint H<br/>Config do emulador<br/>+ controles"]
+        D --> I["Sprint I<br/>Emulador manual<br/>+ buscas"]
+    end
 
-    D2["D2 — calibrar limiares<br/>(contínuo, em paralelo)"] -.-> D
+    subgraph v2["v2.0 — exige backend na nuvem e identidade"]
+        direction LR
+        E["Sprint E<br/>Perfil + social"] --> F["Sprint F<br/>Compatibilidade<br/>+ compartilhamento"]
+    end
+
+    G --> E
+    H --> E
+    I --> E
+
+    Design["Design: reduzir gaps e estranheza<br/>(contínuo, atravessa toda sprint)"] -.-> v1
+    D2["D2 — calibrar limiares<br/>(depende da Sprint F, ou seja: v2.0)"] -.-> F
 ```
 
-A Sprint A vem primeiro porque é a única que pode invalidar código já escrito.
-D2 (calibração dos limiares) é trabalho contínuo, não uma sprint: melhora a cada
-máquina nova em que o app rodar.
+A Sprint A veio primeiro porque era a única que podia invalidar código já
+escrito. **G, H e I não dependem umas das outras** — são paralelizáveis, e a
+ordem entre elas é escolha de prioridade, não de dependência técnica.
+
+Duas coisas no diagrama são pontilhadas de propósito, porque não são sprints:
+
+- **Design** é contínuo, sem critério de saída — ver a seção de princípio
+  contínuo acima. Ele atravessa G, H e I em vez de vir antes ou depois.
+- **D2** deixou de apontar para a Sprint D e passou a apontar para a F: a
+  calibração agora depende do relato de compatibilidade da comunidade, que é
+  v2.0. **A v1.0 sai sem os limiares calibrados**, e isso está declarado.
 
 **O diagrama mente em um ponto, e é de propósito que fica escrito aqui:** as
 Sprints B, C e D avançaram sem a Sprint A ter fechado — o D11 (abrir uma ROM de
@@ -1735,3 +2306,27 @@ no lugar dele. Se a Sprint D inteira for construída antes e o D11 revelar que
 algum adapter não abre o jogo, o retrabalho cai justamente sobre a tela que
 acabou de ser feita. Depois dele, a ordem é L1 → L2 → L5 → L6 → L7, que é o
 caminho mais curto até o critério de saída da Sprint D.
+*(D11 foi fechado em 2026-08-04 — parágrafo mantido como registro do raciocínio
+da época, não como recomendação vigente.)*
+
+**Próximo passo recomendado (2026-08-04): o I1 — tela de emulador manual.**
+
+Recomendo um, não um menu, e o motivo é a ordem de prioridade deste documento:
+dívida de promessa descoberta vem antes de funcionalidade nova. O I1 é o caso
+mais puro disso no backlog hoje — **o produto tem a funcionalidade inteira
+construída, testada e documentada em `api.md`, e o usuário não tem como
+alcançá-la.** Backend pronto, tipos prontos, cliente pronto, zero tela. Custa
+menos que qualquer item de G ou H e fecha uma lacuna que hoje é invisível para
+quem lê o roadmap e visível para quem usa o app.
+
+Depois dele, a ordem que eu defenderia é **G4 (favoritar) → I2 (busca) → G1
+(capas) → Sprint H**, e a razão de G1 não vir antes é que **ele está bloqueado
+por uma decisão sua**, não por trabalho: IGDB ou ScreenScraper, e quem carrega a
+credencial. Enquanto essa resposta não existir, começar o G1 é escolher por
+tentativa.
+
+A Sprint H vem por último entre as três não porque vale menos — ela é o pedido
+mais ambicioso da lista — mas porque é a única cujo **desenho ainda pode estar
+errado**: a ambiguidade de "configurar por dentro do jogo" (tela do ZeuX ×
+overlay durante a partida) muda a sprint inteira, e resolver isso custa uma
+frase agora contra uma sprint depois.

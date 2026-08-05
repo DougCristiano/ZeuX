@@ -4,17 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ZeuX</title>
-    <script>
-      // Aplica o tema salvo antes do React montar — sem isto, a página
-      // nasceria sempre no tema padrão e trocaria visivelmente um instante
-      // depois, para quem já tinha escolhido outro (ver ThemePicker.tsx).
-      (function () {
-        var saved = localStorage.getItem("zeux-theme");
-        if (saved === "fosforo" || saved === "cartucho" || saved === "sala") {
-          document.documentElement.setAttribute("data-theme", saved);
-        }
-      })();
-    </script>
   </head>
 
   <body>

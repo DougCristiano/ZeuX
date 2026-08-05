@@ -45,6 +45,74 @@ func TestAddLibraryFolderScansImmediately(t *testing.T) {
 	}
 }
 
+// Trava o critério de aceite de "um caminho para todos os jogos"
+// (2026-08-05): uma pasta-raiz com subpastas nomeadas por console tem cada
+// subpasta reconhecida e varrida, sem precisar apontar console por console.
+func TestBulkAddLibraryFoldersMatchesSubfoldersByName(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	root := t.TempDir()
+	nesDir := filepath.Join(root, "NES")
+	snesDir := filepath.Join(root, "Super Nintendo") // casa por Name, não por ID
+	weirdDir := filepath.Join(root, "Pasta Qualquer")
+	for _, dir := range []string{nesDir, snesDir, weirdDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("criando %s: %v", dir, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(nesDir, "Jogo (USA).nes"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM de teste: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snesDir, "Outro Jogo.sfc"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM de teste: %v", err)
+	}
+
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders/bulk", map[string]any{
+		"path": root,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, esperado 200, corpo: %s", rec.Code, rec.Body.String())
+	}
+
+	body := decodeBody(t, rec)
+	matched, ok := body["matched"].([]any)
+	if !ok || len(matched) != 2 {
+		t.Fatalf("matched = %v, esperava 2 entradas", body["matched"])
+	}
+	unmatched, ok := body["unmatched"].([]any)
+	if !ok || len(unmatched) != 1 || unmatched[0] != "Pasta Qualquer" {
+		t.Fatalf("unmatched = %v, esperava [\"Pasta Qualquer\"]", body["unmatched"])
+	}
+
+	byConsole := map[string]float64{}
+	for _, m := range matched {
+		entry := m.(map[string]any)
+		byConsole[entry["console_id"].(string)] = entry["games_found"].(float64)
+	}
+	if byConsole["nes"] != 1 {
+		t.Fatalf("games_found para nes = %v, esperado 1", byConsole["nes"])
+	}
+	if byConsole["snes"] != 1 {
+		t.Fatalf("games_found para snes = %v, esperado 1", byConsole["snes"])
+	}
+}
+
+// Trava que um caminho inexistente é 400 nomeando o problema, não 500 —
+// mesma convenção de TestAddLibraryFolderRejectsMissingPath.
+func TestBulkAddLibraryFoldersRejectsMissingPath(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders/bulk", map[string]any{
+		"path": filepath.Join(t.TempDir(), "nao-existe"),
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, esperado 400", rec.Code)
+	}
+	if code := errorCode(decodeBody(t, rec)); code != "path_not_found" {
+		t.Fatalf("code = %q, esperado path_not_found", code)
+	}
+}
+
 // Trava que apontar um console fora do catálogo é 400 nomeando o problema,
 // não um erro genérico — mesma regra de "erro é frase acionável" do resto da
 // API.
@@ -205,6 +273,61 @@ func TestLibraryGamesIncludePlaytimeAndLastPlayed(t *testing.T) {
 	}
 	if playtime, _ := second["playtime_seconds"].(float64); playtime != 300 {
 		t.Fatalf("playtime_seconds do mais antigo = %v, esperado 300", second["playtime_seconds"])
+	}
+}
+
+// Trava a tela "Todos os jogos" (2026-08-04): sem console_id, GET
+// /library/games lista jogos de todos os consoles juntos, paginado por
+// page/page_size, com total presente para a interface calcular quantas
+// páginas existem.
+func TestLibraryGamesWithoutConsoleIDPaginatesAcrossConsoles(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	dir := t.TempDir()
+
+	roms := map[string]string{"nes": "jogo.nes", "snes": "jogo.sfc", "n64": "jogo.z64"}
+	for consoleID, filename := range roms {
+		path := filepath.Join(dir, consoleID+"-"+filename)
+		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+			t.Fatalf("criando ROM de %s: %v", consoleID, err)
+		}
+		rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+			"console_id": consoleID,
+			"path":       dir,
+		})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("apontando pasta de %s: status %d, corpo %s", consoleID, rec.Code, rec.Body.String())
+		}
+	}
+
+	rec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=2", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, esperado 200, corpo: %s", rec.Code, rec.Body.String())
+	}
+
+	body := decodeBody(t, rec)
+	games := body["games"].([]any)
+	if len(games) != 2 {
+		t.Fatalf("esperava 2 jogos na primeira página (page_size=2), veio %d", len(games))
+	}
+	if total, _ := body["total"].(float64); total != 3 {
+		t.Fatalf("total = %v, esperado 3 (um jogo por console apontado)", body["total"])
+	}
+
+	rec2 := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=2&page_size=2", nil)
+	games2 := decodeBody(t, rec2)["games"].([]any)
+	if len(games2) != 1 {
+		t.Fatalf("esperava 1 jogo na segunda página, veio %d", len(games2))
+	}
+
+	// Busca (?q=, 2026-08-04) acha o jogo mesmo estando fora da primeira
+	// página — a rota filtra no SQL, não no cliente, exatamente por isso.
+	recQ := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=2&q=n64", nil)
+	gamesQ := decodeBody(t, recQ)["games"].([]any)
+	if len(gamesQ) != 1 {
+		t.Fatalf("esperava 1 jogo casando com \"n64\" no título, veio %d", len(gamesQ))
+	}
+	if title, _ := gamesQ[0].(map[string]any)["title"].(string); title != "n64-jogo" {
+		t.Fatalf("título do jogo achado = %q, esperado \"n64-jogo\"", title)
 	}
 }
 

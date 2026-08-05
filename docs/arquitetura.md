@@ -4,7 +4,7 @@ Documento de referência da arquitetura atual. Descreve o que **existe no códig
 hoje**, não o que está planejado. O que ainda não foi construído aparece
 marcado como pendente.
 
-Última verificação contra o código: 2026-08-03.
+Última verificação contra o código: 2026-08-04.
 
 ---
 
@@ -19,9 +19,9 @@ configurada para o patamar que a máquina atende.
 O núcleo é o daemon `zeuxd`, escrito em Go, que expõe uma API HTTP em
 `127.0.0.1:7777`. Desde a Sprint B existe também uma interface Tauri + React
 (`src/`, `src-tauri/`) que sobe o `zeuxd` como processo filho e fala com ele por
-essa mesma API — o onboarding (consentimento → scan → parecer) e a tela de
-emuladores já funcionam de ponta a ponta. As telas de biblioteca não existem
-ainda (Sprint D).
+essa mesma API — o onboarding (consentimento → scan → especificações), a tela
+de emuladores e a biblioteca (Sprint D, fechada em 2026-08-03, v0.1.0
+publicada) já funcionam de ponta a ponta.
 
 ### Componentes
 
@@ -35,13 +35,32 @@ ainda (Sprint D).
 | `internal/emulator` | Adapters de emulador, descoberta de binários, launcher e sessões. |
 | `internal/install` | Instalação 1-click: manifesto, download verificado, extração, promoção atômica e supressão do assistente de primeira execução. |
 | `internal/store` | Abre e migra o SQLite local ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)). |
-| `internal/library` | Pastas de ROM apontadas, jogos encontrados na varredura, referência de caminho (nunca cópia). Testado; ainda sem rota HTTP nem uso em `cmd/zeuxd`. |
+| `internal/library` | Pastas de ROM apontadas, jogos encontrados na varredura, referência de caminho (nunca cópia). Rotas HTTP (`/api/v1/library/*`, `internal/api`) e telas (`LibraryScreen`, `AllGamesScreen`, `GamesScreen`, `GameDetailScreen`) prontas desde a Sprint D (fechada em 2026-08-03). |
+
+### Componentes de UI compartilhados
+
+`src/components/ui.tsx` concentra o que mais de uma tela usa, para não duplicar
+regra visual nem de acessibilidade. Desde 2026-08-04 (revisão da tela de
+Especificações e da tela de Emuladores) inclui, além dos componentes de sempre
+(`Button`, `Card`, `Badge`, `GameCover`, `Pagination`...):
+
+- `ConsoleVerdictCard` e `LEVEL_LABEL` — movidos de `VerdictScreen.tsx` para
+  cá, justamente para serem reaproveitados também na tela de Emuladores.
+- `ConsoleIcon` — quadrado com a sigla do console (nunca a logo real de um
+  fabricante — mesma regra do `GameCover` para capa de jogo; ver ADR 0008
+  sobre por que marca de terceiro fica fora). Clicável, abre `ConsoleInfoModal`.
+- `ConsoleMoreBadge` — badge "···" não clicável, quando um card de emulador
+  atende mais consoles do que cabem exibidos (hoje, mais de 6).
+- `ConsoleInfoModal` — nome, ano, patamar de compatibilidade nesta máquina (se
+  houver `Report` carregado), headline, dependência de arquivo externo e
+  gargalos de um console — o mesmo dado de `ConsoleVerdict`, mesma regra de
+  texto descritivo (nunca julgador) das outras telas.
 
 ### Diagrama de componentes
 
 ```mermaid
 graph TD
-    UI["Interface Tauri + React<br/>(onboarding e emuladores prontos;<br/>biblioteca é a Sprint D)"] -->|"fetch HTTP"| API
+    UI["Interface Tauri + React<br/>(onboarding, emuladores e biblioteca prontos)"] -->|"fetch HTTP"| API
 
     subgraph daemon["Processo zeuxd (Go)"]
         API["internal/api<br/>Server + Routes()"]
@@ -342,26 +361,73 @@ descontinuados após ação judicial. Ver [ADR 0008](decisoes/0008-excluir-switc
 
 ## 5. O que ainda não existe
 
-Registrado aqui para que ninguém leia este documento e presuma o contrário:
+Registrado aqui para que ninguém leia este documento e presuma o contrário.
+**A Sprint D (biblioteca) fechou em 2026-08-03** — rota HTTP, telas e a
+verificação de que um jogo abre de verdade (D11) já existem; o que segue é o
+que continua faltando, verificado em 2026-08-04:
 
-- **Rota HTTP e tela da biblioteca.** `internal/library` existe desde
-  2026-08-03 e está testado (tabelas `library_folders`/`library_games` —
-  migrações `0002_library.sql` e `0003_library_games_missing.sql` — mais o
-  repositório `Store` e a varredura `FindROMs`/`SyncFolder`), mas **nada o
-  chama ainda**: nenhuma rota `/api/v1/library/*` em `internal/api`, nenhuma
-  tela em `src/screens/`, e o pacote não está sequer referenciado em
-  `cmd/zeuxd`. Ver `roadmap.md`, itens L5–L9 (L1, L2 e L10 já fechados).
-- **Nada sobre BIOS em lugar nenhum do código** — nem catálogo (L3), nem
-  verificação (L4).
+- **Catálogo de BIOS por arquivo.** O que existe é o oposto: L3 entregou um
+  aviso **genérico** de dependência externa (`requires_external_file`, ver
+  `docs/api.md`), deliberadamente sem listar nome de arquivo — um catálogo de
+  BIOS/firmware por console foi cogitado e descartado, não é um item ainda em
+  aberto.
 - Instalação de emuladores dentro da estrutura de jogos: a pasta gerenciada
   (`ManagedRoot()`) já recebe instalações 1-click de verdade, organizadas por
   console (ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)).
   O que falta é a parte de jogos — cada pasta de console ainda não tem a
   subpasta `jogos/` (saves, capas, metadados); a varredura (L2) já existe,
   mas grava referência no banco, não organiza nada em disco por console.
-- Biblioteca de jogos, scraper de metadados, perfis sociais, netplay.
+- **Capa de jogo, favoritos e configuração de emulador dentro do ZeuX** —
+  planejados para a v1.0 nas Sprints G e H do [roadmap](roadmap.md); nada
+  disso está implementado ainda. Ver a seção 6 abaixo.
+- Perfis sociais, netplay, compartilhamento — Sprints E/F, v2.0, fora do
+  escopo da v1.0.
 - `Installation.Version` nunca é preenchido: nenhum adapter tenta detectar
   versão hoje.
-- **Prova de que um jogo abre.** As flags foram validadas contra binários reais
-  (roadmap, D1), mas nenhuma ROM de verdade foi aberta por nenhum emulador — ver
-  D11. O critério de saída da Sprint A continua descoberto.
+
+---
+
+## 6. Direção da v1.0 (Sprints G, H e I) — planejado, nada disto existe ainda
+
+Registrado para dar contexto de para onde o app vai, sem prometer nada como
+pronto. Detalhe completo, critério de aceite e decisões já tomadas estão no
+[roadmap](roadmap.md); aqui só o resumo arquitetural.
+
+- **Capas de jogo (Sprint G, item G1).** Decidido em 2026-08-04: a fonte é o
+  **IGDB**, com **cada usuário conectando a própria conta** (evita cota
+  compartilhada estourar com o uso de todo mundo que instalar o ZeuX). O
+  scraper só fala com endpoints de metadado/imagem — nunca com nada que
+  devolva arquivo de jogo, mesma fronteira legal que já protege `rom_path`
+  hoje (seção 3.10). A capa baixada vira arquivo local em disco (mesma raiz de
+  `ManagedRoot()`); o banco guarda caminho, nunca o binário da imagem.
+- **Identidade visual por console (G5) — decidido em 2026-08-04, sem mudança
+  de arquitetura:** `ConsoleIcon` (sigla estilizada, já em produção desde
+  2026-08-04) é a solução definitiva da v1.0, não um placeholder à espera de
+  logo real de fabricante. Logo de terceiro fica descartado, não adiado — mesmo
+  raciocínio que tirou o Switch do catálogo (ADR 0008).
+- **Favoritos (G4)** — campo novo em `library.Game`/`LibraryGame`, migração
+  nova em `internal/store/migrations/`. Nada disso existe hoje.
+- **Configuração de emulador dentro do ZeuX, não overlay in-game (Sprint H) —
+  ambiguidade resolvida em 2026-08-04.** O pedido original admitia duas
+  leituras: uma tela do ZeuX que edita a config antes de abrir o jogo, ou um
+  overlay durante a partida. A segunda só seria viável para o RetroArch (Quick
+  Menu) — os outros 13 adapters são processos standalone, sem como o ZeuX
+  desenhar dentro da janela deles sem injetar overlay em processo alheio. A
+  decisão foi a primeira leitura: tela do ZeuX, antes de lançar o jogo. Isso
+  significa trabalho novo em `internal/emulator` (o `Adapter` ganha uma
+  capacidade **opcional** de ler/escrever configuração persistida, distinta de
+  `BuildCommand`) — ver a nota em [`docs/adapters.md`](adapters.md#7-o-que-a-sprint-h-vai-pedir-deste-pacote).
+  O botão "Configurar" que hoje só abre o emulador sozinho
+  (`POST /api/v1/emulators/{id}/open`) continua existindo depois disso, como
+  escape — informar, não bloquear, é o mesmo princípio de sempre.
+- **Mapeamento de controle e teclado (H3/H4).** Detecção de gamepad em Go puro
+  é limitada; se a alternativa exigir uma lib com CGO, isso quebra a
+  compilação cruzada sem CGO que o [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)
+  preservou de propósito. A Gamepad API do navegador (via WebView) é a
+  alternativa cogitada no roadmap — decisão ainda em aberto, provavelmente
+  merece ADR próprio quando for tomada.
+
+Nenhum destes itens tem código, rota ou tela hoje. `docs/api.md` tem uma seção
+"Rotas planejadas (ainda não implementadas)" com o que cada um vai precisar da
+API, sem inventar formato de request/response para o que ainda não foi
+desenhado.

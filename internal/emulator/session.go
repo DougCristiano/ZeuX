@@ -171,6 +171,55 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 	return session, nil
 }
 
+// LaunchStandalone abre o executável do emulador sozinho — sem ROM, sem
+// opções, sem `BuildCommand` nenhum. Existe para o botão "Configurar"
+// (2026-08-04): o ZeuX ainda não grava nem aplica configuração de emulador
+// nenhuma (backlog separado, ver docs/roadmap.md) — por ora, "configurar"
+// significa só abrir o próprio emulador para o usuário mexer na
+// configuração dele diretamente, do jeito que faria sem o ZeuX.
+//
+// Não grava sessão: abrir o emulador para configurar não é uma partida
+// jogada, e contar isso como tempo de jogo inflaria a estatística real do
+// usuário. O processo ainda é esperado numa goroutine (só para não deixar
+// zombie no sistema) — só não há nada para fechar no banco quando termina.
+func (l *Launcher) LaunchStandalone(ctx context.Context, adapterID string) error {
+	adapter, ok := l.registry.ByID(adapterID)
+	if !ok {
+		return fmt.Errorf("o ZeuX não conhece o emulador %q", adapterID)
+	}
+
+	install, ok := adapter.Locate(ctx)
+	if !ok {
+		return fmt.Errorf("o %s não está instalado", adapter.Name())
+	}
+	if install.BinaryPath == "" {
+		return fmt.Errorf("caminho do executável do %s não foi encontrado", adapter.Name())
+	}
+
+	// Contexto próprio, como em Launch: o emulador precisa continuar aberto
+	// muito depois desta requisição HTTP ter terminado.
+	cmd, err := command(context.Background(), []string{install.BinaryPath})
+	if err != nil {
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("não foi possível abrir o %s: %w", adapter.Name(), err)
+	}
+
+	l.logger.Info("emulador aberto para configurar (sem jogo)",
+		"emulador", adapter.Name(), "pid", cmd.Process.Pid)
+
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			l.logger.Debug("emulador (modo configurar) encerrado com erro",
+				"emulador", adapter.Name(), "detalhe", err)
+		}
+	}()
+
+	return nil
+}
+
 // supervise espera o emulador terminar e fecha a sessão no repositório.
 func (l *Launcher) supervise(session Session, cmd *exec.Cmd) {
 	waitErr := cmd.Wait()

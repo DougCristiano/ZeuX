@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -97,6 +98,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/emulator-sources", s.handleSources)
 	mux.HandleFunc("POST /api/v1/emulators/{id}/install", s.handleInstall)
 	mux.HandleFunc("DELETE /api/v1/emulators/{id}/install", s.handleUninstall)
+	// Botão "Configurar" (2026-08-04): abre o emulador sozinho, sem ROM —
+	// não é lançamento de jogo, por isso não é /games/launch. Ver
+	// Launcher.LaunchStandalone, internal/emulator/session.go.
+	mux.HandleFunc("POST /api/v1/emulators/{id}/open", s.handleOpenEmulator)
 	mux.HandleFunc("GET /api/v1/installs", s.handleInstalls)
 	mux.HandleFunc("GET /api/v1/installs/{id}", s.handleInstallJob)
 	mux.HandleFunc("POST /api/v1/games/launch", s.handleLaunch)
@@ -104,6 +109,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/sessions", s.handleSessions)
 
 	mux.HandleFunc("POST /api/v1/library/folders", s.handleAddLibraryFolder)
+	// Rota própria em vez de sobrecarregar POST /library/folders com um corpo
+	// opcional diferente — "console_id + path" (um console) e "path" sozinho
+	// (todos os consoles, por subpasta) são operações distintas o bastante
+	// para merecer contrato próprio, não um `if console_id == ""` escondido.
+	mux.HandleFunc("POST /api/v1/library/folders/bulk", s.handleBulkAddLibraryFolders)
 	mux.HandleFunc("GET /api/v1/library/folders", s.handleListLibraryFolders)
 	mux.HandleFunc("DELETE /api/v1/library/folders/{id}", s.handleRemoveLibraryFolder)
 	mux.HandleFunc("POST /api/v1/library/folders/{id}/scan", s.handleScanLibraryFolder)
@@ -268,6 +278,19 @@ func (s *Server) handleUninstall(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"removed": r.PathValue("id")})
+}
+
+// handleOpenEmulator abre o executável do emulador sozinho — sem jogo, sem
+// sessão registrada. Falha do usuário (emulador não instalado, id
+// desconhecido) é 400, mesma convenção de handleLaunch: quase sempre algo
+// que o usuário pode resolver (ex.: instalar o emulador primeiro).
+func (s *Server) handleOpenEmulator(w http.ResponseWriter, r *http.Request) {
+	if err := s.launcher.LaunchStandalone(r.Context(), r.PathValue("id")); err != nil {
+		s.writeError(w, http.StatusBadRequest, "open_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"opened": r.PathValue("id")})
 }
 
 func (s *Server) handleInstalls(w http.ResponseWriter, r *http.Request) {
@@ -569,6 +592,107 @@ func (s *Server) handleAddLibraryFolder(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// bulkAddLibraryFoldersBody é o pedido de "uma pasta para todos os jogos": um
+// único caminho-raiz cuja subpastas de primeiro nível o ZeuX tenta casar,
+// cada uma, com um console do catálogo.
+type bulkAddLibraryFoldersBody struct {
+	Path string `json:"path"`
+}
+
+// normalizeConsoleMatch reduz um nome (de console ou de subpasta) a
+// minúsculas sem separadores, para comparar "Mega Drive", "mega-drive" e
+// "MEGADRIVE" como o mesmo texto — sem isso, a varredura em lote exigiria que
+// o usuário nomeasse as subpastas exatamente como o catálogo interno.
+func normalizeConsoleMatch(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// handleBulkAddLibraryFolders implementa "selecionar um caminho para todos os
+// jogos" (2026-08-05, a pedido do Douglas): ele aponta UMA pasta-raiz
+// organizada com uma subpasta por console (ex. `Roms/PS1`, `Roms/SNES`), e o
+// ZeuX aponta cada subpasta reconhecida para o console certo, na mesma
+// varredura que handleAddLibraryFolder já faz uma por uma.
+//
+// Isto NÃO adivinha console por extensão de arquivo solto — essa rota foi
+// descartada de propósito em 2026-08-02 (ver o comentário de LibraryScreen.tsx
+// no frontend): extensão sozinha é ambígua entre consoles (.bin/.iso/.zip
+// valem para vários). O casamento aqui é só por NOME DE SUBPASTA contra
+// id/nome/sigla do console — determinístico, sem achismo.
+func (s *Server) handleBulkAddLibraryFolders(w http.ResponseWriter, r *http.Request) {
+	var body bulkAddLibraryFoldersBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body", `O corpo deve ser um JSON com {"path": "..."}.`)
+		return
+	}
+	if body.Path == "" {
+		s.writeError(w, http.StatusBadRequest, "missing_fields", "O campo path é obrigatório.")
+		return
+	}
+
+	entries, err := os.ReadDir(body.Path)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "path_not_found",
+			fmt.Sprintf("A pasta %q não existe ou não pôde ser lida.", body.Path))
+		return
+	}
+
+	// Índice normalizado -> console, construído uma vez: cada console entra
+	// pelo id, pelo nome e pela sigla, todos normalizados — uma subpasta
+	// "ps1", "PlayStation" ou "PS1" acham o mesmo console.
+	byNormalized := make(map[string]verdict.Console)
+	for _, console := range s.catalog.Consoles {
+		byNormalized[normalizeConsoleMatch(console.ID)] = console
+		byNormalized[normalizeConsoleMatch(console.Name)] = console
+		byNormalized[normalizeConsoleMatch(console.ShortName)] = console
+	}
+
+	type matchedFolder struct {
+		ConsoleID  string `json:"console_id"`
+		Name       string `json:"name"`
+		Path       string `json:"path"`
+		GamesFound int    `json:"games_found"`
+	}
+	matched := []matchedFolder{}
+	unmatched := []string{}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		console, ok := byNormalized[normalizeConsoleMatch(entry.Name())]
+		if !ok {
+			unmatched = append(unmatched, entry.Name())
+			continue
+		}
+
+		subPath := filepath.Join(body.Path, entry.Name())
+		folder, err := s.library.AddFolder(r.Context(), console.ID, subPath)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
+			return
+		}
+		found, err := s.syncLibraryFolder(r.Context(), folder, console)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
+			return
+		}
+		matched = append(matched, matchedFolder{
+			ConsoleID: console.ID, Name: console.Name, Path: subPath, GamesFound: found,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"matched":   matched,
+		"unmatched": unmatched,
+	})
+}
+
 func (s *Server) handleListLibraryFolders(w http.ResponseWriter, r *http.Request) {
 	folders, err := s.library.ListFolders(r.Context())
 	if err != nil {
@@ -647,15 +771,30 @@ type gameWithStats struct {
 	LastPlayedAt    string `json:"last_played_at,omitempty"`
 }
 
+// defaultLibraryPageSize e maxLibraryPageSize regem só o modo "todos os
+// jogos" (sem console_id) — o modo por console mantém o comportamento
+// antigo, lista inteira sem paginar, porque GamesScreen já lida bem com o
+// tamanho normal de uma pasta de um console só.
+const (
+	defaultLibraryPageSize = 24
+	maxLibraryPageSize     = 100
+)
+
 func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) {
 	consoleID := r.URL.Query().Get("console_id")
-	if consoleID == "" {
-		s.writeError(w, http.StatusBadRequest, "missing_fields",
-			"O parâmetro console_id é obrigatório.")
-		return
-	}
 
-	games, err := s.library.ListGames(r.Context(), consoleID)
+	var (
+		games []library.Game
+		err   error
+	)
+	if consoleID == "" {
+		// ?q= filtra por título no modo "todos os jogos" (2026-08-04, busca
+		// da Biblioteca) — no SQL, não no cliente, para achar o jogo mesmo
+		// se ele estiver em outra página.
+		games, err = s.library.ListAllGames(r.Context(), r.URL.Query().Get("q"))
+	} else {
+		games, err = s.library.ListGames(r.Context(), consoleID)
+	}
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
 		return
@@ -709,7 +848,41 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		return result[i].LastPlayedAt > result[j].LastPlayedAt
 	})
 
-	writeJSON(w, http.StatusOK, map[string]any{"games": result})
+	response := map[string]any{"games": result}
+
+	if consoleID == "" {
+		// Paginação só no modo "todos os jogos" — depois de ordenar por
+		// último jogado, nunca antes (ver comentário de ListAllGames).
+		page := 1
+		if raw := r.URL.Query().Get("page"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+				page = parsed
+			}
+		}
+		pageSize := defaultLibraryPageSize
+		if raw := r.URL.Query().Get("page_size"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= maxLibraryPageSize {
+				pageSize = parsed
+			}
+		}
+
+		total := len(result)
+		start := (page - 1) * pageSize
+		if start > total {
+			start = total
+		}
+		end := start + pageSize
+		if end > total {
+			end = total
+		}
+
+		response["games"] = result[start:end]
+		response["total"] = total
+		response["page"] = page
+		response["page_size"] = pageSize
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 // syncLibraryFolder varre o disco a partir de folder, usando as extensões do

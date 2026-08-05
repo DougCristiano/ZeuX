@@ -1,52 +1,135 @@
-import type { ConsoleVerdict, Report } from "../api/types";
-import { Badge, Callout, Card, FOCUS_RING, PartialNotice } from "../components/ui";
+import { useEffect, useState } from "react";
+import { api, ApiError } from "../api";
+import type { ConsoleVerdict, HardwareInfo, Report } from "../api/types";
+import { Callout, Card, ConsoleVerdictCard, LEVEL_LABEL, Pagination, PartialNotice } from "../components/ui";
 
-const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
-  otimo: "ótimo",
-  bom: "bom",
-  limitado: "limitado",
-  improvavel: "improvável",
-};
+const LEVEL_ORDER: ConsoleVerdict["level"][] = ["otimo", "bom", "limitado", "improvavel"];
+const PAGE_SIZE = 9;
 
-function ConsoleCard({ verdict }: { verdict: ConsoleVerdict }) {
-  const isGoodTier = verdict.level === "otimo" || verdict.level === "bom";
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return "desconhecido";
+  const gib = bytes / 1024 ** 3;
+  return `${gib.toFixed(gib >= 10 ? 0 : 1)} GB`;
+}
+
+/**
+ * Coluna esquerda da tela (2026-08-04, a pedido do Douglas): detalhe cru do
+ * hardware, vindo de `GET /hardware` — dado que já existia na API
+ * (`HardwareInfo`) mas nunca era mostrado; `report.summary` só tinha 4
+ * strings pré-formatadas. Busca separada porque `Report` não carrega isso.
+ */
+function SpecsPanel() {
+  const [hardware, setHardware] = useState<HardwareInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .getHardware()
+      .then(setHardware)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível ler o hardware."));
+  }, []);
+
+  if (error) {
+    return (
+      <Card filled>
+        <p className="text-sm text-danger">{error}</p>
+      </Card>
+    );
+  }
+
+  if (!hardware) {
+    return (
+      <Card filled>
+        <p className="text-sm text-muted">Lendo hardware...</p>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-semibold text-ink">{verdict.name}</p>
-        <Badge variant={isGoodTier ? "solid" : "default"}>{LEVEL_LABEL[verdict.level]}</Badge>
-      </div>
+    <div className="flex flex-col gap-4">
+      <Card filled>
+        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Sistema</p>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+          <dt className="text-muted">Plataforma</dt>
+          <dd className="text-ink">{hardware.os.platform}</dd>
+          <dt className="text-muted">Versão</dt>
+          <dd className="text-ink">{hardware.os.version}</dd>
+          <dt className="text-muted">Arquitetura</dt>
+          <dd className="text-ink">{hardware.os.arch}</dd>
+        </dl>
+      </Card>
 
-      {/* Regra de produto: texto descritivo, nunca julgador — exibido como
-          veio da API, sem reescrever (docs/api.md, ConsoleVerdict.headline). */}
-      <p className="text-sm text-muted">{verdict.headline}</p>
+      <Card filled>
+        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Processador</p>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+          <dt className="text-muted">Modelo</dt>
+          <dd className="text-ink">{hardware.cpu.model}</dd>
+          <dt className="text-muted">Fabricante</dt>
+          <dd className="text-ink">{hardware.cpu.vendor}</dd>
+          <dt className="text-muted">Núcleos físicos</dt>
+          <dd className="text-ink">{hardware.cpu.physical_cores}</dd>
+          <dt className="text-muted">Núcleos lógicos</dt>
+          <dd className="text-ink">{hardware.cpu.logical_cores}</dd>
+          <dt className="text-muted">Clock-base</dt>
+          <dd className="text-ink">
+            {hardware.cpu.base_clock_mhz > 0 ? `${(hardware.cpu.base_clock_mhz / 1000).toFixed(2)} GHz` : "desconhecido"}
+          </dd>
+        </dl>
+      </Card>
 
-      {verdict.preset && (
-        <p className="text-sm text-muted">
-          {verdict.emulator} · {verdict.preset}
-        </p>
+      <Card filled>
+        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Memória</p>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+          <dt className="text-muted">Total</dt>
+          <dd className="text-ink">{formatBytes(hardware.memory.total_bytes)}</dd>
+          <dt className="text-muted">Disponível</dt>
+          <dd className="text-ink">{formatBytes(hardware.memory.available_bytes)}</dd>
+        </dl>
+      </Card>
+
+      {hardware.gpus && hardware.gpus.length > 0 ? (
+        hardware.gpus.map((gpu, i) => (
+          <Card filled key={`${gpu.model}-${i}`}>
+            <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">
+              Placa de vídeo{hardware.gpus!.length > 1 ? ` ${i + 1}` : ""}
+            </p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+              <dt className="text-muted">Modelo</dt>
+              <dd className="text-ink">{gpu.model}</dd>
+              <dt className="text-muted">Fabricante</dt>
+              <dd className="text-ink">{gpu.vendor}</dd>
+              <dt className="text-muted">Memória de vídeo</dt>
+              <dd className="text-ink">{formatBytes(gpu.vram_bytes)}</dd>
+              <dt className="text-muted">Tipo</dt>
+              <dd className="text-ink">{gpu.integrated ? "integrada" : "dedicada"}</dd>
+              {gpu.driver_version && (
+                <>
+                  <dt className="text-muted">Driver</dt>
+                  <dd className="text-ink">{gpu.driver_version}</dd>
+                </>
+              )}
+              <dt className="text-muted">Fonte da leitura</dt>
+              <dd className="text-ink">{gpu.source}</dd>
+            </dl>
+          </Card>
+        ))
+      ) : (
+        <Card filled>
+          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Placa de vídeo</p>
+          <p className="text-sm text-muted">Nenhuma placa de vídeo foi identificada nesta leitura.</p>
+        </Card>
       )}
 
-      {verdict.precision === "parcial" && (
-        <PartialNotice>
-          Não foi possível confirmar todos os requisitos deste console — este parecer é uma estimativa.
-        </PartialNotice>
-      )}
-
-      {/* bottlenecks vem ausente (não []) quando não há gargalo a reportar —
-          ver src/api/types.ts. Regra de produto: nomear o componente que
-          barra, nunca uma nota opaca. */}
-      {verdict.bottlenecks && verdict.bottlenecks.length > 0 && (
-        <Callout label="O que separa do patamar acima">
+      {hardware.warnings.length > 0 && (
+        <Callout label="Avisos da leitura de hardware">
           <ul className="list-disc space-y-1 pl-4">
-            {verdict.bottlenecks.map((line) => (
+            {hardware.warnings.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
         </Callout>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -64,62 +147,103 @@ const THRESHOLDS_CALIBRATED = false;
  * Puramente apresentacional (props-driven) — como a tela 01, quem busca o
  * `Report` e trata erro/carregamento é o item B8.
  *
- * Decisão de layout que o wireframe deixava em aberto ("como 33 consoles
- * escalam além de cartão empilhado"): consoles em "otimo"/"bom"/"limitado"
- * ficam sempre visíveis, empilhados; os "improvavel" ficam atrás de um
- * <details> nativo — colapsado por padrão, mas nunca escondido de verdade
- * (expande com Enter/Espaço, sem JavaScript de foco customizado, então
- * funciona por teclado de graça). Isso cumpre "informar, não bloquear": o
- * console e o motivo continuam a uma tecla de distância, só não ocupam a
- * primeira dobra por padrão.
+ * Duas colunas (2026-08-04, a pedido do Douglas): à esquerda o detalhe do
+ * hardware lido (`SpecsPanel`, busca própria de `GET /hardware`); à direita
+ * a grade de consoles com busca + filtro por patamar + paginação — a
+ * paginação vale só para a coluna direita, a esquerda nunca pagina porque
+ * não é uma lista, é um retrato só desta máquina.
  */
 export function VerdictScreen({ report }: { report: Report }) {
-  const visible = report.verdicts.filter((v) => v.level !== "improvavel");
-  const improbable = report.verdicts.filter((v) => v.level === "improvavel");
+  const [search, setSearch] = useState("");
+  const [levelFilter, setLevelFilter] = useState<ConsoleVerdict["level"] | null>(null);
+  const [page, setPage] = useState(1);
+
+  function handleSearch(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
+
+  function handleLevelFilter(level: ConsoleVerdict["level"] | null) {
+    setLevelFilter(level);
+    setPage(1);
+  }
+
+  const filtered = report.verdicts.filter((v) => {
+    if (levelFilter && v.level !== levelFilter) return false;
+    const term = search.trim().toLowerCase();
+    return !term || v.name.toLowerCase().includes(term);
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
-      <Card filled>
-        <p className="mb-2 font-mono text-xs tracking-wide text-muted uppercase">Resumo do que foi lido</p>
-        <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
-          <p className="text-sm text-ink">{report.summary.cpu}</p>
-          <p className="text-sm text-ink">{report.summary.gpu}</p>
-          <p className="text-sm text-ink">{report.summary.memory}</p>
-          <p className="text-sm text-ink">{report.summary.system}</p>
-        </div>
-      </Card>
+    <div className="mx-auto max-w-7xl px-6 py-10">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[320px_1fr]">
+        <aside className="flex flex-col gap-4 lg:max-w-[320px]">
+          <h1 className="text-2xl font-semibold text-ink">Especificações</h1>
+          <SpecsPanel />
+        </aside>
 
-      {!THRESHOLDS_CALIBRATED && (
-        <p className="mt-4 text-sm text-muted">
-          Os patamares abaixo são uma estimativa: os requisitos do catálogo ainda não foram medidos em
-          hardware real.
-        </p>
-      )}
+        <div>
+          {!THRESHOLDS_CALIBRATED && (
+            <p className="mb-4 text-sm text-muted">
+              Os patamares abaixo são uma estimativa: os requisitos do catálogo ainda não foram medidos em
+              hardware real.
+            </p>
+          )}
 
-      {report.precision === "parcial" && (
-        <div className="mt-4">
-          <PartialNotice>Nem tudo pôde ser lido desta máquina — o parecer abaixo é uma estimativa.</PartialNotice>
-        </div>
-      )}
+          {report.precision === "parcial" && (
+            <div className="mb-4">
+              <PartialNotice>Nem tudo pôde ser lido desta máquina — o parecer abaixo é uma estimativa.</PartialNotice>
+            </div>
+          )}
 
-      <div className="mt-4 flex flex-col gap-3">
-        {visible.map((verdict) => (
-          <ConsoleCard key={verdict.console_id} verdict={verdict} />
-        ))}
-      </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Buscar console..."
+              className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleLevelFilter(null)}
+                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+                  levelFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
+                }`}
+              >
+                TODOS
+              </button>
+              {LEVEL_ORDER.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => handleLevelFilter(level)}
+                  className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+                    levelFilter === level ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
+                  }`}
+                >
+                  {LEVEL_LABEL[level].toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {improbable.length > 0 && (
-        <details className="mt-4 rounded border border-line">
-          <summary className={`cursor-pointer rounded px-4 py-2 font-mono text-sm text-muted select-none ${FOCUS_RING}`}>
-            {improbable.length} console(s) provavelmente não rodam aqui — mostrar
-          </summary>
-          <div className="flex flex-col gap-3 p-4 pt-0">
-            {improbable.map((verdict) => (
-              <ConsoleCard key={verdict.console_id} verdict={verdict} />
+          {filtered.length === 0 && (
+            <p className="mt-4 text-base text-muted">Nenhum console encontrado para "{search}".</p>
+          )}
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {pageItems.map((verdict) => (
+              <ConsoleVerdictCard key={verdict.console_id} verdict={verdict} />
             ))}
           </div>
-        </details>
-      )}
+
+          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+        </div>
+      </div>
     </div>
   );
 }
