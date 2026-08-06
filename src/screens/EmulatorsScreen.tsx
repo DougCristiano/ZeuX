@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
-import type { ConsoleVerdict, EmulatorEntry, EmulatorSource, InstallJob, Report, RetroArchCoreStatus } from "../api/types";
+import type {
+  ConsoleVerdict,
+  CustomDefinition,
+  EmulatorEntry,
+  EmulatorSource,
+  InstallJob,
+  Report,
+  RetroArchCoreStatus,
+} from "../api/types";
 import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar, Select } from "../components/ui";
+import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
+import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
+import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { consoleAccentColor } from "../lib/consoleColor";
-
-// Categorias de configuração por emulador (2026-08-05) — preview desabilitado
-// a pedido do Douglas: a Sprint H (docs/roadmap.md) ainda não escreve nem lê
-// config de emulador nenhuma, então clicar aqui não faz nada de verdade
-// ainda. Mostrado cinza/sem cursor de propósito, para não prometer o que
-// ainda não existe (regra do CLAUDE.md).
-const CONFIG_CATEGORIES_PREVIEW = ["Vídeo", "Áudio", "Controles", "Avançado"];
 
 const PAGE_SIZE = 6;
 // Quantos ícones de console cabem no card sem esticar a altura entre
@@ -102,21 +106,47 @@ function IdentityDot({ color }: { color: string | undefined }) {
 function EmulatorCard({
   entry,
   source,
+  customDef,
   verdictById,
   onSelectConsole,
   onChanged,
+  onEditCustom,
 }: {
   entry: EmulatorEntry;
   source?: EmulatorSource;
+  /** Presente quando este entry veio de um cadastro manual (I1,
+   * docs/roadmap.md) — troca Instalar/Remover pelo par Editar/Excluir. */
+  customDef?: CustomDefinition;
   verdictById: Map<string, ConsoleVerdict>;
   onSelectConsole: (consoleId: string) => void;
   onChanged: () => void;
+  onEditCustom: (def: CustomDefinition) => void;
 }) {
   const [state, setState] = useState<RowState>({ kind: "idle" });
   const [showCores, setShowCores] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const [biosError, setBiosError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+  const [showBindings, setShowBindings] = useState(false);
+
+  async function deleteCustom() {
+    if (!customDef) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.deleteCustomEmulator(customDef.id);
+      onChanged();
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "Não foi possível excluir este emulador.");
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
 
   // "Abrir pasta do BIOS" (2026-08-05): existia só dentro da tela de jogos de
   // um console (GamesScreen.tsx), a pedido do Douglas em 2026-08-04 — mas aí
@@ -232,7 +262,13 @@ function EmulatorCard({
           <p className="font-semibold text-ink">{entry.name}</p>
         </div>
         {entry.installed && (
-          <Badge variant="solid">{entry.installation?.managed ? "instalado pelo ZeuX" : "já estava na máquina"}</Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant="solid">{entry.installation?.managed ? "instalado pelo ZeuX" : "já estava na máquina"}</Badge>
+            {/* Só presente em instalação gerenciada (Sprint A) — o ZeuX não
+                executa o binário de uma instalação alheia para descobrir a
+                versão dela. */}
+            {entry.installation?.version && <span className="text-xs text-muted">{entry.installation.version}</span>}
+          </div>
         )}
       </div>
 
@@ -255,20 +291,34 @@ function EmulatorCard({
         )}
       </div>
 
-      {/* Categorias de configuração — preview desabilitado (2026-08-05, ver
-          CONFIG_CATEGORIES_PREVIEW acima): a Sprint H ainda não existe, isto
-          não clica em nada ainda. */}
-      <div className="flex flex-wrap gap-1.5" aria-hidden="true">
-        {CONFIG_CATEGORIES_PREVIEW.map((tab) => (
-          <span
-            key={tab}
-            className="cursor-not-allowed rounded-sm border border-dashed border-line-strong px-1.5 py-0.5 font-pixel text-[8px] tracking-wide text-muted opacity-60"
-            title="Em breve — configuração por categoria ainda não existe no ZeuX."
-          >
-            {tab.toUpperCase()}
-          </span>
-        ))}
-      </div>
+      {/* H2/H3/H4 (docs/roadmap.md): configuração e mapeamento persistidos,
+          só quando entry.configurable/bindable vêm true — hoje só PCSX2 e
+          RetroArch (H1 piloto). Emulador ainda não coberto degrada
+          visivelmente (H5): mostra que ainda é configurado por fora, em vez
+          de simplesmente não ter nenhum botão. */}
+      {entry.installed && (entry.configurable || entry.bindable) && (
+        <div className="flex flex-wrap gap-2">
+          {entry.configurable && (
+            <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
+              {showConfig ? "Ocultar configurações" : "Configurações"}
+            </Button>
+          )}
+          {entry.bindable && (
+            <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
+              {showBindings ? "Ocultar mapeamento" : "Mapear controles"}
+            </Button>
+          )}
+        </div>
+      )}
+      {entry.installed && !entry.configurable && !entry.bindable && (
+        <p className="text-xs text-muted">Configuração e controles ainda só dentro do próprio {entry.name}.</p>
+      )}
+      {showConfig && entry.configurable && (
+        <EmulatorConfigPanel adapterId={entry.adapter_id} adapterName={entry.name} />
+      )}
+      {showBindings && entry.bindable && (
+        <EmulatorBindingsPanel adapterId={entry.adapter_id} adapterName={entry.name} />
+      )}
 
       {/* Só aparece quando alguém já verificou de verdade onde ESTE emulador
           lê o BIOS/firmware (BiosDir, internal/emulator/bios_dir.go) — nunca
@@ -332,6 +382,15 @@ function EmulatorCard({
         <p className="text-sm text-muted">{source.reason}</p>
       )}
 
+      {/* Emulador personalizado (I1) cujo caminho não foi encontrado —
+          continua na lista (nunca some sozinho), com Editar/Excluir
+          disponíveis para o usuário corrigir o caminho ou desistir. */}
+      {customDef && !entry.installed && (
+        <p className="text-sm text-danger">O executável não foi encontrado em "{customDef.binary_path}".</p>
+      )}
+
+      {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
+
       {entry.adapter_id === "retroarch" && (
         <div>
           <Button type="button" variant="ghost" onClick={() => setShowCores((v) => !v)}>
@@ -348,33 +407,60 @@ function EmulatorCard({
       {openError && <p className="text-sm text-danger">{openError}</p>}
 
       <div className="flex flex-wrap items-center gap-2">
-        {entry.installed ? (
+        {entry.installed && (
+          // Renomeado de "Configurar" para "Abrir configurações do
+          // emulador" (H2, docs/roadmap.md) — continua existindo como
+          // escape hatch mesmo para os adapters que já têm
+          // EmulatorConfigPanel/EmulatorBindingsPanel: informar, não
+          // bloquear, o ZeuX nunca vira o único caminho.
+          <Button variant="secondary" disabled={opening} onClick={openStandalone} title="Abre o emulador sem nenhum jogo, para configurar dentro dele.">
+            {opening ? "Abrindo…" : "Abrir configurações do emulador"}
+          </Button>
+        )}
+
+        {customDef ? (
+          // Emulador personalizado (I1): nunca passa por install/uninstall
+          // genérico (não tem fonte de download) — Editar/Excluir são as
+          // únicas ações, disponíveis mesmo se o binário sumiu do caminho.
           <>
-            {/* "Configurar" só abre o emulador sozinho hoje — o ZeuX ainda
-                não grava/aplica configuração nenhuma (backlog separado). */}
-            <Button variant="secondary" disabled={opening} onClick={openStandalone} title="Abre o emulador sem nenhum jogo, para configurar dentro dele.">
-              {opening ? "Abrindo…" : "Configurar"}
+            <Button variant="secondary" onClick={() => onEditCustom(customDef)}>
+              Editar
             </Button>
-            {canRemove &&
-              (state.kind === "confirm-remove" ? (
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="primary" autoFocus onClick={remove}>
-                    Remover mesmo assim
-                  </Button>
-                  <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                    Cancelar
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="secondary"
-                  disabled={state.kind === "removing"}
-                  onClick={() => setState({ kind: "confirm-remove" })}
-                >
-                  {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
+            {confirmingDelete ? (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary" autoFocus disabled={deleting} onClick={deleteCustom}>
+                  Excluir mesmo assim
                 </Button>
-              ))}
+                <Button variant="secondary" onClick={() => setConfirmingDelete(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <Button variant="secondary" disabled={deleting} onClick={() => setConfirmingDelete(true)}>
+                Excluir
+              </Button>
+            )}
           </>
+        ) : entry.installed ? (
+          canRemove &&
+          (state.kind === "confirm-remove" ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary" autoFocus onClick={remove}>
+                Remover mesmo assim
+              </Button>
+              <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={state.kind === "removing"}
+              onClick={() => setState({ kind: "confirm-remove" })}
+            >
+              {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
+            </Button>
+          ))
         ) : source?.kind === "manual" ? (
           <Button variant="primary" onClick={() => openUrl(source.homepage)}>
             Abrir site oficial
@@ -411,6 +497,12 @@ function EmulatorCard({
 export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; report?: Report }) {
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   const [sources, setSources] = useState<Record<string, EmulatorSource>>({});
+  const [customs, setCustoms] = useState<CustomDefinition[]>([]);
+  const [placeholders, setPlaceholders] = useState<Record<string, string>>({});
+  // "closed" | "new" | a definição sendo editada — controla o formulário do
+  // I1, que substitui tanto o botão "+ Adicionar" quanto o "Editar" de um
+  // card específico.
+  const [formMode, setFormMode] = useState<"closed" | "new" | CustomDefinition>("closed");
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [search, setSearch] = useState("");
@@ -419,12 +511,31 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   const [page, setPage] = useState(1);
 
   const verdictById = useMemo(() => new Map(report?.verdicts.map((v) => [v.console_id, v]) ?? []), [report]);
+  const customById = useMemo(() => new Map(customs.map((c) => [c.id, c])), [customs]);
 
   useEffect(() => {
     api
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os emuladores."));
+  }, [reloadKey]);
+
+  // Emuladores personalizados (I1, docs/roadmap.md) — mesma dependência de
+  // reloadKey que a lista de emuladores, para as duas ficarem em sincronia
+  // depois de salvar/excluir uma definição.
+  useEffect(() => {
+    api
+      .getCustomEmulators()
+      .then((res) => {
+        setCustoms(res.custom_emulators);
+        setPlaceholders(res.placeholders);
+      })
+      .catch(() => {
+        // Falha aqui só esconde Editar/Excluir dos cartões personalizados —
+        // eles continuam aparecendo como emulador comum na lista (via
+        // GET /emulators, que não depende desta chamada). Não vale um
+        // Callout dedicado por uma degradação tão parcial.
+      });
   }, [reloadKey]);
 
   // Fonte de kind/homepage (docs/api.md, GET /emulator-sources) — catálogo à
@@ -527,9 +638,11 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
                 key={entry.adapter_id}
                 entry={entry}
                 source={sources[entry.adapter_id]}
+                customDef={customById.get(entry.adapter_id)}
                 verdictById={verdictById}
                 onSelectConsole={setModalConsoleId}
                 onChanged={() => setReloadKey((k) => k + 1)}
+                onEditCustom={setFormMode}
               />
             ))}
           </div>
@@ -537,21 +650,31 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
         </>
       )}
 
-      {/* Preview desabilitado (2026-08-05): o backend de emuladores
-          personalizados já existe por inteiro (GET/POST/DELETE
-          /custom-emulators, internal/emulator/custom.go) — só falta a tela
-          (Sprint I1, docs/roadmap.md). Mostrado aqui pra sinalizar que vem
-          aí, sem fingir que já funciona. */}
+      {/* I1, docs/roadmap.md: o backend já existia por inteiro
+          (GET/POST/DELETE /custom-emulators, internal/emulator/custom.go) —
+          esta tela era o único pedaço faltando. */}
       <div className="mt-6">
         <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar emulador</p>
-        <button
-          type="button"
-          disabled
-          title="Em breve — adicionar emulador manualmente ainda não tem tela no ZeuX."
-          className="w-full cursor-not-allowed rounded border border-dashed border-line-strong px-4 py-3 text-center font-pixel text-[11px] text-muted opacity-60"
-        >
-          + Adicionar emulador manualmente
-        </button>
+        {formMode === "closed" ? (
+          <button
+            type="button"
+            onClick={() => setFormMode("new")}
+            className="w-full rounded border border-dashed border-line-strong px-4 py-3 text-center font-pixel text-[11px] text-muted transition-colors hover:border-ink hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            + Adicionar emulador manualmente
+          </button>
+        ) : (
+          <ManualEmulatorForm
+            existing={formMode === "new" ? undefined : formMode}
+            existingIds={customs.map((c) => c.id).filter((id) => formMode === "new" || id !== (formMode as CustomDefinition).id)}
+            placeholders={placeholders}
+            onSaved={() => {
+              setFormMode("closed");
+              setReloadKey((k) => k + 1);
+            }}
+            onCancel={() => setFormMode("closed")}
+          />
+        )}
       </div>
 
       {modalConsoleId && (

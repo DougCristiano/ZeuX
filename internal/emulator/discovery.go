@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 )
 
 // ManagedDirName é a pasta onde o ZeuX instala os emuladores que ele mesmo
@@ -45,6 +47,38 @@ func ManagedEmulatorDir(root, adapterID string, consoles []string) string {
 	return filepath.Join(root, SharedDirName, adapterID)
 }
 
+// GamesDirName é a subpasta de cada console reservada a jogos (capas, e no
+// futuro saves) — ADR 0010, seção "Estrutura de jogos", implementada pelo
+// G1 (docs/roadmap.md, Sprint G).
+const GamesDirName = "jogos"
+
+// GameCoverDir devolve onde a capa de um jogo deve morar dentro da raiz
+// gerenciada: <root>/<console_id>/jogos/<game_id>/. A chave é o ID do jogo,
+// não o título — estável mesmo que uma nova busca corrija o título depois.
+func GameCoverDir(root, consoleID string, gameID int64) string {
+	return filepath.Join(root, consoleID, GamesDirName, strconv.FormatInt(gameID, 10))
+}
+
+// VersionMarkerName é o arquivo que internal/install (Manager.install) grava
+// dentro de uma instalação gerenciada, com a versão exata (tag do release)
+// que foi baixada — é como Installation.Version consegue ser preenchida para
+// o que o próprio ZeuX instalou (Sprint A, docs/roadmap.md), sem executar o
+// binário nem adivinhar. Uma instalação que o usuário já tinha por conta
+// própria nunca tem este arquivo: a versão fica ausente, dado desconhecido
+// de propósito — nunca um palpite (mesma regra do parecer parcial).
+const VersionMarkerName = ".zeux-version"
+
+// readVersionMarker lê a versão gravada numa instalação gerenciada. Arquivo
+// ausente ou ilegível devolve string vazia, nunca erro — versão é
+// informação de conveniência, não pode travar a detecção do binário.
+func readVersionMarker(managedDir string) string {
+	data, err := os.ReadFile(filepath.Join(managedDir, VersionMarkerName))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
 // findBinary procura o executável de um emulador e devolve o primeiro caminho
 // encontrado.
 //
@@ -53,19 +87,24 @@ func ManagedEmulatorDir(root, adapterID string, consoles []string) string {
 // deixou o ZeuX instalar uma versão, é ela que o app sabe configurar — cair
 // numa instalação antiga do sistema traria comportamento que o app não previu.
 //
+// version só vem preenchida quando managed=true E a instalação tem o
+// VersionMarkerName gravado (ver readVersionMarker) — em qualquer outro
+// caminho (sistema, PATH), fica vazia: o ZeuX não executa o binário para
+// perguntar a versão a ele.
+//
 // Quando o contexto carrega um *dirIndex (ver Survey, que varre os diretórios
 // do sistema uma vez para todos os adapters em vez de uma vez por adapter), a
 // etapa de diretórios do sistema consulta esse índice em memória em vez de
 // refazer os os.ReadDir/os.Stat. Sem índice no contexto — uma chamada avulsa,
 // fora de Survey —, o comportamento é o de sempre: constrói e testa os
 // candidatos na hora.
-func findBinary(ctx context.Context, adapterID string, consoles []string, names []string, extraDirs []string) (path string, managed bool, ok bool) {
+func findBinary(ctx context.Context, adapterID string, consoles []string, names []string, extraDirs []string) (path string, managed bool, version string, ok bool) {
 	if root, err := ManagedRoot(); err == nil {
 		managedDir := ManagedEmulatorDir(root, adapterID, consoles)
 		for _, name := range names {
 			cand := filepath.Join(managedDir, name)
 			if isExecutableFile(cand) {
-				return cand, true, true
+				return cand, true, readVersionMarker(managedDir), true
 			}
 		}
 
@@ -78,7 +117,7 @@ func findBinary(ctx context.Context, adapterID string, consoles []string, names 
 		// managedDir pertence só a este adapter, um único .AppImage ali só
 		// pode ser ele.
 		if matches, _ := filepath.Glob(filepath.Join(managedDir, "*.AppImage")); len(matches) == 1 && isExecutableFile(matches[0]) {
-			return matches[0], true, true
+			return matches[0], true, readVersionMarker(managedDir), true
 		}
 	}
 
@@ -88,12 +127,12 @@ func findBinary(ctx context.Context, adapterID string, consoles []string, names 
 	// arriscar um índice que não os cobre.
 	if idx := discoveryIndexFromContext(ctx); idx != nil && len(extraDirs) == 0 {
 		if cand, ok := idx.find(names); ok {
-			return cand, false, true
+			return cand, false, "", true
 		}
 	} else {
 		for _, cand := range buildCandidates(names, extraDirs) {
 			if isExecutableFile(cand) {
-				return cand, false, true
+				return cand, false, "", true
 			}
 		}
 	}
@@ -102,11 +141,11 @@ func findBinary(ctx context.Context, adapterID string, consoles []string, names 
 	// pacotes no Linux, que não vivem numa pasta previsível.
 	for _, name := range names {
 		if resolved, err := exec.LookPath(name); err == nil {
-			return resolved, false, true
+			return resolved, false, "", true
 		}
 	}
 
-	return "", false, false
+	return "", false, "", false
 }
 
 // buildCandidates lista os caminhos de sistema (sem o diretório gerenciado,
@@ -318,6 +357,14 @@ func isExecutableFile(path string) bool {
 	}
 
 	return info.Mode().Perm()&0o111 != 0
+}
+
+// IsExecutableFile expõe isExecutableFile para outros pacotes — usado pela
+// API (I1, docs/roadmap.md) para recusar o cadastro de um emulador
+// personalizado apontando para um caminho que não existe ou não é
+// executável, sem duplicar a lógica de detecção por SO.
+func IsExecutableFile(path string) bool {
+	return isExecutableFile(path)
 }
 
 // binaryNames adapta os nomes de executável ao sistema operacional. No macOS os

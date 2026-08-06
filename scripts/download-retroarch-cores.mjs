@@ -287,6 +287,18 @@ async function downloadCore(coreName, config) {
 }
 
 async function main() {
+  // Mesmo gate de cmd/download-retroarch-app/main.go: baixar 24 cores é a
+  // parte mais lenta do build (~60 min na CI Linux, achado em 2026-08-05).
+  // Sem a flag, todo `npm run dev`/build normal pula e fica rápido — só o
+  // corte deliberado da versão oficial (workflow_dispatch com
+  // bundle_retroarch=true em release.yml) define ZEUX_BUNDLE_RETROARCH=1.
+  if (process.env.ZEUX_BUNDLE_RETROARCH !== "1") {
+    console.log(
+      'download-retroarch-cores: ZEUX_BUNDLE_RETROARCH não é "1" — pulando (defina a variável para empacotar de verdade, ex.: ao cortar a versão oficial).'
+    );
+    return;
+  }
+
   console.log("download-retroarch-cores: 20 cores do buildbot.libretro.com");
   console.log(`plataforma: ${getBuildBotPlatform()}`);
   console.log(`destino: ${path.relative(repoRoot, coresDir)}\n`);

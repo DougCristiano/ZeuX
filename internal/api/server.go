@@ -5,7 +5,9 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,6 +21,7 @@ import (
 	"github.com/doufl/zeux/internal/consent"
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
+	"github.com/doufl/zeux/internal/igdb"
 	"github.com/doufl/zeux/internal/install"
 	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/verdict"
@@ -34,6 +37,8 @@ type Server struct {
 	launcher  *emulator.Launcher
 	installs  *install.Manager
 	library   *library.Store
+	igdbCreds *igdb.CredentialsStore
+	igdbJobs  *igdb.ScrapeManager
 	logger    *slog.Logger
 
 	// devOrigin é a origem extra liberada por SetDevOrigin. Só é lido, nunca
@@ -55,6 +60,8 @@ func NewServer(
 	launcher *emulator.Launcher,
 	installs *install.Manager,
 	libraryStore *library.Store,
+	igdbCreds *igdb.CredentialsStore,
+	igdbJobs *igdb.ScrapeManager,
 	logger *slog.Logger,
 ) *Server {
 	return &Server{
@@ -66,6 +73,8 @@ func NewServer(
 		launcher:  launcher,
 		installs:  installs,
 		library:   libraryStore,
+		igdbCreds: igdbCreds,
+		igdbJobs:  igdbJobs,
 		logger:    logger,
 	}
 }
@@ -102,6 +111,17 @@ func (s *Server) Routes() http.Handler {
 	// não é lançamento de jogo, por isso não é /games/launch. Ver
 	// Launcher.LaunchStandalone, internal/emulator/session.go.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/open", s.handleOpenEmulator)
+	// H1/H2 (docs/roadmap.md): configuração persistida do emulador — só
+	// para adapters que satisfazem emulator.ConfigurableAdapter
+	// (PCSX2/RetroArch nesta v1.0, ver Status.Configurable em GET
+	// /emulators).
+	mux.HandleFunc("GET /api/v1/emulators/{id}/config", s.handleGetEmulatorConfig)
+	mux.HandleFunc("POST /api/v1/emulators/{id}/config", s.handleSetEmulatorConfig)
+	mux.HandleFunc("DELETE /api/v1/emulators/{id}/config", s.handleRestoreEmulatorConfig)
+	// H3/H4: mapeamento de teclado/controle — só para
+	// emulator.KeyBindableAdapter (ver Status.Bindable).
+	mux.HandleFunc("GET /api/v1/emulators/{id}/bindings", s.handleGetEmulatorBindings)
+	mux.HandleFunc("POST /api/v1/emulators/{id}/bindings", s.handleSetEmulatorBindings)
 	mux.HandleFunc("GET /api/v1/installs", s.handleInstalls)
 	mux.HandleFunc("GET /api/v1/installs/{id}", s.handleInstallJob)
 	mux.HandleFunc("POST /api/v1/games/launch", s.handleLaunch)
@@ -118,6 +138,23 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/library/folders/{id}", s.handleRemoveLibraryFolder)
 	mux.HandleFunc("POST /api/v1/library/folders/{id}/scan", s.handleScanLibraryFolder)
 	mux.HandleFunc("GET /api/v1/library/games", s.handleListLibraryGames)
+	// G4 (docs/roadmap.md): favoritar/desfavoritar. Rota própria, não um
+	// PATCH em /library/games/{id} — só um campo, sem motivo para um
+	// contrato mais genérico ainda não usado por mais nada.
+	mux.HandleFunc("POST /api/v1/library/games/{id}/favorite", s.handleFavoriteGame)
+	mux.HandleFunc("DELETE /api/v1/library/games/{id}/favorite", s.handleUnfavoriteGame)
+
+	// G1 (docs/roadmap.md, Sprint G): scraper de metadados IGDB. Credencial
+	// é por usuário — sem ela, estas rotas de busca simplesmente recusam
+	// (400 igdb_not_configured), nunca tentam a rede.
+	mux.HandleFunc("GET /api/v1/igdb/credentials", s.handleGetIGDBCredentials)
+	mux.HandleFunc("POST /api/v1/igdb/credentials", s.handleSetIGDBCredentials)
+	mux.HandleFunc("DELETE /api/v1/igdb/credentials", s.handleClearIGDBCredentials)
+	mux.HandleFunc("POST /api/v1/library/games/scrape-covers", s.handleScrapeCovers)
+	mux.HandleFunc("GET /api/v1/scrape-jobs/{id}", s.handleScrapeJob)
+	// Serve as capas já baixadas em disco (nunca a URL do IGDB direto — G1
+	// exige arquivo local). Primeiro uso de http.FileServer neste servidor.
+	mux.HandleFunc("GET /api/v1/covers/", s.handleCoverFile)
 
 	return s.withLogging(s.withCORS(mux))
 }
@@ -293,6 +330,183 @@ func (s *Server) handleOpenEmulator(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"opened": r.PathValue("id")})
 }
 
+// resolveConfigurableAdapter acha o adapter, confirma que ele está
+// instalado (precisa de Installation para resolver o caminho do arquivo de
+// config — ver retroArchConfigPath, que depende do BinaryPath para o modo
+// portátil) e que ele satisfaz ConfigurableAdapter. As três falhas têm
+// `code` diferentes porque pedem correções diferentes do usuário.
+func (s *Server) resolveConfigurableAdapter(w http.ResponseWriter, r *http.Request) (emulator.ConfigurableAdapter, emulator.Installation, bool) {
+	id := r.PathValue("id")
+	adapter, ok := s.emulators.ByID(id)
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum emulador com o id %q.", id))
+		return nil, emulator.Installation{}, false
+	}
+
+	configurable, ok := adapter.(emulator.ConfigurableAdapter)
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "not_configurable",
+			fmt.Sprintf("O %s não tem configuração persistida gerenciável pelo ZeuX ainda.", adapter.Name()))
+		return nil, emulator.Installation{}, false
+	}
+
+	install, ok := adapter.Locate(r.Context())
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "not_installed",
+			fmt.Sprintf("O %s não está instalado — instale antes de configurar.", adapter.Name()))
+		return nil, emulator.Installation{}, false
+	}
+
+	return configurable, install, true
+}
+
+func (s *Server) handleGetEmulatorConfig(w http.ResponseWriter, r *http.Request) {
+	configurable, install, ok := s.resolveConfigurableAdapter(w, r)
+	if !ok {
+		return
+	}
+
+	opts, err := configurable.ReadConfig(install)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "config_read_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, opts)
+}
+
+func (s *Server) handleSetEmulatorConfig(w http.ResponseWriter, r *http.Request) {
+	configurable, install, ok := s.resolveConfigurableAdapter(w, r)
+	if !ok {
+		return
+	}
+
+	var body struct {
+		Fullscreen    bool              `json:"fullscreen"`
+		InternalScale int               `json:"internal_scale"`
+		Renderer      emulator.Renderer `json:"renderer"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON no formato {"fullscreen": bool, "internal_scale": int, "renderer": string}.`)
+		return
+	}
+
+	unapplied, err := configurable.WriteConfig(install, emulator.Options{
+		Fullscreen:    body.Fullscreen,
+		InternalScale: body.InternalScale,
+		Renderer:      body.Renderer,
+	})
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "config_write_failed", err.Error())
+		return
+	}
+	if unapplied == nil {
+		// []string(nil) serializa como `null`, não `[]` — o front espera um
+		// array sempre iterável (achado testando de verdade em 2026-08-05:
+		// `null.length` derrubou a tela inteira).
+		unapplied = []string{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"unapplied": unapplied})
+}
+
+func (s *Server) handleRestoreEmulatorConfig(w http.ResponseWriter, r *http.Request) {
+	configurable, install, ok := s.resolveConfigurableAdapter(w, r)
+	if !ok {
+		return
+	}
+
+	if err := configurable.RestoreConfig(install); err != nil {
+		s.writeError(w, http.StatusBadRequest, "config_restore_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"restored": true})
+}
+
+// resolveBindableAdapter espelha resolveConfigurableAdapter para
+// KeyBindableAdapter (H3/H4) — mesmo raciocínio de códigos de erro
+// distintos por causa diferente.
+func (s *Server) resolveBindableAdapter(w http.ResponseWriter, r *http.Request) (emulator.KeyBindableAdapter, emulator.Installation, bool) {
+	id := r.PathValue("id")
+	adapter, ok := s.emulators.ByID(id)
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum emulador com o id %q.", id))
+		return nil, emulator.Installation{}, false
+	}
+
+	bindable, ok := adapter.(emulator.KeyBindableAdapter)
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "not_bindable",
+			fmt.Sprintf("O %s não tem mapeamento de controle gerenciável pelo ZeuX ainda.", adapter.Name()))
+		return nil, emulator.Installation{}, false
+	}
+
+	install, ok := adapter.Locate(r.Context())
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "not_installed",
+			fmt.Sprintf("O %s não está instalado — instale antes de mapear controles.", adapter.Name()))
+		return nil, emulator.Installation{}, false
+	}
+
+	return bindable, install, true
+}
+
+func (s *Server) handleGetEmulatorBindings(w http.ResponseWriter, r *http.Request) {
+	bindable, install, ok := s.resolveBindableAdapter(w, r)
+	if !ok {
+		return
+	}
+
+	bindings, err := bindable.ReadBindings(install)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "bindings_read_failed", err.Error())
+		return
+	}
+	if bindings == nil {
+		// Ausência de arquivo não é "sem ações" — devolve a lista de ações
+		// conhecidas, cada uma sem tecla/botão vinculado, para a tela
+		// sempre ter o que mostrar (mesmo raciocínio de nunca confundir
+		// "não pôde ler" com "não existe a ação").
+		actions := bindable.Actions()
+		bindings = make([]emulator.InputBinding, len(actions))
+		for i, action := range actions {
+			bindings[i] = emulator.InputBinding{Action: action}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"actions":  bindable.Actions(),
+		"bindings": bindings,
+	})
+}
+
+func (s *Server) handleSetEmulatorBindings(w http.ResponseWriter, r *http.Request) {
+	bindable, install, ok := s.resolveBindableAdapter(w, r)
+	if !ok {
+		return
+	}
+
+	var body struct {
+		Bindings []emulator.InputBinding `json:"bindings"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON no formato {"bindings": [{"action": "...", "key": "..."}]}.`)
+		return
+	}
+
+	unapplied, err := bindable.WriteBindings(install, body.Bindings)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "bindings_write_failed", err.Error())
+		return
+	}
+	if unapplied == nil {
+		unapplied = []string{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"unapplied": unapplied})
+}
+
 func (s *Server) handleInstalls(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"installs": s.installs.Jobs()})
 }
@@ -336,6 +550,28 @@ func (s *Server) handleUpsertCustom(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&def); err != nil {
 		s.writeError(w, http.StatusBadRequest, "invalid_body",
 			"O corpo deve ser um JSON com id, name, consoles, binary_path e args.")
+		return
+	}
+
+	// Validação estrutural primeiro (id/name/consoles/args vazios) — dá a
+	// mensagem certa antes de checar o disco, para não confundir "caminho
+	// não existe" com "formulário incompleto".
+	if err := def.Validate(); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_definition", err.Error())
+		return
+	}
+
+	// I1 (docs/roadmap.md): o caminho precisa existir e ser executável no
+	// momento do cadastro — sem isso, o emulador apareceria na lista e só
+	// quebraria na hora de jogar, um sucesso falso. Checagem só aqui, no
+	// caminho de cadastro pela tela — nunca em CustomDefinition.Validate(),
+	// que também roda no carregamento do JSON gravado em disco a cada
+	// início do daemon: um caminho temporariamente indisponível (HD externo
+	// desconectado) não pode apagar a definição do usuário, mesma filosofia
+	// de library.Game.Missing.
+	if !emulator.IsExecutableFile(def.BinaryPath) {
+		s.writeError(w, http.StatusBadRequest, "binary_not_found",
+			fmt.Sprintf("O caminho %q não existe ou não é um executável.", def.BinaryPath))
 		return
 	}
 
@@ -716,12 +952,44 @@ func (s *Server) handleRemoveLibraryFolder(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Lê os jogos ANTES de remover: ON DELETE CASCADE (migração 0002) apaga
+	// as linhas junto da pasta, e depois disso não haveria mais como saber
+	// quais capas (G2) pertenciam a ela. Falha nesta leitura não impede a
+	// remoção — só significa que a limpeza de capa órfã fica pra trás desta
+	// vez, preferível a bloquear "remover pasta" por causa de um efeito
+	// colateral de limpeza.
+	games, gamesErr := s.library.GamesByFolder(r.Context(), id)
+
 	if err := s.library.RemoveFolder(r.Context(), id); err != nil {
 		s.writeError(w, http.StatusNotFound, "not_found", err.Error())
 		return
 	}
 
+	if gamesErr == nil {
+		s.removeCoverDirs(games)
+	} else {
+		s.logger.Warn("não foi possível listar jogos da pasta para limpar capas órfãs", "pasta", id, "erro", gamesErr)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"removed": id})
+}
+
+// removeCoverDirs apaga do disco a pasta de capa (G2: "remover pasta não
+// deixa imagem órfã") de cada jogo informado. Erro por jogo só é logado —
+// uma capa que não pôde ser removida não é motivo para reportar falha numa
+// operação de remoção de pasta que já terminou com sucesso no banco.
+func (s *Server) removeCoverDirs(games []library.Game) {
+	root, err := emulator.ManagedRoot()
+	if err != nil {
+		s.logger.Warn("não foi possível localizar a pasta gerenciada para limpar capas órfãs", "erro", err)
+		return
+	}
+	for _, game := range games {
+		dir := emulator.GameCoverDir(root, game.ConsoleID, game.ID)
+		if err := os.RemoveAll(dir); err != nil {
+			s.logger.Warn("não foi possível remover a capa órfã", "jogo", game.ID, "erro", err)
+		}
+	}
 }
 
 // handleScanLibraryFolder repete a varredura de uma pasta já apontada —
@@ -769,6 +1037,21 @@ type gameWithStats struct {
 	library.Game
 	PlaytimeSeconds int    `json:"playtime_seconds"`
 	LastPlayedAt    string `json:"last_played_at,omitempty"`
+
+	// CoverURL é derivado de Game.CoverPath (G1) — nunca exposto cru, nunca
+	// uma URL de terceiro. omitempty garante o campo AUSENTE (nunca "") quando
+	// a capa não foi resolvida, contrato documentado em docs/api.md.
+	CoverURL string `json:"cover_url,omitempty"`
+}
+
+// coverURLFor converte o caminho relativo guardado no banco (G1) na URL
+// servida por handleCoverFile. Vazio devolve vazio — a chamadora decide não
+// preencher o campo (omitempty).
+func coverURLFor(coverPath string) string {
+	if coverPath == "" {
+		return ""
+	}
+	return "/api/v1/covers/" + coverPath
 }
 
 // defaultLibraryPageSize e maxLibraryPageSize regem só o modo "todos os
@@ -790,8 +1073,9 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 	if consoleID == "" {
 		// ?q= filtra por título no modo "todos os jogos" (2026-08-04, busca
 		// da Biblioteca) — no SQL, não no cliente, para achar o jogo mesmo
-		// se ele estiver em outra página.
-		games, err = s.library.ListAllGames(r.Context(), r.URL.Query().Get("q"))
+		// se ele estiver em outra página. ?favorite=true filtra só os
+		// favoritos (G4), combinável com ?q=.
+		games, err = s.library.ListAllGames(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("favorite") == "true")
 	} else {
 		games, err = s.library.ListGames(r.Context(), consoleID)
 	}
@@ -828,7 +1112,7 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 
 	result := make([]gameWithStats, 0, len(games))
 	for _, game := range games {
-		gw := gameWithStats{Game: game}
+		gw := gameWithStats{Game: game, CoverURL: coverURLFor(game.CoverPath)}
 		if st, ok := byPath[game.Path]; ok {
 			gw.PlaytimeSeconds = st.seconds
 			gw.LastPlayedAt = st.last.Format(time.RFC3339)
@@ -883,6 +1167,155 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+// favoriteResponse é a resposta comum de handleFavoriteGame/handleUnfavoriteGame.
+type favoriteResponse struct {
+	ID       int64 `json:"id"`
+	Favorite bool  `json:"favorite"`
+}
+
+func (s *Server) handleFavoriteGame(w http.ResponseWriter, r *http.Request) {
+	s.setFavorite(w, r, true)
+}
+
+func (s *Server) handleUnfavoriteGame(w http.ResponseWriter, r *http.Request) {
+	s.setFavorite(w, r, false)
+}
+
+// setFavorite implementa as duas rotas (POST marca, DELETE desmarca) — o
+// corpo é idêntico exceto o valor gravado, então uma função só evita
+// duplicar a validação do {id} e o tratamento de erro.
+func (s *Server) setFavorite(w http.ResponseWriter, r *http.Request, favorite bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id", "O identificador do jogo deve ser numérico.")
+		return
+	}
+
+	if err := s.library.SetFavorite(r.Context(), id, favorite); err != nil {
+		if errors.Is(err, library.ErrGameNotFound) {
+			s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum jogo com o id %d.", id))
+			return
+		}
+		s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, favoriteResponse{ID: id, Favorite: favorite})
+}
+
+// handleGetIGDBCredentials nunca ecoa client_secret de volta — mesmo
+// instinto de nunca logar uma senha. A interface só precisa saber se há
+// conta conectada, não o valor guardado.
+func (s *Server) handleGetIGDBCredentials(w http.ResponseWriter, r *http.Request) {
+	_, configured, err := s.igdbCreds.Load()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "igdb_credentials_read_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"configured": configured})
+}
+
+// handleSetIGDBCredentials não valida contra o IGDB na hora — fica
+// instantânea e funciona offline. A validação real acontece na primeira
+// busca (handleScrapeCovers), onde um client_id/secret errado vira um erro
+// específico e acionável.
+func (s *Server) handleSetIGDBCredentials(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo da requisição deve ser um JSON no formato {"client_id": "...", "client_secret": "..."}.`)
+		return
+	}
+	if body.ClientID == "" || body.ClientSecret == "" {
+		s.writeError(w, http.StatusBadRequest, "igdb_credentials_invalid",
+			"Informe o ID do cliente e o segredo do cliente do IGDB.")
+		return
+	}
+
+	creds := igdb.Credentials{ClientID: body.ClientID, ClientSecret: body.ClientSecret}
+	if err := s.igdbCreds.Save(creds); err != nil {
+		s.writeError(w, http.StatusInternalServerError, "igdb_credentials_write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"configured": true})
+}
+
+// handleClearIGDBCredentials desconecta a conta — reversível (o usuário só
+// reconecta), por isso não exige nenhuma confirmação especial no servidor.
+func (s *Server) handleClearIGDBCredentials(w http.ResponseWriter, r *http.Request) {
+	if err := s.igdbCreds.Clear(); err != nil {
+		s.writeError(w, http.StatusInternalServerError, "igdb_credentials_write_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"configured": false})
+}
+
+// handleScrapeCovers dispara uma busca de capas — em lote (corpo vazio ou
+// sem game_id, todo jogo ainda sem capa) ou de um jogo só (game_id
+// presente, também serve para reconsultar um jogo específico — G2).
+func (s *Server) handleScrapeCovers(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		GameID int64 `json:"game_id"`
+	}
+	// Corpo ausente é válido aqui (dispara o lote) — só um JSON malformado é
+	// erro; um corpo vazio decodifica para body zerado sem erro.
+	if r.Body != nil {
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err != io.EOF {
+			s.writeError(w, http.StatusBadRequest, "invalid_body",
+				`O corpo da requisição deve ser um JSON no formato {"game_id": 123} ou vazio.`)
+			return
+		}
+	}
+
+	var gameIDs []int64
+	if body.GameID != 0 {
+		gameIDs = []int64{body.GameID}
+	}
+
+	job, err := s.igdbJobs.Start(r.Context(), gameIDs)
+	if err != nil {
+		switch {
+		case errors.Is(err, igdb.ErrNotConfigured):
+			s.writeError(w, http.StatusBadRequest, "igdb_not_configured", err.Error())
+		case errors.Is(err, igdb.ErrScrapeInProgress):
+			s.writeError(w, http.StatusConflict, "scrape_in_progress", err.Error())
+		default:
+			s.writeError(w, http.StatusBadRequest, "scrape_refused", err.Error())
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, job)
+}
+
+func (s *Server) handleScrapeJob(w http.ResponseWriter, r *http.Request) {
+	job, ok := s.igdbJobs.Job(r.PathValue("id"))
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", "Nenhuma busca de capas com este identificador.")
+		return
+	}
+	writeJSON(w, http.StatusOK, job)
+}
+
+// handleCoverFile serve as capas já baixadas em disco — nunca a URL do IGDB
+// direto (G1: a interface só vê um arquivo local já resolvido). A raiz é
+// recalculada a cada requisição (só um os.UserConfigDir(), barato) em vez de
+// guardada no Server, para não propagar uma falha de resolução do diretório
+// ao construir o servidor inteiro.
+func (s *Server) handleCoverFile(w http.ResponseWriter, r *http.Request) {
+	root, err := emulator.ManagedRoot()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "cover_root_unavailable",
+			"Não foi possível localizar a pasta gerenciada do ZeuX.")
+		return
+	}
+	http.StripPrefix("/api/v1/covers/", http.FileServer(http.Dir(root))).ServeHTTP(w, r)
 }
 
 // syncLibraryFolder varre o disco a partir de folder, usando as extensões do

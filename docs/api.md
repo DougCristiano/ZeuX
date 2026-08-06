@@ -88,6 +88,14 @@ está em português e já pode ser exibida ao usuário como está.
 | DELETE | `/api/v1/library/folders/{id}` | Remove a referência à pasta (não apaga arquivo) |
 | POST | `/api/v1/library/folders/{id}/scan` | Revarre uma pasta já apontada |
 | GET | `/api/v1/library/games` | Lista os jogos achados para um console |
+| POST | `/api/v1/library/games/{id}/favorite` | Marca um jogo como favorito |
+| DELETE | `/api/v1/library/games/{id}/favorite` | Desmarca um jogo como favorito |
+| GET | `/api/v1/igdb/credentials` | Estado da conexão com o IGDB (conectado sim/não) |
+| POST | `/api/v1/igdb/credentials` | Conecta a conta do IGDB (client_id/client_secret) |
+| DELETE | `/api/v1/igdb/credentials` | Desconecta a conta do IGDB |
+| POST | `/api/v1/library/games/scrape-covers` | Dispara a busca de capas (lote ou um jogo) |
+| GET | `/api/v1/scrape-jobs/{id}` | Acompanha uma busca de capas em andamento |
+| GET | `/api/v1/covers/{caminho}` | Serve uma capa já baixada em disco |
 
 ---
 
@@ -496,12 +504,18 @@ curl -X POST http://127.0.0.1:7777/api/v1/custom-emulators \
 
 **200 OK** — mesma forma de `GET /custom-emulators`, com a lista já atualizada.
 
+**Não instala nem copia nada** — só valida e grava a definição. `binary_path`
+precisa **já existir e ser executável** no momento do cadastro (I1,
+docs/roadmap.md): o ZeuX recusa em vez de deixar um emulador "cadastrado"
+que só quebraria na hora de jogar.
+
 **Erros**
 
 | Status | `code` | Quando |
 |---|---|---|
 | 400 | `invalid_body` | Corpo não é o JSON esperado (id, name, consoles, binary_path, args). |
-| 400 | `invalid_definition` | Falha de validação — o caso mais comum é `args` sem `{rom}`. A mensagem nomeia o problema. |
+| 400 | `invalid_definition` | Falha de validação estrutural — o caso mais comum é `args` sem `{rom}`. A mensagem nomeia o problema. |
+| 400 | `binary_not_found` | `binary_path` não existe no disco, ou existe mas não é executável (fora do Windows, onde a extensão já basta). A mensagem nomeia o caminho. |
 
 ---
 
@@ -1056,8 +1070,10 @@ curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
       "title": "Jogo",
       "added_at": "2026-08-03T20:00:00Z",
       "missing": false,
+      "favorite": true,
       "playtime_seconds": 412,
-      "last_played_at": "2026-08-03T21:10:00Z"
+      "last_played_at": "2026-08-03T21:10:00Z",
+      "cover_url": "/api/v1/covers/nes/jogos/5/cover.jpg"
     },
     {
       "id": 6,
@@ -1067,18 +1083,227 @@ curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
       "title": "Outro Jogo",
       "added_at": "2026-08-03T20:00:00Z",
       "missing": false,
+      "favorite": false,
       "playtime_seconds": 0
     }
   ]
 }
 ```
 
+No modo "todos os jogos" (sem `console_id`), `?favorite=true` restringe aos
+jogos favoritados (G4) — combinável com `?q=`.
+
 | Campo | Tipo | Notas |
 |---|---|---|
+| `favorite` | bool | Marcado por `POST/DELETE .../favorite` (G4). **Sempre presente**, nunca ausente mesmo quando `false` — diferente de `cover_url`, este campo não representa um dado que pode não ter sido resolvido ainda. |
 | `playtime_seconds` | int | Soma de `duration_seconds` de todas as sessões deste `rom_path`. `0` quando nunca foi jogado — sempre presente, nunca omitido. |
 | `last_played_at` | string | **Ausente** (não `""`) quando `playtime_seconds` é `0`. |
+| `cover_url` | string | Capa já baixada em disco pelo scraper de metadados (G1) e servida por `GET /api/v1/covers/...` — **nunca** uma URL de terceiro (IGDB) renderizada direto. **Ausente** (não `""`) quando a capa ainda não foi resolvida ou o IGDB não tem o jogo; a tela cai no placeholder de sigla. |
 
 **400 `missing_fields`** — sem `console_id` na query string.
+
+---
+
+## POST /api/v1/library/games/{id}/favorite
+
+Marca um jogo como favorito (G4). Idempotente — chamar de novo com o jogo já
+favoritado continua devolvendo 200.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/library/games/5/favorite
+```
+
+**200 OK**
+
+```json
+{ "id": 5, "favorite": true }
+```
+
+**Erros**
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `invalid_id` | `{id}` não é numérico. |
+| 404 | `not_found` | Nenhum jogo com este `id`. |
+| 500 | `library_write_failed` | Erro de I/O gravando no banco local. |
+
+---
+
+## DELETE /api/v1/library/games/{id}/favorite
+
+Desmarca um jogo como favorito. Mesmas regras de erro de `POST
+.../favorite` acima.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/library/games/5/favorite
+```
+
+**200 OK**
+
+```json
+{ "id": 5, "favorite": false }
+```
+
+---
+
+## GET /api/v1/igdb/credentials
+
+Estado da conexão com o IGDB (G1) — nunca devolve o `client_secret` de volta,
+só se há credencial configurada. Mesmo instinto de nunca logar uma senha.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/igdb/credentials
+```
+
+**200 OK**
+
+```json
+{ "configured": false }
+```
+
+Esta rota não tem caminho de erro além de falha de leitura do disco
+(`igdb_credentials_read_failed`, 500).
+
+---
+
+## POST /api/v1/igdb/credentials
+
+Conecta a conta do IGDB do usuário — `client_id`/`client_secret` obtidos no
+painel de desenvolvedor do Twitch (o IGDB usa a mesma autenticação). Guardado
+localmente (`~/.config/ZeuX/igdb_credentials.json` no Linux), nunca no
+repositório, nunca em variável de ambiente do processo.
+
+**Não valida contra o IGDB na hora** — fica instantânea e funciona offline. A
+validação real acontece na primeira busca (`POST
+/library/games/scrape-covers`), onde uma credencial errada vira um erro
+específico e acionável.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/igdb/credentials \
+  -H "Content-Type: application/json" \
+  -d '{"client_id":"...","client_secret":"..."}'
+```
+
+**200 OK**
+
+```json
+{ "configured": true }
+```
+
+**Erros**
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `invalid_body` | JSON malformado. |
+| 400 | `igdb_credentials_invalid` | `client_id` ou `client_secret` vazio. |
+| 500 | `igdb_credentials_write_failed` | Erro de I/O gravando o arquivo. |
+
+---
+
+## DELETE /api/v1/igdb/credentials
+
+Desconecta a conta — reversível (o usuário só reconecta depois), por isso
+sem confirmação especial no servidor.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/igdb/credentials
+```
+
+**200 OK**
+
+```json
+{ "configured": false }
+```
+
+---
+
+## POST /api/v1/library/games/scrape-covers
+
+Dispara a busca de capas pelo scraper de metadados do IGDB (G1). **Não
+bloqueia**: devolve o `Job` imediatamente (`202 Accepted`) e a interface
+acompanha o progresso por `GET /scrape-jobs/{id}` — mesmo desenho de `POST
+/emulators/{id}/install`.
+
+Corpo vazio (ou sem `game_id`) dispara o **lote**: todo jogo que ainda não
+tentou buscar capa (`cover_path` e `cover_status` ambos vazios). `game_id`
+presente busca **um jogo só** — também serve para reconsultar um jogo cuja
+capa já foi resolvida (G2), sem apagar o cache dos outros.
+
+Falha de rede num jogo do lote **não derruba o lote inteiro** — aquele jogo
+fica com `cover_status: "error"` e a busca segue para o próximo. Só uma
+credencial recusada pelo IGDB aborta o job inteiro (nenhum jogo teria
+sucesso mesmo).
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/library/games/scrape-covers \
+  -H "Content-Type: application/json" -d '{}'
+
+# busca de um jogo só
+curl -X POST http://127.0.0.1:7777/api/v1/library/games/scrape-covers \
+  -H "Content-Type: application/json" -d '{"game_id": 5}'
+```
+
+**202 Accepted**
+
+```json
+{
+  "id": "s1",
+  "phase": "buscando",
+  "total": 12,
+  "processed": 0,
+  "results": [],
+  "started_at": "2026-08-05T21:00:00Z",
+  "finished_at": null
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `phase` | string | `"buscando"` → `"baixando"` → `"concluido"` ou `"falhou"`. |
+| `results[].status` | string | `"found"`, `"not_found"` ou `"error"`, por jogo processado. |
+| `error` | string | Só presente quando `phase` é `"falhou"` (ex.: credencial recusada) — sempre a causa de o job inteiro ter abortado, nunca de um jogo isolado (isso vai em `results[].message`). |
+
+**Erros**
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `invalid_body` | JSON malformado. |
+| 400 | `igdb_not_configured` | Nenhuma credencial do IGDB conectada — não tenta a rede. |
+| 409 | `scrape_in_progress` | Já existe uma busca em andamento. |
+| 400 | `scrape_refused` | `game_id` informado não existe. |
+
+---
+
+## GET /api/v1/scrape-jobs/{id}
+
+Acompanha uma busca de capas específica por `id`.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/scrape-jobs/s1
+```
+
+**200 OK** — mesma forma do `Job` devolvido por `POST
+/library/games/scrape-covers`.
+
+**404 `not_found`** — nenhuma busca com este `id`.
+
+---
+
+## GET /api/v1/covers/{caminho}
+
+Serve o arquivo de capa já baixado em disco pelo scraper (G1) — nunca a URL
+do IGDB direto. `{caminho}` é o valor de `cover_url` devolvido por `GET
+/library/games`, sempre relativo à pasta gerenciada do ZeuX.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/covers/nes/jogos/5/cover.jpg -o capa.jpg
+```
+
+**200 OK** — a imagem, `Content-Type` conforme o arquivo.
+
+**404** — nenhum arquivo neste caminho (resposta padrão do `http.FileServer`
+do Go, sem corpo JSON — esta é a única rota do daemon que devolve um arquivo
+em vez de JSON).
 
 ---
 
@@ -1102,16 +1327,23 @@ curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
 | `launch_failed` | 400 | POST `/games/launch` | Qualquer falha do lançamento; a causa vai no `message`. |
 | `sessions_read_failed` | 500 | GET `/sessions` | Erro lendo o banco local (`internal/store`) — histórico ou tempo de jogo. |
 | `invalid_definition` | 400 | POST `/custom-emulators` | Definição inválida (o caso mais comum é `args` sem `{rom}`). |
-| `not_found` | 404 | DELETE `/custom-emulators/{id}`, GET `/installs/{id}` | Nenhum registro com este `id`. |
+| `binary_not_found` | 400 | POST `/custom-emulators` | `binary_path` não existe ou não é executável — nomeado na mensagem (I1). |
 | `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |
 | `install_refused` | 400 | POST `/emulators/{id}/install` | Fonte desconhecida, fonte manual, ou instalação já em andamento para este emulador. |
 | `uninstall_failed` | 400 | DELETE `/emulators/{id}/install` | Nada gerenciado para remover, ou falha ao apagar os arquivos. |
 | `open_failed` | 400 | POST `/emulators/{id}/open` | `id` desconhecido, emulador não encontrado no disco, ou falha ao iniciar o processo. |
-| `invalid_id` | 400 | DELETE `/library/folders/{id}`, POST `/library/folders/{id}/scan` | `{id}` não é numérico. |
+| `invalid_id` | 400 | DELETE `/library/folders/{id}`, POST `/library/folders/{id}/scan`, POST/DELETE `/library/games/{id}/favorite` | `{id}` não é numérico. |
 | `path_not_found` | 400 | POST `/library/folders` | O caminho informado não existe ou não é uma pasta. |
-| `library_write_failed` | 500 | POST `/library/folders` | Erro de I/O gravando a pasta no banco local. |
+| `library_write_failed` | 500 | POST `/library/folders`, POST/DELETE `/library/games/{id}/favorite` | Erro de I/O gravando no banco local. |
 | `library_read_failed` | 500 | GET `/library/folders`, `/library/games`, POST `/library/folders/{id}/scan` | Erro de I/O lendo o banco local. |
 | `library_scan_failed` | 500 | POST `/library/folders`, `/library/folders/{id}/scan` | Erro de I/O varrendo a pasta ou gravando os jogos achados. |
+| `not_found` | 404 | DELETE `/custom-emulators/{id}`, GET `/installs/{id}`, POST/DELETE `/library/games/{id}/favorite` | Nenhum registro com este `id`. |
+| `igdb_credentials_read_failed` | 500 | GET `/igdb/credentials` | Erro de I/O lendo `igdb_credentials.json`. |
+| `igdb_credentials_invalid` | 400 | POST `/igdb/credentials` | `client_id` ou `client_secret` vazio. |
+| `igdb_credentials_write_failed` | 500 | POST/DELETE `/igdb/credentials` | Erro de I/O gravando/removendo `igdb_credentials.json`. |
+| `igdb_not_configured` | 400 | POST `/library/games/scrape-covers` | Nenhuma credencial do IGDB conectada — a rota nem tenta a rede. |
+| `scrape_in_progress` | 409 | POST `/library/games/scrape-covers` | Já existe uma busca de capas em andamento. |
+| `scrape_refused` | 400 | POST `/library/games/scrape-covers` | `game_id` informado não existe. |
 
 ---
 
@@ -1127,8 +1359,6 @@ o L5 já fez para a biblioteca.
 
 | Rota (provável) | Para quê | Item do roadmap |
 |---|---|---|
-| `GET /api/v1/library/games` ganha o campo `cover_url` | Capa de jogo, servida como arquivo local já baixado pelo scraper de metadados (IGDB, conta do próprio usuário) — nunca uma URL de terceiro renderizada direto. Ausente quando a capa não foi resolvida; a tela cai no placeholder de sigla que já existe hoje. | [G1](roadmap.md#g1--capas-de-jogo-a-partir-de-um-scraper-de-metadados-g) |
-| `POST`/`DELETE /api/v1/library/games/{id}/favorite` (ou `PATCH` equivalente) | Favoritar/desfavoritar um jogo da biblioteca. `GET /library/games` passa a trazer `favorite` sempre presente (nunca ausente). | [G4](roadmap.md#g4--favoritar-jogo-m) |
 | Configuração de emulador (rota e formato ainda não decididos) | Ler e escrever a configuração persistida de um emulador (resolução interna, renderer, tela cheia) a partir do ZeuX, em vez de só abrir o emulador sozinho (`/emulators/{id}/open`, acima). Depende do H1 definir o modelo antes de a rota existir. | [H1](roadmap.md#h1--modelo-de-configuração-persistente-por-emulador-com-um-piloto-g), [H2](roadmap.md#h2--tela-de-configuração-do-emulador-dentro-do-zeux-m) |
 | `GET /api/v1/controllers` | Lista os controles (joystick/gamepad) conectados nesse momento, com nome legível — base do mapeamento de botões pelo ZeuX. | [H3](roadmap.md#h3--detectar-joystick-e-mapear-botões-g) |
 

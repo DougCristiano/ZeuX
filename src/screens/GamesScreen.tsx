@@ -72,6 +72,12 @@ export function GamesScreen({
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({});
   const [installState, setInstallState] = useState<InstallState>({ kind: "idle" });
+  // I2 (docs/roadmap.md): client-side, igual às outras telas com busca —
+  // este catálogo é a lista de jogos de UM console (nunca cresce sem
+  // limite como "Todos os jogos", que filtra no servidor). Filtra sobre
+  // `games` sem reordenar, preservando a ordenação por último jogado que o
+  // GET /library/games já devolve (L11).
+  const [search, setSearch] = useState("");
   // Erro de lançamento vira modal, não texto discreto na linha do jogo —
   // achado em 2026-08-04, um texto inline passava despercebido.
   const [launchError, setLaunchError] = useState<string | null>(null);
@@ -184,6 +190,11 @@ export function GamesScreen({
     doLaunch(game.path);
   }
 
+  const trimmedSearch = search.trim();
+  const visibleGames = trimmedSearch
+    ? (games ?? []).filter((g) => g.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
+    : games;
+
   return (
     <div className="mx-auto max-w-5xl px-6 pt-16 pb-10">
       {launchError && (
@@ -238,8 +249,22 @@ export function GamesScreen({
       )}
 
       {games && games.length > 0 && (
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar jogos..."
+          className="mb-4 w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        />
+      )}
+
+      {games && games.length > 0 && visibleGames && visibleGames.length === 0 && (
+        <p className="text-base text-muted">Nenhum jogo encontrado para "{trimmedSearch}".</p>
+      )}
+
+      {visibleGames && visibleGames.length > 0 && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {games.map((game) => {
+          {visibleGames.map((game) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =
               (installState.kind === "installing" ||

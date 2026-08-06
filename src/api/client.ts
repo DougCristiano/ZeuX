@@ -5,11 +5,16 @@ import type {
   ConsentStatus,
   CustomDefinition,
   CustomEmulatorsResponse,
+  EmulatorBindingsResponse,
+  EmulatorConfigWriteResult,
   EmulatorEntry,
+  EmulatorPersistedConfig,
   EmulatorSource,
   ErrorBody,
   HardwareInfo,
   HealthStatus,
+  IGDBCredentialsStatus,
+  InputBinding,
   InstallJob,
   BulkMatchedFolder,
   LaunchBody,
@@ -18,13 +23,24 @@ import type {
   PreviewResult,
   Report,
   RetroArchCoreStatus,
+  ScrapeJob,
   Session,
   SessionsResponse,
 } from "./types";
 
 // O zeuxd sobe como sidecar do Tauri (item B5) e escuta sempre neste
 // endereço fixo — descoberta dinâmica de porta é backlog sem sprint.
-const API_BASE = "http://127.0.0.1:7777/api/v1";
+export const API_ORIGIN = "http://127.0.0.1:7777";
+const API_BASE = `${API_ORIGIN}/api/v1`;
+
+// `cover_url` (G1) vem do servidor como caminho absoluto de rota
+// ("/api/v1/covers/..."), não URL completa — o servidor não sabe (nem
+// precisa saber) o próprio host:porta. Um <img src> com esse caminho cru
+// resolveria contra a origem do WebView/preview do front, não contra o
+// zeuxd. Esta função é o único lugar que faz essa junção.
+export function coverImageURL(coverUrl: string | undefined): string | undefined {
+  return coverUrl ? `${API_ORIGIN}${coverUrl}` : undefined;
+}
 
 /**
  * Erro de API com o `code` estável do servidor. `message` já vem em
@@ -117,11 +133,24 @@ export const api = {
     }),
   uninstallEmulator: (id: string) =>
     request<{ removed: string }>(`/emulators/${encodeURIComponent(id)}/install`, { method: "DELETE" }),
-  // Botão "Configurar" (2026-08-04): abre o emulador sozinho, sem jogo — o
-  // ZeuX ainda não grava/aplica configuração nenhuma (backlog separado);
-  // por ora, "configurar" é abrir o próprio emulador pro usuário mexer.
+  // Botão "Abrir configurações do emulador" — abre o emulador sozinho, sem
+  // jogo, escape hatch que sempre continua existindo (H2, docs/roadmap.md).
   openEmulator: (id: string) =>
     request<{ opened: string }>(`/emulators/${encodeURIComponent(id)}/open`, { method: "POST" }),
+
+  // --- Configuração persistida do emulador (H1/H2) ---
+  getEmulatorConfig: (id: string) =>
+    request<EmulatorPersistedConfig>(`/emulators/${encodeURIComponent(id)}/config`),
+  setEmulatorConfig: (id: string, opts: EmulatorPersistedConfig) =>
+    postJSON<EmulatorConfigWriteResult>(`/emulators/${encodeURIComponent(id)}/config`, opts),
+  restoreEmulatorConfig: (id: string) =>
+    request<{ restored: boolean }>(`/emulators/${encodeURIComponent(id)}/config`, { method: "DELETE" }),
+
+  // --- Mapeamento de teclado/controle (H3/H4) ---
+  getEmulatorBindings: (id: string) =>
+    request<EmulatorBindingsResponse>(`/emulators/${encodeURIComponent(id)}/bindings`),
+  setEmulatorBindings: (id: string, bindings: InputBinding[]) =>
+    postJSON<EmulatorConfigWriteResult>(`/emulators/${encodeURIComponent(id)}/bindings`, { bindings }),
   getInstalls: () => request<{ installs: InstallJob[] }>("/installs"),
   getInstallJob: (id: string) => request<InstallJob>(`/installs/${encodeURIComponent(id)}`),
 
@@ -150,9 +179,28 @@ export const api = {
   // Sem console_id: modo "todos os jogos" (2026-08-04), paginado — ver
   // handleListLibraryGames em internal/api/server.go. `query` filtra por
   // título no servidor (acha o jogo mesmo fora da página atual) — omitido
-  // quando vazio, em vez de mandar `q=`.
-  getAllLibraryGames: (page: number, pageSize: number, query?: string) =>
+  // quando vazio, em vez de mandar `q=`. `favoriteOnly` (G4) manda
+  // `favorite=true`, combinável com a busca.
+  getAllLibraryGames: (page: number, pageSize: number, query?: string, favoriteOnly?: boolean) =>
     request<{ games: LibraryGame[]; total: number; page: number; page_size: number }>(
-      `/library/games?page=${page}&page_size=${pageSize}${query ? `&q=${encodeURIComponent(query)}` : ""}`,
+      `/library/games?page=${page}&page_size=${pageSize}${query ? `&q=${encodeURIComponent(query)}` : ""}${favoriteOnly ? "&favorite=true" : ""}`,
     ),
+  // G4: favoritar/desfavoritar — resposta idêntica nas duas, só o valor
+  // gravado muda.
+  favoriteGame: (id: number) =>
+    request<{ id: number; favorite: boolean }>(`/library/games/${id}/favorite`, { method: "POST" }),
+  unfavoriteGame: (id: number) =>
+    request<{ id: number; favorite: boolean }>(`/library/games/${id}/favorite`, { method: "DELETE" }),
+
+  // --- Scraper de metadados IGDB (G1) ---
+  getIGDBCredentials: () => request<IGDBCredentialsStatus>("/igdb/credentials"),
+  setIGDBCredentials: (clientId: string, clientSecret: string) =>
+    postJSON<IGDBCredentialsStatus>("/igdb/credentials", { client_id: clientId, client_secret: clientSecret }),
+  clearIGDBCredentials: () =>
+    request<IGDBCredentialsStatus>("/igdb/credentials", { method: "DELETE" }),
+  // gameId ausente dispara o lote (todo jogo ainda sem capa); presente busca
+  // (ou reconsulta, G2) um jogo só.
+  scrapeCovers: (gameId?: number) =>
+    postJSON<ScrapeJob>("/library/games/scrape-covers", gameId ? { game_id: gameId } : {}),
+  getScrapeJob: (id: string) => request<ScrapeJob>(`/scrape-jobs/${encodeURIComponent(id)}`),
 };

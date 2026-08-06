@@ -32,7 +32,7 @@ func (a standaloneAdapter) Name() string       { return a.name }
 func (a standaloneAdapter) Consoles() []string { return a.consoles }
 
 func (a standaloneAdapter) Locate(ctx context.Context) (Installation, bool) {
-	path, managed, ok := findBinary(ctx, a.id, a.consoles, a.names, nil)
+	path, managed, version, ok := findBinary(ctx, a.id, a.consoles, a.names, nil)
 	if !ok {
 		return Installation{}, false
 	}
@@ -41,6 +41,7 @@ func (a standaloneAdapter) Locate(ctx context.Context) (Installation, bool) {
 		AdapterID:  a.id,
 		Name:       a.name,
 		BinaryPath: path,
+		Version:    version,
 		Managed:    managed,
 	}, true
 }
@@ -105,8 +106,13 @@ func newDuckStation() Adapter {
 	}
 }
 
+// PCSX2 é um dos dois pilotos do H1 (docs/roadmap.md) — envolvido em
+// pcsx2ConfigurableAdapter para ganhar ReadConfig/WriteConfig/RestoreConfig
+// (pcsx2_config.go) além do BuildCommand de sempre. Nenhum outro adapter
+// desta lista muda: só o PCSX2 sai como algo além de um standaloneAdapter
+// puro.
 func newPCSX2() Adapter {
-	return standaloneAdapter{
+	return pcsx2ConfigurableAdapter{Adapter: standaloneAdapter{
 		id:       "pcsx2",
 		name:     "PCSX2",
 		consoles: []string{"ps2"},
@@ -136,7 +142,7 @@ func newPCSX2() Adapter {
 			// começa com hífen seriam lidas como flag.
 			return opts, []string{"--", req.ROMPath}, unapplied
 		},
-	}
+	}}
 }
 
 func newDolphin() Adapter {

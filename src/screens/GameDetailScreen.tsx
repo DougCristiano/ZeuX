@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../api";
+import { api, ApiError, coverImageURL } from "../api";
 import type { LibraryGame } from "../api/types";
-import { Badge, Button, Card, ErrorModal, GameCover } from "../components/ui";
+import { Badge, Button, Card, ErrorModal, FavoriteToggle, GameCover } from "../components/ui";
+import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
 
@@ -54,6 +55,82 @@ export function GameDetailScreen({
   const [sessionCount, setSessionCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { statusFor, launch, launchError, clearLaunchError } = useLaunchGame();
+  const igdbConfigured = useIGDBStatus();
+  // Estado próprio, não `game.cover_url` direto: o prop `game` vem de um
+  // snapshot guardado no App.tsx no momento do clique e não muda sozinho
+  // depois de uma busca de capa bem-sucedida nesta tela.
+  const [coverUrl, setCoverUrl] = useState(game.cover_url);
+  const [scrapingCover, setScrapingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  // Mesmo raciocínio de coverUrl: estado próprio, não game.favorite direto,
+  // porque o snapshot em App.tsx não muda sozinho depois do toggle aqui.
+  const [favorite, setFavorite] = useState(game.favorite);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCoverUrl(game.cover_url);
+    setFavorite(game.favorite);
+  }, [game.id, game.cover_url, game.favorite]);
+
+  function toggleFavorite() {
+    const next = !favorite;
+    setFavorite(next);
+    setFavoriteError(null);
+    const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
+    call.catch(() => {
+      setFavorite(!next);
+      setFavoriteError("Não foi possível salvar o favorito. Tente de novo.");
+    });
+  }
+
+  function pollCoverJob(jobId: string) {
+    api
+      .getScrapeJob(jobId)
+      .then((job) => {
+        if (job.phase === "concluido") {
+          setScrapingCover(false);
+          const result = job.results[0];
+          if (result?.status === "error") {
+            setCoverError(result.message ?? "Não foi possível buscar a capa deste jogo.");
+          } else if (result?.status === "not_found") {
+            setCoverError("O IGDB não tem capa para este jogo.");
+          } else {
+            // Encontrada: recarrega este jogo para pegar o cover_url novo —
+            // a rota de busca não devolve o caminho da capa, só o status.
+            api
+              .getLibraryGames(game.console_id)
+              .then((res) => {
+                const updated = res.games.find((g) => g.id === game.id);
+                if (updated) setCoverUrl(updated.cover_url);
+              })
+              .catch(() => {});
+          }
+          return;
+        }
+        if (job.phase === "falhou") {
+          setScrapingCover(false);
+          setCoverError(job.error ?? "Não foi possível buscar a capa agora.");
+          return;
+        }
+        setTimeout(() => pollCoverJob(jobId), 400);
+      })
+      .catch((err) => {
+        setScrapingCover(false);
+        setCoverError(err instanceof ApiError ? err.message : "Não foi possível acompanhar a busca de capa.");
+      });
+  }
+
+  function handleScrapeCover() {
+    setCoverError(null);
+    setScrapingCover(true);
+    api
+      .scrapeCovers(game.id)
+      .then((job) => pollCoverJob(job.id))
+      .catch((err) => {
+        setScrapingCover(false);
+        setCoverError(err instanceof ApiError ? err.message : "Não foi possível iniciar a busca de capa.");
+      });
+  }
 
   useEffect(() => {
     api
@@ -76,8 +153,18 @@ export function GameDetailScreen({
       </Button>
 
       <div className="flex flex-col gap-5 sm:flex-row">
-        <div className="w-full max-w-[220px]">
-          <GameCover label={shortName} consoleId={game.console_id} size="lg" />
+        <div className="relative w-full max-w-[220px]">
+          <GameCover label={shortName} consoleId={game.console_id} coverUrl={coverImageURL(coverUrl)} size="lg" />
+          <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
+          {favoriteError && <p className="mt-1 text-xs text-danger">{favoriteError}</p>}
+          {igdbConfigured && (
+            <div className="mt-2">
+              <Button variant="secondary" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full text-xs">
+                {scrapingCover ? "Buscando…" : coverUrl ? "Buscar capa de novo" : "Buscar capa"}
+              </Button>
+              {coverError && <p className="mt-1 text-xs text-danger">{coverError}</p>}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-1 flex-col gap-3">

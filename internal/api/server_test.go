@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/doufl/zeux/internal/consent"
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
+	"github.com/doufl/zeux/internal/igdb"
 	"github.com/doufl/zeux/internal/install"
 	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/store"
@@ -110,7 +112,13 @@ func newTestServerWithDB(t *testing.T, probe hardware.Probe) (*api.Server, *sql.
 
 	libraryStore := library.NewStore(db)
 
-	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, silentLogger())
+	igdbCreds, err := igdb.NewCredentialsStore()
+	if err != nil {
+		t.Fatalf("igdb.NewCredentialsStore: %v", err)
+	}
+	igdbJobs := igdb.NewScrapeManager(libraryStore, igdbCreds, silentLogger())
+
+	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, igdbCreds, igdbJobs, silentLogger())
 	return server, db
 }
 
@@ -337,11 +345,16 @@ func TestCustomEmulatorLifecycle(t *testing.T) {
 	server := newTestServer(t, fakeProbe{})
 	handler := server.Routes()
 
+	binPath := filepath.Join(t.TempDir(), "meu-emulador-bin")
+	if err := os.WriteFile(binPath, []byte("x"), 0o755); err != nil {
+		t.Fatalf("criando binário de teste: %v", err)
+	}
+
 	def := map[string]any{
 		"id":          "meu-emulador",
 		"name":        "Meu Emulador",
 		"consoles":    []string{"ps1"},
-		"binary_path": "/opt/meu-emulador/bin",
+		"binary_path": binPath,
 		"args":        []string{"{rom}"},
 	}
 

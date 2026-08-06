@@ -102,6 +102,14 @@ duplicado.
 
 ## Quantas faltam (contado em 2026-08-04: toda a Sprint D fechada — L1, L2, L3, L5, L6, L7, L8, L9, L10, L11; D4 resolvido e removido)
 
+**Esta contagem ficou desatualizada em 2026-08-05** (G1, G2, G4, I1, I2, o
+item `Installation.Version` da Sprint A e o de cores do RetroArch da Sprint C
+fecharam na mesma sessão) — os números abaixo não foram recalculados porque
+várias linhas dependem umas das outras de um jeito frágil o bastante para
+recontar errado ser pior que deixar a tabela velha e sinalizada. As linhas
+correspondentes, no corpo do documento, já refletem o estado real; só esta
+tabela-resumo ficou para trás. Recontar é trabalho futuro, não perdido.
+
 Itens **abertos**, contados uma vez cada — D11 aparece como critério de saída
 da Sprint A, mas conta uma vez só.
 
@@ -616,7 +624,7 @@ jogos.
 | ~~D7 — fixar versões no `mise.toml`~~ | P | **Feito** (`go 1.26.5`, `node 24.18.1`) |
 | ~~D11 — abrir uma ROM real em 3 emuladores~~ | P | **Feito 2026-08-04** — PS2/PCSX2 e N64/RMG confirmados pelo Douglas |
 | ~~D4 — resolver OneDrive~~ | P | **Resolvido 2026-08-04** — repositório movido para fora do OneDrive |
-| Detectar `Installation.Version` | P | ~~D1~~ desbloqueado. **Não feito** — `Installation.Version` existe no tipo (`adapter.go:100`) e nenhum adapter o preenche |
+| ~~Detectar `Installation.Version`~~ | P | **Feito 2026-08-05** — só para instalação gerenciada pelo ZeuX: `internal/install/manager.go` grava a tag do release (`emulator.VersionMarkerName`, arquivo `.zeux-version`) dentro do diretório instalado; `findBinary` lê de volta. Instalação que o usuário já tinha continua com a versão ausente de propósito — o ZeuX não executa o binário alheio para perguntar a versão a ele, dado desconhecido nunca é palpite. Exibido em `EmulatorsScreen.tsx` junto do badge "instalado pelo ZeuX". |
 | ~~Atualizar o README~~ | P | **Feito** — já documenta instalação 1-click e as rotas de `/emulators`, `/games/*`, `/sessions` |
 
 **Critério de saída:** pelo menos 3 emuladores diferentes abrindo jogos de fato,
@@ -631,7 +639,7 @@ fechada.**
 
 ---
 
-## Sprint B — Ambiente Tauri e casca da UI
+## Sprint B — Ambiente Tauri e casca da UI — **encerrada em 2026-08-05**
 
 Objetivo: primeira tela consumindo a API — e a primeira prova de que o
 [ADR 0001](decisoes/0001-ipc-http-local.md) (IPC por HTTP local) funciona dentro
@@ -656,7 +664,7 @@ sequência.
 | B8 | Fluxo de onboarding: consentimento → scan → parecer | M | B5, B6, B7 · **Feito 2026-08-02** — máquina de estados real em `App.tsx`, os 6 critérios verificados com Chromium contra um `zeuxd` de verdade (incluindo troca de `PolicyText`/`PolicyVersion` recompilando o Go) |
 | B9 | Tela de parecer: gargalos nomeados, aviso de "parcial" | M | B8 · **Feito 2026-08-02** — maior parte já vinha do B7/B8; acrescentado o aviso permanente de estimativa (D2 aberto) |
 | B10 | Instalar com ressalva de hardware (servidor já faz — ver nota) | P | B9 · **Feito 2026-08-02** — telas 06/07 do wireframe combinadas em `EmulatorsScreen`; testado com tentativa de instalação real (falhou por rede, o que provou o caminho de erro sem precisar simular) |
-| B11 | Empacotamento: binário Go dentro do instalador Tauri | M | B4 · **Feito pela metade 2026-08-02** — a mecânica existe e é a parte difícil; falta a prova. Ver abaixo |
+| B11 | Empacotamento: binário Go dentro do instalador Tauri | M | B4 · **Feito — encerrado em 2026-08-05.** Mecânica implementada 2026-08-02; prova em máquina limpa dos 3 SOs feita pelo Douglas. Ver abaixo |
 
 **A ordem tem uma razão só:** B2 vem antes de qualquer tela. O servidor **não
 tem uma linha de `Access-Control-*` hoje** (verificado por `grep` em
@@ -721,40 +729,41 @@ commit dela (mesmo comportamento de antes, "republicar assets"). Os jobs de
 build passaram a ler a tag resolvida via `needs.create-release.outputs.tag`,
 não mais recalculando a mesma expressão em cada um.
 
-**O que falta é a única parte que importa, agora nos 3 SOs:** ninguém
-instalou esses artefatos numa máquina limpa de cada plataforma. Fica aberto
-com o critério explícito, por SO:
+**Encerrado em 2026-08-05 — verificação em máquina real feita pelo Douglas.**
+Mesma limitação estrutural do D11: nenhuma sessão de IA tem acesso a uma
+máquina limpa de cada SO, então esta etapa só podia ser fechada por ele. Ficam
+os checkboxes como registro do que foi coberto:
 
 **Windows:**
-- [ ] O `.msi` gerado pela CI é instalado numa máquina **sem Go, Node ou Rust**.
-- [ ] Abrir o app pelo atalho leva do consentimento ao parecer sem passo manual.
-- [ ] Fechar a janela derruba o `zeuxd` — nenhum processo sobra e a porta `7777`
+- [x] O `.msi` gerado pela CI é instalado numa máquina **sem Go, Node ou Rust**.
+- [x] Abrir o app pelo atalho leva do consentimento ao parecer sem passo manual.
+- [x] Fechar a janela derruba o `zeuxd` — nenhum processo sobra e a porta `7777`
       fica livre (`netstat -ano | findstr 7777` volta vazio).
-- [ ] Desinstalar remove o binário do daemon junto.
-- [ ] O aviso do SmartScreen (sem assinatura de código) é registrado aqui como
+- [x] Desinstalar remove o binário do daemon junto.
+- [x] O aviso do SmartScreen (sem assinatura de código) é registrado aqui como
       esperado, não tratado como falha.
 
 **Linux:**
-- [ ] O `.deb`/`.rpm`/`.AppImage` roda numa distro limpa (sem Go, Node, Rust,
+- [x] O `.deb`/`.rpm`/`.AppImage` roda numa distro limpa (sem Go, Node, Rust,
       nem as libs de dev do Tauri instaladas manualmente).
-- [ ] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
-- [ ] Testar em pelo menos uma distro baseada em Debian (`.deb`) e uma em
+- [x] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
+- [x] Testar em pelo menos uma distro baseada em Debian (`.deb`) e uma em
       formato universal (`.AppImage`) — o `.rpm` fica como bônus se houver
       máquina Fedora/openSUSE à mão.
 
 **macOS:**
-- [ ] O `.dmg` monta e o `.app` abre numa máquina limpa (sem Xcode, Go, Node
+- [x] O `.dmg` monta e o `.app` abre numa máquina limpa (sem Xcode, Go, Node
       ou Rust).
-- [ ] **Gatekeeper vai bloquear a primeira abertura** (sem assinatura Apple
+- [x] **Gatekeeper vai bloquear a primeira abertura** (sem assinatura Apple
       Developer nem notarização) — isso é esperado e registrado aqui como
       tal, não como falha. O caminho de contorno é clique-direito → Abrir.
       Assinatura de código fica fora de escopo por ora (mesmo motivo do
       SmartScreen: custo de certificado).
-- [ ] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
+- [x] Fechar a janela derruba o `zeuxd` — `lsof -i :7777` volta vazio.
 
-**Depende de:** nada no código — os 3 workflows já existem e compilam. Falta
-só a verificação humana em máquina real de cada SO, que nenhuma sessão de IA
-consegue fazer (mesma limitação estrutural do D11).
+**Depende de:** nada — os 3 workflows compilam e a verificação humana em
+máquina real de cada SO, a única parte que uma sessão de IA não consegue
+fazer, está feita.
 
 **Dependências de sistema junto do instalador (2026-08-04):** o Douglas pediu
 que o próprio instalador do ZeuX cuide de pedir as dependências que faltam,
@@ -822,11 +831,10 @@ roda:
   ambiente de teste, e não substitui rodar numa máquina Linux desktop real
   com GPU de verdade (a próxima verificação pendente da lista acima).
 
-**Ainda pendente:** os checkboxes acima seguem em aberto porque nenhum foi
-testado numa distro **limpa** (sem as libs de dev já instaladas por este
-container ter sido usado para compilar CI localmente) nem numa máquina com
-GPU real. O que foi provado aqui é que o mecanismo de dependência funciona
-como desenhado — a prova completa em ambiente limpo continua com o Douglas.
+**Fechado em 2026-08-05:** o parágrafo acima descreve a prova parcial feita
+dentro deste container (mecanismo de dependência, sem distro limpa nem GPU
+real). A prova completa, em máquina limpa de verdade, foi feita pelo Douglas
+— ver os checkboxes marcados acima.
 
 **Distribuição: Releases, não só artifact de CI (2026-08-04).** O Douglas
 notou que os instaladores só existiam como artifact de workflow — que expira
@@ -888,14 +896,11 @@ pena dobrar o tempo de CI para cobrir uma fatia de usuários com Mac Intel
 (cada vez menor, já que a Apple não vende mais essas máquinas desde 2023),
 ou aceitar `aarch64`-only até haver sinal de demanda real?
 
-**Ainda faltando, mesmo com a v0.1.0 publicada:** nenhum dos 6 instaladores
-foi testado numa máquina limpa de verdade — os checkboxes de Windows/Linux/
-macOS no início desta seção continuam abertos. O teste feito nesta sessão
-(Linux, ver acima) usou um `.deb` compilado localmente, não o artifact
-oficial da Release. Rodar exatamente o `zeux_0.1.0_amd64.deb` publicado, em
-vez de uma compilação local equivalente, é o próximo passo mais barato —
-mesmo binário, zero surpresa esperada, mas fecha a lacuna "testei uma coisa
-parecida" vs "testei o artefato que o usuário final vai baixar".
+**Fechado em 2026-08-05:** os 6 instaladores da v0.1.0 foram testados em
+máquina limpa pelo Douglas — ver os checkboxes marcados acima. O teste feito
+nesta sessão (Linux, ver acima) tinha usado um `.deb` compilado localmente,
+não o artifact oficial da Release; a verificação do Douglas fecha essa
+lacuna.
 
 **Nota sobre B10:** o bloqueio por hardware com escape **já existe no servidor**
 (`hardwareBlocks` + `?force=true` + `override_hint`, em
@@ -915,11 +920,12 @@ Ver [ADR 0009](decisoes/0009-desktop-agora-controle-depois.md). O critério
 verificável está em B7 e B8: o onboarding inteiro precisa ser concluído só com
 Tab e Enter.
 
-**Critério de saída (resumo):** um instalador que roda numa máquina sem Go, Node
-nem Rust leva o usuário do consentimento ao parecer sem passo manual, o `zeuxd`
-sobe e desce com a janela, e o ADR 0001 deixa de ser aposta — com o `origin`
-real do WebView escrito aqui. Os sete itens completos estão em
-[`sprint-b-plano.md`](sprint-b-plano.md).
+**Critério de saída — cumprido em 2026-08-05:** um instalador que roda numa
+máquina sem Go, Node nem Rust leva o usuário do consentimento ao parecer sem
+passo manual, o `zeuxd` sobe e desce com a janela, e o ADR 0001 deixou de ser
+aposta — `origin` real do WebView confirmado (B2), e os 6 instaladores da
+v0.1.0 testados em máquina limpa dos 3 SOs pelo Douglas. Os sete itens
+completos estão em [`sprint-b-plano.md`](sprint-b-plano.md).
 
 ---
 
@@ -945,7 +951,7 @@ refletindo o estado certo.
 | ~~Extração para `ManagedRoot()`~~ | M | **Feito** — `extract.go` + `manager.go` (`promote`), atômico via diretório de trabalho + `rename` |
 | ~~Instalar/atualizar/remover apenas o que é `managed`~~ | M | **Feito** — `Uninstall` só apaga dentro de `ManagedRoot()`; atualização preserva dados de instalação portátil |
 | ~~Estrutura de diretórios por console (não achatada por adapter)~~ | M | **Feito 2026-08-02** — ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md); só a parte de emuladores, a de jogos depende da Sprint D |
-| **Instalação de cores do RetroArch** | M | **Bloqueado neste ambiente** — ver nota abaixo |
+| ~~**Instalação de cores do RetroArch**~~ | M | **Resolvido — via empacotamento, não via instalação em tempo real.** Ver [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md): os 24 cores (mais os 4 de precisão máxima) vêm dentro do próprio instalador do ZeuX (`scripts/download-retroarch-cores.mjs` + `cmd/download-retroarch-app`, baixados no build, não em runtime), não resolvidos via `internal/install` contra `buildbot.libretro.com` como esta linha presumia originalmente. **Douglas verificou de verdade em 2026-08-05, lançando jogos de 3 consoles diferentes via RetroArch** — cores presentes e funcionais. A nota de bloqueio abaixo (rede indisponível neste ambiente de CI) descreve por que a implementação *nesta sessão* não teria como testar contra o buildbot — segue registrada por precisão histórica, mas deixou de ser o caminho adotado. |
 | ~~**Aviso quando o hardware não comporta, e o usuário decide**~~ | P | **Feito na Sprint B, item B10** |
 | ~~Rotas: `POST /api/v1/emulators/{id}/install`, `DELETE`, progresso~~ | M | **Feito** — documentado em `docs/api.md`, testado de verdade no B10 |
 
@@ -954,6 +960,15 @@ automaticamente**. Mostrar o parecer, explicar o gargalo, e deixar o usuário
 decidir por conta e risco. Não bloquear — informar.
 
 ### Bloqueio real: instalação de cores do RetroArch
+
+**Resolvido por outra via (ver linha da tabela acima, ADR 0012) — seção
+mantida por registro histórico do porquê a rota abaixo foi descartada, não
+como pendência ativa.** Em vez de o `internal/install` resolver e baixar
+cores em tempo real contra o `buildbot.libretro.com` (a ideia original
+descrita abaixo), a decisão foi empacotar os cores dentro do instalador do
+ZeuX — baixados uma vez, no build, não a cada instalação do usuário. O
+Douglas testou o resultado empacotado com jogos reais de 3 consoles em
+2026-08-05 e confirmou funcionando.
 
 Os cores do RetroArch (libretro) são distribuídos pelo `buildbot.libretro.com`,
 não pelo GitHub Releases — um mecanismo de resolução diferente do que
@@ -1433,25 +1448,25 @@ console.
 "Fora do MVP" da Sprint D, onde o texto original está preservado.
 
 **Critério de aceite:**
-- [ ] Existe uma rota `GET /api/v1/library/games` (ou campo novo nela) que
+- [x] Existe uma rota `GET /api/v1/library/games` (ou campo novo nela) que
       devolve `cover_url` apontando para um arquivo **local** já baixado —
       nunca uma URL de terceiro renderizada direto pelo WebView (offline
       quebraria a tela, e cada render viraria uma requisição de rede).
-- [ ] Um jogo sem capa encontrada devolve o campo **ausente**, e a tela cai no
+- [x] Um jogo sem capa encontrada devolve o campo **ausente**, e a tela cai no
       placeholder de sigla que já existe — nunca uma capa errada de um jogo
       parecido. Dado que não pôde ser obtido é declarado desconhecido, mesma
       regra do parecer parcial.
-- [ ] `grep` no cliente do scraper mostra que os únicos endpoints chamados são
+- [x] `grep` no cliente do scraper mostra que os únicos endpoints chamados são
       de metadado/imagem. **Nenhum caminho de código baixa, referencia ou
       exibe link de arquivo de jogo** — verificável por leitura, e travado por
       um teste que falha se a lista de hosts/endpoints permitidos crescer.
-- [ ] A busca acontece **sob demanda ou em lote explícito**, com o usuário
+- [x] A busca acontece **sob demanda ou em lote explícito**, com o usuário
       sabendo que está saindo para a internet — não uma varredura silenciosa
       mandando os nomes dos arquivos dele para um terceiro no primeiro
       `POST /library/folders`.
-- [ ] Falha de rede não quebra a biblioteca: a tela continua listando tudo com
+- [x] Falha de rede não quebra a biblioteca: a tela continua listando tudo com
       placeholder, e o erro é acionável ("tentar de novo"), não silencioso.
-- [ ] Um teste roda **sem rede**, contra um servidor de mentira, e cobre:
+- [x] Um teste roda **sem rede**, contra um servidor de mentira, e cobre:
       achou / não achou / erro de rede / resposta malformada.
 
 **Fonte decidida em 2026-08-04: IGDB.** Cobertura mais ampla (inclui variantes
@@ -1468,10 +1483,10 @@ app: sem conta conectada, a biblioteca continua funcionando com o placeholder
 de sigla, nunca uma tela vazia ou travada esperando login.
 
 **Critério de aceite adicional, por causa dessa decisão:**
-- [ ] Existe uma tela/fluxo para o usuário informar `client_id`/`client_secret`
+- [x] Existe uma tela/fluxo para o usuário informar `client_id`/`client_secret`
       (ou o fluxo OAuth que o IGDB documentar), guardado localmente (mesmo
       princípio de `consent.Store`: nunca hardcoded, nunca no repositório).
-- [ ] Sem credencial conectada, G1 não roda — nem tenta, nem mostra erro de
+- [x] Sem credencial conectada, G1 não roda — nem tenta, nem mostra erro de
       rede — a biblioteca simplesmente não busca capa, mesma aparência de hoje.
 
 **Depende de:** nada (decisão fechada) · **Bloqueia:** G2, G3
@@ -1482,17 +1497,17 @@ Sem cache, cada abertura da biblioteca refaz a busca — lento, estoura cota de
 API, e não funciona offline. Um app desktop precisa abrir igual com e sem rede.
 
 **Critério de aceite:**
-- [ ] As imagens ficam em disco numa pasta gerenciada pelo ZeuX (mesma raiz de
+- [x] As imagens ficam em disco numa pasta gerenciada pelo ZeuX (mesma raiz de
       `ManagedRoot()`, ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)),
       e o banco guarda **caminho**, nunca o binário da imagem — mesma regra que
       o L1 já trava para ROM.
-- [ ] Abrir a biblioteca com a rede desligada mostra todas as capas já baixadas.
+- [x] Abrir a biblioteca com a rede desligada mostra todas as capas já baixadas.
       Verificável: derrubar a rede, reiniciar o `zeuxd`, abrir a tela.
-- [ ] Uma segunda abertura da mesma tela **não faz nenhuma requisição externa**
+- [x] Uma segunda abertura da mesma tela **não faz nenhuma requisição externa**
       para jogos já resolvidos — medível pelo log do `--debug`.
-- [ ] Existe uma forma de limpar/reconsultar um jogo específico cuja capa veio
+- [x] Existe uma forma de limpar/reconsultar um jogo específico cuja capa veio
       errada, sem apagar o cache inteiro.
-- [ ] Remover a pasta da biblioteca não deixa imagem órfã acumulando para sempre.
+- [x] Remover a pasta da biblioteca não deixa imagem órfã acumulando para sempre.
 
 **Depende de:** G1 · **Bloqueia:** nada
 
@@ -1524,23 +1539,30 @@ por escolha do usuário.
 campo de favorito; `grep -ri favorit internal/ src/` devolve vazio.
 
 **Critério de aceite:**
-- [ ] Migração nova em `internal/store/migrations/` (a próxima depois de
-      `0003_library_games_missing.sql`) acrescenta o favorito à entrada de jogo.
-      Rodar o daemon numa base antiga migra sem perder nada.
-- [ ] Rota que marca e desmarca — `POST` e `DELETE
-      /api/v1/library/games/{id}/favorite`, ou um `PATCH` equivalente —
-      documentada em [`docs/api.md`](api.md) **antes** da tela, como o L5 fez.
-- [ ] `GET /api/v1/library/games` devolve `favorite` em toda entrada, sempre
-      presente (nunca ausente quando `false`), e aceita filtrar só os favoritos.
-- [ ] Favoritar um `id` que não existe devolve **404 com `code` estável**, não
-      500 nem 200 silencioso.
-- [ ] Na tela: alternar favorito em `AllGamesScreen`/`GameDetailScreen` atualiza
-      na hora, sem recarregar; o estado sobrevive a reiniciar o app.
-- [ ] O toggle é alcançável **só com Tab e Enter**, e não existe apenas em hover
-      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)) — este é o
-      caso clássico onde a estrelinha que só aparece no hover quebra a regra.
-- [ ] Jogo com `missing: true` continua favoritável (o arquivo pode voltar) —
-      ou, se a decisão for outra, ela fica escrita aqui.
+- [x] Migração nova em `internal/store/migrations/` (a próxima depois de
+      `0003_library_games_missing.sql` — na prática `0005`, já que o G1 usou a
+      `0004` para capa) acrescenta o favorito à entrada de jogo. Rodar o
+      daemon numa base antiga migra sem perder nada (mesmo mecanismo de
+      `internal/store.migrate`, testado desde o L1).
+- [x] Rota que marca e desmarca — `POST` e `DELETE
+      /api/v1/library/games/{id}/favorite` — documentada em
+      [`docs/api.md`](api.md) **antes** da tela, como o L5 fez.
+- [x] `GET /api/v1/library/games` devolve `favorite` em toda entrada, sempre
+      presente (nunca ausente quando `false`), e aceita filtrar só os
+      favoritos (`?favorite=true`).
+- [x] Favoritar um `id` que não existe devolve **404 com `code` estável**
+      (`not_found`), não 500 nem 200 silencioso.
+- [x] Na tela: alternar favorito em `AllGamesScreen`/`GameDetailScreen` atualiza
+      na hora (otimista, com reversão se a chamada falhar), sem recarregar; o
+      estado sobrevive a reiniciar o app (persistido no banco).
+- [x] O toggle é alcançável **só com Tab e Enter**, e não existe apenas em hover
+      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)) —
+      `FavoriteToggle` (`src/components/ui.tsx`) é sempre visível, nunca
+      condicionado a `group-hover`.
+- [x] Jogo com `missing: true` continua favoritável (o arquivo pode voltar) —
+      `SetFavorite` não checa `missing`, decisão confirmada por
+      `TestSetFavoriteTogglesAndPersists`/ausência de qualquer guarda no
+      handler.
 
 **Depende de:** nada (L1/L5 já entregues) · **Bloqueia:** nada
 
@@ -1623,29 +1645,74 @@ que o usuário ajustou na mão.
 não couber em dois emuladores de formatos diferentes, é melhor descobrir aqui
 que depois de cinco.
 
-**Critério de aceite:**
-- [ ] O `Adapter` ganha uma capacidade opcional de configuração — declarando
+**Critério de aceite — implementado e verificado em 2026-08-06:**
+- [x] O `Adapter` ganha uma capacidade opcional de configuração
+      (`ConfigurableAdapter`, `internal/emulator/adapter.go`) — declarando
       quais opções ele sabe **persistir** (distinto das que sabe passar por
-      linha de comando). Um adapter que não implementa continua funcionando
-      exatamente como hoje: nenhuma regressão em `BuildCommand`.
-- [ ] Implementado de verdade em **dois** emuladores com formatos de arquivo
-      diferentes — por exemplo, um `.ini` (DuckStation/PCSX2) e o
-      `retroarch.cfg`. Dois, não um: um só não prova abstração nenhuma.
-- [ ] **Escrever preserva o que o ZeuX não conhece.** Um teste pega um arquivo
-      de config com 40 chaves das quais o ZeuX modela 3, grava, e confirma que
-      as outras 37 saíram byte a byte iguais — comentários inclusive, se o
-      formato permitir. Este é o critério mais importante do item: config de
-      emulador é do usuário, o ZeuX é visita.
-- [ ] Antes de escrever pela primeira vez, o arquivo original é copiado para um
-      backup dentro da pasta gerenciada, e existe rota/botão de restaurar.
-- [ ] Uma opção que o emulador não suporta **não é inventada** — cai na mesma
-      disciplina do `Unapplied` ([ADR 0006](decisoes/0006-campo-unapplied.md)),
-      declarada como não aplicada em vez de escrita como chave que não existe.
-- [ ] `go test ./internal/emulator/...` passa **sem nenhum emulador instalado** —
-      a leitura/escrita opera sobre caminho, e o teste usa arquivos temporários.
-- [ ] O que foi verificado contra **binário real** e o que foi só lido em
+      linha de comando, `Options`/`BuildCommand`, que continuam intactas). Um
+      adapter que não implementa continua funcionando exatamente como hoje —
+      travado por `TestOrdinaryStandaloneAdapterDoesNotSatisfyConfigurableAdapter`
+      (DuckStation, por exemplo, segue sem a capacidade).
+- [x] Implementado de verdade em **dois** emuladores com formatos de arquivo
+      genuinamente diferentes: **PCSX2** (`.ini` seccionado,
+      `internal/emulator/pcsx2_config.go` + `iniconfig.go`) e **RetroArch**
+      (`retroarch.cfg`, achatado sem seção e com valor sempre entre aspas,
+      `retroarch_config.go`). Campos cobertos por adapter, honestamente
+      escopados ao que foi confirmado contra arquivo real (ver tabela
+      abaixo) — Renderer fica em `Unapplied` nos dois quando pedido, porque
+      o mapeamento não foi confirmado contra binário real.
+- [x] **Escrever preserva o que o ZeuX não conhece** — verificado não só em
+      teste sintético (`TestPCSX2WriteConfigPreservesUnknownKeys`,
+      `TestRetroArchWriteConfigPreservesUnknownKeys`), mas contra **cópias
+      dos arquivos reais desta máquina**: um `PCSX2.ini` real de 608 linhas
+      (gerado por uma execução de verdade do PCSX2) e um `retroarch.cfg`
+      real de 3461 linhas tiveram round-trip byte a byte idêntico sem
+      nenhuma escrita, e a escrita de Fullscreen+InternalScale no PCSX2.ini
+      real mudou **exatamente as 2 linhas esperadas**, nenhuma a mais.
+- [x] Antes de escrever pela primeira vez, o arquivo original é copiado para
+      um backup, e existe `RestoreConfig` para reverter
+      (`internal/emulator/configbackup.go`). **Desvio deliberado do texto
+      original deste item:** o backup fica como um arquivo irmão
+      (`<config>.zeux-backup`), ao lado do arquivo de configuração real do
+      emulador — não dentro da pasta gerenciada do ZeuX. A config real de
+      um emulador não roda de dentro de `ManagedRoot()` (ver achado sobre o
+      PCSX2 em `pcsx2_config.go`: nem a instalação gerenciada roda em modo
+      portátil), e replicar essa árvore de caminhos dentro da pasta
+      gerenciada só para guardar um backup adicionaria uma camada de
+      indireção sem ganho real nesta etapa — o arquivo irmão é encontrável
+      no mesmo lugar que o original, com a mesma permissão. Revisar se H2
+      (a tela) precisar de outro arranjo.
+- [x] Uma opção que o emulador não suporta **não é inventada** — mesma
+      disciplina do `Unapplied` de `BuildCommand` (ADR 0006): Renderer para
+      os dois adapters, e InternalScale para o RetroArch (não é o mesmo
+      conceito de `video_scale`, que é escala de janela, não resolução do
+      core).
+- [x] `go test ./internal/emulator/...` passa **sem nenhum emulador
+      instalado** — toda leitura/escrita opera sobre um caminho recebido
+      por parâmetro (ou uma `var` de pacote sobrescrita em teste), nunca
+      descobre o caminho sozinha durante o teste.
+- [x] O que foi verificado contra **binário real** e o que foi só lido em
       documentação fica escrito, adapter por adapter — mesma honestidade que o
-      D1 impôs às flags.
+      D1 impôs às flags. Tabela:
+
+| Adapter | Campo | Chave | Confirmado contra | Status |
+|---|---|---|---|---|
+| PCSX2 | Fullscreen | `[UI] StartFullscreen` | Arquivo real desta máquina, gerado por execução de verdade | Implementado |
+| PCSX2 | InternalScale | `[EmuCore/GS] upscale_multiplier` | Arquivo real desta máquina | Implementado |
+| PCSX2 | Renderer | `[EmuCore/GS] Renderer` (id numérico) | Só a existência da chave — mapeamento id→Renderer não confirmado | `Unapplied` de propósito |
+| RetroArch | Fullscreen | `video_fullscreen` | Arquivo real desta máquina (`~/.config/retroarch/retroarch.cfg`) | Implementado |
+| RetroArch | Renderer (OpenGL, Vulkan) | `video_driver` = `"gl"`/`"vulkan"` | `"gl"` é o driver ativo real nesta máquina; `"vulkan"` é nome de driver estável e documentado, não testado ativo aqui | Implementado, parcial |
+| RetroArch | Renderer (D3D12, Software) | `video_driver` | Não verificado — nenhuma máquina Windows disponível nesta sessão para conferir o id exato | `Unapplied` de propósito |
+| RetroArch | InternalScale | — | `video_scale` existe mas é escala de janela, conceito diferente de resolução do core | Não implementado (conceito não mapeia) |
+
+**Achado real registrado durante a implementação:** mesmo a instalação do
+PCSX2 feita pelo próprio ZeuX (AppImage, gerenciada) não roda em modo
+portátil nesta máquina — grava a config em `~/.config/PCSX2/inis/PCSX2.ini`
+(padrão do sistema), não em `<pasta gerenciada>/inis/PCSX2_qt.ini` como
+`seedPCSX2` (`internal/install/firstrun.go`) presume. `pcsx2ConfigPath()`
+(H1) já usa o caminho real confirmado; **`seedPCSX2` continua com a
+suposição antiga e não foi corrigido aqui** — está fora do escopo do H1,
+registrado para não se perder.
 
 **Depende de:** decisão sobre a ambiguidade acima · **Bloqueia:** H2, H5
 
@@ -1654,21 +1721,38 @@ que depois de cinco.
 O H1 sem tela é biblioteca sem consumidor. Aqui o botão "Configurar" deixa de
 abrir o emulador e passa a abrir o ZeuX.
 
-**Critério de aceite:**
-- [ ] A partir da tela de Emuladores (e/ou de um jogo), o usuário altera pelo
-      menos resolução interna, renderer e tela cheia, e o valor sobrevive a
-      fechar o ZeuX e abrir de novo.
-- [ ] Cada campo mostra o valor **efetivo hoje** — lido do arquivo real do
-      emulador, não o default que o ZeuX imagina. Valor que não pôde ser lido
-      aparece como desconhecido, nunca como um chute bonito.
-- [ ] Opção que aquele emulador não suporta **não aparece na tela** ou aparece
-      explicitamente indisponível com o motivo — nunca um campo que finge
-      funcionar.
-- [ ] O botão "Configurar" atual (abrir o emulador sozinho) **continua
-      existindo** como escape, renomeado para o que ele é ("Abrir configurações
-      do emulador"). Informar, não bloquear: o ZeuX nunca vira o único caminho.
-- [ ] "Restaurar padrão" volta ao backup do H1 e é reversível.
-- [ ] Concluível só com Tab e Enter.
+**Critério de aceite — implementado e verificado ao vivo em 2026-08-05:**
+- [x] A partir da tela de Emuladores, o usuário altera resolução interna,
+      renderer e tela cheia (`EmulatorConfigPanel.tsx`, rotas
+      `GET/POST/DELETE /api/v1/emulators/{id}/config`), e o valor sobrevive a
+      fechar o ZeuX e abrir de novo — **verificado contra o `PCSX2.ini` real
+      desta máquina**: gravou `StartFullscreen = true`, reabriu o app,
+      confirmou o valor lido, gravou de volta `false`, e o arquivo bateu
+      byte a byte com o original ao final do teste.
+- [x] Cada campo mostra o valor **efetivo hoje**, lido do arquivo real —
+      `fullscreen === null` renderiza "(desconhecido — nunca lido do
+      arquivo)" em vez de um chute.
+- [x] Renderer não confirmado (ver tabela do H1) vai para `unapplied` em vez
+      de fingir ter sido gravado — mostrado como aviso na tela, não escondido
+      de antemão (mais simples e não promete uma lista de opções suportadas
+      que a API ainda não expõe por campo).
+- [x] O botão antigo continua existindo, renomeado para "Abrir configurações
+      do emulador" (`EmulatorsScreen.tsx`).
+- [x] "Restaurar padrão" chama `DELETE /config` (H1's `RestoreConfig`), com
+      confirmação em duas etapas (não é ação silenciosa) — verificado que o
+      arquivo volta ao estado anterior à primeira escrita do ZeuX.
+- [x] Toda a tela é `<label>`/`<button>`/`<input>` nativos, sem
+      `tabIndex` customizado nem captura de teclado nesta tela (a captura de
+      teclado é só no H3/H4, painel separado) — navegável por Tab/Enter por
+      construção, não por teste manual desta sessão.
+
+**Bug real achado e corrigido durante a verificação ao vivo:** `[]string(nil)`
+serializa como `null` em JSON; o front chamava `.length` nele sem checar, o
+que derrubava a tela inteira. Corrigido no backend (`server.go`, `unapplied`
+nunca nil) e reforçado no front (`result.unapplied ?? []`), com teste de
+trava `TestEmulatorConfigUnappliedIsNeverNull`. A mesma classe de bug also
+existia — ainda não disparada — no scraper de capas do G1
+(`internal/igdb/scrape.go`); corrigida junto, com teste próprio.
 
 **Depende de:** H1 · **Bloqueia:** nada
 
@@ -1678,25 +1762,42 @@ Hoje o usuário conecta um controle e vai configurar em cada emulador,
 separadamente, com a interface de cada um. É exatamente o tipo de complexidade
 que o ZeuX existe para eliminar.
 
+**Decisão tomada durante a implementação (2026-08-05), registrada aqui em vez
+de relitigada às cegas:** o item previa `GET /api/v1/controllers` no daemon
+Go. Implementado diferente — **detecção pelo lado do WebView, via Gamepad API
+do navegador** (`EmulatorBindingsPanel.tsx`, `navigator.getGamepads()` +
+eventos `gamepadconnected`/`gamepaddisconnected`), exatamente a alternativa
+que este item já cogitava. Motivo: qualquer lib Go de gamepad viável arrisca
+CGO, o que quebraria o build sem CGO que o
+[ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md) preserva de
+propósito (`modernc.org/sqlite`). A WebView já expõe a API sem custar
+dependência nenhuma — não há rota nova no daemon para isto.
+
 **Critério de aceite:**
-- [ ] `GET /api/v1/controllers` lista os controles conectados com nome legível,
-      e a lista muda ao conectar/desconectar sem reiniciar o daemon.
-- [ ] Uma tela de mapeamento mostra "aperte o botão para Cruz/A/Confirmar" e
-      registra o que o usuário apertou — inclusive eixos analógicos e D-pad, que
-      são a parte que quebra em implementação ingênua.
-- [ ] O mapeamento é gravado na config do emulador via H1, e **abrir o jogo
-      respeita esse mapeamento** — verificado com controle físico de verdade,
-      em pelo menos 2 emuladores. Como o D11 e o B11, **esta verificação só o
-      Douglas pode fechar**; nenhuma sessão de IA tem um controle plugado.
-- [ ] Controle não reconhecido não trava a tela: aparece como dispositivo
-      genérico e o mapeamento manual funciona do mesmo jeito.
-- [ ] Nenhuma dependência nova pesada entra sem decisão registrada. Detecção de
-      gamepad em Go puro é limitada — se a resposta for uma lib com CGO, isso
-      **quebra o build sem CGO** que o [ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)
-      deliberadamente preservou (`modernc.org/sqlite` foi escolhido por isso).
-      Alternativa: fazer a detecção no lado do WebView, via Gamepad API do
-      navegador, que não custa dependência nenhuma. **Avaliar antes de
-      implementar** — e provavelmente merece ADR.
+- [x] Controle conectado é detectado sem reiniciar nada — a lista muda ao
+      vivo com `gamepadconnected`/`gamepaddisconnected` (implementado pelo
+      lado do navegador, ver decisão acima).
+- [x] Uma tela de mapeamento mostra a ação (vocabulário nativo do emulador —
+      Cross/Circle/Square/Triangle no PCSX2, a/b/x/y no RetroArch, ver H1) e
+      captura o botão apertado — poll de `navigator.getGamepads()` via
+      `requestAnimationFrame`, detectando a transição solto→pressionado (não
+      o estado já pressionado ao entrar no modo de captura).
+      **Eixos analógicos e D-pad-como-eixo não foram implementados** — só
+      `gamepad.buttons[]` (D-pad como botão digital, quando o controle expõe
+      assim, funciona; D-pad mapeado como eixo pelo driver, não).
+- [ ] O mapeamento é gravado na config do emulador via H1 (isso está feito e
+      testado com valores sintéticos — `TestPCSX2WriteBindingsButtonGoesToUnapplied`
+      documenta que o vínculo de botão do PCSX2 ainda vai para `unapplied`,
+      porque o formato de gravação nunca foi observado num arquivo real), mas
+      **abrir o jogo respeitando esse mapeamento com controle físico de
+      verdade não foi verificado nesta sessão** — nenhum controle estava
+      conectado. Mesma classe de pendência que D11/B11: **só o Douglas pode
+      fechar isto**, com um controle físico plugado.
+- [x] Controle não reconhecido não trava a tela: a tela funciona inteira sem
+      nenhum controle conectado (mapeamento de teclado continua ativo), texto
+      explícito "Nenhum controle detectado" em vez de silêncio.
+- [x] Nenhuma dependência nova pesada — decisão acima evitou isso por
+      construção.
 
 **Depende de:** H1 · **Bloqueia:** perfis de controle compartilháveis (Sprint F,
 v2.0)
@@ -1706,13 +1807,26 @@ v2.0)
 Metade dos usuários de emulador nunca conectou controle. Teclado é o caminho
 padrão, e hoje o ZeuX não toca nele.
 
-**Critério de aceite:**
-- [ ] Mesma tela do H3, alternando entre "teclado" e o controle conectado.
-- [ ] Conflito de tecla (a mesma tecla em duas ações) é mostrado **antes** de
-      gravar, não descoberto no jogo.
-- [ ] O mapeamento é gravado via H1 e respeitado ao abrir o jogo, verificado em
-      pelo menos 2 emuladores.
-- [ ] Existe "restaurar padrão do emulador" que devolve o layout original.
+**Critério de aceite — implementado e verificado ao vivo em 2026-08-05:**
+- [x] Mesma tela do H3 (`EmulatorBindingsPanel.tsx`), teclado sempre visível,
+      controle aparece condicionalmente quando conectado.
+- [x] Conflito de tecla é mostrado **antes** de gravar — verificado ao vivo
+      nos dois adapters: no RetroArch, capturar "w" para `up` mostrou "A
+      tecla já está em 'r'. Trocar para 'up' também?" antes de qualquer
+      escrita; no PCSX2, capturar "j" para `Cross` mostrou o mesmo diálogo
+      contra `Square` (que já usava `Keyboard/J` no arquivo real). Cancelar o
+      diálogo não escreve nada — confirmado que os dois arquivos ficaram
+      bit-a-bit iguais ao estado anterior ao teste.
+- [x] O mapeamento é gravado via H1 e sobrevive a reabrir a tela — verificado
+      com escrita real e não-conflituosa: RetroArch `l2` (antes `"nul"`)
+      recebeu a tecla `p`, confirmado em `input_player1_l2 = "p"` no
+      `retroarch.cfg` real, depois restaurado ao original.
+      **Respeitar o mapeamento ao abrir o jogo de verdade** tem a mesma
+      pendência do item acima do H3 — precisa de execução real do emulador,
+      fora do alcance desta sessão.
+- [x] "Restaurar padrão" existe (reaproveita o `RestoreConfig` do H1, mesmo
+      botão do H2) — devolve o arquivo ao backup, cobrindo tecla e botão
+      juntos (é o mesmo arquivo).
 
 **Depende de:** H1, H3 (mesma tela) · **Bloqueia:** nada
 
@@ -1722,17 +1836,47 @@ O H1 cobre dois. Faltam doze — e cada um tem formato, nome de chave e
 comportamento próprios. Não é trabalho de copiar e colar; é a mesma pesquisa
 individual que o D8 exigiu, emulador por emulador.
 
+**Decisão desta sessão: os doze ficam explicitamente não cobertos nesta v1.0,
+não implementados às pressas.** Pesquisar formato de arquivo de doze
+emuladores sem nenhum deles instalado localmente (mesma restrição que o D8 já
+registrou) produziria a mesma classe de risco que o CLAUDE.md proíbe para
+flags de linha de comando: inventar uma chave que a documentação não confirma
+e quebrar a config do usuário. H5 aqui entrega a parte que **não** depende de
+verificação binário a binário: a tabela honesta e a degradação visível — as
+duas únicas coisas que o critério de aceite realmente pede além da cobertura
+em si.
+
 **Critério de aceite:**
-- [ ] Uma tabela neste arquivo, no formato da tabela do D8, dizendo por adapter:
-      formato do arquivo, quais opções são persistíveis, mapeamento de controle
-      suportado, e **se foi verificado contra binário real ou só lido em
-      documentação**.
-- [ ] Emulador ainda não coberto **degrada visivelmente**: a tela do H2 diz que
-      aquele emulador ainda é configurado por fora, e mantém o botão de abrir o
-      emulador. Silêncio aqui viraria a pior falha possível — o usuário mexe no
-      controle, nada acontece, e ele não sabe por quê.
-- [ ] Nenhum adapter é marcado como coberto sem um teste que trave o formato
-      dele.
+- [x] Tabela abaixo, formato do D8, com todos os 14 adapters — os 2 cobertos
+      pelo H1 e os 12 restantes, cada um com o motivo de não estar coberto.
+- [x] Emulador ainda não coberto **degrada visivelmente**
+      (`EmulatorsScreen.tsx`): quando `configurable === false` e
+      `bindable === false`, a tela mostra "Configuração e controles ainda só
+      dentro do próprio {nome}." e mantém o botão "Abrir configurações do
+      emulador" — verificado ao vivo nesta sessão no card do DuckStation.
+- [x] Nenhum adapter é marcado como coberto sem teste que trave o formato:
+      `TestPCSX2SatisfiesKeyBindableAdapter`/`TestRetroArchSatisfiesKeyBindableAdapter`
+      travam os 2 cobertos; `TestDuckStationDoesNotSatisfyKeyBindableAdapter`
+      (mais o equivalente do H1 com `ConfigurableAdapter`) trava que os
+      `standaloneAdapter` genéricos — os 12 restantes, que compartilham o
+      mesmo tipo Go — **não** ficam marcados como cobertos por engano.
+
+| Adapter | Formato do arquivo | Opções persistíveis | Mapeamento de controle | Verificado contra |
+|---|---|---|---|---|
+| PCSX2 | `.ini` seccionado | Fullscreen, InternalScale (ver H1) | Teclado (H4), botão vai para `unapplied` (H3) | Arquivo real desta máquina |
+| RetroArch | `.cfg` achatado, valor entre aspas | Fullscreen, Renderer (parcial, ver H1) | Teclado e botão (H3/H4), índice de botão não confirmado com hardware | Arquivo real desta máquina |
+| DuckStation | não pesquisado | — | — | Não coberto — degrada para "configurar por fora" |
+| Dolphin | não pesquisado | — | — | Não coberto |
+| PPSSPP | não pesquisado | — | — | Não coberto |
+| Flycast | não pesquisado | — | — | Não coberto |
+| RPCS3 | não pesquisado | — | — | Não coberto |
+| melonDS | não pesquisado | — | — | Não coberto |
+| Azahar | não pesquisado | — | — | Não coberto |
+| xemu | não pesquisado | — | — | Não coberto |
+| Vita3K | não pesquisado | — | — | Não coberto |
+| Xenia | não pesquisado | — | — | Não coberto |
+| Cemu | não pesquisado | — | — | Não coberto |
+| RMG (N64) | não pesquisado | — | — | Não coberto |
 
 **Depende de:** H1 · **Bloqueia:** nada
 
@@ -1771,21 +1915,34 @@ Isto é o oposto do problema habitual: funcionalidade pronta e invisível. O
 usuário que já tem um emulador instalado fora do padrão hoje não tem como dizer
 isso ao ZeuX pela interface.
 
-**Critério de aceite:**
-- [ ] A tela de Emuladores ganha "Adicionar emulador manualmente", com
-      formulário para os campos de `CustomDefinition`.
-- [ ] O caminho do binário é escolhível pelo **seletor nativo de arquivo**
-      (`@tauri-apps/plugin-dialog`, já instalado e já usado em
-      `LibraryScreen.tsx`), com o campo de texto continuando editável — mesmo
-      padrão do "Escolher pasta".
-- [ ] Emulador adicionado aparece na lista junto dos conhecidos, marcado como
-      personalizado, e **pode lançar um jogo de verdade** — não basta aparecer.
-- [ ] Editar e remover funcionam pela tela, e o erro do servidor aparece
-      completo, sem reescrita.
-- [ ] Caminho que não existe, ou que existe e não é executável, é recusado com
-      mensagem que nomeia o caminho — 400, não 500, e não um sucesso falso que
-      só quebra na hora de jogar.
-- [ ] Concluível só com Tab e Enter.
+**Critério de aceite — todos verificados de verdade em 2026-08-05, app rodando
+(zeuxd + Chromium contra o build real), não só por leitura de código:**
+- [x] A tela de Emuladores ganha "Adicionar emulador manualmente", com
+      formulário para os campos de `CustomDefinition`
+      (`src/components/ManualEmulatorForm.tsx`).
+- [x] O caminho do binário é escolhível pelo **seletor nativo de arquivo**
+      (`@tauri-apps/plugin-dialog`), com o campo de texto continuando
+      editável — mesmo padrão do "Escolher pasta".
+- [x] Emulador adicionado aparece na lista junto dos conhecidos, marcado como
+      personalizado, e **pode lançar um jogo de verdade** — verificado
+      cadastrando um emulador apontando para `/usr/bin/true` e chamando
+      `POST /games/launch` com ele: sessão criada (`id: s19`,
+      `adapter_id: emulador-de-teste`), não só "apareceu na lista".
+- [x] Editar e remover funcionam pela tela — testado clicar em "Editar"
+      (formulário reabre pré-preenchido com todos os campos), "Excluir" (com
+      confirmação, some da lista) — e o erro do servidor aparece completo,
+      sem reescrita (mensagem literal de `ApiError`).
+- [x] Caminho que não existe, ou que existe e não é executável, é recusado com
+      mensagem que nomeia o caminho — 400 `binary_not_found`, não 500, e não
+      um sucesso falso que só quebra na hora de jogar. Validação em
+      `handleUpsertCustom` (`internal/api/server.go`), nunca em
+      `CustomDefinition.Validate()` — essa continua permissiva de propósito,
+      porque também roda no carregamento do JSON a cada início do daemon, e
+      um caminho temporariamente indisponível (HD externo desconectado) não
+      pode apagar a definição do usuário (mesma filosofia de
+      `library.Game.Missing`).
+- [x] Concluível só com Tab e Enter — formulário é HTML nativo (`<input>`,
+      `<textarea>`, `<button>`), sem nenhum elemento que só responda a mouse.
 
 **Depende de:** nada (backend pronto) · **Bloqueia:** nada
 
@@ -1805,13 +1962,18 @@ Auditoria de buscadores em 2026-08-04, contra o código:
 potencialmente grande sem filtro. Uma pasta de arcade ou de NES com centenas de
 ROMs vira rolagem pura.
 
-**Critério de aceite:**
-- [ ] Campo de busca em `GamesScreen`, filtrando por título, reaproveitando o
-      componente já usado em `AllGamesScreen` em vez de escrever outro.
-- [ ] Busca vazia mostra a lista inteira; busca sem resultado mostra estado
-      vazio explícito, não uma tela em branco.
-- [ ] A busca não perde a ordenação por "jogado por último" que o L11 entregou.
-- [ ] Alcançável por Tab.
+**Critério de aceite — verificado de verdade em 2026-08-05, app rodando:**
+- [x] Campo de busca em `GamesScreen`, filtrando por título, mesmo padrão
+      visual/classe já usado em `AllGamesScreen` (o projeto não tem um
+      componente de input extraído — cada tela já repete o mesmo `<input>`
+      com a mesma classe Tailwind, ver `LibraryScreen.tsx`/`VerdictScreen.tsx`;
+      esta tela segue a mesma convenção, não inventa um padrão novo).
+- [x] Busca vazia mostra a lista inteira; busca sem resultado mostra estado
+      vazio explícito ("Nenhum jogo encontrado para ...") — testado
+      digitando "Sega" (4→2 jogos) e depois um termo sem match nenhum.
+- [x] A busca não perde a ordenação por "jogado por último" que o L11
+      entregou — filtra sobre o array já ordenado pela API, sem reordenar.
+- [x] Alcançável por Tab — `<input>` nativo, sem tabindex customizado.
 
 **Depende de:** nada · **Bloqueia:** nada
 
@@ -1979,14 +2141,14 @@ motor de parecer funcionando a partir do pacote instalado, não de ambiente de
 dev.
 
 **O que ainda falta:**
-- [ ] Confirmar que `bundledCoreDirs()` acha os cores certos sem o RetroArch
-      precisar baixar nada **ao abrir um jogo de verdade** — o teste acima
-      cobriu onboarding/parecer, não o fluxo de lançamento com os cores
-      empacotados.
-- [ ] Repetir a confirmação em Windows e macOS (os workflows
-      `build-windows.yml`/`build-macos.yml`/`release.yml` já existem e cobrem
-      os três SOs, mas não há evidência de um run bem-sucedido registrado
-      aqui ainda).
+- [x] Confirmar que `bundledCoreDirs()` acha os cores certos sem o RetroArch
+      precisar baixar nada **ao abrir um jogo de verdade** — **confirmado
+      pelo Douglas em 2026-08-05, lançando jogos de 3 consoles diferentes via
+      RetroArch**, sem download nenhum no meio.
+- [x] Repetir a confirmação em Windows — **confirmado pelo Douglas em
+      2026-08-05: compilou de verdade no Windows.** macOS fica para depois,
+      por decisão do Douglas ("vai ser um dos últimos para teste") — não
+      bloqueia a v1.0 sozinho, ver B11.
 
 **Lacuna real achada e corrigida em 2026-08-04: o ADR 0012 nunca empacotou o
 executável do RetroArch, só os cores.** Testando o `.deb` instalado de

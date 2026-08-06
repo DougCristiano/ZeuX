@@ -1,2 +1,2 @@
 export * from "./types";
-export { api, ApiError } from "./client";
+export { api, ApiError, coverImageURL } from "./client";

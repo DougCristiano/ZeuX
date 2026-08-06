@@ -331,6 +331,102 @@ func TestLibraryGamesWithoutConsoleIDPaginatesAcrossConsoles(t *testing.T) {
 	}
 }
 
+// Trava o critério de aceite central do G4: favoritar marca na hora, GET
+// /library/games devolve o campo sempre presente, e desfavoritar desfaz.
+func TestFavoriteGameTogglesAndReflectsInListing(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Jogo.nes"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM de teste: %v", err)
+	}
+
+	addRec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+	gamesRec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?console_id=nes", nil)
+	games := decodeBody(t, gamesRec)["games"].([]any)
+	if len(games) != 1 {
+		t.Fatalf("setup: esperava 1 jogo, veio %d (add: %d)", len(games), decodeBody(t, addRec)["games_found"])
+	}
+	game := games[0].(map[string]any)
+	if fav, ok := game["favorite"]; !ok || fav != false {
+		t.Fatalf("favorite = %v (presente=%v), esperado false sempre presente", fav, ok)
+	}
+	id := int64(game["id"].(float64))
+
+	favRec := doJSON(t, server.Routes(), http.MethodPost,
+		"/api/v1/library/games/"+strconv.FormatInt(id, 10)+"/favorite", nil)
+	if favRec.Code != http.StatusOK {
+		t.Fatalf("status ao favoritar = %d, esperado 200, corpo: %s", favRec.Code, favRec.Body.String())
+	}
+	if fav, _ := decodeBody(t, favRec)["favorite"].(bool); !fav {
+		t.Fatal("resposta de POST .../favorite deveria trazer favorite=true")
+	}
+
+	gamesRec2 := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?console_id=nes", nil)
+	games2 := decodeBody(t, gamesRec2)["games"].([]any)
+	if fav, _ := games2[0].(map[string]any)["favorite"].(bool); !fav {
+		t.Fatal("GET /library/games depois de favoritar deveria trazer favorite=true")
+	}
+
+	unfavRec := doJSON(t, server.Routes(), http.MethodDelete,
+		"/api/v1/library/games/"+strconv.FormatInt(id, 10)+"/favorite", nil)
+	if unfavRec.Code != http.StatusOK {
+		t.Fatalf("status ao desfavoritar = %d, esperado 200", unfavRec.Code)
+	}
+	if fav, _ := decodeBody(t, unfavRec)["favorite"].(bool); fav {
+		t.Fatal("resposta de DELETE .../favorite deveria trazer favorite=false")
+	}
+}
+
+// Trava que favoritar um id inexistente é 404 com code estável — não 500
+// nem 200 silencioso (critério de aceite explícito do G4).
+func TestFavoriteUnknownGameReturns404(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/games/999999/favorite", nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, esperado 404", rec.Code)
+	}
+	if code := errorCode(decodeBody(t, rec)); code != "not_found" {
+		t.Fatalf("code = %q, esperado not_found", code)
+	}
+}
+
+// Trava ?favorite=true no modo "todos os jogos": só os favoritados voltam.
+func TestLibraryGamesFilterByFavorite(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.nes"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM a: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.nes"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM b: %v", err)
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+
+	gamesRec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10", nil)
+	games := decodeBody(t, gamesRec)["games"].([]any)
+	if len(games) != 2 {
+		t.Fatalf("setup: esperava 2 jogos, veio %d", len(games))
+	}
+	id := int64(games[0].(map[string]any)["id"].(float64))
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/games/"+strconv.FormatInt(id, 10)+"/favorite", nil)
+
+	favRec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10&favorite=true", nil)
+	favGames := decodeBody(t, favRec)["games"].([]any)
+	if len(favGames) != 1 {
+		t.Fatalf("esperava 1 jogo com ?favorite=true, veio %d", len(favGames))
+	}
+	if got := int64(favGames[0].(map[string]any)["id"].(float64)); got != id {
+		t.Fatalf("jogo filtrado = %d, esperado %d", got, id)
+	}
+}
+
 func insertClosedSession(t *testing.T, sessions *emulator.SQLiteSessions, consoleID, romPath string, startedAt time.Time, duration time.Duration) {
 	t.Helper()
 	ctx := context.Background()

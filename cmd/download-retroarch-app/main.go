@@ -50,6 +50,21 @@ import (
 )
 
 func main() {
+	// Empacotar o RetroArch (baixar o app + 24 cores, ver
+	// scripts/download-retroarch-cores.mjs) é o passo mais lento do build —
+	// ~60 min só de download na CI Linux, achado em 2026-08-05 depois que
+	// b989383 corrigiu o download de ficar sendo pulado silenciosamente.
+	// Rodar isso em todo `npm run dev`/`npm run tauri build` deixaria
+	// qualquer iteração local ou build de teste lenta à toa. Só o corte
+	// deliberado da versão oficial (workflow_dispatch com
+	// bundle_retroarch=true em release.yml) passa esta variável — build
+	// normal (dev, push de tag comum) pula e usa o RetroArch bundled da
+	// versão empacotada anteriormente, se houver.
+	if os.Getenv("ZEUX_BUNDLE_RETROARCH") != "1" {
+		fmt.Println("download-retroarch-app: ZEUX_BUNDLE_RETROARCH não é \"1\" — pulando (defina a variável para empacotar de verdade, ex.: ao cortar a versão oficial).")
+		return
+	}
+
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "download-retroarch-app: %v\n", err)
 		fmt.Fprintln(os.Stderr, "aviso: o build continua sem o app do RetroArch empacotado — a instalação dele segue manual até isto ser corrigido.")
