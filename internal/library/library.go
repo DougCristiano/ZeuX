@@ -13,10 +13,17 @@ package library
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
+
+// ErrGameNotFound é devolvido por operações que alteram um jogo específico
+// (favoritar, capa) quando o id não existe — a camada de API usa
+// `errors.Is` para decidir entre 404 e 500 sem depender de comparar texto de
+// mensagem.
+var ErrGameNotFound = errors.New("nenhum jogo com este id")
 
 // Folder é uma pasta de ROM que o usuário apontou para um console.
 type Folder struct {
@@ -42,6 +49,25 @@ type Game struct {
 	// vez de sumir, porque o tempo de jogo já registrado (D3) referencia este
 	// jogo pelo caminho.
 	Missing bool `json:"missing"`
+
+	// CoverPath é o caminho (relativo a emulator.ManagedRoot()) da capa já
+	// baixada pelo scraper de metadados (G1) — nunca uma URL de terceiro,
+	// nunca o binário da imagem. `json:"-"` de propósito: a API deriva
+	// `cover_url` a partir disto em internal/api, o tipo de domínio não
+	// expõe caminho de disco cru para fora do processo.
+	CoverPath string `json:"-"`
+
+	// CoverStatus distingue "nunca tentou buscar" ('') de "tentou e o IGDB
+	// não achou" ('not_found') e "tentou e falhou" ('error') — sem isso o
+	// lote de busca (G1) reprocessaria para sempre um jogo que o IGDB
+	// genuinamente não tem.
+	CoverStatus string `json:"-"`
+
+	// Favorite (G4, docs/roadmap.md) — diferente de CoverPath/CoverStatus,
+	// vai direto no JSON (sem derivação na API): é um campo de domínio
+	// simples, sempre presente, nunca ausente mesmo quando `false` — quem
+	// tem 300 ROMs e joga 8 precisa distinguir "não favoritei" de "não sei".
+	Favorite bool `json:"favorite"`
 }
 
 // NewGame é o que a varredura (L2) precisa fornecer para gravar uma entrada;
@@ -299,25 +325,28 @@ func (s *Store) SyncFolder(ctx context.Context, folderID int64, found []NewGame)
 // sem diferenciar maiúsculas/minúsculas (2026-08-04, busca da tela
 // "Todos os jogos" — precisa achar o jogo em qualquer página, não só na
 // carregada, por isso o filtro é no SQL, não no cliente).
-func (s *Store) ListAllGames(ctx context.Context, query string) ([]Game, error) {
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if query == "" {
-		rows, err = s.db.QueryContext(ctx, `
-			SELECT id, folder_id, console_id, path, title, added_at, missing
-			FROM library_games
-			ORDER BY id DESC
-		`)
-	} else {
-		rows, err = s.db.QueryContext(ctx, `
-			SELECT id, folder_id, console_id, path, title, added_at, missing
-			FROM library_games
-			WHERE title LIKE ? ESCAPE '\'
-			ORDER BY id DESC
-		`, "%"+escapeLike(query)+"%")
+//
+// favoriteOnly restringe aos jogos marcados como favorito (G4) — combinável
+// com query, no SQL pelo mesmo motivo.
+func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly bool) ([]Game, error) {
+	conditions := make([]string, 0, 2)
+	args := make([]any, 0, 2)
+
+	if query != "" {
+		conditions = append(conditions, `title LIKE ? ESCAPE '\'`)
+		args = append(args, "%"+escapeLike(query)+"%")
 	}
+	if favoriteOnly {
+		conditions = append(conditions, `favorite = 1`)
+	}
+
+	sqlQuery := `SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite FROM library_games`
+	if len(conditions) > 0 {
+		sqlQuery += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	sqlQuery += " ORDER BY id DESC"
+
+	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("lendo jogos: %w", err)
 	}
@@ -326,11 +355,12 @@ func (s *Store) ListAllGames(ctx context.Context, query string) ([]Game, error) 
 	var games []Game
 	for rows.Next() {
 		var (
-			game    Game
-			addedAt string
-			missing int
+			game     Game
+			addedAt  string
+			missing  int
+			favorite int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -339,6 +369,7 @@ func (s *Store) ListAllGames(ctx context.Context, query string) ([]Game, error) 
 		}
 		game.AddedAt = parsed
 		game.Missing = missing != 0
+		game.Favorite = favorite != 0
 		games = append(games, game)
 	}
 
@@ -359,7 +390,7 @@ func escapeLike(s string) string {
 // antigos.
 func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
 		FROM library_games
 		WHERE console_id = ?
 		ORDER BY id DESC
@@ -372,11 +403,12 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 	var games []Game
 	for rows.Next() {
 		var (
-			game    Game
-			addedAt string
-			missing int
+			game     Game
+			addedAt  string
+			missing  int
+			favorite int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -385,8 +417,188 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 		}
 		game.AddedAt = parsed
 		game.Missing = missing != 0
+		game.Favorite = favorite != 0
 		games = append(games, game)
 	}
 
 	return games, rows.Err()
+}
+
+// GameByID devolve um jogo pelo identificador, ou false se não existir —
+// usado pela rota de busca de capa por jogo (G1) para resolver console_id e
+// título antes de disparar a consulta ao IGDB.
+func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
+		FROM library_games WHERE id = ?
+	`, id)
+
+	var (
+		game     Game
+		addedAt  string
+		missing  int
+		favorite int
+	)
+	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+		if err == sql.ErrNoRows {
+			return Game{}, false, nil
+		}
+		return Game{}, false, fmt.Errorf("procurando o jogo %d: %w", id, err)
+	}
+
+	parsed, err := time.Parse(time.RFC3339Nano, addedAt)
+	if err != nil {
+		return Game{}, false, fmt.Errorf("interpretando added_at do jogo %d: %w", id, err)
+	}
+	game.AddedAt = parsed
+	game.Missing = missing != 0
+	game.Favorite = favorite != 0
+
+	return game, true, nil
+}
+
+// GamesByFolder devolve os jogos de uma pasta — usado antes de RemoveFolder
+// para saber quais diretórios de capa (G2) precisam ser apagados do disco,
+// já que o ON DELETE CASCADE remove as linhas antes de a camada de API
+// conseguir consultá-las.
+func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
+		FROM library_games
+		WHERE folder_id = ?
+	`, folderID)
+	if err != nil {
+		return nil, fmt.Errorf("lendo jogos da pasta %d: %w", folderID, err)
+	}
+	defer rows.Close()
+
+	var games []Game
+	for rows.Next() {
+		var (
+			game     Game
+			addedAt  string
+			missing  int
+			favorite int
+		)
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
+		}
+		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
+		if err != nil {
+			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
+		}
+		game.AddedAt = parsed
+		game.Missing = missing != 0
+		game.Favorite = favorite != 0
+		games = append(games, game)
+	}
+
+	return games, rows.Err()
+}
+
+// UncoveredGames devolve os jogos ainda elegíveis para a busca em lote (G1):
+// nunca tentou buscar capa. Jogos com cover_status = 'not_found'/'error' não
+// entram — evita o lote reprocessar para sempre um jogo que o IGDB
+// genuinamente não tem, ou que falhou; o usuário pode reconsultar um jogo
+// específico via ClearCover.
+func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
+		FROM library_games
+		WHERE cover_path = '' AND cover_status = ''
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("lendo jogos sem capa: %w", err)
+	}
+	defer rows.Close()
+
+	var games []Game
+	for rows.Next() {
+		var (
+			game     Game
+			addedAt  string
+			missing  int
+			favorite int
+		)
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
+		}
+		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
+		if err != nil {
+			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
+		}
+		game.AddedAt = parsed
+		game.Missing = missing != 0
+		game.Favorite = favorite != 0
+		games = append(games, game)
+	}
+
+	return games, rows.Err()
+}
+
+// SetCover grava a capa resolvida para um jogo — path é relativo a
+// emulator.ManagedRoot(), nunca absoluto (portabilidade entre instalações) e
+// nunca uma URL de terceiro.
+func (s *Store) SetCover(ctx context.Context, gameID int64, path string) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE library_games SET cover_path = ?, cover_status = '' WHERE id = ?
+	`, path, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando a capa do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+// SetCoverStatus grava que uma busca foi tentada e não resultou numa capa —
+// 'not_found' (IGDB não tem o jogo) ou 'error' (falha de rede/API). Nunca
+// grava um cover_path junto: os dois campos são mutuamente exclusivos.
+func (s *Store) SetCoverStatus(ctx context.Context, gameID int64, status string) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE library_games SET cover_path = '', cover_status = ? WHERE id = ?
+	`, status, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando o status de capa do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+// ClearCover reseta um jogo para "nunca tentou" — G2: reconsultar um jogo
+// específico sem apagar o cache inteiro. Não apaga o arquivo em disco; quem
+// chama (o job de busca) sobrescreve o cover.jpg antigo ao encontrar um novo.
+func (s *Store) ClearCover(ctx context.Context, gameID int64) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE library_games SET cover_path = '', cover_status = '' WHERE id = ?
+	`, gameID)
+	if err != nil {
+		return fmt.Errorf("limpando a capa do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+// SetFavorite marca ou desmarca um jogo como favorito (G4). Um jogo com
+// `missing: true` continua favoritável — o arquivo pode voltar (HD externo
+// reconectado), e o favorito é uma escolha do usuário sobre o jogo, não
+// sobre o arquivo estar presente agora.
+func (s *Store) SetFavorite(ctx context.Context, gameID int64, favorite bool) error {
+	value := 0
+	if favorite {
+		value = 1
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET favorite = ? WHERE id = ?`, value, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando favorito do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+func checkAffected(result sql.Result, gameID int64) error {
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("confirmando alteração do jogo %d: %w", gameID, err)
+	}
+	if affected == 0 {
+		return fmt.Errorf("jogo %d: %w", gameID, ErrGameNotFound)
+	}
+	return nil
 }

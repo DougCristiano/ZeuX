@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import logoZeux from "../assets/logo-zeux.png";
 import { FOCUS_RING } from "./ui";
 
-export type NavID = "library" | "emulators" | "verdict";
+export type NavID = "library" | "emulators" | "verdict" | "settings";
 
 const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
   {
@@ -40,6 +40,25 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
         <rect x="3" y="1" width="12" height="16" rx="1" stroke="currentColor" strokeWidth="2" />
         <path d="M6 9 L8 11 L12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "settings",
+    // Item novo (2026-08-05, G1): reabre de propósito a decisão 4 do plano
+    // de migração visual, que travava a sidebar em 3 itens — aprovado pelo
+    // Douglas nesta sessão para dar lugar a "conectar conta do IGDB", sem
+    // uma tela nem um modal específicos para isso antes.
+    label: "Configurações",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M9 1.5 L9 3.2 M9 14.8 L9 16.5 M16.5 9 L14.8 9 M3.2 9 L1.5 9 M14.3 3.7 L13.1 4.9 M4.9 13.1 L3.7 14.3 M14.3 14.3 L13.1 13.1 M4.9 4.9 L3.7 3.7"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },

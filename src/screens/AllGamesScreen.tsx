@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../api";
-import type { LibraryGame, Report } from "../api/types";
-import { Badge, Button, ErrorModal, GameCover, Pagination } from "../components/ui";
+import { api, ApiError, coverImageURL } from "../api";
+import type { LibraryGame, Report, ScrapeJob } from "../api/types";
+import { Badge, Button, ErrorModal, FavoriteToggle, GameCover, Pagination } from "../components/ui";
+import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 
 const PAGE_SIZE = 24;
@@ -57,33 +58,97 @@ export function AllGamesScreen({
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string | null>(null);
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { statusFor, launch, launchError, clearLaunchError } = useLaunchGame();
+  const igdbConfigured = useIGDBStatus();
+  const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
+  const [scrapeSummary, setScrapeSummary] = useState<string | null>(null);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Buscar reseta pra página 1 — senão "página 3" de uma busca nova quase
-  // sempre estaria vazia.
+  // Buscar (ou trocar o filtro de favoritos) reseta pra página 1 — senão
+  // "página 3" de um filtro novo quase sempre estaria vazia.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, favoriteOnly]);
 
-  useEffect(() => {
+  function loadGames() {
     // Reseta o filtro de plataforma a cada nova página/busca — ele é
     // calculado sobre os jogos da página atual (ver docstring da tela), um
     // valor de outra página pode não existir mais na nova lista.
     setPlatformFilter(null);
     api
-      .getAllLibraryGames(page, PAGE_SIZE, debouncedSearch || undefined)
+      .getAllLibraryGames(page, PAGE_SIZE, debouncedSearch || undefined, favoriteOnly)
       .then((res) => {
         setGames(res.games);
         setTotal(res.total);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os jogos."));
-  }, [page, debouncedSearch]);
+  }
+
+  useEffect(loadGames, [page, debouncedSearch, favoriteOnly]);
+
+  // Toggle otimista (G4): atualiza a lista na hora, sem esperar a resposta
+  // nem recarregar a página inteira. Se a chamada falhar, desfaz.
+  function toggleFavorite(game: LibraryGame) {
+    const next = !game.favorite;
+    setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: next } : g)) : prev));
+    const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
+    call.catch(() => {
+      setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
+      setError("Não foi possível salvar o favorito. Tente de novo.");
+    });
+  }
+
+  // Busca de capas em lote (G1, docs/roadmap.md) — poll com setTimeout
+  // recursivo (não setInterval, mesmo padrão de EmulatorsScreen.pollJob),
+  // pra nunca sobrepor duas checagens da mesma busca.
+  function pollScrapeJob(jobId: string) {
+    api
+      .getScrapeJob(jobId)
+      .then((job) => {
+        setScrapeJob(job);
+        if (job.phase === "concluido") {
+          const found = job.results.filter((r) => r.status === "found").length;
+          const notFound = job.results.length - found;
+          setScrapeSummary(
+            notFound > 0
+              ? `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}, ${notFound} não encontrada${notFound === 1 ? "" : "s"}.`
+              : `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}.`,
+          );
+          setScrapeJob(null);
+          loadGames();
+          return;
+        }
+        if (job.phase === "falhou") {
+          setScrapeError(job.error ?? "Não foi possível buscar capas agora.");
+          setScrapeJob(null);
+          return;
+        }
+        setTimeout(() => pollScrapeJob(jobId), 400);
+      })
+      .catch((err) => {
+        setScrapeError(err instanceof ApiError ? err.message : "Não foi possível acompanhar a busca de capas.");
+        setScrapeJob(null);
+      });
+  }
+
+  function startScrapeCovers() {
+    setScrapeError(null);
+    setScrapeSummary(null);
+    api
+      .scrapeCovers()
+      .then((job) => {
+        setScrapeJob(job);
+        pollScrapeJob(job.id);
+      })
+      .catch((err) => setScrapeError(err instanceof ApiError ? err.message : "Não foi possível iniciar a busca de capas."));
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -103,14 +168,34 @@ export function AllGamesScreen({
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-ink">Todos os jogos</h1>
-        {/* Navegação de topo (Emuladores/Parecer) mudou para a sidebar
-            (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui porque é
-            sub-navegação da própria Biblioteca, não um destino de primeiro
-            nível. */}
-        <Button variant="secondary" onClick={onOpenLibrary}>
-          Gerenciar pastas
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {/* Só aparece com conta do IGDB conectada (G1) — sem credencial,
+              a biblioteca fica exatamente como hoje, sem botão nenhum aqui
+              (docs/roadmap.md: "nunca uma tela vazia ou travada"). */}
+          {igdbConfigured && (
+            <Button variant="secondary" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
+              {scrapeJob ? `Buscando capas… ${scrapeJob.processed}/${scrapeJob.total}` : "Buscar capas"}
+            </Button>
+          )}
+          {/* Navegação de topo (Emuladores/Parecer) mudou para a sidebar
+              (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui porque é
+              sub-navegação da própria Biblioteca, não um destino de primeiro
+              nível. */}
+          <Button variant="secondary" onClick={onOpenLibrary}>
+            Gerenciar pastas
+          </Button>
+        </div>
       </div>
+
+      {scrapeSummary && <p className="mb-3 text-sm text-ink">{scrapeSummary}</p>}
+      {scrapeError && (
+        <p className="mb-3 text-sm text-danger">
+          {scrapeError}{" "}
+          <button type="button" onClick={startScrapeCovers} className="underline">
+            Tentar de novo
+          </button>
+        </p>
+      )}
 
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <input
@@ -120,6 +205,16 @@ export function AllGamesScreen({
           placeholder="Buscar jogos..."
           className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
+        <button
+          type="button"
+          onClick={() => setFavoriteOnly((v) => !v)}
+          aria-pressed={favoriteOnly}
+          className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+            favoriteOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
+          }`}
+        >
+          ★ FAVORITOS
+        </button>
         {platformsOnPage.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
             <button
@@ -153,7 +248,9 @@ export function AllGamesScreen({
         <p className="text-base text-muted">
           {debouncedSearch
             ? `Nenhum jogo encontrado para "${debouncedSearch}".`
-            : 'Nenhum jogo na biblioteca ainda. Aponte uma pasta em "Gerenciar pastas" para começar.'}
+            : favoriteOnly
+              ? "Nenhum jogo favoritado ainda."
+              : 'Nenhum jogo na biblioteca ainda. Aponte uma pasta em "Gerenciar pastas" para começar.'}
         </p>
       )}
 
@@ -165,19 +262,27 @@ export function AllGamesScreen({
               const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
               return (
                 <div key={game.id} className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    className="text-left"
-                    title={game.title}
-                    onClick={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
-                  >
-                    <GameCover
-                      label={shortNameFor(game.console_id)}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      className="block w-full text-left"
                       title={game.title}
-                      consoleId={game.console_id}
-                      showPlayOverlay
+                      onClick={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                    >
+                      <GameCover
+                        label={shortNameFor(game.console_id)}
+                        title={game.title}
+                        consoleId={game.console_id}
+                        coverUrl={coverImageURL(game.cover_url)}
+                        showPlayOverlay
+                      />
+                    </button>
+                    <FavoriteToggle
+                      favorite={game.favorite}
+                      onToggle={() => toggleFavorite(game)}
+                      className="absolute top-1.5 right-1.5"
                     />
-                  </button>
+                  </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink" title={game.title}>
                       {game.title}

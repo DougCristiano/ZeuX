@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -207,7 +208,7 @@ func TestListAllGamesIncludesEveryConsole(t *testing.T) {
 		t.Fatalf("SaveGames n64: %v", err)
 	}
 
-	all, err := s.ListAllGames(ctx, "")
+	all, err := s.ListAllGames(ctx, "", false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -236,7 +237,7 @@ func TestListAllGamesFiltersByTitleCaseInsensitive(t *testing.T) {
 		t.Fatalf("SaveGames: %v", err)
 	}
 
-	found, err := s.ListAllGames(ctx, "chrono")
+	found, err := s.ListAllGames(ctx, "chrono", false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -246,11 +247,125 @@ func TestListAllGamesFiltersByTitleCaseInsensitive(t *testing.T) {
 
 	// "%" no termo de busca não pode virar curinga solto — sem escapar,
 	// "100%" casaria com qualquer título que comece com "100".
-	percentMatch, err := s.ListAllGames(ctx, "100%")
+	percentMatch, err := s.ListAllGames(ctx, "100%", false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
 	if len(percentMatch) != 1 || percentMatch[0].Title != "100% Orange Juice" {
 		t.Fatalf("ListAllGames(100%%) = %+v, esperava só \"100%% Orange Juice\"", percentMatch)
+	}
+}
+
+// Trava o contrato central do G4: favorite sempre presente (nunca omitido)
+// e falso por padrão — um jogo recém-varrido não vem favoritado sozinho.
+func TestNewGameIsNotFavoriteByDefault(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	if err := s.SaveGames(ctx, folder.ID, []NewGame{{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"}}); err != nil {
+		t.Fatalf("SaveGames: %v", err)
+	}
+
+	games, err := s.ListGames(ctx, "ps1")
+	if err != nil {
+		t.Fatalf("ListGames: %v", err)
+	}
+	if len(games) != 1 || games[0].Favorite {
+		t.Fatalf("ListGames = %+v, esperava 1 jogo com favorite=false", games)
+	}
+}
+
+// Trava o toggle: SetFavorite(true) marca, SetFavorite(false) desmarca — e o
+// estado sobrevive a uma nova leitura (persistência, não só o valor devolvido
+// na hora).
+func TestSetFavoriteTogglesAndPersists(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	if err := s.SaveGames(ctx, folder.ID, []NewGame{{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"}}); err != nil {
+		t.Fatalf("SaveGames: %v", err)
+	}
+	games, err := s.ListGames(ctx, "ps1")
+	if err != nil || len(games) != 1 {
+		t.Fatalf("ListGames setup: %v / %+v", err, games)
+	}
+	id := games[0].ID
+
+	if err := s.SetFavorite(ctx, id, true); err != nil {
+		t.Fatalf("SetFavorite(true): %v", err)
+	}
+	game, ok, err := s.GameByID(ctx, id)
+	if err != nil || !ok {
+		t.Fatalf("GameByID após favoritar: ok=%v err=%v", ok, err)
+	}
+	if !game.Favorite {
+		t.Fatal("GameByID após SetFavorite(true) deveria vir com favorite=true")
+	}
+
+	if err := s.SetFavorite(ctx, id, false); err != nil {
+		t.Fatalf("SetFavorite(false): %v", err)
+	}
+	game, ok, err = s.GameByID(ctx, id)
+	if err != nil || !ok {
+		t.Fatalf("GameByID após desfavoritar: ok=%v err=%v", ok, err)
+	}
+	if game.Favorite {
+		t.Fatal("GameByID após SetFavorite(false) deveria vir com favorite=false")
+	}
+}
+
+// Trava que favoritar um id inexistente devolve um erro identificável
+// (ErrGameNotFound), não um sucesso silencioso nem um erro genérico — é o
+// que permite a API mapear para 404 em vez de 500.
+func TestSetFavoriteUnknownIDFails(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	err := s.SetFavorite(ctx, 999, true)
+	if !errors.Is(err, ErrGameNotFound) {
+		t.Fatalf("SetFavorite(999): erro = %v, esperava ErrGameNotFound", err)
+	}
+}
+
+// Trava o filtro do G4: ListAllGames(favoriteOnly=true) devolve só os
+// favoritados, combinável com a busca por título.
+func TestListAllGamesFiltersByFavorite(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	games := []NewGame{
+		{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"},
+		{ConsoleID: "ps1", Path: "/jogos/ps1/b.bin", Title: "B"},
+	}
+	if err := s.SaveGames(ctx, folder.ID, games); err != nil {
+		t.Fatalf("SaveGames: %v", err)
+	}
+
+	all, err := s.ListAllGames(ctx, "", false)
+	if err != nil || len(all) != 2 {
+		t.Fatalf("ListAllGames setup: %v / %+v", err, all)
+	}
+	if err := s.SetFavorite(ctx, all[0].ID, true); err != nil {
+		t.Fatalf("SetFavorite: %v", err)
+	}
+
+	favorites, err := s.ListAllGames(ctx, "", true)
+	if err != nil {
+		t.Fatalf("ListAllGames(favoriteOnly): %v", err)
+	}
+	if len(favorites) != 1 || favorites[0].ID != all[0].ID {
+		t.Fatalf("ListAllGames(favoriteOnly) = %+v, esperava só o jogo %d", favorites, all[0].ID)
 	}
 }

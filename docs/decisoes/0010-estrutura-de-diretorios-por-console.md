@@ -1,8 +1,6 @@
 # 0010 — Estrutura de diretórios gerenciados por console
 
-**Status:** Aceito (parcial — só a parte de emuladores está implementada; a
-parte de jogos tem a decisão tomada — metadados + referência, nunca cópia da
-ROM — mas ainda não foi construída)
+**Status:** Aceito (implementado — emuladores e jogos)
 
 ## Contexto
 
@@ -42,11 +40,27 @@ atendem um console cada.
 não um nome de exibição — estabilidade importa mais que fricção
 (ver `defaultCoreByConsole` e `consoles.json` para a mesma convenção).
 
-**Estrutura de jogos (documentada, não implementada):** a intenção de
-produto é que cada pasta de console também tenha uma subpasta `jogos/`, com
-save states, capas e informações do jogo. Isso depende da Sprint D (banco de
-dados + varredura de biblioteca + scraper de metadados), que ainda não foi
-desenhada — implementar a parte de jogos agora seria desenhar às cegas.
+**Estrutura de jogos (implementada em 2026-08-05, G1 — `docs/roadmap.md`,
+Sprint G):**
+
+```
+<ManagedRoot>/
+  <console_id>/emuladores/<adapter_id>/   # emulador de console único
+  <console_id>/jogos/<game_id>/           # capa (e no futuro saves) de um jogo
+  compartilhados/<adapter_id>/            # emulador de mais de um console
+```
+
+`emulator.GameCoverDir(root, consoleID, gameID)` resolve o caminho. A chave é
+o **id do jogo** (`library.Game.ID`), não o título — estável mesmo que uma
+busca posterior corrija o título, e sem preocupação com caractere inválido
+de nome de arquivo. Hoje só guarda `cover.jpg` (a capa baixada pelo scraper
+de metadados IGDB); saves continuam fora de escopo, sem desenho ainda.
+
+O banco (`library_games.cover_path`, migração `0004`) guarda o caminho
+**relativo a `ManagedRoot()`**, nunca absoluto — resolvido pela API
+(`GET /api/v1/covers/...`) na hora de montar `cover_url`. Isso mantém o
+banco portável entre reinstalações em pastas diferentes, mesmo princípio já
+usado para o caminho da ROM.
 
 **Pendência resolvida em 2026-08-02:** o pedido original era guardar o arquivo
 do jogo (a ROM) dentro da estrutura gerenciada. Isso contraria a regra
@@ -57,8 +71,10 @@ dentro de uma estrutura que o próprio ZeuX gerencia passa a "manusear" o
 conteúdo, não só apontar para ele). Apresentado o conflito, o Douglas optou
 pelo caminho compatível com a regra: `jogos/<console>/` guarda metadados
 (saves, capas, informações) e uma **referência ao caminho onde a ROM já está
-no disco do usuário** — nunca uma cópia do arquivo. Ainda não implementado;
-depende do desenho da Sprint D (banco de dados + varredura de biblioteca).
+no disco do usuário** — nunca uma cópia do arquivo. Implementado pelo G1: o
+scraper de metadados (`internal/igdb`) só fala com hosts de metadado/imagem
+do IGDB (trava estrutural testada em `internal/igdb/allowlist_test.go`) e
+grava só a capa baixada — nunca um caminho, link ou cópia do jogo em si.
 
 ## Consequências
 
@@ -83,12 +99,15 @@ depende do desenho da Sprint D (banco de dados + varredura de biblioteca).
   quantos consoles um adapter atende antes de resolver o caminho — mais uma
   consulta ao registro de adapters (`emulator.NewRegistry().ByID`), que era
   desnecessária na estrutura achatada.
-- `jogos/<console>/` vai guardar uma referência (caminho) para a ROM, não o
-  arquivo — a interface precisa deixar claro que mover ou apagar o arquivo
-  original quebra a referência, já que o ZeuX não tem uma cópia própria.
+- `jogos/<console_id>/<game_id>/` guarda a capa baixada, nunca o arquivo do
+  jogo — `library_games.path` continua sendo a única referência à ROM, sem
+  mudança de comportamento aqui.
+- Remover uma pasta da biblioteca (`DELETE /library/folders/{id}`) agora
+  também apaga as subpastas de capa dos jogos removidos, para não acumular
+  imagem órfã (G2) — `internal/api/server.go`, `removeCoverDirs`.
 
-## Gatilho para revisão
+## Resolvido em 2026-08-05 (G1)
 
-Reabrir a parte de jogos quando a Sprint D for desenhada (banco de dados,
-varredura de biblioteca, scraper), usando a decisão já tomada aqui: metadados
-e referência ao caminho, nunca cópia da ROM.
+A pendência de "estrutura de jogos" desta ADR está fechada: implementada
+exatamente como decidido acima (metadados + referência, nunca cópia da ROM).
+Ver `docs/roadmap.md`, Sprint G, itens G1/G2, e `internal/igdb/`.

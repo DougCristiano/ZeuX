@@ -252,6 +252,19 @@ func (m *Manager) install(ctx context.Context, job *Job, source Source) error {
 		return err
 	}
 
+	// Grava a versão exata (tag do release) dentro do próprio diretório
+	// instalado — é o que permite Installation.Version vir preenchida depois
+	// (emulator.readVersionMarker), sem precisar executar o binário para
+	// perguntar a versão a ele. Move junto com o resto no rename atômico de
+	// promote(); falha aqui não é motivo para abortar a instalação — a
+	// versão é conveniência, não pode travar o essencial.
+	if err := os.WriteFile(
+		filepath.Join(stagingDir, emulator.VersionMarkerName),
+		[]byte(release.Version), 0o644,
+	); err != nil {
+		m.logger.Warn("não foi possível gravar a versão da instalação", "emulador", source.Name, "erro", err)
+	}
+
 	m.update(job, func(j *Job) {
 		j.Phase = PhaseFinishing
 		j.Message = "Colocando o " + source.Name + " no lugar..."

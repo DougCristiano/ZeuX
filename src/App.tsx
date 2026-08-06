@@ -10,6 +10,7 @@ import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { GamesScreen } from "./screens/GamesScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
 import { VerdictScreen } from "./screens/VerdictScreen";
 
@@ -37,7 +38,8 @@ type Phase =
   | "emulators"
   | "library"
   | "games"
-  | "game-detail";
+  | "game-detail"
+  | "settings";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("checking-port");
@@ -169,6 +171,7 @@ function App() {
       setCameFromDeclined(false);
       setPhase("emulators");
     }
+    if (id === "settings") setPhase("settings");
   }
 
   let screen: ReactNode;
@@ -289,6 +292,10 @@ function App() {
         />
       );
       break;
+
+    case "settings":
+      screen = <SettingsScreen />;
+      break;
   }
 
   // Sidebar (2026-08-04, Sprint 1): shell fixo para as fases pós-onboarding
@@ -296,7 +303,8 @@ function App() {
   // DeclinedScreen (sem consentimento, sem report ainda) continua tela
   // cheia, sem sidebar — ver EmulatorsScreen.onBack.
   if (report && SIDEBAR_PHASES.includes(phase)) {
-    const active: NavID = phase === "verdict" ? "verdict" : phase === "emulators" ? "emulators" : "library";
+    const active: NavID =
+      phase === "verdict" ? "verdict" : phase === "emulators" ? "emulators" : phase === "settings" ? "settings" : "library";
     return (
       <div className="flex h-screen">
         <Sidebar active={active} onNav={navigateSidebar} />
@@ -308,6 +316,14 @@ function App() {
   return screen;
 }
 
-const SIDEBAR_PHASES: Phase[] = ["all-games", "verdict", "emulators", "library", "games", "game-detail"];
+const SIDEBAR_PHASES: Phase[] = [
+  "all-games",
+  "verdict",
+  "emulators",
+  "library",
+  "games",
+  "game-detail",
+  "settings",
+];
 
 export default App;

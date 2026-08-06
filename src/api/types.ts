@@ -137,7 +137,11 @@ export type Installation = {
   adapter_id: string;
   name: string;
   binary_path: string;
-  /** Nunca preenchido hoje — nenhum adapter detecta versão (ver docs/roadmap.md). */
+  /** Preenchida só para instalação gerenciada pelo ZeuX (`managed: true`) —
+   * vem da tag do release baixado, gravada em disco na hora da instalação
+   * (Sprint A, docs/roadmap.md). Ausente para instalação que o usuário já
+   * tinha: o ZeuX não executa o binário para perguntar a versão a ele, dado
+   * desconhecido nunca é um palpite. */
   version?: string;
   managed: boolean;
 };
@@ -157,6 +161,46 @@ export type EmulatorEntry = {
   bios_dir?: string;
   /** Só significativo quando `bios_dir` está presente. */
   bios_dir_empty?: boolean;
+  /** H1/H2, docs/roadmap.md — diz se GET/POST/DELETE .../config existe de
+   * verdade para este emulador (hoje só PCSX2 e RetroArch). */
+  configurable: boolean;
+  /** H3/H4 — diz se GET/POST .../bindings existe de verdade. */
+  bindable: boolean;
+};
+
+// --- Configuração persistida do emulador (H1/H2, docs/roadmap.md) ---
+
+export type Renderer = "" | "vulkan" | "opengl" | "d3d12" | "software";
+
+export type EmulatorPersistedConfig = {
+  /** Ausente (nunca `false`) quando o ZeuX não conseguiu ler o valor real
+   * do arquivo do emulador — nunca um chute. */
+  fullscreen?: boolean;
+  internal_scale?: number;
+  /** Ausente quando o mapeamento para o vocabulário do emulador não foi
+   * confirmado (ex.: Renderer do PCSX2, D3D12/Software do RetroArch). */
+  renderer?: Renderer;
+};
+
+export type EmulatorConfigWriteResult = {
+  /** Mensagens em português, já prontas para exibir — mesmo padrão de
+   * Command.unapplied. */
+  unapplied: string[];
+};
+
+// --- Mapeamento de teclado/controle (H3/H4) ---
+
+export type InputBinding = {
+  /** Nome da ação na vocabulário do PRÓPRIO emulador — "Cross" no PCSX2 não
+   * é necessariamente o mesmo botão físico que "b" no RetroArch. */
+  action: string;
+  key?: string;
+  button?: string;
+};
+
+export type EmulatorBindingsResponse = {
+  actions: string[];
+  bindings: InputBinding[];
 };
 
 // --- Cores do RetroArch (GET /api/v1/retroarch/cores) ---
@@ -312,10 +356,51 @@ export type LibraryGame = {
    * a entrada continua existindo (o tempo de jogo referencia o caminho), só
    * marcada. Nunca some da lista sozinha. */
   missing: boolean;
+  /** Marcado por POST/DELETE /library/games/{id}/favorite (G4). Sempre
+   * presente, nunca ausente mesmo quando `false` — diferente de `cover_url`,
+   * não representa um dado que pode não ter sido resolvido ainda. */
+  favorite: boolean;
   /** Soma de todas as sessões deste jogo (L11). `0` quando nunca foi jogado —
    * sempre presente, nunca ausente. */
   playtime_seconds: number;
   /** Ausente (nunca `""`) quando `playtime_seconds` é `0`. GET /library/games
    * já devolve os jogos ordenados por este campo, mais recente primeiro. */
   last_played_at?: string;
+  /** Capa já baixada em disco pelo scraper de metadados (G1), servida por
+   * GET /covers/... — nunca uma URL de terceiro. Ausente (nunca `""`)
+   * quando a capa ainda não foi resolvida ou o IGDB não tem o jogo; a tela
+   * cai no placeholder de sigla. */
+  cover_url?: string;
+};
+
+// --- Scraper de metadados IGDB (G1, docs/roadmap.md) ---
+
+export type IGDBCredentialsStatus = {
+  /** Nunca traz o client_secret de volta — só se há conta conectada. */
+  configured: boolean;
+};
+
+export type ScrapePhase = "buscando" | "baixando" | "concluido" | "falhou";
+
+export type ScrapeGameResult = {
+  game_id: number;
+  title: string;
+  status: "found" | "not_found" | "error";
+  /** Só presente quando status é "error" — a causa daquele jogo específico. */
+  message?: string;
+};
+
+export type ScrapeJob = {
+  id: string;
+  phase: ScrapePhase;
+  total: number;
+  processed: number;
+  results: ScrapeGameResult[];
+  started_at: string;
+  /** `null` enquanto a busca está em andamento. */
+  finished_at: string | null;
+  /** Só presente quando phase é "falhou" — causa de o job INTEIRO ter
+   * abortado (ex.: credencial recusada), nunca de um jogo isolado (isso vai
+   * em results[].message). */
+  error?: string;
 };

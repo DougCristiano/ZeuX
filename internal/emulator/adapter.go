@@ -105,6 +105,89 @@ type Installation struct {
 	Managed bool `json:"managed"`
 }
 
+// PersistedOptions descreve o que um ConfigurableAdapter achou já gravado no
+// arquivo de configuração do próprio emulador — nunca um palpite. Ponteiros
+// nil de propósito: distinguem "não pôde ler" de "leu e o valor é
+// false/0/default" (mesma disciplina do parecer parcial —
+// docs/roadmap.md, princípio 4 do CLAUDE.md).
+type PersistedOptions struct {
+	Fullscreen    *bool     `json:"fullscreen,omitempty"`
+	InternalScale *int      `json:"internal_scale,omitempty"`
+	Renderer      *Renderer `json:"renderer,omitempty"`
+}
+
+// ConfigurableAdapter é a capacidade opcional (H1, docs/roadmap.md) de ler e
+// escrever a configuração que o emulador persiste em disco — diferente de
+// Options/BuildCommand, que só valem para uma execução via linha de comando.
+// Nem todo Adapter implementa isto; verificar com asserção de tipo
+// (`if c, ok := adapter.(ConfigurableAdapter); ok { ... }`), nunca presumir.
+type ConfigurableAdapter interface {
+	// ReadConfig lê o estado hoje gravado no arquivo do emulador para esta
+	// Installation. Um campo ausente em PersistedOptions é "não pôde ler",
+	// nunca um valor inventado.
+	ReadConfig(install Installation) (PersistedOptions, error)
+
+	// WriteConfig funde opts no arquivo do emulador, preservando byte a
+	// byte tudo que o ZeuX não modela — config de emulador é do usuário, o
+	// ZeuX é visita. Faz backup do arquivo original antes da primeira
+	// escrita (ver RestoreConfig). Devolve, no mesmo espírito do Unapplied
+	// de BuildCommand (ADR 0006), o que este adapter não sabe persistir.
+	WriteConfig(install Installation, opts Options) (unapplied []string, err error)
+
+	// RestoreConfig devolve o arquivo de configuração ao estado anterior à
+	// primeira escrita do ZeuX feita por WriteConfig — reversão simétrica.
+	// Erro quando nunca houve um backup para restaurar (WriteConfig nunca
+	// rodou para esta Installation).
+	RestoreConfig(install Installation) error
+}
+
+// InputBinding é o mapeamento de uma ação para uma tecla e/ou botão de
+// controle, sempre na **vocabulário do próprio emulador** — nunca traduzido
+// para um layout genérico do ZeuX. "Cross" no PCSX2 não é necessariamente o
+// mesmo botão físico que "b" no RetroArch, e uma correspondência entre os
+// dois não foi verificada contra hardware real (H3/H4, docs/roadmap.md);
+// inventar essa tradução seria o mesmo erro que o parecer parcial proíbe
+// para hardware.
+type InputBinding struct {
+	// Action é o nome da ação, no vocabulário deste adapter — ver
+	// KeyBindableAdapter.Actions().
+	Action string `json:"action"`
+
+	// Key é a tecla de teclado vinculada, no formato que o próprio
+	// emulador grava (ex.: "K" no PCSX2 — sem o prefixo "Keyboard/", que é
+	// detalhe de arquivo, não de domínio — "x" no RetroArch). Ausente
+	// (nunca uma string vazia) quando não foi lida/não está vinculada.
+	Key *string `json:"key,omitempty"`
+
+	// Button é o botão de controle vinculado, como o próprio emulador o
+	// identifica (ex.: um índice numérico em string). Ausente quando não
+	// lido/não vinculado.
+	Button *string `json:"button,omitempty"`
+}
+
+// KeyBindableAdapter é a capacidade opcional (H3/H4, docs/roadmap.md) de
+// ler e escrever o mapeamento de teclado/controle de um emulador. Mesmo
+// princípio de ConfigurableAdapter: nem todo Adapter implementa: verificar
+// com asserção de tipo, nunca presumir.
+type KeyBindableAdapter interface {
+	// Actions lista as ações que este adapter sabe mapear, na vocabulário
+	// do próprio emulador (não um layout genérico do ZeuX — ver
+	// InputBinding).
+	Actions() []string
+
+	// ReadBindings lê o mapeamento hoje gravado no arquivo do emulador.
+	ReadBindings(install Installation) ([]InputBinding, error)
+
+	// WriteBindings grava bindings, preservando o resto do arquivo — mesma
+	// disciplina de ConfigurableAdapter.WriteConfig, inclusive backup antes
+	// da primeira escrita (compartilha o mesmo arquivo e o mesmo mecanismo
+	// de backupBeforeFirstWrite/restoreFromBackup do H1 quando o adapter
+	// também é ConfigurableAdapter sobre o mesmo arquivo). Devolve o que
+	// não pôde ser aplicado — ex.: um Button pedido para um adapter cujo
+	// formato de botão de controle não foi confirmado contra hardware real.
+	WriteBindings(install Installation, bindings []InputBinding) (unapplied []string, err error)
+}
+
 // Adapter traduz uma Request na linha de comando de um emulador específico.
 type Adapter interface {
 	// ID é o identificador estável usado em configuração e API.

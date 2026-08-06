@@ -109,7 +109,7 @@ func (retroArchAdapter) Consoles() []string {
 func (a retroArchAdapter) Locate(ctx context.Context) (Installation, bool) {
 	names := binaryNames("retroarch", []string{"retroarch.exe"}, "RetroArch")
 
-	path, managed, ok := findBinary(ctx, a.ID(), a.Consoles(), names, nil)
+	path, managed, version, ok := findBinary(ctx, a.ID(), a.Consoles(), names, nil)
 	if !ok {
 		return Installation{}, false
 	}
@@ -118,6 +118,7 @@ func (a retroArchAdapter) Locate(ctx context.Context) (Installation, bool) {
 		AdapterID:  a.ID(),
 		Name:       a.Name(),
 		BinaryPath: path,
+		Version:    version,
 		Managed:    managed,
 	}, true
 }

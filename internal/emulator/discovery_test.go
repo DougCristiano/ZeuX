@@ -60,7 +60,7 @@ func TestFindBinaryLocatesSingleConsoleAdapterInsideConsoleFolder(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	path, managed, ok := findBinary(context.Background(), "duckstation", []string{"ps1"}, []string{"duckstation-qt"}, nil)
+	path, managed, _, ok := findBinary(context.Background(), "duckstation", []string{"ps1"}, []string{"duckstation-qt"}, nil)
 	if !ok {
 		t.Fatal("esperava achar o binário gerenciado")
 	}
@@ -98,7 +98,7 @@ func TestFindBinaryLocatesAppImageByGlobWhenExactNameDoesNotMatch(t *testing.T) 
 
 	// "pcsx2-qt" é o nome que o adapter procura primeiro — não existe aqui, só
 	// o AppImage, então a busca exata falha e precisa cair no glob.
-	path, managed, ok := findBinary(context.Background(), "pcsx2", []string{"ps2"}, []string{"pcsx2-qt"}, nil)
+	path, managed, _, ok := findBinary(context.Background(), "pcsx2", []string{"ps2"}, []string{"pcsx2-qt"}, nil)
 	if !ok {
 		t.Fatal("esperava achar o AppImage pelo glob")
 	}
@@ -107,6 +107,68 @@ func TestFindBinaryLocatesAppImageByGlobWhenExactNameDoesNotMatch(t *testing.T) 
 	}
 	if path != appImagePath {
 		t.Errorf("path = %q, queria %q", path, appImagePath)
+	}
+}
+
+// Trava o critério de aceite do item de Sprint A "Installation.Version": uma
+// instalação gerenciada com o marcador de versão gravado (internal/install
+// grava isso depois de baixar um release) devolve a versão via findBinary,
+// sem executar o binário para perguntar a ele.
+func TestFindBinaryReadsVersionMarkerForManagedInstall(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	root, err := ManagedRoot()
+	if err != nil {
+		t.Fatalf("ManagedRoot: %v", err)
+	}
+
+	dir := ManagedEmulatorDir(root, "duckstation", []string{"ps1"})
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "duckstation-qt"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, VersionMarkerName), []byte("v0.10.1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, managed, version, ok := findBinary(context.Background(), "duckstation", []string{"ps1"}, []string{"duckstation-qt"}, nil)
+	if !ok || !managed {
+		t.Fatalf("esperava achar o binário gerenciado: ok=%v managed=%v", ok, managed)
+	}
+	if version != "v0.10.1" {
+		t.Errorf("version = %q, queria %q (sem espaço/quebra de linha à volta)", version, "v0.10.1")
+	}
+}
+
+// Trava o lado "dado desconhecido, nunca um palpite": uma instalação
+// gerenciada sem o marcador (ex.: gravada antes desta funcionalidade
+// existir) devolve versão vazia, não erro nem valor inventado.
+func TestFindBinaryVersionEmptyWithoutMarker(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	root, err := ManagedRoot()
+	if err != nil {
+		t.Fatalf("ManagedRoot: %v", err)
+	}
+
+	dir := ManagedEmulatorDir(root, "duckstation", []string{"ps1"})
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "duckstation-qt"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, version, ok := findBinary(context.Background(), "duckstation", []string{"ps1"}, []string{"duckstation-qt"}, nil)
+	if !ok {
+		t.Fatal("esperava achar o binário gerenciado")
+	}
+	if version != "" {
+		t.Errorf("version = %q, esperava vazio sem marcador gravado", version)
 	}
 }
 
@@ -132,7 +194,7 @@ func TestFindBinaryDoesNotGuessBetweenMultipleAppImages(t *testing.T) {
 		}
 	}
 
-	_, _, ok := findBinary(context.Background(), "pcsx2", []string{"ps2"}, []string{"pcsx2-qt"}, nil)
+	_, _, _, ok := findBinary(context.Background(), "pcsx2", []string{"ps2"}, []string{"pcsx2-qt"}, nil)
 	if ok {
 		t.Error("não deveria escolher entre duas AppImages ambíguas")
 	}

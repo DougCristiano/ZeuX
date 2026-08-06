@@ -271,6 +271,50 @@ export function GameCover({
 }
 
 /**
+ * Estrela de favorito (G4, docs/roadmap.md) — **sempre visível**, nunca só
+ * no hover: ADR 0009 exige que toda ação alcançável por mouse tenha
+ * equivalente por teclado, e uma estrela hover-only some do fluxo de quem
+ * navega só com Tab. `aria-pressed` comunica o estado a leitor de tela;
+ * `stopPropagation` evita que clicar na estrela também dispare o clique do
+ * card por baixo dela (ex.: abrir o jogo) quando ela é posicionada
+ * sobreposta a um elemento clicável.
+ */
+export function FavoriteToggle({
+  favorite,
+  onToggle,
+  className = "",
+}: {
+  favorite: boolean;
+  onToggle: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={favorite}
+      aria-label={favorite ? "Remover dos favoritos" : "Favoritar"}
+      title={favorite ? "Remover dos favoritos" : "Favoritar"}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
+        favorite ? "border-amber bg-black/60 text-amber" : "border-line-strong bg-black/60 text-muted hover:text-ink"
+      } ${FOCUS_RING} ${className}`}
+    >
+      <svg width="14" height="14" viewBox="0 0 16 16" fill={favorite ? "currentColor" : "none"} aria-hidden="true">
+        <path
+          d="M8 1.5 L9.85 5.6 L14.3 6.15 L11 9.15 L11.9 13.6 L8 11.4 L4.1 13.6 L5 9.15 L1.7 6.15 L6.15 5.6 Z"
+          stroke="currentColor"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+/**
  * Paginação — "Anterior/Próxima" mais indicador de página, extraída de
  * `AllGamesScreen` (2026-08-04) para reaproveitar em `EmulatorsScreen` e
  * `VerdictScreen`, que ganharam o mesmo padrão. Sempre "página N de M",

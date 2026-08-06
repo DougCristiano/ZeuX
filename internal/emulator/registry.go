@@ -117,6 +117,14 @@ type Status struct {
 	// confirmar antes de tentar, em vez de deixar o usuário descobrir só
 	// depois de clicar.
 	BiosDirEmpty bool `json:"bios_dir_empty,omitempty"`
+
+	// Configurable/Bindable (H1/H3/H4, docs/roadmap.md) dizem se este
+	// adapter satisfaz ConfigurableAdapter/KeyBindableAdapter — a interface
+	// usa isso para mostrar ou esconder os botões de configurar/mapear sem
+	// precisar tentar a rota e tratar erro (mesmo raciocínio de BiosDir:
+	// declarar a capacidade real, não descobrir por tentativa).
+	Configurable bool `json:"configurable"`
+	Bindable     bool `json:"bindable"`
 }
 
 // Survey verifica quais emuladores estão instalados na máquina.
@@ -136,11 +144,15 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 		sort.Strings(consoles)
 
 		_, isCustom := adapter.(customAdapter)
+		_, configurable := adapter.(ConfigurableAdapter)
+		_, bindable := adapter.(KeyBindableAdapter)
 		status := Status{
-			AdapterID: adapter.ID(),
-			Name:      adapter.Name(),
-			Consoles:  consoles,
-			Custom:    isCustom,
+			AdapterID:    adapter.ID(),
+			Name:         adapter.Name(),
+			Consoles:     consoles,
+			Custom:       isCustom,
+			Configurable: configurable,
+			Bindable:     bindable,
 		}
 
 		if install, ok := adapter.Locate(ctx); ok {

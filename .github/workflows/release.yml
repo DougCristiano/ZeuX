@@ -26,6 +26,11 @@ on:
       tag:
         description: "Tag a publicar — reaproveitada se já existir, criada no commit atual se não existir (ex.: v0.1.0)"
         required: true
+      bundle_retroarch:
+        description: "Empacotar RetroArch + 24 cores (~60 min a mais). Só é permitido com tag=v0.5.0 — o job create-release falha se marcado para qualquer outra tag."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -41,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
+      bundle_retroarch: ${{ steps.bundle.outputs.value }}
     steps:
       # Checkout no ref que disparou o run (branch, no caso de
       # workflow_dispatch) — nunca direto na tag do input, que pode ainda
@@ -67,6 +73,34 @@ jobs:
             git push origin "$TAG"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # v0.5.0 é, por decisão do Douglas (2026-08-05), a única versão que sai
+      # com RetroArch + os 24 cores empacotados (opção de instalar 1-click) —
+      # toda outra tag continua no build rápido, sem essa etapa. A decisão é
+      # amarrada ao **nome da tag**, não a um input manual esquecível: quem
+      # cortar v0.5.0 (por push de tag comum ou workflow_dispatch) leva o
+      # bundle automaticamente, e nenhuma outra tag leva por engano. O input
+      # `bundle_retroarch` do workflow_dispatch só serve para travar esse
+      # comportamento de propósito: se alguém marcar `true` numa tag que não
+      # é v0.5.0, o run falha aqui em vez de silenciosamente empacotar (ou
+      # não) a versão errada.
+      - name: Decidir se este build empacota RetroArch (só v0.5.0)
+        id: bundle
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.resolve.outputs.tag }}"
+          REQUESTED="${{ github.event.inputs.bundle_retroarch }}"
+          if [ "$REQUESTED" = "true" ] && [ "$TAG" != "v0.5.0" ]; then
+            echo "::error::bundle_retroarch=true só é permitido para a tag v0.5.0 (recebida: $TAG). Rode de novo sem essa opção, ou use a tag v0.5.0."
+            exit 1
+          fi
+          if [ "$TAG" = "v0.5.0" ]; then
+            echo "Tag v0.5.0 — empacotando RetroArch + cores."
+            echo "value=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag $TAG — build rápido, sem RetroArch empacotado."
+            echo "value=0" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Criar a Release
         uses: softprops/action-gh-release@v2
@@ -99,7 +133,14 @@ jobs:
         run: npm ci
 
       - name: Build do instalador Tauri
+        # Sem isto, RetroArch + os 24 cores (scripts/download-retroarch-cores.mjs,
+        # cmd/download-retroarch-app) não são baixados — o build fica rápido
+        # por padrão, inclusive em push de tag comum. Só liga de verdade
+        # rodando este workflow manualmente (workflow_dispatch) com
+        # bundle_retroarch=true, para o corte deliberado da versão oficial.
         run: npm run tauri build
+        env:
+          ZEUX_BUNDLE_RETROARCH: ${{ needs.create-release.outputs.bundle_retroarch }}
 
       - name: Publicar assets na Release
         uses: softprops/action-gh-release@v2
@@ -154,7 +195,14 @@ jobs:
         run: npm ci
 
       - name: Build do instalador Tauri
+        # Sem isto, RetroArch + os 24 cores (scripts/download-retroarch-cores.mjs,
+        # cmd/download-retroarch-app) não são baixados — o build fica rápido
+        # por padrão, inclusive em push de tag comum. Só liga de verdade
+        # rodando este workflow manualmente (workflow_dispatch) com
+        # bundle_retroarch=true, para o corte deliberado da versão oficial.
         run: npm run tauri build
+        env:
+          ZEUX_BUNDLE_RETROARCH: ${{ needs.create-release.outputs.bundle_retroarch }}
 
       - name: Publicar assets na Release
         uses: softprops/action-gh-release@v2
@@ -192,7 +240,14 @@ jobs:
         run: npm ci
 
       - name: Build do instalador Tauri
+        # Sem isto, RetroArch + os 24 cores (scripts/download-retroarch-cores.mjs,
+        # cmd/download-retroarch-app) não são baixados — o build fica rápido
+        # por padrão, inclusive em push de tag comum. Só liga de verdade
+        # rodando este workflow manualmente (workflow_dispatch) com
+        # bundle_retroarch=true, para o corte deliberado da versão oficial.
         run: npm run tauri build
+        env:
+          ZEUX_BUNDLE_RETROARCH: ${{ needs.create-release.outputs.bundle_retroarch }}
 
       - name: Publicar assets na Release
         uses: softprops/action-gh-release@v2

@@ -18,6 +18,7 @@ import (
 	"github.com/doufl/zeux/internal/consent"
 	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/hardware"
+	"github.com/doufl/zeux/internal/igdb"
 	"github.com/doufl/zeux/internal/install"
 	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/store"
@@ -91,9 +92,16 @@ func run(addr string, logger *slog.Logger) error {
 
 	libraryStore := library.NewStore(db)
 
+	igdbCreds, err := igdb.NewCredentialsStore()
+	if err != nil {
+		return err
+	}
+	igdbJobs := igdb.NewScrapeManager(libraryStore, igdbCreds, logger)
+
 	server := api.NewServer(
 		hardware.NewProbe(), catalog, consentStore,
-		registry, customStore, launcher, installer, libraryStore, logger)
+		registry, customStore, launcher, installer, libraryStore,
+		igdbCreds, igdbJobs, logger)
 
 	// Só quem está rodando o front em modo desenvolvimento (`npm run tauri
 	// dev`) define esta variável — o instalador nunca a define, então o
