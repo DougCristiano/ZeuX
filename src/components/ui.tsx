@@ -1,6 +1,7 @@
-import type { ButtonHTMLAttributes, CSSProperties, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import type { ConsoleVerdict } from "../api/types";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 
 // Componentes primitivos do item B7 (docs/sprint-b-plano.md), construídos
 // sobre os tokens de src/index.css. Cor, tipografia e foco vivem aqui uma vez
@@ -35,36 +36,6 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
       className={`rounded px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
       {...props}
     />
-  );
-}
-
-/**
- * `<select>` temático (2026-08-05) — o `<select>` nativo cru usava o chrome
- * do navegador/SO para a seta e ficava com padding/altura diferente dos
- * `input`s ao lado (o que o Douglas apontou como "CSS ruim, não condiz com o
- * projeto"). `appearance-none` tira a seta nativa e desenhamos uma própria
- * com os tokens do tema; o popup de opções em si continua fora do nosso CSS
- * (o navegador desenha), mas `color-scheme: dark` em `:root` (src/index.css)
- * faz esse popup nativo usar o esquema escuro em vez do claro do SO.
- */
-export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <div className="relative inline-block">
-      <select
-        className={`appearance-none rounded border border-line bg-fill py-2 pr-8 pl-3 text-sm text-ink transition-colors hover:border-line-strong ${FOCUS_RING} ${className}`}
-        {...props}
-      />
-      <svg
-        width="10"
-        height="6"
-        viewBox="0 0 10 6"
-        fill="none"
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted"
-      >
-        <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
   );
 }
 
@@ -145,32 +116,32 @@ export function PartialNotice({ children }: { children: ReactNode }) {
  * lançar um jogo falhou) em vez de um texto discreto que passa despercebido
  * na tela — achado em 2026-08-04, quando "Não foi possível abrir o jogo"
  * apareceu como texto inline e o Douglas pediu algo mais visível. Fecha só
- * pelo botão ou pela tecla Esc, nunca clicando fora — erro não deveria
- * desaparecer sem o usuário perceber que leu.
+ * pelo botão, pela tecla Esc ou pelo X do `Dialog` — nunca clicando fora
+ * (`onInteractOutside` recusado): erro não deveria desaparecer sem o usuário
+ * perceber que leu.
+ *
+ * J2 (docs/roadmap.md): shell trocado pelo `Dialog` do shadcn (Radix) —
+ * focus-trap e `aria-modal` de graça, em vez do shell escrito à mão que
+ * `ConsoleInfoModal` duplicava por conta própria. Conteúdo (título,
+ * mensagem, botão) continua usando o `Button` do ZeuX, não o do shadcn — a
+ * identidade visual das ações não muda.
  */
 export function ErrorModal({ title, message, onClose }: { title: string; message: string; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="error-modal-title"
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-    >
-      <div className="w-full max-w-md rounded border border-line bg-fill p-5">
-        <h2 id="error-modal-title" className="mb-2 text-lg font-semibold text-danger">
-          {title}
-        </h2>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-w-md rounded border border-line bg-fill p-5 ring-0"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <DialogTitle className="mb-2 text-lg font-semibold text-danger">{title}</DialogTitle>
         <p className="text-base text-ink">{message}</p>
         <div className="mt-4 flex justify-end">
           <Button variant="primary" autoFocus onClick={onClose}>
             Entendi
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -252,7 +223,11 @@ export function GameCover({
         {title ?? label}
       </div>
       {showPlayOverlay && (
-        <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/40 group-hover:flex group-focus-visible:flex">
+        // Escurecimento mais forte (J4, docs/roadmap.md — referência real do
+        // Playnite em docs/referencias-playnite.md: overlay de hover em
+        // `#AA000000`, ~67% opaco, mais forte que o glow de borda que o ZeuX
+        // já tinha) — o placeholder de sigla continua legível por baixo.
+        <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/60 group-hover:flex group-focus-visible:flex">
           <div
             className={`flex h-11 w-11 items-center justify-center rounded-full border-2 ${
               accent
@@ -464,6 +439,9 @@ export function ConsoleMoreBadge({ count }: { count: number }) {
  * DeclinedScreen, antes do consentimento/scan) — mostra só o nome que já se
  * conhece nesse caso, nunca finge um parecer que não existe.
  */
+// J2 (docs/roadmap.md): mesmo shell `Dialog` do `ErrorModal` — os dois
+// reimplementavam o mesmo `fixed inset-0`/backdrop/`role="dialog"`/Esc à mão
+// antes da adoção do shadcn.
 export function ConsoleInfoModal({
   verdict,
   fallbackName,
@@ -474,21 +452,14 @@ export function ConsoleInfoModal({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="console-modal-title"
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-    >
-      <div className="w-full max-w-md rounded border border-line bg-fill p-5">
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-w-md rounded border border-line bg-fill p-5 ring-0"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <div className="mb-3 flex items-start justify-between gap-2">
           <div>
-            <h2 id="console-modal-title" className="text-lg font-semibold text-ink">
-              {verdict?.name ?? fallbackName}
-            </h2>
+            <DialogTitle className="text-lg font-semibold text-ink">{verdict?.name ?? fallbackName}</DialogTitle>
             {verdict?.year && <p className="text-sm text-muted">{verdict.year}</p>}
           </div>
           {verdict && (
@@ -534,7 +505,7 @@ export function ConsoleInfoModal({
             Fechar
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

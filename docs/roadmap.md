@@ -123,13 +123,23 @@ da Sprint A, mas conta uma vez só.
 | **Sprint G (v1.0)** | **5** | G1–G5 — biblioteca visual: capas, favoritos, ícone de console |
 | **Sprint H (v1.0)** | **5** | H1–H5 — configuração de emulador e mapeamento de controles |
 | **Sprint I (v1.0)** | **3** | I1–I3 — arestas: emulador manual na UI, busca faltante, teclado |
+| Sprint K (v1.0) | **0** | K1–K6 — **fechada em 2026-08-06** |
+| Sprint J (v1.0) | **0** | J1–J5 — **fechada em 2026-08-06** (J5 avaliado e não aplicado, por decisão, não por pendência) |
+| **Sprint L (v1.0)** | **1** | L0–L2 feitos; L3 (verificação com controle físico real) só o Douglas fecha |
 | Sprint E (**v2.0**) | **7** | — |
 | Sprint F (**v2.0**) | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
 | **Total do MVP e da dívida** | **4** | dívida + A + B + C + D |
-| **Total para fechar a v1.0** | **17** | os 4 acima + G + H + I |
-| **Total geral** | **36** | tudo acima, v1.0 + v2.0 |
+| **Total para fechar a v1.0** | **17** | os 4 acima + G + H + I — **desatualizado, ver nota abaixo** |
+| **Total geral** | **36** | tudo acima, v1.0 + v2.0 — **desatualizado, ver nota abaixo** |
 | Fora do MVP, registrado | 1 | identificação por hash (scraper e cache de capas **saíram desta lista** — reabertos como G1/G2) |
+
+**Adicionado em 2026-08-06, não recalculado nas linhas de Total acima** (mesmo
+motivo da nota de 2026-08-05: recontar errado é pior que deixar sinalizado):
+Sprints K, J e L (15 itens novos) entraram na v1.0, a partir da revisão
+crítica do frontend e do pedido do Douglas de navegação por controle. Os
+"Total" desta tabela precisam de +15 para refletir isso — as linhas
+individuais (K/J/L acima) já estão certas.
 
 **Reorganização de 2026-08-04:** as sprints E e F foram rotuladas como **v2.0**
 e três sprints novas (G, H, I) entraram para a **v1.0**, a partir da direção
@@ -1994,6 +2004,380 @@ nativo é o de **arquivo** (binário do emulador), e isso é o I1.
 **Critério de saída da Sprint I:** um usuário com um emulador instalado por
 conta própria consegue registrá-lo, apontar as pastas e achar qualquer jogo da
 biblioteca, sem tocar em terminal e sem editar arquivo de configuração.
+
+---
+
+## Sprint K — Consertar layout, foco e responsividade (v1.0)
+
+Objetivo: fechar o que a revisão crítica do frontend (skills
+`web-design-guidelines` e `vercel-composition-patterns`, 2026-08-06) achou de
+errado — nada de escopo novo, só dívida de UI que a própria revisão apontou
+com `arquivo:linha`. Base barata, sem dependência nova, antes da Sprint J
+tocar os mesmos arquivos.
+
+| Item | Tam. | Depende de |
+|---|---|---|
+| K1 — foco ausente nos filtros de `AllGamesScreen` | P | nada |
+| K2 — labels/`autoComplete` nos campos de busca | P | nada |
+| K3 — progressão de breakpoints nos grids | M | nada |
+| K4 — tipografia (`...` → `…`) | P | nada |
+| K5 — auditar telas não revisadas ainda | M | nada |
+| K6 — quebrar `EmulatorCard` em subcomponentes | M | nada |
+
+### K1 — Foco ausente nos filtros de `AllGamesScreen` (P)
+
+`src/screens/AllGamesScreen.tsx:212-217` (botão "★ FAVORITOS") e `:220-240`
+(chips de plataforma) não usam `FOCUS_RING` (`src/components/ui.tsx`),
+diferente do resto do app, que centraliza o anel de foco ali desde o ADR
+0009. Quem navega por teclado perde o indicador de foco exatamente nesses
+dois grupos de botão.
+
+**Critério de aceite:** os dois grupos usam `FOCUS_RING`, indicador de foco
+visível e consistente com o resto da tela.
+
+### K2 — Labels e atributos de formulário nos campos de busca (P)
+
+`AllGamesScreen.tsx:201-207`, `EmulatorsScreen.tsx:606-612`,
+`GamesScreen.tsx:252-258`, `LibraryScreen.tsx:314-320` — inputs de
+busca/filtro só têm `placeholder`, sem `<label>` associado nem `name`.
+
+**Critério de aceite:** cada input de busca tem `<label className="sr-only">`
+associado via `htmlFor`/`id`, e `name`/`autoComplete="off"` (são buscas
+locais, não campos de autocomplete do navegador).
+
+### K3 — Breakpoints inconsistentes nos grids (M) — **feito em 2026-08-06**
+
+Auditoria de todos os `grid-cols-*` responsivos em `src/screens/` contra a
+régua do CLAUDE.md (descontar sidebar 64px + scrollbar ~16px da largura da
+janela, e nunca prender um breakpoint no valor exato do tamanho padrão da
+janela — 1280px). Resultado: a maior parte já seguia a regra
+(`AllGamesScreen.tsx:265` usa `lg`→`2xl`, nunca `xl`; `EmulatorsScreen.tsx` e
+`GamesScreen.tsx` usam só `sm`→`lg`) — o padrão "pular xl e ir de lg para
+2xl" **não é bug, é a aplicação correta da regra** (evita o breakpoint
+frágil, aceita uma faixa "plana" de janela onde a densidade não sobe).
+
+**Achado real:** `VerdictScreen.tsx:238` usava `xl:grid-cols-3` — exatamente
+o valor frágil, e pior aqui, porque esta grade divide espaço com uma coluna
+lateral fixa de 320px (`VerdictScreen.tsx:181`, `lg:grid-cols-[320px_1fr]`),
+sobrando ainda menos largura que uma grade de tela cheia. Trocado para
+`2xl:grid-cols-3`, com comentário explicando o porquê.
+
+**Critério de aceite:** nenhum grid do projeto usa `xl` como breakpoint de
+densidade — confirmado por `grep -rn "grid-cols" src/screens/`.
+
+### K4 — Tipografia (P) — **feito em 2026-08-06**
+
+6 ocorrências de reticência literal (`...`) em texto de UI trocadas por `…`:
+`AllGamesScreen.tsx`/`GamesScreen.tsx` ("Buscar jogos..."),
+`VerdictScreen.tsx` ("Lendo hardware...", "Buscar console..."),
+`LibraryScreen.tsx` ("Varrendo..."), `EmulatorsScreen.tsx` ("Carregando
+cores...", "Buscar emulador ou console...").
+
+**Critério de aceite:** `grep -rn '\.\.\.' src --include="*.tsx" | grep -v
+'\.\.\.[a-zA-Z_]'` não acha nada restante (o filtro exclui spread de JS,
+`...props`/`...obj`, que não é reticência de texto).
+
+### K5 — Auditar as telas não revisadas ainda (M) — **feito em 2026-08-06**
+
+`VerdictScreen.tsx`, `SettingsScreen.tsx`, `ConsentScreen.tsx`,
+`DeclinedScreen.tsx`, `ManualEmulatorForm.tsx` não tinham entrado na revisão
+crítica original (que cobriu `App.tsx`, `ui.tsx`, `Sidebar.tsx`,
+`AllGamesScreen`, `EmulatorsScreen`, `EmulatorConfigPanel`,
+`EmulatorBindingsPanel`, `GamesScreen`, `LibraryScreen`, `GameDetailScreen`).
+
+**Achado real:** `VerdictScreen.tsx` tinha o mesmo bug do K1 (chips de
+filtro por patamar, linhas 210-229, sem `FOCUS_RING`) e do K2 (campo "Buscar
+console" sem `<label>`/`name`) — corrigido junto.
+
+**As outras 4 telas auditadas e já estavam corretas:** `SettingsScreen.tsx`
+e `ManualEmulatorForm.tsx` usam `<label>` envolvendo o `<input>` (associação
+implícita, válida); `ConsentScreen.tsx` e `DeclinedScreen.tsx` só usam o
+componente `Button` (que já embute `FOCUS_RING`) e não têm campo de busca
+nem grid. Nenhuma mudança necessária nessas 4.
+
+### K6 — Quebrar `EmulatorCard` em peças menores (M) — **feito em 2026-08-06**
+
+`src/screens/EmulatorsScreen.tsx` tinha um `EmulatorCard` de ~370 linhas com
+~10 `useState` e uma parede de condicionais (`entry.installed` ×
+`entry.configurable` × `entry.bindable` × `customDef` × `RowState`).
+
+**Extraído em 5 componentes**, cada um com o estado que genuinamente é dele
+(nada subiu para Context — escopo continua local a um card):
+`EmulatorCardHeader` (nome, ponto de identidade, badge — sem estado),
+`EmulatorCardConsoles` (ícones de console — sem estado),
+`EmulatorCardConfigPanels` (toggle de config/bindings — `showConfig`/
+`showBindings` locais), `EmulatorCardBios` (botão de pasta do BIOS —
+`biosError` local), `EmulatorCardActions` (a máquina de estados `RowState`
+inteira — instalar/remover/abrir standalone/editar-excluir personalizado).
+`EmulatorCard` virou orquestrador: monta `Card` + os 5 pedaços + o toggle de
+cores do RetroArch. `RowState` continua union discriminada, comportamento
+idêntico — `npm run build` (`tsc` + `vite build`) passou sem erro.
+
+**Critério de saída da Sprint K:** as 7 telas usam `FOCUS_RING` em todo
+elemento interativo (achado extra: `VerdictScreen.tsx` tinha o mesmo bug do
+K1/K2, corrigido em K5), nenhum grid usa o breakpoint frágil `xl` (achado
+real em `VerdictScreen.tsx`, corrigido em K3), `EmulatorCard` deixou de ser
+um componente de 370 linhas. **Sprint K encerrada em 2026-08-06.**
+
+---
+
+## Sprint J — Adotar shadcn de verdade e aproximar do Playnite (v1.0)
+
+Objetivo: sair de "skill instalada" para componentes de verdade no app, e
+puxar o layout na direção do Playnite nos três eixos que o Douglas confirmou
+em 2026-08-06 — densidade/hierarquia visual, componentes de interface e
+navegação/organização. Depende da Sprint K (K6 principalmente — trocar
+componentes dentro de um `EmulatorCard` ainda monolítico duplicaria
+trabalho).
+
+Pesquisa de referência já feita, não repetir: `docs/referencias-playnite.md`
+(código-fonte real do Playnite, `GridViewItemTemplate.xaml`,
+`DetailsViewGameOverview.xaml`).
+
+| Item | Tam. | Depende de |
+|---|---|---|
+| J1 — `shadcn init` mapeado aos tokens existentes | M | Sprint K |
+| J2 — `Dialog` substitui `ErrorModal`/`ConsoleInfoModal` | M | J1 |
+| J3 — `Select`/`Combobox` no filtro de console | M | J1 |
+| J4 — hover do `GameCover` estilo Playnite | M | nada |
+| J5 — `DropdownMenu` para ações secundárias por card | M | J1, K6 |
+
+### J1 — `shadcn init` mapeado aos tokens existentes (M)
+
+Rodar `npx shadcn@latest init` (Tailwind v4 já suportado pela CLI atual).
+Sobrescrever as variáveis que o shadcn espera para apontar aos tokens do
+ZeuX (`src/index.css`) em vez da paleta padrão:
+
+| Variável shadcn | Token ZeuX |
+|---|---|
+| `--background` | `--paper` |
+| `--foreground` | `--ink` |
+| `--card` | `--panel` |
+| `--primary` | `--accent` |
+| `--primary-foreground` | `--accent-ink` |
+| `--border` | `--line` |
+| `--ring` | `--accent` (mesmo anel de `FOCUS_RING`) |
+| `--muted-foreground` | `--muted` |
+| `--destructive` | `--danger` |
+
+Preserva a identidade neon única (ADR 0013) e o anel de foco único (ADR
+0009) em vez do shadcn trazer uma segunda linguagem visual por cima —
+decisão tomada nesta sessão para não repetir o erro que as skills de
+"visual taste" opinativas (`frontend-design`, `minimalist-ui`) teriam
+causado, avaliadas e descartadas em 2026-08-06.
+
+Dependências novas (`npm install`, autorizado pelo Douglas em 2026-08-06):
+`@radix-ui/*` (conforme componente usado), `clsx`, `tailwind-merge`,
+`class-variance-authority`, `lucide-react`. Isto é uma exceção explícita ao
+ADR 0004 (adiava dependências de Node) — decisão tomada, não mais "adiado".
+
+**Feito em 2026-08-06.** `npx shadcn@latest init --template vite --base
+radix --preset nova` precisou de alias `@/*` primeiro (`tsconfig.json`
+`paths`, `vite.config.ts` `resolve.alias` via `fileURLToPath` — o projeto é
+ESM, `__dirname` não existe). **Achado real do CLI:** ele sobrescreveu
+`--muted` e `--accent` (mesmo nome que os tokens do ZeuX já usavam) com
+valores `oklch` neutros, importou a fonte Geist (`@fontsource-variable/geist`,
+removida) por cima do Inter self-hospedado, e gravou um bloco `.dark{}`
+inteiro que nunca ativa (o ZeuX não tem alternância clara/escura). Corrigido
+à mão em `src/index.css`: `--muted`/`--accent` restaurados, as variáveis
+novas do shadcn (`--background`, `--primary`, `--border`, `--ring` etc.)
+apontando para os tokens ZeuX em vez de valores próprios, `.dark{}` e
+`--chart-*`/`--sidebar-*` (não usados — sem gráfico, sem `Sidebar` do
+shadcn) removidos. `shadcn` movido para `devDependencies` (é a CLI, não roda
+em produção). O `Button` que o `init` gerou (`src/components/ui/button.tsx`)
+foi removido — o ZeuX mantém o próprio `Button` (`ui.tsx`, variantes
+primary/secondary/ghost já estabelecidas), o shadcn entra só pelos
+componentes comportamentais (Dialog, Select, DropdownMenu) das próximas
+tasks. `npm run build` passa.
+
+### J2 — `Dialog` do shadcn substitui `ErrorModal` e `ConsoleInfoModal` (M)
+
+Elimina a duplicação achada na revisão de 2026-08-06: `ErrorModal`
+(`ui.tsx:151-175`) e `ConsoleInfoModal` (`ui.tsx:467-540`) reimplementavam o
+mesmo shell (`fixed inset-0` + backdrop + `role="dialog"` + Esc) cada um por
+conta própria. `Dialog` do Radix já traz focus-trap, `Esc` fecha,
+`aria-modal` — sem reescrever isso à mão de novo no próximo modal que
+aparecer.
+
+**Feito em 2026-08-06.** `npx shadcn@latest add dialog` trouxe `Dialog`/
+`DialogContent`/`DialogTitle` (Radix) — `DialogContent` depende do `Button`
+do shadcn internamente (botão "X" de fechar), então esse arquivo voltou
+(diferente do J1, aqui é dependência real, não sobra). `ErrorModal` e
+`ConsoleInfoModal` (`ui.tsx`) trocaram o shell à mão pelo `Dialog`;
+conteúdo interno continua com o `Button` do ZeuX. Preservada a regra "fecha
+só por botão/Esc, nunca clicando fora": `onInteractOutside={(e) =>
+e.preventDefault()}` em ambos. `npm run build` passa.
+
+### J3 — `Select`/`Combobox` do shadcn no filtro de console (M)
+
+`EmulatorsScreen.tsx` (filtro "Todos os consoles") e
+`EmulatorConfigPanel.tsx` (`RENDERER_LABEL`) usam o `<select>` temático
+(`ui.tsx:50-69`). Trocar pelo `Select`/`Combobox` do shadcn dá busca por
+teclado de graça na lista de 33 consoles.
+
+**Feito em 2026-08-06** — com uma ressalva de escopo: `npx shadcn@latest add
+select` trouxe o `Select` do Radix (teclado nativo, digitar salta pro item
+que começa com a letra — mesmo comportamento de um `<select>` nativo, só sem
+o chrome do SO). **Não é** um combobox com busca por texto livre nos 33
+consoles — isso exigiria compor `Command`+`Popover` (outro componente,
+escopo maior); registrado aqui para não prometer mais do que foi feito.
+Radix recusa `SelectItem value=""`, então os dois usos (filtro de console em
+`EmulatorsScreen.tsx`, backend gráfico em `EmulatorConfigPanel.tsx`) ganharam
+um valor-sentinela (`__all__`/`__default__`) convertido de volta para `""`
+fora do componente. O `Select` nativo antigo (`ui.tsx`) foi removido —
+nenhum outro lugar do projeto o usava. `npm run build` passa.
+
+### J4 — Hover do `GameCover` estilo Playnite (M)
+
+Já documentado como "ideia concreta, sem esperar scraper" em
+`docs/referencias-playnite.md`: overlay escurecido (`bg-black/40` a
+`bg-black/60`) no hover/foco de `GameCover` (`ui.tsx:193-271`), com o botão
+"Jogar" (já existe como `showPlayOverlay`) mais proeminente — o Playnite
+escurece + revela ação, o ZeuX hoje só faz glow de borda.
+
+**Achado real em 2026-08-06: o overlay de escurecimento já existia** (G4,
+implementado antes desta sprint) — `showPlayOverlay` em `GameCover`
+(`ui.tsx`) já escurecia e revelava o ícone de "Jogar". **Mas
+`group-focus-visible` nunca funcionava de verdade**: o elemento que recebe
+foco de teclado em `AllGamesScreen.tsx` é o `<button>` que envolve o
+`GameCover`, não a `<div className="group">` interna do próprio componente
+— `:hover` cascateia naturalmente entre elementos sobrepostos (por isso o
+mouse "funcionava sozinho"), mas `:focus-visible` não. Corrigido
+adicionando `group` também ao `<button>` externo em `AllGamesScreen.tsx`.
+Escurecimento aumentado de `bg-black/40` para `bg-black/60`, mais perto do
+`#AA000000` (~67%) que `docs/referencias-playnite.md` registra como o hover
+real do Playnite. `npm run build` passa.
+
+**Critério de saída:** hover e foco por teclado revelam o overlay de forma
+idêntica (ADR 0009: nada só-hover) — confirmado corrigindo o bug acima, não
+apenas assumido; placeholder de sigla continua por baixo quando não há capa.
+
+### J5 — Menu de ações por card com `DropdownMenu` (M)
+
+Cards de `EmulatorCard` (pós-K6) acumulam botões secundários soltos
+(Editar/Excluir de emulador personalizado, Remover, Abrir configurações).
+Agrupar em `DropdownMenu` do shadcn por card reduz botões sempre visíveis,
+aproximando da IA do Playnite (menu de contexto por item).
+
+**Reavaliado em 2026-08-06, não aplicado.** Contada a combinação máxima de
+botões simultâneos em `EmulatorCardActions` (pós-K6) — pior caso é
+"Abrir configurações do emulador" + "Editar" + "Excluir" (emulador
+personalizado já instalado), 3 botões num `flex-wrap`. Isso não é o
+cenário "várias ações soltas competindo por atenção" que motivava o
+`DropdownMenu` no plano original — é menos denso que um único menu de
+contexto do Playnite. Esconder 3 botões atrás de um clique extra custaria
+mais do que resolveria (e o ADR 0009 exigiria garantir que cada item
+continuasse alcançável só por foco, custo real para um ganho que não existe
+hoje). Registrado como não feito de propósito — `DropdownMenu` já está
+disponível (`npx shadcn add dropdown-menu`) se uma sprint futura adicionar
+ações suficientes para justificar.
+
+**Critério de saída da Sprint J:** nenhum modal do projeto reimplementa o
+shell à mão (feito), `Select` usa o componente do shadcn (feito, sem busca
+por texto livre — ver ressalva de J3), `GameCover` revela "Jogar" com
+escurecimento no hover/foco de verdade nos dois casos (feito, corrigindo um
+bug real de foco no processo), ações secundárias agrupadas em
+`DropdownMenu` — **avaliado e não aplicado** (J5): a densidade real de
+botões por card não justifica. **Sprint J encerrada em 2026-08-06.**
+
+---
+
+## Sprint L — Navegação por controle no layout atual (v1.0)
+
+Objetivo: controle (joystick) navega entre telas, listas e jogos —
+D-pad/analógico ≈ Tab, A ≈ clique, B ≈ voltar. Depende da Sprint J (o
+`Dialog` já com focus-trap deixa "B fecha modal" de graça) e da Sprint K
+(foco visível consistente em toda a base).
+
+**Isto reabre o [ADR 0009](decisoes/0009-desktop-agora-controle-depois.md)**,
+que hoje diz "sem navegação direcional" e reserva um modo TV completo
+(layout alternativo, estilo Playnite Fullscreen) para quando houver ADR
+próprio. Perguntado ao Douglas em 2026-08-06: o escopo da v1.0 é navegação
+por controle **sobre o layout de mesa existente**, não um modo TV separado
+com alvos grandes e densidade baixa — isso fica registrado como possível
+sprint futura, não parte desta.
+
+| Item | Tam. | Depende de |
+|---|---|---|
+| L0 — ADR 0014 (emenda o ADR 0009) | P | nada |
+| L1 — hook `useGamepadNavigation` | G | L0 |
+| L2 — montar o hook em `App.tsx` | P | L1 |
+| L3 — verificação com hardware real | P | L2, só o Douglas fecha |
+
+### L0 — ADR 0014: emenda o ADR 0009 (P)
+
+Registrar em `docs/decisoes/0014-navegacao-por-controle.md` que a cláusula
+"sem navegação direcional" do ADR 0009 deixa de valer, mas as três
+restrições de acessibilidade (foco de primeira classe, nada só-hover, nada
+só-clique-direito) continuam sendo a base — exatamente o que o ADR 0009
+previa ("se o modo TV for construído, ele merece ADR próprio"). Registrar
+explicitamente que isto **não é** o modo TV completo que o ADR 0009 também
+menciona.
+
+### L1 — Hook `useGamepadNavigation` (G)
+
+Novo módulo `src/hooks/useGamepadNavigation.ts`, reaproveitando a técnica já
+usada em `EmulatorBindingsPanel.tsx` (`navigator.getGamepads()` + poll via
+`requestAnimationFrame`, comparando estado anterior/atual para achar
+transições).
+
+- **D-pad / analógico esquerdo** → navegação espacial entre elementos
+  focáveis (não linear — um grid 2D como `AllGamesScreen` precisa de
+  vizinho mais próximo por direção real, via `getBoundingClientRect()` dos
+  elementos focáveis visíveis).
+- **Botão A** (índice 0) → `click()` no elemento focado.
+- **Botão B** (índice 1) → tecla `Escape` sintética (cobre `onBack` de tela
+  e fechar modal do shadcn, sem callback por tela).
+- Só ativo quando `gamepadconnected` dispara (mesma detecção de
+  `EmulatorBindingsPanel.tsx:54-66`) — sem controle conectado, nada muda.
+
+### L2 — Montar o hook em `App.tsx` (P) — **feito em 2026-08-06**
+
+`useGamepadNavigation()` chamado uma vez no topo de `App()`, antes de
+qualquer `useState` de fase — opera sobre `document.activeElement`, não
+precisa saber a `phase` atual.
+
+### L1/L2 — nota de implementação e uma limitação real do botão B
+
+`src/hooks/useGamepadNavigation.ts` (novo). D-pad e analógico esquerdo usam
+navegação espacial (vizinho mais próximo por direção, penalizando desvio
+perpendicular — necessário porque uma grade 2D não navega bem com
+Tab/Shift+Tab linear). Botão A dispara `.click()` no elemento focado. `npm
+run build` (`tsc` + `vite build`) passa.
+
+**Limitação registrada de propósito, não escondida:** o botão B despacha um
+`Escape` sintético (fecha modal do shadcn, que já escuta isso via Radix) e,
+sem modal aberto, procura um `<button>` visível cujo texto comece com
+"Voltar" e clica nele. **Não existe hoje um registro central de "voltar"** —
+cada tela recebe seu próprio `onBack` como prop de `App.tsx`
+(`GamesScreen`, `LibraryScreen`, `EmulatorsScreen`, `GameDetailScreen`), sem
+um callback compartilhado que o hook pudesse chamar diretamente. Clicar no
+botão visível funciona porque as 4 telas já usam a mesma convenção de texto
+("Voltar"/"Voltar à biblioteca"), mas é uma correspondência por texto, não
+por contrato — se uma tela renomear esse botão, B para de voltar nela
+silenciosamente. Registrado aqui para não virar surpresa: um registro
+central de `onBack` (ex.: contexto de navegação) resolveria isso de vez, mas
+é escopo maior que esta sprint — candidato a item futuro se o texto do botão
+divergir.
+
+### L3 — Verificação com hardware real (P) — só o Douglas fecha
+
+Mesma ressalva estrutural do D11/B11: nenhuma sessão de IA tem controle
+físico conectado — nada do L1/L2 foi testado com um gamepad de verdade,
+só lido e revisado. Checklist para o Douglas confirmar:
+
+- [ ] D-pad e analógico percorrem a grade de jogos (`AllGamesScreen`) em
+      todas as direções sem travar num canto nem pular fileira.
+- [ ] A abre um jogo/confirma um diálogo com o foco correto.
+- [ ] B fecha um `Dialog` aberto (`ErrorModal`/`ConsoleInfoModal`) e volta
+      uma tela nas 4 telas com botão "Voltar".
+- [ ] Teclado e mouse continuam funcionando exatamente como antes — nada
+      foi removido, só adicionado.
+
+**Critério de saída da Sprint L:** os 4 itens acima confirmados pelo
+Douglas com hardware real. **Sprint L parcialmente encerrada em
+2026-08-06** — L0/L1/L2 feitos e revisados, L3 aberto até a verificação
+humana.
 
 ---
 

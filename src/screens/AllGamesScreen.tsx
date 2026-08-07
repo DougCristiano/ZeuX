@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, coverImageURL } from "../api";
 import type { LibraryGame, Report, ScrapeJob } from "../api/types";
-import { Badge, Button, ErrorModal, FavoriteToggle, GameCover, Pagination } from "../components/ui";
+import { Badge, Button, ErrorModal, FavoriteToggle, FOCUS_RING, GameCover, Pagination } from "../components/ui";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 
@@ -198,18 +198,24 @@ export function AllGamesScreen({
       )}
 
       <div className="mb-5 flex flex-wrap items-center gap-3">
+        <label htmlFor="all-games-search" className="sr-only">
+          Buscar jogos
+        </label>
         <input
+          id="all-games-search"
           type="text"
+          name="all-games-search"
+          autoComplete="off"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar jogos..."
+          placeholder="Buscar jogos…"
           className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
         <button
           type="button"
           onClick={() => setFavoriteOnly((v) => !v)}
           aria-pressed={favoriteOnly}
-          className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+          className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
             favoriteOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
           }`}
         >
@@ -220,7 +226,7 @@ export function AllGamesScreen({
             <button
               type="button"
               onClick={() => setPlatformFilter(null)}
-              className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+              className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
                 platformFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
               }`}
             >
@@ -231,7 +237,7 @@ export function AllGamesScreen({
                 key={p}
                 type="button"
                 onClick={() => setPlatformFilter(p)}
-                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
                   platformFilter === p ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
@@ -265,7 +271,14 @@ export function AllGamesScreen({
                   <div className="relative">
                     <button
                       type="button"
-                      className="block w-full text-left"
+                      // "group" também aqui, não só no <div> interno do
+                      // GameCover (J4, docs/roadmap.md): quem recebe foco de
+                      // teclado é este botão, não a div — sem isto,
+                      // `group-focus-visible` no overlay de "Jogar" nunca
+                      // via, só `group-hover` (o mouse funciona "de graça"
+                      // porque a div preenche o botão inteiro e :hover
+                      // cobre os dois; :focus-visible não cascata assim).
+                      className="group block w-full text-left"
                       title={game.title}
                       onClick={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
                     >

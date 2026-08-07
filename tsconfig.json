@@ -14,6 +14,14 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Alias exigido pelo shadcn/ui (J1, docs/roadmap.md) — os componentes
+       gerados importam por "@/lib/utils", "@/components/ui/*" etc. Sem
+       "baseUrl": com "moduleResolution": "bundler", TS 6 resolve "paths" a
+       partir deste arquivo e marca "baseUrl" sozinho como depreciado. */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

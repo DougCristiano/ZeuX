@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
+import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import type { LibraryGame } from "./api/types";
 import { AllGamesScreen } from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
@@ -42,6 +43,11 @@ type Phase =
   | "settings";
 
 function App() {
+  // Sprint L / ADR 0014 (docs/roadmap.md, docs/decisoes/): D-pad/analógico ≈
+  // Tab, A ≈ clique, B ≈ Esc. Um lugar só, não por tela — o hook opera sobre
+  // document.activeElement, não precisa saber a phase atual.
+  useGamepadNavigation();
+
   const [phase, setPhase] = useState<Phase>("checking-port");
   const [policy, setPolicy] = useState<{ text: string; version: string } | null>(null);
   const [busy, setBusy] = useState(false);
