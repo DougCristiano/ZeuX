@@ -135,3 +135,25 @@ export function GameTile({
     </div>
   );
 }
+
+/**
+ * M12 (docs/sprint-m-plano.md, 2026-08-07): mesma forma do `GameTile` real
+ * (capa `aspect-[3/4]`, duas linhas de texto abaixo), sem dado nenhum —
+ * substitui a tela em branco que `AllGamesScreen` mostrava enquanto
+ * `games === null`. Vive ao lado de `GameTile` de propósito: quem alterar a
+ * forma de um precisa lembrar do outro. `aria-hidden`: o `role="status"` que
+ * envolve a grade inteira (em `AllGamesScreen`) já anuncia "carregando" uma
+ * vez só; 30 células decorativas repetindo isso pra leitor de tela seria
+ * ruído.
+ */
+export function GameTileSkeleton() {
+  return (
+    <div className="flex flex-col gap-2" aria-hidden="true">
+      <div className="aspect-[3/4] animate-pulse rounded border border-line-strong bg-fill" />
+      <div className="flex flex-col gap-1.5">
+        <div className="h-3.5 w-4/5 animate-pulse rounded-sm bg-fill" />
+        <div className="h-3 w-2/5 animate-pulse rounded-sm bg-fill" />
+      </div>
+    </div>
+  );
+}

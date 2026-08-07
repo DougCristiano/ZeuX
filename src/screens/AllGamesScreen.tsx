@@ -6,7 +6,7 @@ import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } fr
 import { Button, ConfirmModal, ErrorModal, FOCUS_RING, Pagination, ProgressBar } from "../components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { GameListRow } from "../components/GameListRow";
-import { GameTile } from "../components/GameTile";
+import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
@@ -539,9 +539,11 @@ export function AllGamesScreen({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-ink">
           Todos os jogos
-          {/* M12 cuida do estado de carregamento de verdade; por ora, um
-              parênteses discreto — total já é dado que a tela guarda. */}
-          {games && <span className="ml-2 text-base font-normal text-muted">· {total}</span>}
+          {/* M12 (docs/sprint-m-plano.md): a partir de `total`, que
+              `loadGames` já guarda em estado — sem chamada nova (critério do
+              item). Ausente durante o carregamento inicial (`games` ainda
+              `null`): a contagem some junto com o resto, não sobra sozinha. */}
+          {games && <span className="ml-2 text-base font-normal text-muted">· {total.toLocaleString("pt-BR")}</span>}
         </h1>
         <div className="flex flex-wrap gap-2">
           {/* Só aparece com conta do IGDB conectada (G1) — sem credencial,
@@ -656,16 +658,55 @@ export function AllGamesScreen({
         )}
       </div>
 
+      {/* M12 (docs/sprint-m-plano.md, 2026-08-07): skeleton na mesma grade,
+          `PAGE_SIZE` células — antes, `games === null` não renderizava nada
+          aqui, a tela ficava em branco entre abrir e a resposta de
+          `GET /library/games` chegar. `role="status"`/`aria-live`: um
+          anúncio só pra leitor de tela, não 30 (`GameTileSkeleton` é
+          `aria-hidden` célula a célula). As colunas espelham
+          `GRID_BREAKPOINTS` (acima) em classes Tailwind puras — não precisa
+          de `useGridColumns()` aqui porque não há virtualização de linha pra
+          alinhar, só uma grade estática de PAGE_SIZE itens. */}
+      {games === null && (
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Carregando jogos…</span>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
+            {Array.from({ length: PAGE_SIZE }, (_, i) => (
+              <GameTileSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {games && games.length === 0 && (
-        <p className="text-base text-muted">
-          {debouncedSearch
-            ? `Nenhum jogo encontrado para "${debouncedSearch}".`
-            : platformFilter
-              ? `Nenhum jogo de ${shortNameFor(platformFilter)} nesta busca.`
-              : favoriteOnly
-                ? "Nenhum jogo favoritado ainda."
-                : 'Nenhum jogo na biblioteca ainda. Aponte uma pasta em "Gerenciar pastas" para começar.'}
-        </p>
+        (() => {
+          // M12: precedência idêntica às mensagens abaixo — "biblioteca
+          // vazia de verdade" é só quando nenhum filtro está em jogo; os
+          // outros três continuam texto simples (critério do item: os três
+          // estados vazios continuam distintos entre si, não colapsam num
+          // só). Só este ganha painel + ação principal, porque só este é a
+          // primeira tela real de um usuário novo (docs/roadmap.md).
+          const trulyEmpty = !debouncedSearch && !platformFilter && !favoriteOnly;
+          if (trulyEmpty) {
+            return (
+              <div className="flex flex-col items-center gap-3 rounded border border-dashed border-line-strong px-6 py-16 text-center">
+                <p className="text-base text-muted">Nenhum jogo na biblioteca ainda.</p>
+                <Button variant="primary" onClick={onOpenLibrary}>
+                  Escolher pasta com meus jogos
+                </Button>
+              </div>
+            );
+          }
+          return (
+            <p className="text-base text-muted">
+              {debouncedSearch
+                ? `Nenhum jogo encontrado para "${debouncedSearch}".`
+                : platformFilter
+                  ? `Nenhum jogo de ${shortNameFor(platformFilter)} nesta busca.`
+                  : "Nenhum jogo favoritado ainda."}
+            </p>
+          );
+        })()
       )}
 
       {games && games.length > 0 && (

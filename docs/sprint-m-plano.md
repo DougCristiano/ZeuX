@@ -772,6 +772,21 @@ alta, cada uma com borda branca de ponta a ponta pra qualquer corte ficar
 reimplementação aproximada. As duas bordas saíram inteiras nas duas capturas.
 Ramo `else` (placeholder de sigla) não foi tocado.
 
+**Atualizado em 2026-08-07 (Lote 9): M12 fechou** — zero checkbox aberto,
+sem ressalva nenhuma (item marcado como "verificável por sessão de IA, sem
+depender do Douglas" no próprio plano, e assim se confirmou).
+`GameTileSkeleton` (novo, ao lado de `GameTile.tsx` — quem mudar a forma de
+um lembra do outro) substitui a tela em branco durante o carregamento
+inicial; a "biblioteca vazia de verdade" (sem busca/filtro/favoritos) ganhou
+painel centralizado com o botão "Escolher pasta com meus jogos", que navega
+de fato para `LibraryScreen` via o mesmo `onOpenLibrary` que "Gerenciar
+pastas" já usava; o cabeçalho mostra `total.toLocaleString("pt-BR")`, sem
+requisição nova. Testado ao vivo os três estados: skeleton (atrasando
+`GET /library/games` 1,5s via `page.route`), painel de biblioteca vazia
+(removendo as 6 pastas de teste via API e restaurando depois — estado
+idêntico ao anterior), e busca sem resultado (confirmando que continua texto
+simples, não o painel, e que os três não colapsaram num só).
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
 `go test` e `npm run build`): M4, M5, M6, M8, M9, M10, M11, M12, M13, M15 — e
 as partes mecânicas de M1, M2, M3.

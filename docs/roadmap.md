@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **10** | M1–M15. **Atualizado 2026-08-07** (Lote 8, testado ao vivo com Chromium/Playwright): **M5, M8, M9, M10 e M11 fechados** (todo checkbox do critério marcado — M11 trocou `object-cover` por `object-contain` + fundo desfocado em `GameCover`, verificado com duas imagens de teste sintéticas contra o CSS real compilado: sem corte em capa quadrada nem alta). M1/M2/M3/M4/M6/M7/M10/M11 com código pronto e a maior parte do critério verificado ao vivo, cada um ainda com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M12–M15 sem começar |
+| **Sprint M (v1.0)** | **9** | M1–M15. **Atualizado 2026-08-07** (Lote 9, testado ao vivo com Chromium/Playwright): **M5, M8, M9, M10, M11 e M12 fechados** (todo checkbox do critério marcado — M12 deu skeleton de carregamento, painel de biblioteca vazia com ação principal, e contagem total no cabeçalho a `AllGamesScreen`; testado ao vivo atrasando a rede pra capturar o skeleton, removendo/restaurando as pastas configuradas pra capturar o painel vazio, e uma busca sem resultado pra confirmar que os três estados continuam distintos). M1/M2/M3/M4/M6/M7/M10/M11 com código pronto e a maior parte do critério verificado ao vivo, cada um ainda com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M13–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -3135,7 +3135,7 @@ preenchendo a faixa que sobrou. Falta o Douglas conferir com uma capa real do
 IGDB (proporção de capa oficial pode ter nuance que um SVG sintético não
 reproduz) — mesma ressalva que o próprio item já previa.
 
-### M12 — Carregando fica em branco; vazio é uma frase cinza (M)
+### M12 — Carregando fica em branco; vazio é uma frase cinza (M) — **feito em 2026-08-07**
 
 Enquanto `games === null`, `AllGamesScreen` não renderiza nada
 (`:251-263`): a tela fica em branco entre abrir e carregar. E a **primeira
@@ -3145,19 +3145,34 @@ backend já devolva `total` e a tela já o guarde em estado (`:56`, `:89`),
 usando só para calcular páginas.
 
 **Critério de aceite:**
-- [ ] Durante o carregamento aparece um skeleton de capas na mesma grade
+- [x] Durante o carregamento aparece um skeleton de capas na mesma grade
       (mesma quantidade de células da página), não tela em branco nem spinner
-      solto.
-- [ ] Biblioteca vazia mostra um painel centralizado com a ação principal
+      solto. `GameTileSkeleton` (novo, ao lado de `GameTile`), `PAGE_SIZE`
+      células, mesmas colunas responsivas da grade real.
+- [x] Biblioteca vazia mostra um painel centralizado com a ação principal
       ("Escolher pasta com meus jogos") levando ao fluxo que já existe, em vez
-      de só descrever o que fazer.
-- [ ] O cabeçalho mostra a contagem total ("Todos os jogos · 1.204") a partir
-      do `total` que a rota já devolve — sem chamada nova.
-- [ ] Os outros dois estados vazios de hoje (busca sem resultado, favoritos
-      vazios — `:255-259`) continuam existindo e distintos entre si.
+      de só descrever o que fazer. O botão chama o mesmo `onOpenLibrary` que
+      "Gerenciar pastas" já usava.
+- [x] O cabeçalho mostra a contagem total ("Todos os jogos · 1.204") a partir
+      do `total` que a rota já devolve — sem chamada nova (`total.toLocaleString("pt-BR")`,
+      já presente no estado da tela).
+- [x] Os outros dois estados vazios de hoje (busca sem resultado, favoritos
+      vazios — `:255-259`) continuam existindo e distintos entre si — só a
+      "biblioteca vazia de verdade" (sem busca, sem filtro de plataforma, sem
+      favoritos) ganhou o painel; os outros dois continuam texto simples.
 
 **Depende de:** M5
 **Bloqueia:** nada
+
+**Testado ao vivo** (Chromium/Playwright contra `zeuxd` real): (1) atrasando a
+resposta de `GET /library/games` em 1,5s via `page.route`, o skeleton
+apareceu no lugar da tela em branco (`role="status"` confirmado visível);
+(2) busca por um termo inexistente mostrou o texto "Nenhum jogo encontrado
+para…" (não o painel) com o cabeçalho já mostrando "· 0"; (3) removendo as 6
+pastas configuradas via API (restauradas depois, estado idêntico ao anterior)
+e recarregando, apareceu o painel centralizado com "Nenhum jogo na biblioteca
+ainda." + botão "Escolher pasta com meus jogos", que ao clicar navegou de
+fato para a tela `Biblioteca` — não só descreveu a ação.
 
 ### M13 — Rótulos da sidebar derivados por `slice(0, 3)` (P)
 
