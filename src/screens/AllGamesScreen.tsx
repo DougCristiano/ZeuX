@@ -1,14 +1,18 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
-import type { LibraryGame, Report, ScrapeJob } from "../api/types";
-import { Button, ErrorModal, FOCUS_RING, Pagination } from "../components/ui";
+import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
+import { Button, ConfirmModal, ErrorModal, FOCUS_RING, Pagination, ProgressBar } from "../components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile } from "../components/GameTile";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
+import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { percentOf } from "../lib/format";
+import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 
 // M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24 nunca
 // fechava fileira numa grade de 5 ou 6 colunas; 30 é múltiplo dos dois. O
@@ -152,11 +156,19 @@ function useGridColumns(): number {
  * servidor continua limitada a `PAGE_SIZE`, a virtualização é sobre o DOM
  * **daquela página**, não substitui a paginação.
  *
- * Deliberadamente mais simples que GamesScreen (por console): sem instalar
- * emulador inline, sem confirmação de BIOS vazio — essa profundidade
- * continua só na tela por console. Aqui o objetivo é achar e abrir rápido;
- * se o emulador não estiver pronto, o erro (via ErrorModal) já diz o que
- * fazer.
+ * M8 (mesma data): a checagem "este jogo pode abrir?" e o fluxo de
+ * instalação inline (antes exclusivos de `GamesScreen`) passaram a valer
+ * aqui também, via `evaluateGameLaunchability`/`useInlineInstall`
+ * (src/lib/gameLaunchability.ts, src/hooks/useInlineInstall.ts) — mesma
+ * regra nas duas telas, critério do próprio item. O que muda é só a
+ * apresentação: a grade é virtualizada (M3), então confirmação de hardware
+ * fraco/BIOS vazio vira `ConfirmModal` (screen-level, um por vez) em vez do
+ * painel inline por tile que `GamesScreen` usa — inserir um painel dentro de
+ * uma linha virtualizada quebraria a altura uniforme que `useVirtualizer`
+ * exige. Pelo mesmo motivo, o progresso de instalação vira um painel
+ * flutuante fixo (não preso a um tile): se o usuário rolar a grade e o tile
+ * que disparou a instalação sair da viewport, a linha virtualizada dele é
+ * desmontada — um indicador por tile sumiria com ela.
  */
 export function AllGamesScreen({
   report,
@@ -208,6 +220,17 @@ export function AllGamesScreen({
   const [scrapeSummary, setScrapeSummary] = useState<string | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const columns = useGridColumns();
+  // M8: carregado uma vez só para a tela inteira — diferente de GamesScreen
+  // (um console por vez), aqui os jogos abrangem qualquer console, então o
+  // lookup de adapter é por jogo (`adapterEntryFor` abaixo), não fixo.
+  const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
+
+  useEffect(() => {
+    api
+      .getEmulators()
+      .then((res) => setEmulators(res.emulators))
+      .catch(() => setEmulators([]));
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
@@ -330,6 +353,41 @@ export function AllGamesScreen({
     return report.verdicts.find((v) => v.console_id === consoleId)?.short_name ?? consoleId;
   }
 
+  function verdictFor(consoleId: string): ConsoleVerdict | undefined {
+    return report.verdicts.find((v) => v.console_id === consoleId);
+  }
+
+  function adapterEntryFor(verdict: ConsoleVerdict | undefined): EmulatorEntry | undefined {
+    return verdict?.adapter_id ? (emulators ?? []).find((e) => e.adapter_id === verdict.adapter_id) : undefined;
+  }
+
+  async function openBiosFolder(dir: string) {
+    try {
+      await openPath(dir);
+    } catch (err) {
+      setError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // M8: fluxo de instalação inline compartilhado com GamesScreen.
+  const install = useInlineInstall({
+    onEmulatorInstalled: (adapterId) =>
+      setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
+    onLaunch: (romPath) => {
+      const game = games?.find((g) => g.path === romPath);
+      if (game) launch(game);
+    },
+  });
+
+  function isPendingInstallFor(path: string): boolean {
+    return (
+      (install.state.kind === "installing" ||
+        install.state.kind === "confirm-hardware" ||
+        install.state.kind === "confirm-bios") &&
+      install.state.pendingGamePath === path
+    );
+  }
+
   // Chips ordenados por rótulo visível (não por console_id cru) — só um
   // detalhe de leitura, o servidor já manda a lista deduplicada.
   const platformOptions = consoles
@@ -355,10 +413,16 @@ export function AllGamesScreen({
     getItemKey: (index) => `${viewMode}-${index}`,
   });
 
-  function launchableGame(game: LibraryGame): (() => void) | undefined {
-    if (game.missing) return undefined;
+  // M8: mesma cadeia de decisão de GamesScreen — só varia o que cada tela
+  // tem à mão (aqui, verdict/adapterEntry são resolvidos por jogo, não
+  // fixos para um único console). Continua clicável em jogo `missing`
+  // (deixa o erro real do servidor aparecer, em vez de esconder o botão) —
+  // mesma escolha de GamesScreen.
+  function playHandlerFor(game: LibraryGame): (() => void) | undefined {
     if (statusFor(game.id).kind === "launching") return undefined;
-    return () => launch(game);
+    if (isPendingInstallFor(game.path)) return undefined;
+    const verdict = verdictFor(game.console_id);
+    return () => install.handlePlay(game, verdict, adapterEntryFor(verdict));
   }
 
   return (
@@ -377,8 +441,99 @@ export function AllGamesScreen({
           onClose={clearLaunchError}
           onRetry={retryLaunch}
         />
+      ) : install.state.kind === "error" ? (
+        <ErrorModal
+          title="Não foi possível instalar o emulador"
+          message={install.state.message}
+          onClose={() => install.setState({ kind: "idle" })}
+        />
       ) : (
         error && <ErrorModal title="Não foi possível carregar a biblioteca" message={error} onClose={() => setError(null)} />
+      )}
+
+      {/*
+       * M8: confirmação de hardware fraco/BIOS vazio, em modal (não painel
+       * inline por tile) — motivo no comentário da própria tela, acima. Só
+       * um pode estar ativo por vez (`install.state` é único pra tela
+       * inteira), então não precisa de prioridade entre os dois como o
+       * bloco de erro acima.
+       */}
+      {install.state.kind === "confirm-hardware" &&
+        (() => {
+          const confirmState = install.state;
+          return (
+            <ConfirmModal
+              title="Hardware abaixo do recomendado"
+              message={confirmState.message}
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => install.startInstall(confirmState.adapterId, true, confirmState.pendingGamePath)}
+                  >
+                    Instalar mesmo assim
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
+      {install.state.kind === "confirm-bios" &&
+        (() => {
+          const confirmState = install.state;
+          const pendingGame = games?.find((g) => g.path === confirmState.pendingGamePath);
+          const pendingVerdict = pendingGame ? verdictFor(pendingGame.console_id) : undefined;
+          const pendingAdapterEntry = adapterEntryFor(pendingVerdict);
+          return (
+            <ConfirmModal
+              title="BIOS ausente"
+              message="A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir."
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    Cancelar
+                  </Button>
+                  {pendingAdapterEntry?.bios_dir && (
+                    <Button variant="secondary" onClick={() => openBiosFolder(pendingAdapterEntry.bios_dir!)}>
+                      Abrir pasta do BIOS
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      install.setState({ kind: "idle" });
+                      if (pendingGame) launch(pendingGame);
+                    }}
+                  >
+                    Jogar mesmo assim
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
+      {/*
+       * Painel flutuante, não modal — instalar não deveria travar o resto
+       * da tela (o usuário pode continuar rolando/buscando enquanto baixa).
+       * Fixo na tela, não no tile: ver comentário no topo do arquivo sobre
+       * por que um indicador por tile não sobrevive à virtualização.
+       */}
+      {install.state.kind === "installing" && (
+        <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
+          <p className="text-sm text-ink">
+            Instalando {install.state.job.name}… {install.state.job.phase}
+          </p>
+          <div className="mt-2">
+            <ProgressBar percent={percentOf(install.state.job)} />
+          </div>
+        </div>
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -528,6 +683,13 @@ export function AllGamesScreen({
               if (viewMode === "lista") {
                 const game = games[virtualRow.index];
                 const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                const verdict = verdictFor(game.console_id);
+                // Ausente até `emulators` responder — tile/linha aparece
+                // sem badge nesse meio-tempo, nunca com um palpite (mesma
+                // regra documentada em GameTile).
+                const launchability = emulators
+                  ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
+                  : undefined;
                 return (
                   <div key={virtualRow.key} data-index={virtualRow.index} ref={rowVirtualizer.measureElement} style={rowStyle}>
                     <GameListRow
@@ -535,8 +697,10 @@ export function AllGamesScreen({
                       consoleShortName={shortNameFor(game.console_id)}
                       accentColor={consoleAccentColor(game.console_id)}
                       onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
-                      onPlay={launchableGame(game)}
+                      onPlay={playHandlerFor(game)}
                       onToggleFavorite={() => toggleFavorite(game)}
+                      launchability={launchability}
+                      onInstall={verdict?.adapter_id ? () => install.startInstall(verdict.adapter_id!, false, game.path) : undefined}
                     />
                   </div>
                 );
@@ -558,14 +722,20 @@ export function AllGamesScreen({
                 >
                   {rowGames.map((game) => {
                     const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                    const verdict = verdictFor(game.console_id);
+                    const launchability = emulators
+                      ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
+                      : undefined;
                     return (
                       <GameTile
                         key={game.id}
                         game={game}
                         shortName={shortNameFor(game.console_id)}
                         onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
-                        onPlay={launchableGame(game)}
+                        onPlay={playHandlerFor(game)}
                         onToggleFavorite={() => toggleFavorite(game)}
+                        launchability={launchability}
+                        onInstall={verdict?.adapter_id ? () => install.startInstall(verdict.adapter_id!, false, game.path) : undefined}
                       />
                     );
                   })}

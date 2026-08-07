@@ -70,15 +70,19 @@ export function Badge({
   children,
   variant = "default",
   accentColor,
+  title,
 }: {
   children: ReactNode;
   variant?: BadgeVariant;
   accentColor?: string;
+  /** M8 (docs/sprint-m-plano.md): tooltip nativo com a frase completa, quando o texto do badge é um resumo curto. */
+  title?: string;
 }) {
   const styles =
     variant === "solid" ? "border-accent bg-accent text-accent-ink" : "border-line-strong text-muted";
   return (
     <span
+      title={title}
       className={`inline-block rounded-sm border px-1.5 py-0.5 font-mono text-xs tracking-wide ${accentColor ? "" : styles}`}
       style={accentColor ? { borderColor: accentColor, color: accentColor, background: `${accentColor}1a` } : undefined}
     >
@@ -162,6 +166,46 @@ export function ErrorModal({
             {onRetry ? "Tentar de novo" : "Entendi"}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Modal de confirmação: mesmo shell do `ErrorModal` (Dialog do shadcn, sem
+ * fechar clicando fora), mas para decisões com mais de um botão de saída —
+ * "instalar mesmo assim"/"cancelar", ou "abrir pasta"/"jogar mesmo
+ * assim"/"cancelar". `ErrorModal` fixa o par retry/fechar; aqui quem chama
+ * monta os próprios botões em `actions`, porque cada fluxo tem sua própria
+ * sequência (M8, docs/sprint-m-plano.md).
+ *
+ * Criado para `AllGamesScreen`: a grade é virtualizada (M3), então um painel
+ * inline de confirmação por tile — o que `GamesScreen` faz, sem
+ * virtualização — quebraria a altura uniforme que o `useVirtualizer` exige
+ * por linha. Como só existe uma instalação pendente por vez (estado
+ * compartilhado de `useInlineInstall`), um modal por tela resolve sem
+ * precisar ensinar a virtualização a lidar com altura variável.
+ */
+export function ConfirmModal({
+  title,
+  message,
+  actions,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  actions: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-w-md rounded border border-line bg-fill p-5 ring-0"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <DialogTitle className="mb-2 text-lg font-semibold text-ink">{title}</DialogTitle>
+        <p className="text-base text-ink">{message}</p>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">{actions}</div>
       </DialogContent>
     </Dialog>
   );

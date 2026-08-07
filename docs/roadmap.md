@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **14** | M1–M15. **Atualizado 2026-08-07** (Lote 4, testado ao vivo com Chromium/Playwright): **M5 fechado** (0 checkbox aberto — célula única testada de ponta a ponta, incluindo a instalação inline do L8 disparando pelo overlay). M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M8–M15 sem começar |
+| **Sprint M (v1.0)** | **13** | M1–M15. **Atualizado 2026-08-07** (Lote 5, testado ao vivo com Chromium/Playwright): **M5 e M8 fechados** (0 checkbox aberto cada — M8 unificou a checagem "este jogo pode abrir?" e a instalação inline entre `GamesScreen` e `AllGamesScreen`, badge/instalação testados ao vivo na grade e na lista; a transição `confirm-hardware`/`confirm-bios` não pôde ser forçada ao vivo nesta máquina, registrado no item). M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M9–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -2955,25 +2955,44 @@ barra, princípio 3): quando há gargalo nomeado, o badge é `"sem preset —
 [`sprint-m-plano.md`](sprint-m-plano.md).
 
 **Critério de aceite:**
-- [ ] Um jogo cujo emulador não está instalado, ou cujo console não alcançou
+- [x] Um jogo cujo emulador não está instalado, ou cujo console não alcançou
       patamar nenhum, aparece com a capa esmaecida e um badge curto dizendo o
       que falta ("instalar emulador" / "sem preset — {componente}" /
-      "arquivo ausente").
-- [ ] O caso "sem preset" nomeia o motivo (o componente do
+      "arquivo ausente"). Testado ao vivo (grade e lista).
+- [x] O caso "sem preset" nomeia o motivo (o componente do
       `verdict.bottlenecks`) sempre que o dado existir — nunca fica só no fato
-      genérico quando há um motivo para citar.
-- [ ] O texto do badge descreve o que falta, **nunca julga a máquina**
+      genérico quando há um motivo para citar. Testado ao vivo: jogo de
+      console "improvável" mostrou "sem preset — CPU".
+- [x] O texto do badge descreve o que falta, **nunca julga a máquina**
       (princípio 2) e **nunca bloqueia** o clique (princípio 5) — o jogo
       continua lançável por conta e risco.
-- [ ] Clicar em "instalar emulador" a partir da grade dispara a mesma
-      instalação inline que o L8 já implementou em `GamesScreen`
-      (`:306-356`), em vez de só falhar depois.
-- [ ] A regra de decisão vive em **um** lugar (uma função/hook compartilhado),
-      não copiada nas duas telas — verificável por `grep`: só uma
-      implementação de "este jogo pode abrir?".
+- [x] Clicar em "instalar emulador" a partir da grade dispara a mesma
+      instalação inline que o L8 já implementou em `GamesScreen`, em vez de
+      só falhar depois. Testado ao vivo em `AllGamesScreen` (grade e lista):
+      o clique disparou `POST /emulators/retroarch/install` de verdade e o
+      erro real do RetroArch empacotado (ADR 0012) apareceu no `ErrorModal`.
+- [x] A regra de decisão vive em **um** lugar (uma função/hook compartilhado),
+      não copiada nas duas telas — verificado por `grep`:
+      `evaluateGameLaunchability` (src/lib/gameLaunchability.ts) é a única
+      implementação, consumida por `GamesScreen`, `AllGamesScreen` e
+      `useInlineInstall`.
 
 **Depende de:** M5 (sem o tile unificado, isto vira duas implementações)
 **Bloqueia:** nada
+
+**Não verificado ao vivo nesta sessão:** a confirmação de "hardware abaixo do
+recomendado" (`confirm-hardware`) e de "BIOS ausente" (`confirm-bios`) —
+ambas viraram `ConfirmModal` em `AllGamesScreen` (painel inline por tile
+quebraria a altura uniforme da virtualização, M3), mesmo `useInlineInstall`
+que já cobria essas duas transições em `GamesScreen`. Não pôde ser forçado ao
+vivo porque o hardware desta máquina de teste alcança patamar em todo
+adapter instalável do catálogo (`hardwareBlocks`, `internal/api/server.go`,
+só bloqueia quando **nenhum** console do emulador é viável) — não há aqui um
+emulador cujos consoles sejam todos "improvável". Coberto por `go build`/`npm
+run build` (TypeScript não deixaria os dois estados fora do union tratado) e
+por revisão de código; falta o Douglas confirmar visualmente numa máquina
+onde o bloqueio realmente dispare, ou aceitar a paridade com o painel já
+usado em `GamesScreen`.
 
 ### M9 — "Onde estão minhas ROMs" tratado como formulário administrativo (G)
 

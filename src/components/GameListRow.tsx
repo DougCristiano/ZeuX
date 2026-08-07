@@ -1,4 +1,5 @@
 import type { LibraryGame } from "../api/types";
+import type { GameLaunchability } from "../lib/gameLaunchability";
 import { formatPlaytime } from "../lib/format";
 import { Badge, FavoriteToggle, FOCUS_RING } from "./ui";
 
@@ -14,6 +15,11 @@ import { Badge, FavoriteToggle, FOCUS_RING } from "./ui";
  * o botão de jogar e a estrela) abre o detalhe; o ▶ tem `tabIndex={-1}` —
  * mouse e leitor de tela em modo de navegação por elementos alcançam,
  * Tab/D-pad não, pelo mesmo motivo documentado em `GameCover`.
+ *
+ * `launchability`/`onInstall` (M8, docs/sprint-m-plano.md, 2026-08-07):
+ * mesmo par de props que `GameTile` ganhou — substitui o badge fixo
+ * "arquivo ausente" (só cobria um dos quatro motivos possíveis) pelo mesmo
+ * badge curto/clicável das duas telas.
  */
 export function GameListRow({
   game,
@@ -22,6 +28,8 @@ export function GameListRow({
   onOpenDetail,
   onPlay,
   onToggleFavorite,
+  launchability,
+  onInstall,
 }: {
   game: LibraryGame;
   consoleShortName: string;
@@ -30,7 +38,13 @@ export function GameListRow({
   /** Ausente (jogo `missing` ou lançamento em andamento) esconde o botão de jogar — mesma regra do M1. */
   onPlay?: () => void;
   onToggleFavorite: () => void;
+  /** Ausente = tela não carregou dado o bastante para avaliar — linha aparece sem badge, nunca com um palpite. */
+  launchability?: GameLaunchability;
+  /** Só relevante quando `launchability.reason === "not_installed"` — dispara a instalação inline (L8) a partir do badge. */
+  onInstall?: () => void;
 }) {
+  const blocked = launchability !== undefined && !launchability.launchable;
+
   return (
     <div className="flex h-full items-center gap-3 border-b border-line px-2">
       <div
@@ -50,11 +64,26 @@ export function GameListRow({
           <Badge accentColor={accentColor}>{consoleShortName}</Badge>
         </span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{game.title}</span>
-        {game.missing && (
-          <span className="shrink-0">
-            <Badge>arquivo ausente</Badge>
-          </span>
-        )}
+        {blocked &&
+          (launchability!.reason === "not_installed" && onInstall ? (
+            <button
+              type="button"
+              title={launchability!.title}
+              onClick={(e) => {
+                // Não deixa o clique borbulhar pra linha (que abriria o
+                // detalhe) — este botão tem a própria ação.
+                e.stopPropagation();
+                onInstall();
+              }}
+              className={`inline-block shrink-0 rounded-sm border border-line-strong px-1.5 py-0.5 font-mono text-xs tracking-wide text-muted underline decoration-dotted transition-colors hover:text-ink ${FOCUS_RING}`}
+            >
+              {launchability!.badge}
+            </button>
+          ) : (
+            <span className="shrink-0">
+              <Badge title={launchability!.title}>{launchability!.badge}</Badge>
+            </span>
+          ))}
         <span className="shrink-0 font-mono text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</span>
       </div>
       <FavoriteToggle favorite={game.favorite} onToggle={onToggleFavorite} className="shrink-0" />

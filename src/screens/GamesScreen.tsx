@@ -1,34 +1,18 @@
 import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
-import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
+import type { EmulatorEntry, LibraryGame, Report, Session } from "../api/types";
 import { Button, Callout, ErrorModal, ProgressBar } from "../components/ui";
 import { GameTile } from "../components/GameTile";
+import { useInlineInstall } from "../hooks/useInlineInstall";
+import { evaluateGameLaunchability } from "../lib/gameLaunchability";
+import { percentOf } from "../lib/format";
 
 type RowStatus =
   | { kind: "idle" }
   | { kind: "launching" }
   | { kind: "launched"; session: Session }
   | { kind: "error"; message: string };
-
-// Estado da instalação inline (L8): um só por tela, porque todos os jogos
-// deste console compartilham o mesmo adapter. pendingGamePath guarda qual
-// jogo disparou o clique, para lançar assim que a instalação terminar — o
-// usuário não deveria precisar clicar em "Jogar" de novo.
-type InstallState =
-  | { kind: "idle" }
-  | { kind: "confirm-hardware"; message: string; pendingGamePath: string }
-  // Achado em 2026-08-04: diferente de hardware fraco (que pode rodar mal,
-  // mas roda), sem BIOS o jogo nunca abre — confirma antes de tentar, em vez
-  // de deixar clicar "Jogar" e só descobrir depois que falhou.
-  | { kind: "confirm-bios"; pendingGamePath: string }
-  | { kind: "installing"; job: InstallJob; pendingGamePath: string }
-  | { kind: "error"; message: string };
-
-function percentOf(job: InstallJob): number | null {
-  if (job.total_bytes <= 0) return null;
-  return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
-}
 
 /**
  * Tela 05 do wireframe: grid de jogos de um console, com o botão que fecha o
@@ -40,23 +24,24 @@ function percentOf(job: InstallJob): number | null {
  *
  * M5 (docs/sprint-m-plano.md, 2026-08-07): a célula do jogo (capa, badge,
  * cor, favorito, clique-pro-detalhe) passou a ser `GameTile`, a mesma que
- * `AllGamesScreen` usa — antes esta tela desenhava um quadrado 64×64
- * `font-mono` sem capa, sem favorito e sem caminho pro detalhe. O que
- * continua exclusivo daqui (não entrou no componente compartilhado):
- * cabeçalho de parecer/BIOS, instalação inline (L8) e confirmação de BIOS
- * vazio — vivem como blocos irmãos do tile, ligados por
+ * `AllGamesScreen` usa. M8 (mesma data): a checagem de "este jogo pode
+ * abrir?" e o fluxo de instalação inline saíram daqui — viraram
+ * `evaluateGameLaunchability` (src/lib/gameLaunchability.ts) e
+ * `useInlineInstall` (src/hooks/useInlineInstall.ts), compartilhados com
+ * `AllGamesScreen`. O que continua exclusivo desta tela (não entrou no
+ * componente/hook compartilhado): cabeçalho de parecer/BIOS e confirmação de
+ * BIOS vazio — vivem como blocos irmãos do tile, ligados por
  * `installState.pendingGamePath`.
  *
  * **Limitação aceita, herdada do M1:** o botão "Jogar" full-width saiu —
- * `handlePlay` (a checagem de instalado/BIOS antes de lançar) agora é o
- * `onPlay` do overlay ▶, alcançável por mouse e por leitor de tela em modo
- * de navegação por elementos, mas fora da ordem de Tab/D-pad (mesma decisão
- * que M1 já tomou para `AllGamesScreen` — ver comentário em `GameTile`).
- * Quem só usa teclado/controle chega em `handlePlay` só depois de abrir o
- * detalhe (Enter no tile) e for até o botão "▶ Jogar" de lá — que hoje
- * lança direto, sem passar pela checagem de instalado/BIOS deste console
- * (`GameDetailScreen` ainda não conhece esse fluxo). Fica registrado como
- * lacuna para o M6 fechar, não escondido.
+ * a checagem de instalado/BIOS antes de lançar agora é o `onPlay` do overlay
+ * ▶, alcançável por mouse e por leitor de tela em modo de navegação por
+ * elementos, mas fora da ordem de Tab/D-pad (mesma decisão que M1 já tomou
+ * para `AllGamesScreen` — ver comentário em `GameTile`). Quem só usa
+ * teclado/controle chega nesse fluxo só depois de abrir o detalhe (Enter no
+ * tile) e ir até o botão "▶ Jogar" de lá — que hoje lança direto, sem passar
+ * pela checagem de instalado/BIOS deste console (`GameDetailScreen` ainda
+ * não conhece este hook). Fica registrado como lacuna, não escondido.
  */
 export function GamesScreen({
   consoleId,
@@ -77,7 +62,6 @@ export function GamesScreen({
   const [error, setError] = useState<string | null>(null);
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   const [rowStatus, setRowStatus] = useState<Record<number, RowStatus>>({});
-  const [installState, setInstallState] = useState<InstallState>({ kind: "idle" });
   // I2 (docs/roadmap.md): client-side, igual às outras telas com busca —
   // este catálogo é a lista de jogos de UM console (nunca cresce sem
   // limite como "Todos os jogos", que filtra no servidor). Filtra sobre
@@ -137,64 +121,12 @@ export function GamesScreen({
     }
   }
 
-  async function pollInstallJob(jobId: string, pendingGamePath: string) {
-    try {
-      const job = await api.getInstallJob(jobId);
-      if (job.phase === "concluido") {
-        setInstallState({ kind: "idle" });
-        setEmulators((prev) =>
-          (prev ?? []).map((e) => (e.adapter_id === verdict?.adapter_id ? { ...e, installed: true } : e)),
-        );
-        await doLaunch(pendingGamePath);
-        return;
-      }
-      if (job.phase === "falhou") {
-        setInstallState({ kind: "error", message: job.error ?? "A instalação falhou." });
-        return;
-      }
-      setInstallState({ kind: "installing", job, pendingGamePath });
-      setTimeout(() => pollInstallJob(jobId, pendingGamePath), 400);
-    } catch (err) {
-      setInstallState({
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível acompanhar a instalação.",
-      });
-    }
-  }
-
-  async function startInstall(force: boolean, pendingGamePath: string) {
-    if (!verdict?.adapter_id) return;
-    try {
-      const job = await api.installEmulator(verdict.adapter_id, force);
-      setInstallState({ kind: "installing", job, pendingGamePath });
-      pollInstallJob(job.id, pendingGamePath);
-    } catch (err) {
-      if (err instanceof ApiError && err.code === "hardware_insufficient") {
-        setInstallState({ kind: "confirm-hardware", message: err.message, pendingGamePath });
-        return;
-      }
-      setInstallState({
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível iniciar a instalação.",
-      });
-    }
-  }
-
-  function handlePlay(game: LibraryGame) {
-    if (game.missing || !canAutoConfigure) return;
-
-    if (adapterEntry && !adapterEntry.installed) {
-      startInstall(false, game.path);
-      return;
-    }
-
-    if (adapterEntry?.bios_dir && adapterEntry.bios_dir_empty) {
-      setInstallState({ kind: "confirm-bios", pendingGamePath: game.path });
-      return;
-    }
-
-    doLaunch(game.path);
-  }
+  // M8: fluxo de instalação inline compartilhado com AllGamesScreen.
+  const install = useInlineInstall({
+    onEmulatorInstalled: (adapterId) =>
+      setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
+    onLaunch: doLaunch,
+  });
 
   // Toggle otimista (G4), mesmo padrão de AllGamesScreen.tsx — esta tela
   // nunca teve favoritos antes do M5 (não desenhava a estrela nenhuma).
@@ -217,7 +149,7 @@ export function GamesScreen({
     <div className="mx-auto max-w-5xl px-6 pt-16 pb-10">
       {/*
        * Um só modal de erro por vez, em ordem de prioridade — antes disto,
-       * `installState.kind === "error"` e o `error` genérico apareciam como
+       * `install.state.kind === "error"` e o `error` genérico apareciam como
        * parágrafo vermelho solto no meio da tela (achado numa sessão
        * anterior, 2026-08-07: "não tá bom, nem legível"). Mesmo motivo que
        * criou o `ErrorModal` em 2026-08-04 para `launchError`, só que os
@@ -225,11 +157,11 @@ export function GamesScreen({
        */}
       {launchError ? (
         <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={() => setLaunchError(null)} />
-      ) : installState.kind === "error" ? (
+      ) : install.state.kind === "error" ? (
         <ErrorModal
           title="Não foi possível instalar o emulador"
-          message={installState.message}
-          onClose={() => setInstallState({ kind: "idle" })}
+          message={install.state.message}
+          onClose={() => install.setState({ kind: "idle" })}
         />
       ) : (
         error && <ErrorModal title="Não foi possível carregar a tela" message={error} onClose={() => setError(null)} />
@@ -265,6 +197,10 @@ export function GamesScreen({
         </div>
       )}
 
+      {/* M8 acrescentou o badge por tile ("sem preset — {componente}"), mas
+          não substitui este aviso de tela inteira: com um console inteiro
+          sem preset, repetir a mesma frase em cada uma das dezenas de capas
+          seria pior que dizer uma vez só aqui em cima. */}
       {!canAutoConfigure && (
         <div className="mb-4">
           <Callout label="Sem preset automático">
@@ -305,11 +241,14 @@ export function GamesScreen({
           {visibleGames.map((game) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =
-              (installState.kind === "installing" ||
-                installState.kind === "confirm-hardware" ||
-                installState.kind === "confirm-bios") &&
-              installState.pendingGamePath === game.path;
-            const canPlay = !game.missing && canAutoConfigure && status.kind !== "launching" && !isPendingInstall;
+              (install.state.kind === "installing" ||
+                install.state.kind === "confirm-hardware" ||
+                install.state.kind === "confirm-bios") &&
+              install.state.pendingGamePath === game.path;
+            const canPlay = status.kind !== "launching" && !isPendingInstall;
+            // M8: mesma regra nas duas telas — só varia o que cada uma tem
+            // à mão (aqui, adapterEntry já vem carregado desde sempre).
+            const launchability = evaluateGameLaunchability(game, verdict, adapterEntry);
 
             return (
               <div key={game.id} className="flex flex-col gap-2">
@@ -317,25 +256,40 @@ export function GamesScreen({
                   game={game}
                   shortName={shortName}
                   onOpenDetail={() => onOpenGame(game, consoleName, shortName)}
-                  onPlay={canPlay ? () => handlePlay(game) : undefined}
+                  onPlay={canPlay ? () => install.handlePlay(game, verdict, adapterEntry) : undefined}
                   onToggleFavorite={() => toggleFavorite(game)}
+                  launchability={launchability}
+                  onInstall={
+                    verdict?.adapter_id ? () => install.startInstall(verdict.adapter_id!, false, game.path) : undefined
+                  }
                 />
 
-                {isPendingInstall && installState.kind === "confirm-hardware" && (
-                  <div className="rounded border border-dashed border-line-strong p-2">
-                    <p className="text-sm text-ink">{installState.message}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button variant="primary" onClick={() => startInstall(true, game.path)}>
-                        Instalar mesmo assim
-                      </Button>
-                      <Button variant="secondary" onClick={() => setInstallState({ kind: "idle" })}>
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
+                {isPendingInstall && install.state.kind === "confirm-hardware" && (
+                  (() => {
+                    // Captura local: dentro do onClick (outro closure), o
+                    // TS não mantém o estreitamento de `install.state.kind`
+                    // — sem isto, `adapterId` não existiria no tipo.
+                    const confirmState = install.state;
+                    return (
+                      <div className="rounded border border-dashed border-line-strong p-2">
+                        <p className="text-sm text-ink">{confirmState.message}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button
+                            variant="primary"
+                            onClick={() => install.startInstall(confirmState.adapterId, true, game.path)}
+                          >
+                            Instalar mesmo assim
+                          </Button>
+                          <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
 
-                {isPendingInstall && installState.kind === "confirm-bios" && (
+                {isPendingInstall && install.state.kind === "confirm-bios" && (
                   <div className="rounded border border-dashed border-line-strong p-2">
                     <p className="text-sm text-ink">
                       A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
@@ -349,26 +303,26 @@ export function GamesScreen({
                       <Button
                         variant="primary"
                         onClick={() => {
-                          setInstallState({ kind: "idle" });
+                          install.setState({ kind: "idle" });
                           doLaunch(game.path);
                         }}
                       >
                         Jogar mesmo assim
                       </Button>
-                      <Button variant="secondary" onClick={() => setInstallState({ kind: "idle" })}>
+                      <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
                         Cancelar
                       </Button>
                     </div>
                   </div>
                 )}
 
-                {isPendingInstall && installState.kind === "installing" && (
+                {isPendingInstall && install.state.kind === "installing" && (
                   <div>
                     <p className="text-sm text-muted">
-                      Instalando {verdict?.emulator ?? "emulador"}… {installState.job.phase}
+                      Instalando {verdict?.emulator ?? "emulador"}… {install.state.job.phase}
                     </p>
                     <div className="mt-1">
-                      <ProgressBar percent={percentOf(installState.job)} />
+                      <ProgressBar percent={percentOf(install.state.job)} />
                     </div>
                   </div>
                 )}

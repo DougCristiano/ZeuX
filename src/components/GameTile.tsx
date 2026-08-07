@@ -1,5 +1,6 @@
 import type { LibraryGame } from "../api/types";
 import { coverImageURL } from "../api";
+import type { GameLaunchability } from "../lib/gameLaunchability";
 import { formatPlaytime } from "../lib/format";
 import { Badge, FavoriteToggle, FOCUS_RING, GameCover } from "./ui";
 
@@ -28,8 +29,19 @@ import { Badge, FavoriteToggle, FOCUS_RING, GameCover } from "./ui";
  * `AllGamesScreen`, consistente com M1. Ver comentário em `GamesScreen.tsx`
  * sobre a limitação que isso herda para quem só usa teclado/controle na
  * grade por console (mesma limitação que M1 já aceitou para "Todos os
- * jogos"; M6 deve fechar o resto ao dar a `GameDetailScreen` acesso ao
- * fluxo rico).
+ * jogos"; M6 já fechou parte disso — GameDetailScreen mostra o veredito —,
+ * mas o "▶ Jogar" de lá ainda lança direto, sem passar pela checagem de
+ * instalado/BIOS deste hook).
+ *
+ * `launchability` (M8, docs/sprint-m-plano.md, 2026-08-07): sinaliza na
+ * própria grade o jogo que não vai abrir — capa esmaecida + badge curto —
+ * em vez do usuário só descobrir no clique. Substitui o antigo badge fixo
+ * "arquivo ausente": agora é um dos quatro motivos possíveis de
+ * `evaluateGameLaunchability` (src/lib/gameLaunchability.ts), a mesma regra
+ * usada pelas duas telas (critério do item, verificável por `grep`).
+ * Continua clicável mesmo bloqueado (princípio 5: informar, não bloquear) —
+ * o único efeito extra é o badge de "instalar emulador" virar um botão que
+ * dispara a instalação inline (`onInstall`) em vez de só descrever o motivo.
  */
 export function GameTile({
   game,
@@ -37,6 +49,8 @@ export function GameTile({
   onOpenDetail,
   onPlay,
   onToggleFavorite,
+  launchability,
+  onInstall,
 }: {
   game: LibraryGame;
   /** Sigla do console — capa placeholder e badge de plataforma. */
@@ -45,7 +59,13 @@ export function GameTile({
   /** Ausente esconde o botão de jogar do overlay (jogo `missing`, lançamento em andamento, ou console sem preset). */
   onPlay?: () => void;
   onToggleFavorite: () => void;
+  /** Ausente = tela não carregou dado o bastante para avaliar (ex.: `AllGamesScreen` antes do `GET /emulators` responder) — tile aparece sem badge, nunca com um palpite. */
+  launchability?: GameLaunchability;
+  /** Só relevante quando `launchability.reason === "not_installed"` — dispara a instalação inline (L8) a partir do badge. */
+  onInstall?: () => void;
 }) {
+  const blocked = launchability !== undefined && !launchability.launchable;
+
   return (
     <div className="flex flex-col gap-2">
       <div className="relative">
@@ -69,6 +89,8 @@ export function GameTile({
             onOpenDetail();
           }}
         >
+          {/* M8: esmaecida quando bloqueado — a capa em si, não o tile
+              inteiro, pra estrela de favorito continuar com contraste normal. */}
           <GameCover
             label={shortName}
             title={game.title}
@@ -76,6 +98,7 @@ export function GameTile({
             coverUrl={coverImageURL(game.cover_url)}
             showPlayOverlay
             onPlay={onPlay}
+            className={blocked ? "opacity-50" : ""}
           />
         </div>
         <FavoriteToggle favorite={game.favorite} onToggle={onToggleFavorite} className="absolute top-1.5 right-1.5" />
@@ -87,9 +110,25 @@ export function GameTile({
           {game.title}
         </p>
         <p className="text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
-        {game.missing && (
+        {blocked && (
           <div className="mt-1">
-            <Badge>arquivo ausente</Badge>
+            {launchability!.reason === "not_installed" && onInstall ? (
+              <button
+                type="button"
+                title={launchability!.title}
+                onClick={(e) => {
+                  // Não deixa o clique borbulhar pro wrapper (que abriria o
+                  // detalhe) — este botão tem a própria ação.
+                  e.stopPropagation();
+                  onInstall();
+                }}
+                className={`inline-block rounded-sm border border-line-strong px-1.5 py-0.5 font-mono text-xs tracking-wide text-muted underline decoration-dotted transition-colors hover:text-ink ${FOCUS_RING}`}
+              >
+                {launchability!.badge}
+              </button>
+            ) : (
+              <Badge title={launchability!.title}>{launchability!.badge}</Badge>
+            )}
           </div>
         )}
       </div>

@@ -710,9 +710,24 @@ sessão não pode compilar nem rodar (sem Rust instalado, ADR 0004). O lado do
 front foi confirmado (falha graciosa fora do Tauri), a permissão em si
 precisa do Douglas num build real.
 
+**Atualizado em 2026-08-07 (Lote 5): M8 fechou** — zero checkbox aberto no
+critério original (a checagem "este jogo pode abrir?" e a instalação inline
+compartilhadas entre as duas telas, confirmadas por `grep`). Testado ao vivo
+com biblioteca semeada (SNES sem emulador instalado, PS Vita sem preset): a
+grade e a lista de `AllGamesScreen` mostraram os badges certos, e clicar em
+"instalar emulador" disparou a mesma chamada real que já fechava o L8 em
+`GamesScreen` — o erro genuíno do RetroArch empacotado (ADR 0012) apareceu no
+`ErrorModal`, não um texto inventado. Peça nova, registrada como não
+verificável nesta sessão: os dois estados de confirmação
+(`confirm-hardware`/`confirm-bios`) viraram `ConfirmModal` em vez do painel
+inline de `GamesScreen` — decisão forçada pela virtualização (M3), não pelo
+critério do item — mas o hardware desta máquina de teste não bloqueia nenhum
+adapter instalável, então a transição não pôde ser observada ao vivo (só por
+`npm run build`/revisão de código). Ver a nota completa no item do roadmap.
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
-`go test` e `npm run build`): M4, M5, M6, M9, M12, M13, M15 — e as partes
-mecânicas de M1, M2, M3, M8, M11.
+`go test` e `npm run build`): M4, M5, M6, M8, M9, M12, M13, M15 — e as partes
+mecânicas de M1, M2, M3, M11.
 
 **Precisa do Douglas olhando a tela de verdade:**
 - **M2** — se as cores de dois consoles são distinguíveis lado a lado.

@@ -13,3 +13,12 @@ export function formatPlaytime(seconds: number): string {
   const remainder = minutes % 60;
   return remainder > 0 ? `${hours}h${remainder}min jogados` : `${hours}h jogados`;
 }
+
+// M8 (docs/sprint-m-plano.md): extraído de GamesScreen para ser reaproveitado
+// também por AllGamesScreen — as duas mostram progresso do mesmo InstallJob.
+// `total_bytes` pode vir 0 (tamanho desconhecido) — nesse caso o percentual
+// não existe, `ProgressBar` sabe desenhar a barra indeterminada para `null`.
+export function percentOf(job: { downloaded_bytes: number; total_bytes: number }): number | null {
+  if (job.total_bytes <= 0) return null;
+  return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
+}
