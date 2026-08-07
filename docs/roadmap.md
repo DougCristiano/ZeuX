@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **13** | M1–M15. **Atualizado 2026-08-07** (Lote 5, testado ao vivo com Chromium/Playwright): **M5 e M8 fechados** (0 checkbox aberto cada — M8 unificou a checagem "este jogo pode abrir?" e a instalação inline entre `GamesScreen` e `AllGamesScreen`, badge/instalação testados ao vivo na grade e na lista; a transição `confirm-hardware`/`confirm-bios` não pôde ser forçada ao vivo nesta máquina, registrado no item). M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M9–M15 sem começar |
+| **Sprint M (v1.0)** | **12** | M1–M15. **Atualizado 2026-08-07** (Lote 6, testado ao vivo com Chromium/Playwright): **M5, M8 e M9 fechados** (0 checkbox aberto cada — M9 trocou os 33 cartões paginados de `LibraryScreen` por "Consoles configurados" (uma linha por console com pasta) + "Adicionar console" (`Select` do shadcn), testado ao vivo: 2 linhas para 2 consoles configurados, revarrer/remover funcionando, remover devolvendo o console ao `Select`). M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M10–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -3009,27 +3009,42 @@ por console") **já é o assistente** — não construir outro. Este item reorga
 o que sobra ao redor dele.
 
 **Critério de aceite:**
-- [ ] A tela passa a ter duas seções: **"Consoles configurados"** (uma linha
+- [x] A tela passa a ter duas seções: **"Consoles configurados"** (uma linha
       compacta por console **que tem pasta apontada** — ícone/cor do console,
       nome, caminho truncado com `title` completo, contagem de jogos, revarrer
       e remover) e **"Adicionar console"** (escolher o console + escolher a
-      pasta).
-- [ ] Um usuário com 3 consoles configurados vê **3 linhas**, não 33 cartões
+      pasta). Testado ao vivo.
+- [x] Um usuário com 3 consoles configurados vê **3 linhas**, não 33 cartões
       — hoje vê 6 cartões por página e precisa paginar até achar os dele.
-- [ ] `Pagination` desaparece desta tela (`LibraryScreen.tsx:344`): a lista
-      passa a ser do tamanho do que o usuário configurou.
-- [ ] A tela usa `ConsoleIcon`/`consoleAccentColor`, ficando consistente com
-      as outras.
-- [ ] Nada de link, sugestão de fonte ou transferência de ROM em lugar nenhum
+      Testado ao vivo com 2 consoles configurados: 2 linhas, sem paginação.
+- [x] `Pagination` desaparece desta tela: a lista passa a ser do tamanho do
+      que o usuário configurou (import removido, componente não é mais usado
+      em `LibraryScreen.tsx`).
+- [x] A tela usa `ConsoleIcon`/`consoleAccentColor` (via `ConsoleIcon`,
+      que já resolve a cor internamente), ficando consistente com as outras
+      — testado ao vivo: clicar no ícone abre `ConsoleInfoModal`, mesmo
+      comportamento de `EmulatorsScreen`.
+- [x] Nada de link, sugestão de fonte ou transferência de ROM em lugar nenhum
       — só caminho que já existe no disco (regra 6 do `CLAUDE.md`, que a tela
-      atual respeita e a nova precisa continuar respeitando).
-- [ ] Continua possível chegar a `GamesScreen` mesmo com 0 jogos achados — o
-      botão "Ver jogos" existe hoje justamente porque é lá que fica "Abrir
-      pasta do BIOS" (`LibraryScreen.tsx:231-237`); esse caminho não pode
-      sumir na reorganização.
+      atual respeita e a nova precisa continuar respeitando). Revisado linha a
+      linha no arquivo novo.
+- [x] Continua possível chegar a `GamesScreen` mesmo com 0 jogos achados — o
+      botão "Ver jogos" continua sempre visível na linha do console, mesmo
+      antes da contagem responder ("Ver jogos" sem número) ou com contagem 0.
 
 **Depende de:** nada
 **Bloqueia:** nada
+
+**Testado ao vivo** (Chromium/Playwright contra `zeuxd` real, biblioteca
+semeada com SNES/PS Vita já configurados): tela abriu com 2 linhas (não 33
+cartões), "Revarrer" manteve a contagem certa, "Remover" tirou a linha da
+seção "Consoles configurados" **e** fez o console reaparecer no `Select` de
+"Adicionar console" na mesma hora (verificado abrindo o dropdown depois da
+remoção) — sem isso, o usuário não teria como reconfigurar um console que
+removeu. Diálogo nativo de escolher pasta (`@tauri-apps/plugin-dialog`) não
+roda fora do Tauri, mesma limitação já registrada para o `BulkFolderPicker`
+em sessões anteriores — não pôde ser exercitado nesta sessão (só o
+`addLibraryFolder` por trás dele, via API direta).
 
 ### M10 — Cor por console: hash sobre 10 cores para 33 consoles (M)
 

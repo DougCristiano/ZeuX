@@ -725,6 +725,20 @@ critério do item — mas o hardware desta máquina de teste não bloqueia nenhu
 adapter instalável, então a transição não pôde ser observada ao vivo (só por
 `npm run build`/revisão de código). Ver a nota completa no item do roadmap.
 
+**Atualizado em 2026-08-07 (Lote 6): M9 fechou** — zero checkbox aberto.
+Trocou o cartão grande por console (33, paginados de 6 em 6) por "Consoles
+configurados" (uma linha por console com pasta apontada, usando
+`ConsoleIcon`/cor pela primeira vez nesta tela) + "Adicionar console"
+(`Select` do shadcn, filtrado para só oferecer console ainda sem pasta).
+`BulkFolderPicker` não mudou de lugar nem de comportamento — continua sendo o
+único assistente. Testado ao vivo com 2 consoles já configurados (SNES, PS
+Vita): a tela abriu com 2 linhas (não 33 cartões, sem paginação), "Revarrer"
+manteve a contagem certa, "Remover" tirou a linha e devolveu o console ao
+`Select` na mesma hora — confirmado abrindo o dropdown depois da remoção.
+Único trecho não exercitado ao vivo: o diálogo nativo de "Escolher pasta"
+(`@tauri-apps/plugin-dialog`), que não roda fora do Tauri — mesma limitação
+já registrada para o `BulkFolderPicker` em sessões anteriores.
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
 `go test` e `npm run build`): M4, M5, M6, M8, M9, M12, M13, M15 — e as partes
 mecânicas de M1, M2, M3, M11.
