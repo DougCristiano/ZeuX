@@ -4,7 +4,12 @@ import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import type { LibraryGame } from "./api/types";
-import { AllGamesScreen, DEFAULT_ALL_GAMES_VIEW, type AllGamesViewState } from "./screens/AllGamesScreen";
+import {
+  AllGamesScreen,
+  loadInitialAllGamesView,
+  persistAllGamesView,
+  type AllGamesViewState,
+} from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
@@ -77,8 +82,12 @@ function App() {
   // busca e filtro de plataforma de AllGamesScreen sobem para cá — a tela em
   // si não guarda mais esse estado, só o consome. Sem isto, abrir um jogo e
   // voltar resetava tudo (a tela desmontava no switch de `phase` abaixo).
-  const [allGamesView, setAllGamesView] = useState<AllGamesViewState>(DEFAULT_ALL_GAMES_VIEW);
+  // `loadInitialAllGamesView` (lazy initializer, roda uma vez só) traz
+  // `sort`/`viewMode` do `localStorage` — os únicos dois campos do M3 que
+  // precisam sobreviver a reabrir o app, não só a ir ao detalhe e voltar.
+  const [allGamesView, setAllGamesView] = useState<AllGamesViewState>(loadInitialAllGamesView);
   function handleAllGamesViewChange(patch: Partial<AllGamesViewState>) {
+    persistAllGamesView(patch);
     setAllGamesView((prev) => ({ ...prev, ...patch }));
   }
   // Posição de rolagem de "Todos os jogos" — a opção (a) do M4 não preserva
@@ -87,16 +96,17 @@ function App() {
   // (mesmo nó do DOM, só o filho `{screen}` muda), mas o conteúdo mais curto
   // do detalhe encolhe `scrollHeight` e o navegador zera `scrollTop`
   // sozinho — perdendo a posição quando a grade volta a ser mais alta.
+  //
+  // **A restauração em si não mora aqui** — mora dentro de `AllGamesScreen`
+  // (achado testando ao vivo com Playwright, 2026-08-07): um efeito neste
+  // componente pai, disparado só por `phase`, roda **antes** de
+  // `AllGamesScreen` buscar os jogos (a chamada é assíncrona) — nesse
+  // instante a grade ainda não tem altura nenhuma pra rolar, o navegador
+  // zera `scrollTop` de volta sozinho, e nada dispara de novo depois que os
+  // jogos chegam. `AllGamesScreen` recebe `initialScrollTop` e só aplica
+  // depois que `games` deixa de ser `null`.
   const mainRef = useRef<HTMLElement>(null);
   const [allGamesScrollTop, setAllGamesScrollTop] = useState(0);
-  useEffect(() => {
-    if (phase === "all-games" && mainRef.current) {
-      mainRef.current.scrollTop = allGamesScrollTop;
-    }
-    // Só quando a fase muda para "all-games" — rodar a cada render
-    // sobrescreveria a rolagem do próprio usuário enquanto ele navega ali.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
@@ -269,6 +279,8 @@ function App() {
           onOpenLibrary={() => setPhase("library")}
           view={allGamesView}
           onViewChange={handleAllGamesViewChange}
+          scrollElementRef={mainRef}
+          initialScrollTop={allGamesScrollTop}
           onOpenGame={(game, consoleName, shortName) => {
             const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
             // M4: guarda a rolagem antes de trocar de fase — é a última

@@ -494,6 +494,73 @@ func TestLibraryGamesFilterByPlatformAndConsolesField(t *testing.T) {
 	}
 }
 
+// Trava o critério central do M3 (docs/sprint-m-plano.md): cada valor de
+// `?sort=` ordena o resultado inteiro (antes de paginar), e um valor
+// desconhecido cai no padrão sem erro — 3 jogos com título, tempo jogado e
+// data de última sessão todos diferentes, para nenhuma ordenação empatar por
+// acidente.
+func TestLibraryGamesSortValues(t *testing.T) {
+	server, db := newTestServerWithDB(t, fakeProbe{})
+	dir := t.TempDir()
+
+	// Zebra: título por último, mas foi jogado por mais tempo e mais
+	// recentemente — só desempata por tempo_jogado ou recentes.
+	// Abacaxi: título primeiro, pouco tempo jogado, nunca jogado.
+	// Meio: título do meio, tempo do meio, jogado há mais tempo que Zebra.
+	paths := map[string]string{
+		"Zebra":   filepath.Join(dir, "Zebra.nes"),
+		"Abacaxi": filepath.Join(dir, "Abacaxi.nes"),
+		"Meio":    filepath.Join(dir, "Meio.nes"),
+	}
+	for _, p := range paths {
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatalf("criando ROM %s: %v", p, err)
+		}
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+
+	sessions := emulator.NewSQLiteSessions(db)
+	insertClosedSession(t, sessions, "nes", paths["Zebra"], time.Now().Add(-5*time.Minute), 600*time.Second)
+	insertClosedSession(t, sessions, "nes", paths["Meio"], time.Now().Add(-1*time.Hour), 120*time.Second)
+	// Abacaxi nunca foi jogado — sem sessão.
+
+	titlesInOrder := func(t *testing.T, sort string) []string {
+		t.Helper()
+		rec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10&sort="+sort, nil)
+		games := decodeBody(t, rec)["games"].([]any)
+		if len(games) != 3 {
+			t.Fatalf("?sort=%s: esperava 3 jogos, veio %d", sort, len(games))
+		}
+		out := make([]string, len(games))
+		for i, g := range games {
+			out[i] = g.(map[string]any)["title"].(string)
+		}
+		return out
+	}
+
+	if got := titlesInOrder(t, "titulo"); !slices.Equal(got, []string{"Abacaxi", "Meio", "Zebra"}) {
+		t.Fatalf("?sort=titulo = %v, esperado ordem alfabética [Abacaxi Meio Zebra]", got)
+	}
+	if got := titlesInOrder(t, "tempo_jogado"); !slices.Equal(got, []string{"Zebra", "Meio", "Abacaxi"}) {
+		t.Fatalf("?sort=tempo_jogado = %v, esperado [Zebra Meio Abacaxi] (600s, 120s, 0s)", got)
+	}
+	if got := titlesInOrder(t, "recentes"); !slices.Equal(got, []string{"Zebra", "Meio", "Abacaxi"}) {
+		t.Fatalf("?sort=recentes = %v, esperado [Zebra Meio Abacaxi] (jogado há 5min, 1h, nunca)", got)
+	}
+	// Valor desconhecido cai no padrão (recentes) sem erro 400 — é
+	// preferência de tela, não contrato quebrado.
+	recAlgo := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10&sort=lixo-total", nil)
+	if recAlgo.Code != http.StatusOK {
+		t.Fatalf("?sort=lixo-total: status = %d, esperado 200 (cai no padrão)", recAlgo.Code)
+	}
+	if got := titlesInOrder(t, "lixo-total"); !slices.Equal(got, []string{"Zebra", "Meio", "Abacaxi"}) {
+		t.Fatalf("?sort=lixo-total = %v, esperado o mesmo do padrão (recentes)", got)
+	}
+}
+
 func toStringSlice(t *testing.T, raw any) []string {
 	t.Helper()
 	list, ok := raw.([]any)

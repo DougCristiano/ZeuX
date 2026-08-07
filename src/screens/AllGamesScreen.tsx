@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError, coverImageURL } from "../api";
 import type { LibraryGame, Report, ScrapeJob } from "../api/types";
 import { Badge, Button, ErrorModal, FavoriteToggle, FOCUS_RING, GameCover, Pagination } from "../components/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { GameListRow } from "../components/GameListRow";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
+import { consoleAccentColor } from "../lib/consoleColor";
+import { formatPlaytime } from "../lib/format";
 
 // M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24 nunca
 // fechava fileira numa grade de 5 ou 6 colunas; 30 é múltiplo dos dois. O
@@ -14,16 +19,6 @@ const PAGE_SIZE = 30;
 // tecla. 300ms é o padrão comum para busca "enquanto digita".
 const SEARCH_DEBOUNCE_MS = 300;
 
-function formatPlaytime(seconds: number): string {
-  if (seconds <= 0) return "nunca jogado";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 1) return "menos de 1 min";
-  if (minutes < 60) return `${minutes} min jogados`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder > 0 ? `${hours}h${remainder}min jogados` : `${hours}h jogados`;
-}
-
 /**
  * Estado de navegação da tela — M4 (docs/sprint-m-plano.md, decidido pelo
  * Douglas em 2026-08-07: "opção (a)"): mora em `App.tsx`, não aqui dentro.
@@ -33,12 +28,24 @@ function formatPlaytime(seconds: number): string {
  * este pedaço de estado para o componente pai, que nunca desmonta, resolve
  * sem precisar manter duas telas montadas ao mesmo tempo (a outra opção
  * cogitada, descartada por manter complexidade extra por menos ganho).
+ *
+ * `sort`/`viewMode` (M3) entraram no mesmo objeto — precisam sobreviver a
+ * abrir um jogo e voltar igual ao resto, mas **também** a reabrir o app
+ * inteiro (critério do item), por isso os dois têm espelho em
+ * `localStorage` (`loadInitialAllGamesView`/`persistAllGamesView` abaixo).
+ * `page`/`search`/`platformFilter` não têm esse espelho de propósito —
+ * reabrir o app numa busca antiga seria mais confuso que útil.
  */
+export type SortValue = "recentes" | "titulo" | "tempo_jogado";
+export type ViewMode = "grade" | "lista";
+
 export interface AllGamesViewState {
   page: number;
   search: string;
   platformFilter: string | null;
   favoriteOnly: boolean;
+  sort: SortValue;
+  viewMode: ViewMode;
 }
 
 export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
@@ -46,7 +53,88 @@ export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
   search: "",
   platformFilter: null,
   favoriteOnly: false,
+  sort: "recentes",
+  viewMode: "grade",
 };
+
+const SORT_VALUES: readonly SortValue[] = ["recentes", "titulo", "tempo_jogado"];
+const VIEW_MODES: readonly ViewMode[] = ["grade", "lista"];
+// M3: rótulo dizendo o que cada ordem é, em vez de deixar o usuário
+// adivinhar por que a lista está naquela sequência (critério do item).
+const SORT_LABELS: Record<SortValue, string> = {
+  recentes: "Jogados por último",
+  titulo: "Título (A–Z)",
+  tempo_jogado: "Mais jogados",
+};
+
+const SORT_STORAGE_KEY = "zeux.allGames.sort";
+const VIEW_MODE_STORAGE_KEY = "zeux.allGames.viewMode";
+
+function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw !== null && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback;
+  } catch {
+    // localStorage indisponível (modo privado, quota, WebView restrito) —
+    // preferência de tela, não dado crítico; cai no padrão em silêncio.
+    return fallback;
+  }
+}
+
+function writeStored(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // mesma tolerância do read acima — não é motivo pra quebrar a tela.
+  }
+}
+
+/** Lazy initializer de `App.tsx` — só sort/viewMode vêm do localStorage. */
+export function loadInitialAllGamesView(): AllGamesViewState {
+  return {
+    ...DEFAULT_ALL_GAMES_VIEW,
+    sort: readStored(SORT_STORAGE_KEY, SORT_VALUES, DEFAULT_ALL_GAMES_VIEW.sort),
+    viewMode: readStored(VIEW_MODE_STORAGE_KEY, VIEW_MODES, DEFAULT_ALL_GAMES_VIEW.viewMode),
+  };
+}
+
+/** Chamado por `App.tsx` a cada mudança de view — só grava o que precisa sobreviver a reabrir o app. */
+export function persistAllGamesView(patch: Partial<AllGamesViewState>) {
+  if (patch.sort) writeStored(SORT_STORAGE_KEY, patch.sort);
+  if (patch.viewMode) writeStored(VIEW_MODE_STORAGE_KEY, patch.viewMode);
+}
+
+// M3 (virtualização): quantas colunas a grade tem, replicando os
+// breakpoints do próprio className abaixo (`grid-cols-2 sm: md: lg: 2xl:`).
+// Precisa ser calculado em JS porque a virtualização substitui o
+// `display: grid` que faria isso sozinho — cada "linha" virtualizada tem
+// que saber quantos jogos ela carrega. Mede a LARGURA DA JANELA, não a do
+// container: os breakpoints do Tailwind são media query sobre viewport,
+// não sobre elemento (CLAUDE.md, "layout responsivo").
+const GRID_BREAKPOINTS: readonly [minWidth: number, columns: number][] = [
+  [1536, 6], // 2xl
+  [1024, 5], // lg
+  [768, 4], // md
+  [640, 3], // sm
+  [0, 2],
+];
+function columnsForWidth(width: number): number {
+  for (const [min, columns] of GRID_BREAKPOINTS) {
+    if (width >= min) return columns;
+  }
+  return 2;
+}
+function useGridColumns(): number {
+  const [columns, setColumns] = useState(() => columnsForWidth(window.innerWidth));
+  useEffect(() => {
+    function onResize() {
+      setColumns(columnsForWidth(window.innerWidth));
+    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return columns;
+}
 
 /**
  * Tela "Todos os jogos" (2026-08-04, a pedido do Douglas): landing page
@@ -59,12 +147,10 @@ export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
  * /home/douglas/.claude/plans/sleepy-roaming-pearl.md): busca por título
  * (`?q=` no backend — acha o jogo em qualquer página, não só na carregada)
  * e filtro por plataforma. M4 (2026-08-07) moveu o filtro de plataforma do
- * cliente para o servidor (`?platform=<console_id>`, combinado com
- * paginação) — antes ele rodava só sobre os jogos da página carregada, e o
- * próprio conjunto de opções mudava ao virar de página (bug real, descrito
- * no roadmap). `consoles` na resposta agora é o conjunto completo
- * (respeitando busca/favoritos, não a plataforma escolhida), calculado no
- * servidor antes de paginar.
+ * cliente para o servidor (`?platform=<console_id>`); M3 (mesma data)
+ * acrescentou ordenação (`?sort=`), modo lista e virtualização — a página do
+ * servidor continua limitada a `PAGE_SIZE`, a virtualização é sobre o DOM
+ * **daquela página**, não substitui a paginação.
  *
  * Deliberadamente mais simples que GamesScreen (por console): sem instalar
  * emulador inline, sem confirmação de BIOS vazio — essa profundidade
@@ -78,16 +164,34 @@ export function AllGamesScreen({
   onOpenGame,
   view,
   onViewChange,
+  scrollElementRef,
+  initialScrollTop,
 }: {
   report: Report;
   onOpenLibrary: () => void;
   onOpenGame: (game: LibraryGame, consoleName: string, shortName: string) => void;
-  /** Página/busca/filtro atuais — controlados por App.tsx (M4). */
+  /** Página/busca/filtro/ordem/modo atuais — controlados por App.tsx (M4). */
   view: AllGamesViewState;
   /** Patch parcial — só os campos que mudaram, como o `setState` de objeto. */
   onViewChange: (patch: Partial<AllGamesViewState>) => void;
+  /**
+   * M3 (virtualização): o elemento que rola de verdade é `<main>`, em
+   * `App.tsx` — sobrevive à troca de fase (M4), esta tela nunca teve o
+   * próprio scroll container. `useVirtualizer` precisa dele pra saber o que
+   * está visível.
+   */
+  scrollElementRef: RefObject<HTMLElement | null>;
+  /**
+   * M4: a rolagem salva antes de abrir o jogo. Só é aplicada **depois** que
+   * `games` deixa de ser `null` — antes disso a grade não tem altura
+   * nenhuma pra rolar, e o navegador zeraria de volta sozinho (achado
+   * testando ao vivo: aplicar isto num efeito do `App.tsx`, disparado só
+   * por `phase`, rodava cedo demais, antes da resposta assíncrona de
+   * `GET /library/games` chegar).
+   */
+  initialScrollTop: number;
 }) {
-  const { page, search, platformFilter, favoriteOnly } = view;
+  const { page, search, platformFilter, favoriteOnly, sort, viewMode } = view;
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [total, setTotal] = useState(0);
   // Consoles presentes no resultado completo (M4) — vem do servidor, não é
@@ -103,6 +207,7 @@ export function AllGamesScreen({
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
   const [scrapeSummary, setScrapeSummary] = useState<string | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const columns = useGridColumns();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
@@ -125,9 +230,26 @@ export function AllGamesScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, favoriteOnly]);
 
+  // M4: restaura a rolagem uma vez só, na primeira vez que `games` chega
+  // depois do mount — depois disso, `restoredScrollRef` trava, pra não
+  // brigar com a rolagem do próprio usuário a cada recarregamento de página
+  // (ex.: trocar de página não deveria voltar pra rolagem antiga).
+  const restoredScrollRef = useRef(false);
+  useEffect(() => {
+    if (restoredScrollRef.current) return;
+    if (!games || !scrollElementRef.current) return;
+    scrollElementRef.current.scrollTop = initialScrollTop;
+    restoredScrollRef.current = true;
+  }, [games, initialScrollTop, scrollElementRef]);
+
   function loadGames() {
     api
-      .getAllLibraryGames(page, PAGE_SIZE, debouncedSearch || undefined, favoriteOnly, platformFilter ?? undefined)
+      .getAllLibraryGames(page, PAGE_SIZE, {
+        query: debouncedSearch || undefined,
+        favoriteOnly,
+        platform: platformFilter ?? undefined,
+        sort,
+      })
       .then((res) => {
         setGames(res.games);
         setTotal(res.total);
@@ -143,7 +265,7 @@ export function AllGamesScreen({
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os jogos."));
   }
 
-  useEffect(loadGames, [page, debouncedSearch, favoriteOnly, platformFilter]);
+  useEffect(loadGames, [page, debouncedSearch, favoriteOnly, platformFilter, sort]);
 
   // Toggle otimista (G4): atualiza a lista na hora, sem esperar a resposta
   // nem recarregar a página inteira. Se a chamada falhar, desfaz.
@@ -214,6 +336,31 @@ export function AllGamesScreen({
     .map((id) => ({ id, label: shortNameFor(id) }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
+  const gameCount = games?.length ?? 0;
+  // M3: virtualização por linha — na grade, cada "linha" carrega `columns`
+  // jogos lado a lado; na lista, uma linha é um jogo. O total de nós no DOM
+  // fica limitado ao que cabe na viewport (+ overscan), não ao PAGE_SIZE
+  // inteiro — é isto que o critério de aceite mede.
+  const rowCount = viewMode === "grade" ? Math.ceil(gameCount / columns) : gameCount;
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollElementRef.current,
+    // Chute inicial — `measureElement` (abaixo) corrige pela altura real
+    // renderizada, então não precisa ser exato (título pode quebrar em 1 ou
+    // 2 linhas, mudando a altura de verdade da célula).
+    estimateSize: () => (viewMode === "grade" ? 280 : 52),
+    overscan: viewMode === "grade" ? 2 : 6,
+    // Cola o offset do scroll ao trocar de página/ordenação/modo — sem isto
+    // o virtualizer tentaria reaproveitar posições da lista anterior.
+    getItemKey: (index) => `${viewMode}-${index}`,
+  });
+
+  function launchableGame(game: LibraryGame): (() => void) | undefined {
+    if (game.missing) return undefined;
+    if (statusFor(game.id).kind === "launching") return undefined;
+    return () => launch(game);
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-6 pt-16 pb-10">
       {launchError && (
@@ -226,7 +373,12 @@ export function AllGamesScreen({
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold text-ink">Todos os jogos</h1>
+        <h1 className="text-2xl font-semibold text-ink">
+          Todos os jogos
+          {/* M12 cuida do estado de carregamento de verdade; por ora, um
+              parênteses discreto — total já é dado que a tela guarda. */}
+          {games && <span className="ml-2 text-base font-normal text-muted">· {total}</span>}
+        </h1>
         <div className="flex flex-wrap gap-2">
           {/* Só aparece com conta do IGDB conectada (G1) — sem credencial,
               a biblioteca fica exatamente como hoje, sem botão nenhum aqui
@@ -256,6 +408,9 @@ export function AllGamesScreen({
         </p>
       )}
 
+      {/* M3: uma barra só, com busca, ordenação, alternância grade/lista,
+          favoritos e chips de plataforma — nada solto fora dela (critério
+          do item). */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <label htmlFor="all-games-search" className="sr-only">
           Buscar jogos
@@ -270,6 +425,36 @@ export function AllGamesScreen({
           placeholder="Buscar jogos…"
           className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
+
+        <Select value={sort} onValueChange={(v) => onViewChange({ sort: v as SortValue })}>
+          <SelectTrigger aria-label="Ordenar por" className="w-fit">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_VALUES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {SORT_LABELS[value]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex gap-1 rounded-sm border border-line-strong p-0.5" role="group" aria-label="Modo de exibição">
+          {(["grade", "lista"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={viewMode === mode}
+              onClick={() => onViewChange({ viewMode: mode })}
+              className={`rounded-sm px-2 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+                viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
+              }`}
+            >
+              {mode === "grade" ? "GRADE" : "LISTA"}
+            </button>
+          ))}
+        </div>
+
         <button
           type="button"
           onClick={() => onViewChange({ favoriteOnly: !favoriteOnly })}
@@ -323,74 +508,115 @@ export function AllGamesScreen({
 
       {games && games.length > 0 && (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
-            {games.map((game) => {
-              const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
-              // Sem botão "Jogar" separado (M1) não há mais onde mostrar
-              // "lançando…" como texto — mas continua valendo não deixar
-              // relançar por cima de um lançamento em andamento.
-              const launching = statusFor(game.id).kind === "launching";
-              return (
-                <div key={game.id} className="flex flex-col gap-2">
-                  <div className="relative">
-                    {/*
-                     * M1 (docs/sprint-m-plano.md): deixou de ser <button> —
-                     * o overlay ▶ agora é um <button> real dentro de
-                     * GameCover (botão dentro de botão é HTML inválido).
-                     * `role="button"` + `tabIndex`/`onKeyDown` repõem a
-                     * semântica e o alcance por teclado que o <button>
-                     * dava de graça. Continua sendo o único alvo alcançável
-                     * por Tab/D-pad do tile: quem navega por teclado/
-                     * controle abre o detalhe por aqui e lança de lá (o
-                     * overlay some da sequência via tabIndex={-1}, ver
-                     * comentário em GameCover) — é o que sustenta "1
-                     * movimento por fileira" do critério de aceite do item.
-                     * "group" continua aqui: é quem o `group-hover`/
-                     * `group-focus-visible` do overlay e do glow de borda
-                     * (M2) enxergam.
-                     */}
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className={`group block w-full cursor-pointer rounded text-left ${FOCUS_RING}`}
-                      title={game.title}
-                      aria-label={`Ver detalhes de ${game.title}`}
-                      onClick={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter" && e.key !== " ") return;
-                        e.preventDefault();
-                        onOpenGame(game, consoleName, shortNameFor(game.console_id));
-                      }}
-                    >
-                      <GameCover
-                        label={shortNameFor(game.console_id)}
-                        title={game.title}
-                        consoleId={game.console_id}
-                        coverUrl={coverImageURL(game.cover_url)}
-                        showPlayOverlay
-                        onPlay={game.missing || launching ? undefined : () => launch(game)}
-                      />
-                    </div>
-                    <FavoriteToggle
-                      favorite={game.favorite}
-                      onToggle={() => toggleFavorite(game)}
-                      className="absolute top-1.5 right-1.5"
+          <div style={{ position: "relative", height: rowVirtualizer.getTotalSize() }}>
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const rowStyle: CSSProperties = {
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${virtualRow.start}px)`,
+              };
+
+              if (viewMode === "lista") {
+                const game = games[virtualRow.index];
+                const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                return (
+                  <div key={virtualRow.key} data-index={virtualRow.index} ref={rowVirtualizer.measureElement} style={rowStyle}>
+                    <GameListRow
+                      game={game}
+                      consoleShortName={shortNameFor(game.console_id)}
+                      accentColor={consoleAccentColor(game.console_id)}
+                      onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                      onPlay={launchableGame(game)}
+                      onToggleFavorite={() => toggleFavorite(game)}
                     />
                   </div>
-                  <div className="min-w-0">
-                    {/* M7: line-clamp-2 (não mais truncate de 1 linha) — com
-                        capa real, este é o único título do tile (GameCover
-                        não desenha mais o dele por cima da arte). */}
-                    <p className="line-clamp-2 text-sm font-semibold text-ink" title={game.title}>
-                      {game.title}
-                    </p>
-                    <p className="text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
-                    {game.missing && (
-                      <div className="mt-1">
-                        <Badge>arquivo ausente</Badge>
+                );
+              }
+
+              const rowGames = games.slice(virtualRow.index * columns, virtualRow.index * columns + columns);
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    ...rowStyle,
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                    gap: "1rem",
+                    paddingBottom: "1rem",
+                  }}
+                >
+                  {rowGames.map((game) => {
+                    const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                    return (
+                      <div key={game.id} className="flex flex-col gap-2">
+                        <div className="relative">
+                          {/*
+                           * M1 (docs/sprint-m-plano.md): deixou de ser
+                           * <button> — o overlay ▶ agora é um <button> real
+                           * dentro de GameCover (botão dentro de botão é
+                           * HTML inválido). `role="button"` +
+                           * `tabIndex`/`onKeyDown` repõem a semântica e o
+                           * alcance por teclado que o <button> dava de
+                           * graça. Continua sendo o único alvo alcançável
+                           * por Tab/D-pad do tile: quem navega por
+                           * teclado/controle abre o detalhe por aqui e
+                           * lança de lá (o overlay some da sequência via
+                           * tabIndex={-1}, ver comentário em GameCover) — é
+                           * o que sustenta "1 movimento por fileira" do
+                           * critério de aceite do item. "group" continua
+                           * aqui: é quem o `group-hover`/
+                           * `group-focus-visible` do overlay e do glow de
+                           * borda (M2) enxergam.
+                           */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className={`group block w-full cursor-pointer rounded text-left ${FOCUS_RING}`}
+                            title={game.title}
+                            aria-label={`Ver detalhes de ${game.title}`}
+                            onClick={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              e.preventDefault();
+                              onOpenGame(game, consoleName, shortNameFor(game.console_id));
+                            }}
+                          >
+                            <GameCover
+                              label={shortNameFor(game.console_id)}
+                              title={game.title}
+                              consoleId={game.console_id}
+                              coverUrl={coverImageURL(game.cover_url)}
+                              showPlayOverlay
+                              onPlay={launchableGame(game)}
+                            />
+                          </div>
+                          <FavoriteToggle
+                            favorite={game.favorite}
+                            onToggle={() => toggleFavorite(game)}
+                            className="absolute top-1.5 right-1.5"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          {/* M7: line-clamp-2 (não mais truncate de 1 linha) — com
+                              capa real, este é o único título do tile (GameCover
+                              não desenha mais o dele por cima da arte). */}
+                          <p className="line-clamp-2 text-sm font-semibold text-ink" title={game.title}>
+                            {game.title}
+                          </p>
+                          <p className="text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
+                          {game.missing && (
+                            <div className="mt-1">
+                              <Badge>arquivo ausente</Badge>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
               );
             })}

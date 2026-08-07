@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **15** | M1–M15. **Atualizado 2026-08-07** (Lote 1, decisões todas tomadas): M1/M2/M4/M7 com código pronto (`go test`/`npm run build` verdes), cada um com 1-2 checkboxes que só o Douglas fecha (janela real do Tauri ou julgamento visual) — por isso continuam contando como abertos pelo método desta tabela. M3/M5/M6/M8-M15 sem começar |
+| **Sprint M (v1.0)** | **15** | M1–M15. **Atualizado 2026-08-07** (Lote 2, testado ao vivo com Chromium/Playwright): M1/M2/M3/M4/M7 com código pronto e a maior parte do critério **verificada rodando o app de verdade** (não só `go test`/`npm run build`) — cada um ainda tem 1 checkbox que só o Douglas fecha (janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem"), exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). Por isso os cinco continuam contando como abertos pelo método desta tabela. M5/M6/M8–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -2518,16 +2518,22 @@ embaixo de cada tile (`AllGamesScreen.tsx:310-316`), que rouba altura de toda
 fileira e cria um segundo alvo focável por jogo. O usuário aprende que ▶
 mente.
 
-**Feito em 2026-08-07** (Lote 1 da Sprint M — código verificado por
-`go test ./...`/`npm run build`; os dois itens marcados com ressalva abaixo
-precisam do Douglas na janela real do Tauri, nenhuma sessão de IA tem como
-medir isso):
+**Feito em 2026-08-07.** Lote 1 fechou o código; nesta mesma data, uma sessão
+seguinte rodou o app de verdade (`zeuxd` + `npm run dev`, Chromium via
+Playwright, biblioteca semeada com 45 ROMs falsas) e mediu os dois itens que
+tinham ficado pendentes — só a **densidade em 1280×800** continua sem bater o
+alvo, e fica registrada como acerto pendente, não escondida:
 
 **Critério de aceite:**
 - [x] Clicar no ▶ do overlay chama `launch(game)` (o mesmo `useLaunchGame` de
       hoje) e não `onOpenGame` — o overlay vira `<button>` de verdade, com
       `aria-label` nomeando o jogo, em vez de div `pointer-events-none`.
-- [x] Clicar na capa fora do ▶ continua abrindo `GameDetailScreen`.
+      **Verificado ao vivo:** clicar no centro do tile (onde o ▶ aparece no
+      hover) devolveu o erro real do servidor ("o emulador RetroArch não foi
+      encontrado nesta máquina") — o clique chegou em `launch`, não em
+      `onOpenGame`.
+- [x] Clicar na capa fora do ▶ continua abrindo `GameDetailScreen`. **Verificado
+      ao vivo:** clique no canto do tile abriu o detalhe do jogo certo.
 - [x] O `<Button variant="primary">Jogar</Button>` sai da célula da grade —
       **o overlay virou parte de `GameCover` (`src/components/ui.tsx`), não
       mais inline em `AllGamesScreen.tsx`** (decisão de arquitetura: é o
@@ -2536,20 +2542,37 @@ medir isso):
       `grep -rn "Jogar" src/screens/AllGamesScreen.tsx src/components/ui.tsx`
       só acha o `aria-label` do overlay e um comentário, nenhum botão visível
       de "Jogar".
-- [ ] Na janela padrão (1280×800, `src-tauri/tauri.conf.json`) com 30 jogos,
-      **pelo menos 3 fileiras de capa ficam visíveis sem rolar** — não medido
-      nesta sessão (precisa da janela real do Tauri, não só do build; número
-      fica pendente aqui).
-- [ ] Navegando só por D-pad/Tab, ir do primeiro jogo de uma fileira ao
-      primeiro da fileira seguinte custa **1** movimento vertical, não 2 — o
-      código foi desenhado para isto (overlay com `tabIndex={-1}`, único alvo
-      focável por tile é o wrapper que abre o detalhe; ver comentário em
-      `GameCover`), mas não foi verificado com Playwright/controle físico
-      nesta sessão.
+- [ ] Na janela padrão (1280×800) com jogos o bastante pra rolar, **pelo menos
+      3 fileiras de capa ficam visíveis sem rolar** — **medido ao vivo e NÃO
+      bateu**: só 2 fileiras cabem inteiras (a 3ª começa a 854px, cortada pelo
+      viewport de 800px). O cabeçalho + barra de controle (`pt-16` + título +
+      barra de busca/ordenação/filtros, ~180px) mais a altura de cada
+      fileira (~337px, capa `aspect-[3/4]` + título + tempo jogado + `gap`)
+      não deixam espaço pra uma terceira. `pt-16` é convenção repetida em
+      **todas** as telas (`grep -rn "pt-16" src/screens`) — não é algo pra
+      encolher só aqui sem avaliar o efeito nas outras. Medido num Chromium
+      comum, não a janela real do Tauri (que tem chrome próprio e pode medir
+      diferente) — mas a folga é grande (60px faltando), não é questão de
+      arredondamento. **Decisão do Douglas:** aceitar 2 fileiras, encolher o
+      cabeçalho desta tela especificamente, ou revisar `pt-16` nas telas que
+      têm barra de controle própria (M3 também adicionou uma).
+- [x] Navegando só por D-pad/Tab, ir do primeiro jogo de uma fileira ao
+      primeiro da fileira seguinte custa **1** movimento vertical, não 2.
+      **Verificado ao vivo, sem controle físico:** a) pela sequência real de
+      Tab do navegador — o overlay (`tabIndex={-1}`) não aparece nela, só
+      wrapper (abre detalhe) e estrela de favorito alternam; b) rodando a
+      função `findNextFocus` de `useGamepadNavigation.ts` **de verdade**
+      contra o DOM renderizado (colada num `page.evaluate`, mesma lógica,
+      sem gamepad de hardware): "down" a partir do primeiro tile foi direto
+      para o primeiro tile da fileira seguinte (mesma coluna), pulando o
+      overlay e a estrela — confirma que o `tabIndex={-1}` concêntrico ao
+      wrapper (ver comentário em `GameCover`) funciona como desenhado.
 - [x] O caminho de erro não some junto com o botão: o `ErrorModal` ganha um
       botão "Tentar de novo" (decidido em 2026-08-07 — não basta reaproveitar
       o clique no ▶), que relança o mesmo jogo sem fechar a tela nem
-      recarregar a grade.
+      recarregar a grade. **Verificado ao vivo:** o modal com "Fechar"/
+      "Tentar de novo" apareceu no clique que lançou o jogo sem RetroArch
+      instalado.
 
 **Depende de:** nada
 **Bloqueia:** M5 (o tile unificado precisa nascer com este comportamento), M3
@@ -2581,16 +2604,25 @@ avesso do que foi decidido.
 (`sprint-m-plano.md`): border-color e box-shadow saíram do CSS solto e viraram
 utilities do Tailwind direto em `GameCover` (`hover:`/`group-focus-visible:`
 com `var(--console-accent, var(--accent))`), removendo as duas regras
-quebradas de `index.css` — mas **as duas primeiras linhas abaixo continuam
-pendentes do Douglas**, é julgamento visual que nenhuma sessão de IA faz:
+quebradas de `index.css`. Testado ao vivo (Chromium/Playwright) na mesma
+sessão do Lote 2: NES (azul `#4D96FF`) e SNES (ciano) mostram bordas
+diferentes no hover, e o foco por teclado real (`Tab`, sem mouse) dispara o
+mesmo glow — `getComputedStyle` confirmou `border-color: rgb(77, 150, 255)`
+no tile focado, e a captura de tela mostra o anel roxo do `FOCUS_RING`
+somado ao glow azul do console. **Achado ao testar:** a primeira medição deu
+falso-negativo por ler o computed style cedo demais (a transição de 150ms
+ainda não tinha rodado) — corrigido esperando a transição antes de medir; não
+era bug do app.
 
 **Critério de aceite:**
-- [ ] Um jogo de PS1 e um de SNES lado a lado mostram, no hover, **duas cores
+- [x] Um jogo de PS1 e um de SNES lado a lado mostram, no hover, **duas cores
       de borda diferentes** (as de `consoleAccentColor`), não o mesmo roxo —
-      o código já usa a cor certa (`var(--console-accent, ...)` em vez de
-      `var(--accent)` fixo), falta o Douglas confirmar na tela.
-- [ ] O glow aparece no foco de teclado/gamepad com a mesma intensidade do
-      hover, com o mouse fora da janela — distinguível numa captura de tela.
+      **verificado ao vivo** (NES azul vs. SNES ciano, capturas de tela
+      salvas na sessão). Julgamento de "são distinguíveis o bastante" ainda é
+      do Douglas, mas o mecanismo está funcionando.
+- [x] O glow aparece no foco de teclado/gamepad com a mesma intensidade do
+      hover — **verificado ao vivo** via `Tab` real (não `.focus()`
+      programático) + captura de tela; mouse fora da área do tile.
 - [x] `grep -n "focus-visible" src/index.css` não deixa nenhum seletor
       apontando para elemento não focável — a regra inteira (`:hover`/
       `:focus-visible`) saiu do CSS.
@@ -2602,7 +2634,7 @@ pendentes do Douglas**, é julgamento visual que nenhuma sessão de IA faz:
 **Bloqueia:** nada formalmente — mas M1 e M5 reescrevem o mesmo componente,
 então fazer antes evita conflito
 
-### M3 — Sem ordenação, sem modo lista, sem barra de controle única (G)
+### M3 — Sem ordenação, sem modo lista, sem barra de controle única (G) — **feito em 2026-08-07, com ressalva**
 
 `AllGamesScreen` oferece busca, chips de plataforma e favoritos — e nada mais.
 Não há como ordenar por nome, por mais recente ou por mais jogado, e não há
@@ -2626,31 +2658,52 @@ explicitamente pelo Douglas — ver detalhe em
 [`sprint-m-plano.md`](sprint-m-plano.md)), em vez de ficar fora como este
 plano recomendava.
 
+**Feito em 2026-08-07** (Lote 2 da Sprint M). `@tanstack/react-virtual`
+instalado (headless, sem CSS próprio). Testado ao vivo (`zeuxd` + `npm run
+dev` + Chromium/Playwright, biblioteca semeada com 45 ROMs falsas em 2
+consoles):
+
 **Critério de aceite:**
-- [ ] `GET /api/v1/library/games` aceita `?sort=` com pelo menos `recentes`
+- [x] `GET /api/v1/library/games` aceita `?sort=` com pelo menos `recentes`
       (o padrão de hoje), `titulo` e `tempo_jogado`; valor desconhecido cai no
       padrão sem erro. A ordenação acontece **no servidor, antes de paginar** —
       `handleListLibraryGames` já ordena a lista inteira antes de fatiar
       (`server.go:1123-1163`), é ali que o `sort` entra, nunca no cliente.
-- [ ] A grade e a lista são virtualizadas: a contagem de nós DOM renderizados
+      **Verificado ao vivo**: `?sort=titulo` reordenou a tela na hora
+      (NES 1, NES 10, NES 11… ordem alfabética correta).
+- [x] A grade e a lista são virtualizadas: a contagem de nós DOM renderizados
       fica abaixo do total de itens da página quando ela não cabe inteira na
-      viewport, sem quebrar navegação por Tab/D-pad ao rolar.
-- [ ] Teste em `internal/api/library_test.go` trava cada ordem: 3 jogos com
-      títulos, tempos e datas diferentes, uma requisição por valor de `sort`.
-- [ ] `AllGamesScreen` tem **uma** barra no topo com busca, ordenação
+      viewport. **Medido ao vivo**: lista com 29 linhas — 29 renderizadas no
+      topo, **21** depois de rolar até o fim (menos que o total); grade com
+      25 tiles — 25 no topo, **20** no fim. Tab/D-pad não quebrou (ver M1,
+      mesma sessão de teste).
+- [x] Teste em `internal/api/library_test.go`
+      (`TestLibraryGamesSortValues`) trava as 3 ordens + valor desconhecido
+      caindo no padrão, com 3 jogos de título/tempo/data todos diferentes.
+- [x] `AllGamesScreen` tem **uma** barra no topo com busca, ordenação
       (`Select` do shadcn — J3), alternância grade/lista, favoritos e chips de
-      plataforma; nenhum desses controles fica solto fora dela.
-- [ ] O modo lista mostra por linha: título, plataforma com a cor do console,
+      plataforma; nenhum desses controles fica solto fora dela. **Verificado
+      ao vivo** (captura de tela).
+- [x] O modo lista mostra por linha: título, plataforma com a cor do console,
       tempo jogado e a ação de jogar — e **cabe pelo menos 12 linhas** na
-      janela padrão de 1280×800 sem rolar.
-- [ ] A escolha de ordem e de modo sobrevive a ir ao detalhe e voltar (M4) e a
+      janela padrão de 1280×800 sem rolar. **Medido ao vivo: 17 linhas
+      inteiras cabem** (bem acima do alvo).
+- [x] A escolha de ordem e de modo sobrevive a ir ao detalhe e voltar (M4) e a
       reabrir o app. **Guardada em `localStorage`, não em tabela nova:** é
       preferência de interface, não dado de domínio — `internal/store` hoje só
       tem migrações de sessões e biblioteca (`0001`–`0005`), e abrir uma
       tabela de preferências para isto custa mais do que resolve
-      (ADR 0002 / orçamento de complexidade).
-- [ ] O rótulo da ordem padrão diz o que ela é ("jogados por último"), em vez
-      de deixar o usuário adivinhar por que a lista está naquela sequência.
+      (ADR 0002 / orçamento de complexidade). Reabrir o app não foi testado
+      literalmente (exigiria fechar e abrir o processo), mas
+      `loadInitialAllGamesView`/`persistAllGamesView` são funções puras de
+      leitura/escrita de `localStorage`, cobertas por leitura de código.
+- [x] O rótulo da ordem padrão diz o que ela é ("jogados por último"), em vez
+      de deixar o usuário adivinhar por que a lista está naquela sequência —
+      `SORT_LABELS.recentes = "Jogados por último"`, visível no `Select`.
+
+**Precisa do Douglas:** "a lista densa ficou legível" (julgamento de leitura,
+não de contagem) e se a virtualização não introduziu soluço perceptível ao
+rolar rápido — nenhuma sessão de IA sente "jank".
 
 **Depende de:** M4 (sem o estado preservado, escolher uma ordem e voltar do
 detalhe reseta tudo — a barra pareceria quebrada)
@@ -2670,20 +2723,27 @@ filtro ao virar a página. O `docstring` da tela já admite isso desde
 2026-08-04; virou item porque um filtro que muda de opções sozinho é um filtro
 que mente.
 
-**Feito em 2026-08-07** (Lote 1 da Sprint M — decisão "opção (a)": estado subiu
-para `App.tsx`). Metade servidor coberta por teste automatizado
-(`TestLibraryGamesFilterByPlatformAndConsolesField`,
-`go test ./internal/api` verde); metade cliente compila
-(`npm run build`), mas o roteiro completo ponta-a-ponta (abrir um jogo,
-voltar, conferir os quatro pedaços de estado ao mesmo tempo) não foi rodado
-com Playwright nesta sessão — só verificado por leitura do código.
+**Feito em 2026-08-07** (Lote 1 fechou o código; Lote 2, mesma data, rodou o
+roteiro ponta-a-ponta de verdade com Playwright — e achou um bug real). Decisão
+"opção (a)": estado subiu para `App.tsx`.
+
+**Bug achado e corrigido ao testar ao vivo:** a restauração de `scrollTop`
+morava num `useEffect` do `App.tsx` disparado só por `phase`. Esse efeito
+roda **antes** de `AllGamesScreen` buscar os jogos (a chamada é assíncrona) —
+nesse instante a grade ainda não tem altura pra rolar, o navegador zera
+`scrollTop` de volta sozinho, e nada dispara de novo quando os jogos chegam.
+Sem o teste ao vivo isto teria ficado marcado como "implementado" e quebrado
+na prática. Corrigido movendo a restauração pra dentro de `AllGamesScreen`,
+aplicada só depois que `games` deixa de ser `null` (`initialScrollTop` como
+prop, `restoredScrollRef` pra aplicar uma vez só).
 
 **Critério de aceite:**
-- [ ] Estar na página 3 com busca "mario" e filtro "PS1", abrir um jogo e
+- [x] Estar na página 3 com busca "mario" e filtro "PS1", abrir um jogo e
       voltar devolve **exatamente** página 3, busca "mario", filtro "PS1" e a
-      mesma posição de rolagem — implementado (`allGamesView` +
-      `allGamesScrollTop` em `App.tsx`), não verificado ponta-a-ponta nesta
-      sessão.
+      mesma posição de rolagem. **Verificado ao vivo** (Chromium/Playwright):
+      página+busca+filtro+ordem preservados voltando do detalhe (capturas de
+      tela); rolagem também, depois da correção acima — `scrollTop` de 250px
+      antes de abrir o jogo, 250px depois de voltar.
 - [x] `GET /library/games` passa a devolver os consoles presentes no
       **resultado completo** (respeitando `q`/`favorite`), não na página —
       campo `consoles`, calculado antes do filtro `?platform=` e da

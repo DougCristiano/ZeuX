@@ -1107,7 +1107,7 @@ os dois modos vivem na mesma rota porque a tela por console (`GamesScreen`)
 continua usando o formato simples.
 
 ```bash
-curl "http://127.0.0.1:7777/api/v1/library/games?page=1&page_size=30&q=mario&favorite=true&platform=nes"
+curl "http://127.0.0.1:7777/api/v1/library/games?page=1&page_size=30&q=mario&favorite=true&platform=nes&sort=titulo"
 ```
 
 | Parâmetro | Tipo | Notas |
@@ -1115,6 +1115,7 @@ curl "http://127.0.0.1:7777/api/v1/library/games?page=1&page_size=30&q=mario&fav
 | `q` | string | Filtra por título, sem diferenciar maiúsculas/minúsculas — no SQL, então acha o jogo em qualquer página, não só na carregada (2026-08-04). |
 | `favorite` | `"true"` | Restringe aos jogos favoritados (G4). Qualquer outro valor (incluindo ausente) não filtra. |
 | `platform` | string | **M4** (`docs/sprint-m-plano.md`, 2026-08-07) — filtra por `console_id` exato (ex.: `nes`, não o `short_name` "NES"). Aplicado **depois** do campo `consoles` da resposta ser calculado e **antes** da paginação — "página 2 de PS1" é a segunda página só dos jogos de PS1. Nome deliberadamente diferente de `console_id`: esse parâmetro já troca a rota inteira para o outro modo (lista sem paginar) nesta mesma rota, então reusá-lo para filtrar dentro do modo paginado seria ambíguo. |
+| `sort` | string | **M3** (`docs/sprint-m-plano.md`, decidido pelo Douglas em 2026-08-07) — `recentes` (padrão: jogado mais recentemente primeiro, nunca jogado por último), `titulo` (alfabético, sem diferenciar maiúsculas/minúsculas) ou `tempo_jogado` (soma de `playtime_seconds`, maior primeiro). Valor ausente ou desconhecido cai no padrão sem erro — preferência de tela, não contrato quebrado. **Em português de propósito**, exceção à convenção de enum em inglês do `CLAUDE.md` (mesmo espírito de `level: "otimo"`, registrada lá). |
 | `page` | int | Base 1. Valor inválido ou ausente cai em `1`. |
 | `page_size` | int | Padrão `30` (`defaultLibraryPageSize`), teto `100` (`maxLibraryPageSize`). Valor fora da faixa cai no padrão. |
 

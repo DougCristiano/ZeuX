@@ -674,6 +674,18 @@ só o registro compacto, na ordem em que foram perguntadas.
 
 Mesma honestidade que o D11, o B11 e o L3 já impõem a este roadmap.
 
+**Atualizado em 2026-08-07 (Lote 2):** M1, M2, M3 e M4 já passaram pela parte
+"fechável por sessão de IA" — código pronto e testado ao vivo com
+Chromium/Playwright contra um `zeuxd` real (não só `go test`/`npm run build`),
+biblioteca semeada com 45 ROMs falsas em 2 consoles. O teste ao vivo achou e
+corrigiu um bug real (restauração de rolagem do M4, ver o item no roadmap) —
+prova de que "compila" não é o mesmo que "funciona". Os itens da lista abaixo
+que precisam do Douglas continuam precisando; o que mudou é que a parte
+mecânica de M1/M2/M3 saiu de "não verificado" para "verificado, falta só o
+julgamento visual" — e o M1 especificamente teve a densidade de fileiras
+**medida e não batendo o alvo** (2 fileiras cheias em 1280×800, não 3),
+registrado no próprio item do roadmap.
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
 `go test` e `npm run build`): M4, M5, M6, M9, M12, M13, M15 — e as partes
 mecânicas de M1, M2, M3, M8, M11.

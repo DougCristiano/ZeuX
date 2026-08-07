@@ -1154,6 +1154,23 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		}
 		sort.Strings(consoles)
 
+		// M3 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07):
+		// ?sort= troca a ordenação, substituindo a padrão (por último jogado,
+		// já aplicada acima e que continua sendo o comportamento do modo por
+		// console, sem UI de ordenação). Valores em português de propósito —
+		// exceção registrada no CLAUDE.md. Valor vazio ou desconhecido cai no
+		// padrão sem erro: é preferência de tela, não contrato quebrado.
+		switch r.URL.Query().Get("sort") {
+		case "titulo":
+			sort.SliceStable(result, func(i, j int) bool {
+				return strings.ToLower(result[i].Title) < strings.ToLower(result[j].Title)
+			})
+		case "tempo_jogado":
+			sort.SliceStable(result, func(i, j int) bool {
+				return result[i].PlaytimeSeconds > result[j].PlaytimeSeconds
+			})
+		}
+
 		// ?platform=<console_id> filtra o modo "todos os jogos" a um único
 		// console, antes de paginar — em Go, não em SQL: ListAllGames já
 		// devolve a lista inteira em memória (comentário na própria função:
