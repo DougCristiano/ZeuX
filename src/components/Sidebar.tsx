@@ -32,9 +32,12 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
   },
   {
     id: "verdict",
-    // "ESP" (2026-08-04, a pedido do Douglas) — o label.slice(0,3) abaixo já
-    // deriva a sigla certa a partir do nome completo, sem precisar de um
-    // campo de sigla separado.
+    // Sigla "ESP" derivada por slice(0,3) existiu aqui entre 2026-08-04 e
+    // 2026-08-07 (M13, docs/sprint-m-plano.md) — revertida porque não
+    // comunicava nada ("ESP" não lê como "Especificações") e "CON" (item
+    // abaixo teria a mesma sigla que a própria palavra "console", onipresente
+    // nesta tela). A sidebar agora expande no hover/foco e mostra o `label`
+    // completo em vez de qualquer sigla.
     label: "Especificações",
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
@@ -81,36 +84,72 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
  * library, games) — pastas por console e jogos de um console são
  * sub-telas alcançadas de dentro da Biblioteca, não itens de sidebar
  * próprios (decisão de produto do plano).
+ *
+ * M13 (docs/sprint-m-plano.md, 2026-08-07, decidido pelo Douglas: "rail que
+ * expande"): recolhida, mostra só o ícone (`w-16`, a mesma largura de
+ * sempre); no hover **ou** foco de teclado/gamepad, expande e revela o
+ * `item.label` inteiro — nada de sigla derivada em nenhum dos dois estados
+ * (ADR 0009, "nenhuma ação existe apenas em hover": o painel expandido
+ * também abre por `:focus-within`, então quem navega só por teclado/D-pad
+ * chega ao mesmo texto completo que quem usa mouse).
+ *
+ * A expansão é `position: absolute`, sobreposta ao conteúdo — **nunca**
+ * `position: static` empurrando `<main>`. É o mesmo risco de refluxo que o
+ * `CLAUDE.md` já registra para breakpoints: se a sidebar expandida mudasse a
+ * largura real da área de conteúdo (`flex-1` em `App.tsx`), os breakpoints
+ * de coluna da grade (M3/M15) disparariam de novo a cada passada de mouse. O
+ * `<aside>` externo continua `w-16` fixo no fluxo do flexbox — é só o painel
+ * absoluto por dentro que cresce, sem afetar a largura que `<main>` calcula.
  */
 export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) => void }) {
   return (
-    <aside className="flex h-screen w-16 shrink-0 flex-col items-center border-r border-line bg-panel py-5">
-      <div className="mb-7" aria-hidden="true">
-        <img src={logoZeux} alt="" width={36} height={36} className="object-contain" />
-      </div>
+    // `w-16` aqui é o que participa do `flex` de App.tsx — nunca muda. `group`
+    // e `relative` existem só para ancorar e disparar o painel absoluto abaixo.
+    <aside className="group relative h-screen w-16 shrink-0">
+      <div
+        // `w-60`, não `w-48`: medido ao vivo (Playwright) — "Especificações"
+        // (o rótulo mais longo) precisa de ~158px, e o slot do ícone já
+        // consome 64px; `w-48` (192px) cortava as duas palavras mais longas
+        // no meio.
+        className={`absolute inset-y-0 left-0 z-20 flex w-16 flex-col items-center overflow-hidden border-r border-line bg-panel py-5 transition-[width] duration-150 ease-in-out group-hover:w-60 group-hover:shadow-xl group-focus-within:w-60 group-focus-within:shadow-xl`}
+      >
+        <div className="mb-7 shrink-0" aria-hidden="true">
+          <img src={logoZeux} alt="" width={36} height={36} className="object-contain" />
+        </div>
 
-      <nav className="flex w-full flex-1 flex-col" aria-label="Navegação principal">
-        {NAV_ITEMS.map((item) => {
-          const isActive = active === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onNav(item.id)}
-              title={item.label}
-              aria-current={isActive ? "page" : undefined}
-              className={`flex h-[52px] w-full flex-col items-center justify-center gap-1 border-l-2 transition-colors ${FOCUS_RING} ${
-                isActive
-                  ? "border-accent bg-fill text-accent"
-                  : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {item.icon}
-              <span className="font-pixel text-[11px] leading-none tracking-wide">{item.label.slice(0, 3).toUpperCase()}</span>
-            </button>
-          );
-        })}
-      </nav>
+        <nav className="flex w-full flex-1 flex-col" aria-label="Navegação principal">
+          {NAV_ITEMS.map((item) => {
+            const isActive = active === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onNav(item.id)}
+                title={item.label}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex h-[52px] w-full items-center border-l-2 transition-colors ${FOCUS_RING} ${
+                  isActive
+                    ? "border-accent bg-fill text-accent"
+                    : "border-transparent text-muted hover:text-ink"
+                }`}
+              >
+                {/* Slot de largura fixa igual à sidebar recolhida (`w-16`) —
+                    o ícone nunca muda de posição horizontal entre os dois
+                    estados, só o texto aparece ao lado quando expande. */}
+                <span className="flex w-16 shrink-0 items-center justify-center">{item.icon}</span>
+                {/* `max-w`/`opacity`, não `hidden`: precisa transicionar
+                    suavemente (mesmo padrão de duração de `GameCover`), e
+                    `width: auto` não anima em CSS — a técnica de "chutar" um
+                    teto de largura maior que qualquer rótulo real é o jeito
+                    padrão de contornar isso. */}
+                <span className="max-w-0 overflow-hidden font-pixel text-[11px] whitespace-nowrap tracking-wide opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[176px] group-hover:opacity-100 group-focus-within:max-w-[176px] group-focus-within:opacity-100">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
     </aside>
   );
 }

@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **9** | M1–M15. **Atualizado 2026-08-07** (Lote 9, testado ao vivo com Chromium/Playwright): **M5, M8, M9, M10, M11 e M12 fechados** (todo checkbox do critério marcado — M12 deu skeleton de carregamento, painel de biblioteca vazia com ação principal, e contagem total no cabeçalho a `AllGamesScreen`; testado ao vivo atrasando a rede pra capturar o skeleton, removendo/restaurando as pastas configuradas pra capturar o painel vazio, e uma busca sem resultado pra confirmar que os três estados continuam distintos). M1/M2/M3/M4/M6/M7/M10/M11 com código pronto e a maior parte do critério verificado ao vivo, cada um ainda com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M13–M15 sem começar |
+| **Sprint M (v1.0)** | **8** | M1–M15. **Atualizado 2026-08-07** (Lote 10, testado ao vivo com Chromium/Playwright): **M5, M8, M9, M10, M11, M12 e M13 fechados** (todo checkbox do critério marcado — M13 trocou a sigla derivada por `slice(0,3)` por um rail que expande no hover/foco de teclado, medido ao vivo que `<main>` nunca reflui: `boundingClientRect` idêntico recolhida/expandida/focada; achado e corrigido durante o teste — a largura inicial do painel cortava os dois rótulos mais longos, ajustada depois de medir `scrollWidth` de cada um). M1/M2/M3/M4/M6/M7/M10/M11 com código pronto e a maior parte do critério verificado ao vivo, cada um ainda com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M14–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -3174,7 +3174,7 @@ e recarregando, apareceu o painel centralizado com "Nenhum jogo na biblioteca
 ainda." + botão "Escolher pasta com meus jogos", que ao clicar navegou de
 fato para a tela `Biblioteca` — não só descreveu a ação.
 
-### M13 — Rótulos da sidebar derivados por `slice(0, 3)` (P)
+### M13 — Rótulos da sidebar derivados por `slice(0, 3)` (P) — **feito em 2026-08-07**
 
 `Sidebar.tsx:109` faz `item.label.slice(0, 3).toUpperCase()`, produzindo
 "BIB", "EMU", "ESP", "CON". "ESP" não comunica "Especificações" e "CON" lê
@@ -3186,17 +3186,35 @@ comentário de `Sidebar.tsx:35-37` registra que a sigla derivada foi escolha de
 escrita à mão).
 
 **Critério de aceite:**
-- [ ] Nenhum rótulo de navegação é derivado por `slice` — o rail expande no
-      hover/foco mostrando o nome inteiro.
-- [ ] O rail expande também no **foco de teclado/gamepad**, não só no hover
-      (ADR 0009: nada só-hover).
-- [ ] A sidebar continua `w-16` no estado normal (é chrome de navegação, a
+- [x] Nenhum rótulo de navegação é derivado por `slice` — o rail expande no
+      hover/foco mostrando o nome inteiro. `slice(0, 3).toUpperCase()`
+      removido; sem sigla em nenhum dos dois estados (recolhida mostra só o
+      ícone).
+- [x] O rail expande também no **foco de teclado/gamepad**, não só no hover
+      (ADR 0009: nada só-hover) — `group-focus-within` ao lado de
+      `group-hover`, testado ao vivo via `Tab` real.
+- [x] A sidebar continua `w-16` no estado normal (é chrome de navegação, a
       exceção de largura fixa já registrada no `CLAUDE.md`), a expansão é
       sobreposta ao conteúdo (não empurra `<main>`), e a área de conteúdo não
-      muda de largura de forma que reflua a grade a cada passada de mouse.
+      muda de largura de forma que reflua a grade a cada passada de mouse. O
+      `<aside>` externo (o que participa do `flex` de `App.tsx`) nunca muda
+      de largura — só um painel `position: absolute` por dentro dele cresce.
+      Medido ao vivo: `<main>` ficou em `x=64, width=1216` idêntico antes,
+      durante o hover e durante o foco de teclado.
 
 **Depende de:** nada
 **Bloqueia:** nada
+
+**Testado ao vivo** (Chromium/Playwright): `boundingClientRect` de `<main>`
+capturado nos três momentos (recolhida, hover, foco de teclado via `Tab`
+real) — os três batem exatamente (`x: 64, width: 1216`), confirmando que a
+expansão nunca reflui a grade. **Achado ao testar, corrigido antes de
+publicar:** a primeira largura escolhida para o painel expandido (`w-48`,
+192px) cortava "Especificações" e "Configurações" no meio — medi a largura
+real que cada rótulo precisa (`scrollWidth`, até 158px) e ajustei o painel
+para `w-60` (240px, sobra pro slot do ícone de 64px + o rótulo mais longo);
+reconferido depois: `clientWidth === scrollWidth` nos quatro rótulos, nenhum
+cortado.
 
 ### M14 — Nada na tela diz quais botões do controle fazem o quê (P)
 

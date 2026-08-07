@@ -787,6 +787,27 @@ requisição nova. Testado ao vivo os três estados: skeleton (atrasando
 idêntico ao anterior), e busca sem resultado (confirmando que continua texto
 simples, não o painel, e que os três não colapsaram num só).
 
+**Atualizado em 2026-08-07 (Lote 10): M13 fechou** — zero checkbox aberto.
+`Sidebar.tsx`: `<aside>` externo continua `w-16` fixo no `flex` de `App.tsx`
+(nunca muda, é o que garante que `<main>` não reflui); por dentro, um painel
+`position: absolute` cresce para `w-60` no `group-hover`/`group-focus-within`
+e revela `item.label` por inteiro ao lado do ícone (slot de largura fixa
+`w-16`, o ícone nunca muda de posição horizontal entre os dois estados). A
+sigla `slice(0,3).toUpperCase()` foi removida — recolhida mostra só o ícone,
+sem sigla nenhuma. Comentário de `:35-37` (o que registrava a escolha da
+sigla) reescrito pra registrar por que foi revertida, como o passo 5 do plano
+pedia.
+
+Testado ao vivo: `boundingClientRect` de `<main>` capturado recolhida,
+durante hover e durante foco de teclado real (`Tab`) — os três batem
+idênticos (`x: 64, width: 1216`), confirmando que a expansão nunca empurra o
+conteúdo. **Achado ao testar:** a primeira largura do painel (`w-48`, 192px)
+cortava "Especificações" e "Configurações" no meio — `scrollWidth` medido ao
+vivo mostrou que o rótulo mais longo precisa de 158px, e o slot do ícone já
+consome 64px dos 192px disponíveis. Corrigido para `w-60` (240px) antes de
+publicar; reconferido depois, `clientWidth === scrollWidth` nos quatro
+rótulos.
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
 `go test` e `npm run build`): M4, M5, M6, M8, M9, M10, M11, M12, M13, M15 — e
 as partes mecânicas de M1, M2, M3.
