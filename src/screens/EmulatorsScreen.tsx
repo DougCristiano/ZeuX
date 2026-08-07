@@ -10,7 +10,7 @@ import type {
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
-import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar } from "../components/ui";
+import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, ErrorModal, Pagination, ProgressBar } from "../components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
@@ -724,7 +724,15 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
         )}
       </div>
 
-      {error && <p className="text-base text-danger">{error}</p>}
+      {/* Falha ao listar os emuladores é erro de tela inteira (nada renderiza
+          sem essa lista) — vira modal, não parágrafo vermelho solto no topo
+          (mesmo achado do Douglas em GamesScreen/AllGamesScreen,
+          2026-08-07). Os erros por card (instalar/remover/abrir pasta de
+          BIOS, em EmulatorCardActions/EmulatorCardBios abaixo) continuam
+          inline, de propósito: aparecem dentro do próprio card cuja ação
+          falhou, ao lado do botão que a disparou — diferente do erro que
+          motivou a troca, que ficava longe da célula que o causou. */}
+      {error && <ErrorModal title="Não foi possível listar os emuladores" message={error} onClose={() => setError(null)} />}
 
       {emulators && filtered.length === 0 && (
         <p className="text-base text-muted">Nenhum emulador encontrado para "{search}".</p>

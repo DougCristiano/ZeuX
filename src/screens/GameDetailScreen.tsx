@@ -146,7 +146,17 @@ export function GameDetailScreen({
 
   return (
     <div className="mx-auto max-w-4xl px-6 pt-16 pb-10">
-      {launchError && <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={clearLaunchError} />}
+      {/* A contagem de sessões falhar não impede o resto da tela de
+          funcionar — mas o texto vermelho solto dentro do card de
+          estatísticas era fácil de perder (mesmo achado do Douglas em
+          GamesScreen/AllGamesScreen, 2026-08-07). `favoriteError`/
+          `coverError` continuam inline, de propósito: aparecem colados no
+          botão que falhou (favoritar, buscar capa), não soltos pela tela. */}
+      {launchError ? (
+        <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={clearLaunchError} />
+      ) : (
+        error && <ErrorModal title="Não foi possível ler as estatísticas" message={error} onClose={() => setError(null)} />
+      )}
 
       <Button variant="secondary" onClick={onBack} className="mb-4">
         Voltar
@@ -196,7 +206,6 @@ export function GameDetailScreen({
 
       <Card className="mt-6">
         <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Suas estatísticas</h2>
-        {error && <p className="text-sm text-danger">{error}</p>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs text-muted">Tempo jogado</p>

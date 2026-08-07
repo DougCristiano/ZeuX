@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { BulkMatchedFolder, LibraryFolder, LibraryGame, Report } from "../api/types";
-import { Badge, Button, Callout, Card, Pagination } from "../components/ui";
+import { Badge, Button, Callout, Card, ErrorModal, Pagination } from "../components/ui";
 
 type ConsoleInfo = { console_id: string; name: string; short_name: string };
 
@@ -325,7 +325,13 @@ export function LibraryScreen({
         className={`mb-4 ${inputClass}`}
       />
 
-      {error && <p className="text-base text-danger">{error}</p>}
+      {/* Falha ao listar as pastas é erro de tela inteira (nada renderiza
+          sem essa lista) — vira modal, não parágrafo vermelho solto (mesmo
+          achado do Douglas em GamesScreen/AllGamesScreen, 2026-08-07). Os
+          erros por card (BulkFolderPicker, ConsoleLibraryCard, acima)
+          continuam inline: aparecem dentro do próprio card cuja ação
+          falhou. */}
+      {error && <ErrorModal title="Não foi possível listar as pastas" message={error} onClose={() => setError(null)} />}
 
       {folders && (
         <div className="flex flex-col gap-4">
