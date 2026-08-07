@@ -22,12 +22,17 @@ export type LaunchStatus =
 export function useLaunchGame() {
   const [statusByGameId, setStatusByGameId] = useState<Record<number, LaunchStatus>>({});
   const [launchError, setLaunchError] = useState<string | null>(null);
+  // Guardado só para o "Tentar de novo" do ErrorModal (M1,
+  // docs/sprint-m-plano.md) — sem isto o botão não saberia qual jogo
+  // relançar, já que o erro em si (`launchError`) não carrega o jogo.
+  const [lastGame, setLastGame] = useState<LibraryGame | null>(null);
 
   function statusFor(gameId: number): LaunchStatus {
     return statusByGameId[gameId] ?? { kind: "idle" };
   }
 
   async function launch(game: LibraryGame) {
+    setLastGame(game);
     setStatusByGameId((prev) => ({ ...prev, [game.id]: { kind: "launching" } }));
     try {
       await api.launch({ rom_path: game.path, console_id: game.console_id });
@@ -40,5 +45,17 @@ export function useLaunchGame() {
     }
   }
 
-  return { statusFor, launch, launchError, clearLaunchError: () => setLaunchError(null) };
+  // Relança o mesmo jogo da última tentativa, sem o chamador precisar
+  // guardar o `LibraryGame` por conta própria.
+  function retryLaunch() {
+    if (lastGame) launch(lastGame);
+  }
+
+  return {
+    statusFor,
+    launch,
+    launchError,
+    clearLaunchError: () => setLaunchError(null),
+    retryLaunch,
+  };
 }

@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **15** | M1–M15 — nenhum começado |
+| **Sprint M (v1.0)** | **15** | M1–M15. **Atualizado 2026-08-07** (Lote 1, decisões todas tomadas): M1/M2/M4/M7 com código pronto (`go test`/`npm run build` verdes), cada um com 1-2 checkboxes que só o Douglas fecha (janela real do Tauri ou julgamento visual) — por isso continuam contando como abertos pelo método desta tabela. M3/M5/M6/M8-M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -2508,7 +2508,7 @@ motivo que o Douglas já apontou: implementar sinal de "não vai abrir",
 enquadramento de capa e skeleton em duas telas separadas é retrabalho
 garantido.
 
-### M1 — O overlay ▶ não lança, e o botão embaixo do tile custa densidade (M)
+### M1 — O overlay ▶ não lança, e o botão embaixo do tile custa densidade (M) — **feito em 2026-08-07, com ressalvas**
 
 O ícone ▶ que aparece no hover/foco da capa (`ui.tsx:225-243`) é decorativo:
 a div é `pointer-events-none`, e o clique cai no `<button>` de baixo, que
@@ -2518,20 +2518,35 @@ embaixo de cada tile (`AllGamesScreen.tsx:310-316`), que rouba altura de toda
 fileira e cria um segundo alvo focável por jogo. O usuário aprende que ▶
 mente.
 
+**Feito em 2026-08-07** (Lote 1 da Sprint M — código verificado por
+`go test ./...`/`npm run build`; os dois itens marcados com ressalva abaixo
+precisam do Douglas na janela real do Tauri, nenhuma sessão de IA tem como
+medir isso):
+
 **Critério de aceite:**
-- [ ] Clicar no ▶ do overlay chama `launch(game)` (o mesmo `useLaunchGame` de
+- [x] Clicar no ▶ do overlay chama `launch(game)` (o mesmo `useLaunchGame` de
       hoje) e não `onOpenGame` — o overlay vira `<button>` de verdade, com
       `aria-label` nomeando o jogo, em vez de div `pointer-events-none`.
-- [ ] Clicar na capa fora do ▶ continua abrindo `GameDetailScreen`.
-- [ ] O `<Button variant="primary">Jogar</Button>` sai da célula da grade:
-      `grep -n "Jogar" src/screens/AllGamesScreen.tsx` só acha o overlay e seu
-      rótulo acessível.
+- [x] Clicar na capa fora do ▶ continua abrindo `GameDetailScreen`.
+- [x] O `<Button variant="primary">Jogar</Button>` sai da célula da grade —
+      **o overlay virou parte de `GameCover` (`src/components/ui.tsx`), não
+      mais inline em `AllGamesScreen.tsx`** (decisão de arquitetura: é o
+      componente que o M5 vai reusar em `GamesScreen`), então o `grep` do
+      critério original mudou de arquivo:
+      `grep -rn "Jogar" src/screens/AllGamesScreen.tsx src/components/ui.tsx`
+      só acha o `aria-label` do overlay e um comentário, nenhum botão visível
+      de "Jogar".
 - [ ] Na janela padrão (1280×800, `src-tauri/tauri.conf.json`) com 30 jogos,
-      **pelo menos 3 fileiras de capa ficam visíveis sem rolar** — o número
-      medido depois fica escrito aqui, contra o ~1,7 de hoje.
+      **pelo menos 3 fileiras de capa ficam visíveis sem rolar** — não medido
+      nesta sessão (precisa da janela real do Tauri, não só do build; número
+      fica pendente aqui).
 - [ ] Navegando só por D-pad/Tab, ir do primeiro jogo de uma fileira ao
-      primeiro da fileira seguinte custa **1** movimento vertical, não 2.
-- [ ] O caminho de erro não some junto com o botão: o `ErrorModal` ganha um
+      primeiro da fileira seguinte custa **1** movimento vertical, não 2 — o
+      código foi desenhado para isto (overlay com `tabIndex={-1}`, único alvo
+      focável por tile é o wrapper que abre o detalhe; ver comentário em
+      `GameCover`), mas não foi verificado com Playwright/controle físico
+      nesta sessão.
+- [x] O caminho de erro não some junto com o botão: o `ErrorModal` ganha um
       botão "Tentar de novo" (decidido em 2026-08-07 — não basta reaproveitar
       o clique no ▶), que relança o mesmo jogo sem fechar a tela nem
       recarregar a grade.
@@ -2539,7 +2554,7 @@ mente.
 **Depende de:** nada
 **Bloqueia:** M5 (o tile unificado precisa nascer com este comportamento), M3
 
-### M2 — Foco mais fraco que hover: regra de `@layer` e seletor morto (P)
+### M2 — Foco mais fraco que hover: regra de `@layer` e seletor morto (P) — **feito em 2026-08-07, com ressalva**
 
 Dois bugs no mesmo lugar, os dois confirmados no código:
 
@@ -2562,15 +2577,26 @@ glow de borda é regra CSS solta e continua quebrado. Num app que quer ser
 jogável no controle (ADR 0014), foco ser o estado mais fraco da tela é o
 avesso do que foi decidido.
 
+**Feito em 2026-08-07** (Lote 1 da Sprint M) — a correção **(b)** do plano
+(`sprint-m-plano.md`): border-color e box-shadow saíram do CSS solto e viraram
+utilities do Tailwind direto em `GameCover` (`hover:`/`group-focus-visible:`
+com `var(--console-accent, var(--accent))`), removendo as duas regras
+quebradas de `index.css` — mas **as duas primeiras linhas abaixo continuam
+pendentes do Douglas**, é julgamento visual que nenhuma sessão de IA faz:
+
 **Critério de aceite:**
 - [ ] Um jogo de PS1 e um de SNES lado a lado mostram, no hover, **duas cores
-      de borda diferentes** (as de `consoleAccentColor`), não o mesmo roxo.
+      de borda diferentes** (as de `consoleAccentColor`), não o mesmo roxo —
+      o código já usa a cor certa (`var(--console-accent, ...)` em vez de
+      `var(--accent)` fixo), falta o Douglas confirmar na tela.
 - [ ] O glow aparece no foco de teclado/gamepad com a mesma intensidade do
       hover, com o mouse fora da janela — distinguível numa captura de tela.
-- [ ] `grep -n "focus-visible" src/index.css` não deixa nenhum seletor
-      apontando para elemento não focável.
-- [ ] A correção não reintroduz cor fixa por card em `style` inline (o motivo
-      de a regra ter virado classe CSS em 2026-08-04 continua valendo).
+- [x] `grep -n "focus-visible" src/index.css` não deixa nenhum seletor
+      apontando para elemento não focável — a regra inteira (`:hover`/
+      `:focus-visible`) saiu do CSS.
+- [x] A correção não reintroduz cor fixa por card em `style` inline (o motivo
+      de a regra ter virado classe CSS em 2026-08-04 continua valendo) — a
+      cor ainda entra via `--console-accent` (CSS var), nunca hex cru.
 
 **Depende de:** nada
 **Bloqueia:** nada formalmente — mas M1 e M5 reescrevem o mesmo componente,
@@ -2630,7 +2656,7 @@ plano recomendava.
 detalhe reseta tudo — a barra pareceria quebrada)
 **Bloqueia:** nada
 
-### M4 — Voltar do detalhe perde tudo, e os chips de plataforma mentem (M)
+### M4 — Voltar do detalhe perde tudo, e os chips de plataforma mentem (M) — **feito em 2026-08-07, com ressalva**
 
 `App.tsx` renderiza uma tela por `phase` num `switch` (`App.tsx:240-264`):
 abrir um jogo **desmonta** `AllGamesScreen`, e voltar remonta com `page=1`,
@@ -2644,22 +2670,35 @@ filtro ao virar a página. O `docstring` da tela já admite isso desde
 2026-08-04; virou item porque um filtro que muda de opções sozinho é um filtro
 que mente.
 
+**Feito em 2026-08-07** (Lote 1 da Sprint M — decisão "opção (a)": estado subiu
+para `App.tsx`). Metade servidor coberta por teste automatizado
+(`TestLibraryGamesFilterByPlatformAndConsolesField`,
+`go test ./internal/api` verde); metade cliente compila
+(`npm run build`), mas o roteiro completo ponta-a-ponta (abrir um jogo,
+voltar, conferir os quatro pedaços de estado ao mesmo tempo) não foi rodado
+com Playwright nesta sessão — só verificado por leitura do código.
+
 **Critério de aceite:**
 - [ ] Estar na página 3 com busca "mario" e filtro "PS1", abrir um jogo e
       voltar devolve **exatamente** página 3, busca "mario", filtro "PS1" e a
-      mesma posição de rolagem.
-- [ ] `GET /library/games` passa a devolver os consoles presentes no
-      **resultado completo** (respeitando `q`/`favorite`), não na página — o
-      handler já tem `result` inteiro em mãos antes de fatiar
-      (`server.go:1153-1163`), o campo sai de lá.
-- [ ] `AllGamesScreen` consome esse campo e apaga `platformsOnPage`
-      (`AllGamesScreen.tsx:162`); o `setPlatformFilter(null)` de cada
-      `loadGames` (`:84`) deixa de existir.
-- [ ] O filtro de plataforma é aplicado no servidor (mesmo caminho de `?q=` e
-      `?favorite=`), de modo que "PS1, página 2" seja a segunda página **de
-      jogos de PS1**, e não a segunda página do acervo filtrada depois.
-- [ ] Teste em `internal/api/library_test.go` cobrindo o campo novo e o filtro
-      por console combinado com paginação.
+      mesma posição de rolagem — implementado (`allGamesView` +
+      `allGamesScrollTop` em `App.tsx`), não verificado ponta-a-ponta nesta
+      sessão.
+- [x] `GET /library/games` passa a devolver os consoles presentes no
+      **resultado completo** (respeitando `q`/`favorite`), não na página —
+      campo `consoles`, calculado antes do filtro `?platform=` e da
+      paginação (`handleListLibraryGames`, `internal/api/server.go`).
+- [x] `AllGamesScreen` consome esse campo e apaga `platformsOnPage`; não
+      reseta mais o filtro de plataforma a cada carregamento de página (só
+      quando busca/favoritos mudam, ou quando o console filtrado deixa de
+      existir no resultado).
+- [x] O filtro de plataforma é aplicado no servidor via `?platform=` (nome
+      diferente de `console_id` de propósito — esse já troca a rota para o
+      modo por console sem paginação; ver docs/api.md), de modo que "PS1,
+      página 2" é a segunda página **de jogos de PS1**.
+- [x] Teste em `internal/api/library_test.go`
+      (`TestLibraryGamesFilterByPlatformAndConsolesField`) cobrindo o campo
+      `consoles` e o filtro por console combinado com paginação.
 
 **Depende de:** nada
 **Bloqueia:** M3
@@ -2737,7 +2776,7 @@ detalhe seria prometer o que a API não faz.
 **Depende de:** nada
 **Bloqueia:** nada
 
-### M7 — Pixel font abaixo do piso, e título duplicado sobre a capa (P)
+### M7 — Pixel font abaixo do piso, e título duplicado sobre a capa (P) — **feito em 2026-08-07, com ressalva**
 
 `src/index.css:120-127` documenta o piso da fonte pixel: **nada abaixo de
 11px**. Duas violações, as duas em `ui.tsx`: badge de plataforma em `9px`
@@ -2748,16 +2787,23 @@ fica **duplicado** quando existe capa real: uma vez sobre a imagem, outra
 embaixo em Inter (`AllGamesScreen.tsx:300-302`). Nenhum launcher grande faz
 isso: a arte já traz o logotipo do jogo.
 
+**Feito em 2026-08-07** (Lote 1 da Sprint M) — badge de plataforma e
+`ConsoleIcon` foram para `11px`; falta o Douglas confirmar que o badge maior
+ficou legível de verdade sobre a capa (ele já avisou que pode ajustar depois
+se não ficar bom).
+
 **Critério de aceite:**
-- [ ] `grep -rn "font-pixel" src --include="*.tsx"` não acha nenhum
-      `text-[Npx]` com N < 11.
-- [ ] Com `coverUrl` presente, o título **não** é desenhado sobre a arte —
+- [x] `grep -rn "font-pixel" src --include="*.tsx"` não acha nenhum
+      `text-[Npx]` com N < 11 — só `text-[11px]` sobrevive.
+- [x] Com `coverUrl` presente, o título **não** é desenhado sobre a arte —
       fica só o rótulo em Inter embaixo, com `line-clamp-2`.
-- [ ] Sem capa, o título continua sobre o placeholder (a "capa de texto" é o
+- [x] Sem capa, o título continua sobre o placeholder (a "capa de texto" é o
       único dado real que existe ali), com truncamento que impede mais de 3
-      linhas.
-- [ ] A fonte pixel segue restrita a chrome (sidebar, chips, títulos de
-      seção), como `index.css:120-127` já manda.
+      linhas (`line-clamp-3`).
+- [x] A fonte pixel segue restrita a chrome (sidebar, chips, títulos de
+      seção), como `index.css:120-127` já manda — nada novo passou a usá-la.
+- [ ] **Precisa do Douglas:** o badge de `11px` (~20% maior que antes) ficou
+      legível sobre a capa sem atrapalhar a leitura da arte.
 
 **Depende de:** nada
 **Bloqueia:** nada

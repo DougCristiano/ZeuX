@@ -125,8 +125,25 @@ export function PartialNotice({ children }: { children: ReactNode }) {
  * `ConsoleInfoModal` duplicava por conta própria. Conteúdo (título,
  * mensagem, botão) continua usando o `Button` do ZeuX, não o do shadcn — a
  * identidade visual das ações não muda.
+ *
+ * `onRetry` (M1, docs/sprint-m-plano.md, decidido pelo Douglas em
+ * 2026-08-07): com o botão "Jogar" saindo da célula da grade em
+ * `AllGamesScreen`, o jeito de tentar de novo depois de uma falha deixou de
+ * ser "clicar o botão embaixo do tile de novo" — vira este botão aqui. Opcional
+ * porque `GameDetailScreen` continua usando `ErrorModal` sem retry embutido
+ * (o botão "▶ Jogar" da própria tela já cumpre esse papel).
  */
-export function ErrorModal({ title, message, onClose }: { title: string; message: string; onClose: () => void }) {
+export function ErrorModal({
+  title,
+  message,
+  onClose,
+  onRetry,
+}: {
+  title: string;
+  message: string;
+  onClose: () => void;
+  onRetry?: () => void;
+}) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -135,9 +152,14 @@ export function ErrorModal({ title, message, onClose }: { title: string; message
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-danger">{title}</DialogTitle>
         <p className="text-base text-ink">{message}</p>
-        <div className="mt-4 flex justify-end">
-          <Button variant="primary" autoFocus onClick={onClose}>
-            Entendi
+        <div className="mt-4 flex justify-end gap-2">
+          {onRetry && (
+            <Button variant="secondary" onClick={onClose}>
+              Fechar
+            </Button>
+          )}
+          <Button variant="primary" autoFocus onClick={onRetry ?? onClose}>
+            {onRetry ? "Tentar de novo" : "Entendi"}
           </Button>
         </div>
       </DialogContent>
@@ -167,6 +189,7 @@ export function GameCover({
   consoleId,
   size = "md",
   showPlayOverlay = false,
+  onPlay,
   coverUrl,
   className = "",
 }: {
@@ -178,6 +201,13 @@ export function GameCover({
   size?: "md" | "lg";
   /** Mostra um ícone de play sobreposto no hover/foco (ex.: card clicável que lança direto). */
   showPlayOverlay?: boolean;
+  /**
+   * M1 (docs/sprint-m-plano.md): sem `onPlay`, o overlay continua
+   * decorativo (`pointer-events-none`) — é o caso de `GameDetailScreen`,
+   * onde um segundo botão de jogar dentro da capa não faz sentido. Com
+   * `onPlay`, o overlay vira um `<button>` de verdade que lança o jogo.
+   */
+  onPlay?: () => void;
   /** Preparado para o futuro — nenhuma tela passa isto ainda. */
   coverUrl?: string;
   className?: string;
@@ -188,11 +218,17 @@ export function GameCover({
   return (
     <div
       style={accentVars}
-      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border bg-fill transition-colors ${
-        accent
-          ? "border-line-strong hover:border-[var(--console-accent)] focus-within:border-[var(--console-accent)]"
-          : "border-line-strong"
-      } ${className}`}
+      // M2 (docs/sprint-m-plano.md): borda e glow no hover/foco vivem aqui,
+      // não em CSS solto — evita o bug de cascade layer que fazia o glow
+      // nunca usar --console-accent (ver comentário em src/index.css).
+      // `var(--console-accent, var(--accent))` funciona com ou sem
+      // `consoleId`: cai no roxo genérico quando não há cor de console.
+      // `group-focus-visible`, não `focus-within`: quem recebe foco de
+      // teclado/gamepad é o `<button>` ancestral (quando existe um — ver
+      // AllGamesScreen.tsx), nunca esta div; `group-focus-visible` cascateia
+      // por qualquer ancestral `.group` com foco visível, `focus-within`
+      // olharia só para dentro desta div e nunca dispararia.
+      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border border-line-strong bg-fill transition-[border-color,box-shadow] duration-150 ease-in-out hover:border-[var(--console-accent,var(--accent))] group-focus-visible:border-[var(--console-accent,var(--accent))] hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] ${className}`}
     >
       {coverUrl ? (
         <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -211,36 +247,80 @@ export function GameCover({
 
       {/* Badge de plataforma (2026-08-05) — cor de identidade do console,
           não estado. Substitui a repetição da sigla que existia no centro E
-          no rodapé antes do título entrar aqui. */}
+          no rodapé antes do título entrar aqui.
+          M7 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07):
+          9px → 11px — o piso da fonte pixel (src/index.css, "nada abaixo de
+          11px"). Fica ~20% maior sobre a capa; "podemos alterar depois se
+          não ficar bom" foi a condição do próprio Douglas. */}
       <span
-        className="pointer-events-none absolute top-1.5 left-1.5 rounded-sm border px-1.5 py-0.5 font-pixel text-[9px]"
+        className="pointer-events-none absolute top-1.5 left-1.5 rounded-sm border px-1.5 py-0.5 font-pixel text-[11px]"
         style={{ borderColor: accent ?? "var(--line-strong)", color: accent ?? "var(--muted)", background: "rgba(0,0,0,0.7)" }}
       >
         {label}
       </span>
 
-      <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 font-pixel text-[11px] text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
-        {title ?? label}
-      </div>
-      {showPlayOverlay && (
-        // Escurecimento mais forte (J4, docs/roadmap.md — referência real do
-        // Playnite em docs/referencias-playnite.md: overlay de hover em
-        // `#AA000000`, ~67% opaco, mais forte que o glow de borda que o ZeuX
-        // já tinha) — o placeholder de sigla continua legível por baixo.
-        <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/60 group-hover:flex group-focus-visible:flex">
-          <div
-            className={`flex h-11 w-11 items-center justify-center rounded-full border-2 ${
-              accent
-                ? "border-[var(--console-accent)] shadow-[0_0_16px_var(--console-accent)]"
-                : "border-accent shadow-[0_0_16px_var(--accent)]"
-            }`}
-          >
+      {/* M7: título sobre a arte só quando NÃO há capa real — com capa, ele
+          duplicava o rótulo em Inter que AllGamesScreen já desenha embaixo
+          do tile (um title longo, sem truncamento, ainda subia sobre a
+          arte). `line-clamp-3` deixa a "capa de texto" (placeholder de
+          sigla) legível sem estourar a célula. */}
+      {!coverUrl && (
+        <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 line-clamp-3 font-pixel text-[11px] text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
+          {title ?? label}
+        </div>
+      )}
+      {showPlayOverlay &&
+        (() => {
+          const circleClass = `flex h-11 w-11 items-center justify-center rounded-full border-2 ${
+            accent
+              ? "border-[var(--console-accent)] shadow-[0_0_16px_var(--console-accent)]"
+              : "border-accent shadow-[0_0_16px_var(--accent)]"
+          }`;
+          const icon = (
             <svg width="14" height="16" viewBox="0 0 14 16" fill={accent ?? "var(--accent)"} aria-hidden="true">
               <path d="M0 0 L14 8 L0 16 Z" />
             </svg>
-          </div>
-        </div>
-      )}
+          );
+          return (
+            // Escurecimento mais forte (J4, docs/roadmap.md — referência real
+            // do Playnite em docs/referencias-playnite.md: overlay de hover em
+            // `#AA000000`, ~67% opaco, mais forte que o glow de borda que o
+            // ZeuX já tinha) — o placeholder de sigla continua legível por
+            // baixo. O wrapper continua `pointer-events-none`: só o círculo
+            // (quando `onPlay` existe) reativa clique, o resto da capa
+            // continua abrindo o detalhe por baixo (M1).
+            <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/60 group-hover:flex group-focus-visible:flex">
+              {onPlay ? (
+                // M1 (docs/sprint-m-plano.md): botão real, não mais
+                // decorativo. `tabIndex={-1}` tira este botão da ordem
+                // sequencial de Tab e — como ele fica sobreposto ao centro
+                // exato do wrapper focável (AllGamesScreen.tsx) — nenhuma
+                // direção do D-pad o alcançaria mesmo sem isso
+                // (`findNextFocus` exige distância estritamente positiva na
+                // direção pressionada). É assim que o critério "1 movimento
+                // por fileira" se sustenta com dois alvos por tile: quem
+                // navega por Tab/D-pad chega ao jogo pelo wrapper (abre o
+                // detalhe) e lança de lá; mouse e leitor de tela em modo de
+                // navegação por elementos continuam alcançando este botão
+                // direto, só não entram nele pela sequência linear de Tab.
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label={`Jogar ${title ?? label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPlay();
+                  }}
+                  className={`pointer-events-auto ${circleClass}`}
+                >
+                  {icon}
+                </button>
+              ) : (
+                <div className={circleClass}>{icon}</div>
+              )}
+            </div>
+          );
+        })()}
     </div>
   );
 }
@@ -406,7 +486,9 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       onClick={onClick}
       title={label}
       style={{ borderColor: `${accent}66`, color: accent }}
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[8px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
+      // M7 (docs/sprint-m-plano.md): 8px violava o piso de 11px da fonte
+      // pixel (src/index.css) — mesma regra do badge de GameCover.
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
       {label.slice(0, 4).toUpperCase()}
     </button>

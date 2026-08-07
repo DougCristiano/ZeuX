@@ -1,10 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import type { LibraryGame } from "./api/types";
-import { AllGamesScreen } from "./screens/AllGamesScreen";
+import { AllGamesScreen, DEFAULT_ALL_GAMES_VIEW, type AllGamesViewState } from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
@@ -72,6 +72,31 @@ function App() {
     shortName: string;
     year?: number;
   } | null>(null);
+
+  // M4 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): página,
+  // busca e filtro de plataforma de AllGamesScreen sobem para cá — a tela em
+  // si não guarda mais esse estado, só o consome. Sem isto, abrir um jogo e
+  // voltar resetava tudo (a tela desmontava no switch de `phase` abaixo).
+  const [allGamesView, setAllGamesView] = useState<AllGamesViewState>(DEFAULT_ALL_GAMES_VIEW);
+  function handleAllGamesViewChange(patch: Partial<AllGamesViewState>) {
+    setAllGamesView((prev) => ({ ...prev, ...patch }));
+  }
+  // Posição de rolagem de "Todos os jogos" — a opção (a) do M4 não preserva
+  // isto de graça (ao contrário de manter a tela sempre montada), por isso o
+  // `ref` + guarda manual: `<main>` (abaixo) sobrevive à troca de `phase`
+  // (mesmo nó do DOM, só o filho `{screen}` muda), mas o conteúdo mais curto
+  // do detalhe encolhe `scrollHeight` e o navegador zera `scrollTop`
+  // sozinho — perdendo a posição quando a grade volta a ser mais alta.
+  const mainRef = useRef<HTMLElement>(null);
+  const [allGamesScrollTop, setAllGamesScrollTop] = useState(0);
+  useEffect(() => {
+    if (phase === "all-games" && mainRef.current) {
+      mainRef.current.scrollTop = allGamesScrollTop;
+    }
+    // Só quando a fase muda para "all-games" — rodar a cada render
+    // sobrescreveria a rolagem do próprio usuário enquanto ele navega ali.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
@@ -242,8 +267,14 @@ function App() {
         <AllGamesScreen
           report={report!}
           onOpenLibrary={() => setPhase("library")}
+          view={allGamesView}
+          onViewChange={handleAllGamesViewChange}
           onOpenGame={(game, consoleName, shortName) => {
             const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
+            // M4: guarda a rolagem antes de trocar de fase — é a última
+            // chance de ler `mainRef.current.scrollTop` com a grade ainda
+            // na tela.
+            setAllGamesScrollTop(mainRef.current?.scrollTop ?? 0);
             setSelectedGame({ game, consoleName, shortName, year });
             setPhase("game-detail");
           }}
@@ -314,7 +345,9 @@ function App() {
     return (
       <div className="flex h-screen">
         <Sidebar active={active} onNav={navigateSidebar} />
-        <main className="flex-1 overflow-y-auto">{screen}</main>
+        <main ref={mainRef} className="flex-1 overflow-y-auto">
+          {screen}
+        </main>
       </div>
     );
   }
