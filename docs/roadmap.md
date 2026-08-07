@@ -5,7 +5,13 @@ Backlog organizado em sprints, derivado do PRD e do estado real do código.
 **Tamanho relativo:** P (poucas horas) · M (alguns dias) · G (uma sprint ou mais).
 Os tamanhos são relativos entre si, não estimativas de calendário.
 
-Última verificação contra o código: 2026-08-07.
+Última verificação contra o código: **2026-08-07 — auditoria de veracidade
+completa**, sprint por sprint, com `go build`/`go vet`/`go test ./...` e
+`npm run build` verdes (Go 1.26.5, compilação cruzada linux/darwin/windows OK).
+Onde um "Feito" não batia com o código, a linha foi corrigida **com nota
+dizendo o que dizia antes e como foi conferido** — as correções estão marcadas
+com a data em cada lugar, não apagadas. A tabela "Quantas faltam" foi
+**recontada item a item** nesta data.
 
 ---
 
@@ -37,9 +43,11 @@ estimativa, não promessa. Isso é uma dívida assumida, não resolvida — ver 
 **Pronto e verificado (Fase 1):**
 
 - Detecção de CPU/RAM (gopsutil) e GPU por SO, com fallback gracioso.
-- Catálogo de 33 consoles (`schema_version 4`, com extensões de arquivo por
-  console desde o L2) e motor de parecer que nomeia
-  gargalos.
+- Catálogo de 33 consoles (`schema_version 5`, com extensões de arquivo por
+  console desde o L2 e `requires_external_file` desde o L3) e motor de parecer
+  que nomeia gargalos. *(Esta linha dizia `schema_version 4` até a auditoria de
+  2026-08-07; o L3 subiu para `5` e a linha não acompanhou — conferido em
+  `internal/verdict/data/consoles.json`.)*
 - Consentimento persistido e versionado, verificado no servidor.
 - 14 adapters de emulador (13 auditados no D1 + `rmg`, adicionado em
   2026-08-03), descoberta de binários, launcher e rastreio de sessão.
@@ -65,21 +73,24 @@ estimativa, não promessa. Isso é uma dívida assumida, não resolvida — ver 
   revogação, versão de política e recuperação de erro (B8) — verificado com
   Chromium contra um `zeuxd` de verdade, não simulação.
 
-**Não existe ainda** (verificado por leitura de código em 2026-08-03):
+**Não existe ainda** (verificado por leitura de código em 2026-08-03, revisado
+na auditoria de 2026-08-07):
 
-- **A Sprint D (biblioteca) está com todo o MVP fechado, exceto D11.** Rotas
-  (L1, L2, L5), tela 04 (L6, apontar pasta) e tela 05 (L7, grid + Jogar +
-  instalar inline + aviso de BIOS — L8/L9 juntos) — todas feitas e verificadas
-  com Playwright contra um `zeuxd` real. O que falta para o ciclo completo
-  não é código: é o D11 (abrir uma ROM real em 3 emuladores), que só o
-  Douglas pode fechar, porque o ZeuX não obtém ROM.
+- ~~**A Sprint D (biblioteca) está com todo o MVP fechado, exceto D11.**~~
+  **Corrigido em 2026-08-07:** o D11 fechou em 2026-08-04 e estas duas linhas
+  ficaram para trás, contradizendo a própria seção de dívida honesta logo
+  abaixo. A Sprint D está fechada inteira — rotas (L1, L2, L5), tela 04 (L6),
+  tela 05 (L7 + L8/L9), tudo verificado com Playwright contra um `zeuxd` real,
+  e o ciclo com ROM de verdade confirmado pelo Douglas no D11.
+- ~~**Nenhum jogo foi aberto de verdade por nenhum emulador.**~~ **Falso desde
+  2026-08-04**, corrigido aqui em 2026-08-07: PS2/PCSX2 e N64/RMG foram
+  abertos até a tela de título pelo Douglas (ver D11). O critério de saída da
+  Sprint A **não** está mais descoberto.
 - **Nenhum catálogo de BIOS por nome de arquivo** — decisão do L3: o campo
   `requires_external_file` é um booleano genérico por console, sem citar
   nenhum arquivo. `grep -ci bios internal/verdict/data/consoles.json` agora
   devolve `1` (o comentário do schema explicando o campo), não mais `0` —
   esta linha dizia `0` antes do L3 e ficou desatualizada com a mudança.
-- **Nenhum jogo foi aberto de verdade por nenhum emulador.** O critério de
-  saída da Sprint A continua descoberto — ver D11.
 - Qualquer funcionalidade social.
 
 A tela de emuladores **existe** (`src/screens/EmulatorsScreen.tsx`, telas 06/07
@@ -100,56 +111,58 @@ duplicado.
 
 ---
 
-## Quantas faltam (contado em 2026-08-04: toda a Sprint D fechada — L1, L2, L3, L5, L6, L7, L8, L9, L10, L11; D4 resolvido e removido)
+## Quantas faltam (recontado item a item em 2026-08-07)
 
-**Esta contagem ficou desatualizada em 2026-08-05** (G1, G2, G4, I1, I2, o
-item `Installation.Version` da Sprint A e o de cores do RetroArch da Sprint C
-fecharam na mesma sessão) — os números abaixo não foram recalculados porque
-várias linhas dependem umas das outras de um jeito frágil o bastante para
-recontar errado ser pior que deixar a tabela velha e sinalizada. As linhas
-correspondentes, no corpo do documento, já refletem o estado real; só esta
-tabela-resumo ficou para trás. Recontar é trabalho futuro, não perdido.
+**A tabela foi recontada de verdade nesta data**, contra o código, não contra a
+memória das notas anteriores. Ela vinha carregando três notas de "não
+recalculado, ver abaixo" (2026-08-05, 2026-08-06, 2026-08-07) que se somavam
+umas às outras — o leitor precisava aplicar `+15` e depois `+30` de cabeça
+para chegar a um número que ainda assim estaria errado, porque as sprints G, H
+e I fecharam quase inteiras sem que as linhas delas mudassem. **As três notas
+saíram**: elas descreviam uma dívida que esta recontagem pagou, e mantê-las
+depois de recontar seria pior que tê-las deixado.
 
-Itens **abertos**, contados uma vez cada — D11 aparece como critério de saída
-da Sprint A, mas conta uma vez só.
+**O que a recontagem achou de errado nas linhas individuais** (não só nos
+"Total"): Sprint A contava 1 aberto (`Installation.Version`, fechado em
+2026-08-05); Sprint B contava 1 (B11, encerrado em 2026-08-05); Sprint C
+contava 1 (cores do RetroArch, resolvido via ADR 0012 e confirmado pelo
+Douglas em 2026-08-05); Sprint G contava 5 quando só o G5 tem checkbox aberto;
+Sprint H contava 5 quando só o H3 tem; Sprint I contava 3 quando I1/I2/I3 estão
+todos com os critérios marcados. **Somadas, 15 linhas de item apareciam como
+abertas sem estar.**
+
+Método, para poder ser refeito: cada item foi contado **aberto** se tem pelo
+menos um `[ ]` não marcado no próprio critério de aceite, ou se o texto o
+declara pendente. Item deliberadamente fora da v1.0 (G3, J5) **não conta como
+aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lugares
+(dívida e Sprint A) e conta uma vez só.
 
 | Bloco | Abertos | Quais |
 |---|---|---|
-| Dívida honesta | **1** | D2 (estratégia definida, execução depende de Sprint E/F) — D8 e D11 fechados |
-| Sprint A | **1** | `Installation.Version` (D11 fechado em 2026-08-04) |
-| Sprint B | **1** | B11 (verificação humana em Windows/Linux/macOS — código pronto nos 3 SOs) |
-| Sprint C | **1** | Cores do RetroArch — bloqueado por rede, não por trabalho |
-| Sprint D (MVP) | **0** | Todos os 11 itens fechados, critério de saída cumprido (D11 feito) |
-| **Sprint G (v1.0)** | **5** | G1–G5 — biblioteca visual: capas, favoritos, ícone de console |
-| **Sprint H (v1.0)** | **5** | H1–H5 — configuração de emulador e mapeamento de controles |
-| **Sprint I (v1.0)** | **3** | I1–I3 — arestas: emulador manual na UI, busca faltante, teclado |
-| Sprint K (v1.0) | **0** | K1–K6 — **fechada em 2026-08-06** |
-| Sprint J (v1.0) | **0** | J1–J5 — **fechada em 2026-08-06** (J5 avaliado e não aplicado, por decisão, não por pendência) |
-| **Sprint L (v1.0)** | **1** | L0–L2 feitos; L3 (verificação com controle físico real) só o Douglas fecha |
-| **Sprint M (v1.0)** | **15** | M1–M15 — biblioteca de jogos: layout e usabilidade (nenhum começado) |
-| Sprint E (**v2.0**) | **7** | — |
-| Sprint F (**v2.0**) | **6** | — |
-| Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
-| **Total do MVP e da dívida** | **4** | dívida + A + B + C + D |
-| **Total para fechar a v1.0** | **17** | os 4 acima + G + H + I — **desatualizado, ver nota abaixo** |
-| **Total geral** | **36** | tudo acima, v1.0 + v2.0 — **desatualizado, ver nota abaixo** |
-| Fora do MVP, registrado | 1 | identificação por hash (scraper e cache de capas **saíram desta lista** — reabertos como G1/G2) |
+| Dívida honesta | **1** | D2 (estratégia definida; execução depende de Sprint E/F — **não fecha na v1.0**, é dívida declarada) |
+| Sprint A | **0** | fechada; `Installation.Version` feito 2026-08-05, D11 feito 2026-08-04 |
+| Sprint B | **0** | fechada 2026-08-05; B11 verificado em máquina limpa dos 3 SOs pelo Douglas |
+| Sprint C | **0** | fechada; cores do RetroArch resolvidos via [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md), confirmados pelo Douglas em 2026-08-05 |
+| Sprint D (MVP) | **0** | os 11 itens fechados, critério de saída cumprido |
+| **Sprint G (v1.0)** | **1** | **G5** (2 checkboxes de polimento do `ConsoleIcon`). G1/G2/G4 fechados; G3 fora da v1.0 por decisão |
+| **Sprint H (v1.0)** | **1** | **H3** — 1 checkbox: mapeamento respeitado com controle físico real. Só o Douglas fecha. H1/H2/H4/H5 fechados |
+| **Sprint I (v1.0)** | **0** | I1/I2 fechados 2026-08-05; I3 já era feito 2026-08-04 |
+| Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
+| Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
+| **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
+| **Sprint M (v1.0)** | **15** | M1–M15 — nenhum começado |
+| Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
+| Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
+| Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
+| **Total do MVP e da dívida** | **1** | só o D2 — dívida + A + B + C + D |
+| **Total para fechar a v1.0** | **18** | G5 + H3 + L3 + os 15 da Sprint M. **O D2 não entra**: depende da Sprint F (v2.0) e sai declarado como dívida, não resolvido |
+| **Total geral** | **37** | 18 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 5 (sem sprint) |
+| Fora do MVP, registrado | 2 | G3 (identificação por hash) e J5 (`DropdownMenu`) — os dois fora **por decisão escrita**, não por esquecimento |
 
-**Adicionado em 2026-08-06, não recalculado nas linhas de Total acima** (mesmo
-motivo da nota de 2026-08-05: recontar errado é pior que deixar sinalizado):
-Sprints K, J e L (15 itens novos) entraram na v1.0, a partir da revisão
-crítica do frontend e do pedido do Douglas de navegação por controle. Os
-"Total" desta tabela precisam de +15 para refletir isso — as linhas
-individuais (K/J/L acima) já estão certas.
-
-**Adicionado em 2026-08-07, também não recalculado nas linhas de Total**
-(mesma convenção das duas notas acima): a **Sprint M** (15 itens novos,
-M1–M15) entrou na v1.0, a partir da crítica de layout do subagente
-`critico-layout-biblioteca` aprovada pelo Douglas. Somando com a nota
-anterior, os "Total" desta tabela precisam de **+30** para refletir o estado
-real — a linha da Sprint M acima já está certa. Recontar a tabela inteira
-continua sendo trabalho futuro: as linhas individuais são a fonte confiável,
-os "Total" estão sinalizados como velhos de propósito.
+**Leitura honesta do número:** dos 18 itens da v1.0, **3 são verificação humana
+que nenhuma sessão de IA pode fazer** (G5 é polimento visual, H3 e L3 precisam
+de controle físico). O trabalho de código restante da v1.0 é essencialmente a
+**Sprint M inteira**.
 
 **Reorganização de 2026-08-04:** as sprints E e F foram rotuladas como **v2.0**
 e três sprints novas (G, H, I) entraram para a **v1.0**, a partir da direção
@@ -468,7 +481,16 @@ também foi corrigido: `standaloneAdapter.BuildCommand`
 `romPart`, não mais depois do caminho da ROM — no PCSX2 isso deixava de cair
 depois do separador `--`, onde viraria posicional em vez de flag.
 
-### D6 — Busca recursiva de binários (M)
+### D6 — Busca recursiva de binários (M) — **feito**
+
+> **Corrigido em 2026-08-07:** o texto abaixo estava escrito no presente, como
+> se o item ainda estivesse aberto, contradizendo a tabela de dívida (que já o
+> marcava **Feito**) e a Sprint A. Fica preservado como o enunciado original do
+> problema; o que resolveu está logo depois. Conferido no código:
+> `subdirectories()` existe em `internal/emulator/discovery.go:291`, e
+> `findBinary` (`:101`) consulta o índice de diretórios construído por
+> `dirIndex` (D9) — um nível de profundidade, com a ressalva já registrada no
+> `CLAUDE.md`.
 
 `findBinary` procura `<dir>/<nome>` **sem recursão**. Um
 `C:\Program Files\DuckStation\duckstation-qt.exe` não é encontrado, porque só
@@ -481,7 +503,13 @@ Considere cache de resultado com invalidação.
 
 Bloqueia: instalação 1-click (que precisa saber se já existe instalação prévia).
 
-### D7 — Fixar versões no `mise.toml` (P)
+### D7 — Fixar versões no `mise.toml` (P) — **feito**
+
+> **Corrigido em 2026-08-07**, mesmo caso do D6: o texto estava no presente
+> descrevendo um `mise.toml` que não existe mais. O arquivo real hoje traz
+> `go = "1.26.5"` e `node = "24.18.1"`, com o comentário explicando por que
+> aliases móveis foram descartados — conferido lendo `mise.toml` na raiz. O
+> enunciado abaixo fica como registro do problema original.
 
 O arquivo usa aliases móveis:
 
@@ -2123,7 +2151,14 @@ inteira — instalar/remover/abrir standalone/editar-excluir personalizado).
 cores do RetroArch. `RowState` continua union discriminada, comportamento
 idêntico — `npm run build` (`tsc` + `vite build`) passou sem erro.
 
-**Critério de saída da Sprint K:** as 7 telas usam `FOCUS_RING` em todo
+**Correção de contagem, 2026-08-07:** o critério abaixo fala em "7 telas", mas
+`src/screens/` tem **10** arquivos. Somando a lista da revisão original com a do
+K5, a única não citada em lugar nenhum é `StatusScreen.tsx` — auditada agora:
+ela só tem um elemento interativo (`Button` com `autoFocus`, `:23`), que já
+embute `FOCUS_RING`, e não tem campo de busca nem grid. **Nenhuma mudança
+necessária**; fica escrito para que ninguém a trate como não auditada depois.
+
+**Critério de saída da Sprint K:** as telas usam `FOCUS_RING` em todo
 elemento interativo (achado extra: `VerdictScreen.tsx` tinha o mesmo bug do
 K1/K2, corrigido em K5), nenhum grid usa o breakpoint frágil `xl` (achado
 real em `VerdictScreen.tsx`, corrigido em K3), `EmulatorCard` deixou de ser
@@ -2307,12 +2342,25 @@ por controle **sobre o layout de mesa existente**, não um modo TV separado
 com alvos grandes e densidade baixa — isso fica registrado como possível
 sprint futura, não parte desta.
 
+> **Colisão de numeração, achada na auditoria de 2026-08-07 — leia antes de
+> citar um "L" em qualquer lugar.** Os IDs `L0`–`L3` desta sprint colidem com
+> os `L1`–`L11` da **Sprint D** (biblioteca), que são itens completamente
+> diferentes e já fechados. Hoje `L1` significa tanto "Tabelas e repositório da
+> biblioteca" quanto "hook `useGamepadNavigation`", e `L3` significa tanto
+> "Aviso genérico de dependência externa" (feito) quanto "verificação com
+> hardware real" (aberto) — a linha da tabela "Quantas faltam" e o **M14**
+> (`Depende de: L1`) dependem dessa desambiguação para não serem lidos ao
+> contrário. **Convenção adotada aqui, em vez de renumerar** (renumerar
+> quebraria as referências já escritas e o histórico): sempre escrever
+> **`L1 (Sprint L)`** ou **`L1 (Sprint D)`** quando o contexto não for óbvio.
+> O `M14` depende do `L1 (Sprint L)`, o hook.
+
 | Item | Tam. | Depende de |
 |---|---|---|
-| L0 — ADR 0014 (emenda o ADR 0009) | P | nada |
-| L1 — hook `useGamepadNavigation` | G | L0 |
-| L2 — montar o hook em `App.tsx` | P | L1 |
-| L3 — verificação com hardware real | P | L2, só o Douglas fecha |
+| L0 (Sprint L) — ADR 0014 (emenda o ADR 0009) | P | nada |
+| L1 (Sprint L) — hook `useGamepadNavigation` | G | L0 |
+| L2 (Sprint L) — montar o hook em `App.tsx` | P | L1 |
+| L3 (Sprint L) — verificação com hardware real | P | L2, só o Douglas fecha |
 
 ### L0 — ADR 0014: emenda o ADR 0009 (P)
 
@@ -2417,6 +2465,11 @@ grade de capas 3/4 com badge de plataforma, placeholder com a sigla do console
 em vez de arte inventada, overlay de play, estrela de favorito sempre visível
 (nunca hover-only), navegação espacial por D-pad (`useGamepadNavigation.ts`),
 `ErrorModal` para falha de lançamento, identidade neon única.
+
+**O plano detalhado, com os passos técnicos item a item, a ordem de execução e
+as decisões que precisam da confirmação do Douglas antes de codar, está em
+[`sprint-m-plano.md`](sprint-m-plano.md).** Aqui fica só a tabela e o critério
+de aceite de cada item.
 
 **Não duplica K/J/L:** K1/K2 já corrigiram `FOCUS_RING` nos filtros e os labels
 de busca; J2/J3 já trocaram modais e `<select>` pelo shadcn; J4 já corrigiu o
@@ -2991,15 +3044,15 @@ de imagem de disco), não apenas uma regra de termos de uso.
 |---|---|---|
 | Atualização do catálogo via nuvem | M | `schema_version` já existe para isso |
 | ~~Escrever nos arquivos de config dos emuladores (reduz `Unapplied`)~~ | G | **Promovido em 2026-08-04 para a Sprint H (v1.0)**, itens H1/H2/H5. A ressalva original continua valendo e virou critério de aceite do H1: "invasivo; sobrescreve ajustes do usuário" — por isso o H1 exige preservar byte a byte o que o ZeuX não modela, e fazer backup antes da primeira escrita |
-| Novos consoles: Saturn, 3DS, DS, Game Boy/Color, Master System, Xbox | M cada | Switch fica fora por decisão — [ADR 0008](decisoes/0008-excluir-switch-do-catalogo.md) |
+| ~~Novos consoles: Saturn, 3DS, DS, Game Boy/Color, Master System, Xbox~~ | M cada | **Removido em 2026-08-07 — os 6 já estão no catálogo.** Conferido listando os IDs de `internal/verdict/data/consoles.json`: `saturn`, `3ds`, `nds`, `gb`, `gbc`, `mastersystem`, `xbox` — todos presentes entre os 33. A linha datava de quando o catálogo tinha 13 consoles e nunca foi revisada. Switch continua fora por decisão — [ADR 0008](decisoes/0008-excluir-switch-do-catalogo.md) |
 | ~~Testes de `internal/api` e `internal/consent`~~ | M | **Feito 2026-08-01** — `Probe` mockado via interface; ver nota abaixo |
 | Autenticação da API local | M | Necessário se algo além do Tauri falar com ela |
 | Descoberta dinâmica de porta | P | Evita colisão em `7777` |
-| CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual — ~~build do instalador Windows~~ **feito 2026-08-02**, ver abaixo |
+| CI multiplataforma (build + test nos 3 SOs) | M | Hoje a verificação cruzada é manual. **Atualizado em 2026-08-07:** `.github/workflows/` tem **só `release.yml`** — os três `build-{windows,linux,macos}.yml` foram removidos em 2026-08-05 (ver Sprint B). Ou seja, hoje **nada roda `go test` na CI**; o único build automático é o de release por tag. Se este item for retomado, é um workflow novo, não a ressurreição dos antigos |
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | ~~Suporte a controles: detecção e mapeamento~~ | G | **Promovido em 2026-08-04 para a Sprint H (v1.0)**, itens H3 (joystick) e H4 (teclado). Continua sendo pré-requisito dos perfis de controle compartilháveis (Sprint F, agora v2.0) — a diferença é que agora tem valor próprio na v1.0, sem esperar a nuvem |
 | ~~Emulador dedicado 1-click para os consoles que hoje só têm RetroArch~~ | G | **Substituído em 2026-08-03** pela decisão do [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — em vez de um adapter dedicado por console, empacotar o RetroArch + cores selecionados dentro do próprio instalador do ZeuX. N64 continua com o `rmg` como adapter dedicado (não foi desfeito), mas os outros 23 consoles vão pelo empacotamento, não por pesquisa individual |
-| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 20 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. Falta: confirmar em Windows/macOS e testar a instalação de verdade (o RetroArch empacotado achar os cores sem baixar nada na primeira execução) |
+| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 25 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. **Corrigido em 2026-08-07:** esta célula ainda dizia "Falta: confirmar em Windows/macOS e testar a instalação de verdade", o que contradizia os dois `[x]` logo abaixo — Windows e o lançamento real com cores bundled foram confirmados pelo Douglas em 2026-08-05. **O que resta de verdade:** só macOS (o buildbot distribui `.dmg`, sem rota simples em Go puro — decisão registrada no ADR 0012) e trocar o alias móvel `RetroArch.7z` por uma versão datada fixa |
 
 **Download dos cores do RetroArch desbloqueado em 2026-08-04 — dois bugs reais
 achados e corrigidos, verificados pelo Douglas numa máquina com acesso ao
@@ -3181,12 +3234,9 @@ direto). Os cores nunca passavam por `Uninstall` de qualquer forma — vivem
 numa pasta separada (`bundledCoreDirsForWrite()`), fora da árvore que
 `Uninstall` resolve.
 
-**Seletor nativo de pasta na tela de Biblioteca (2026-08-04):** o campo de
-"apontar pasta" exigia digitar o caminho à mão — o próprio código já
-registrava isso como decisão pendente. Adicionado `@tauri-apps/plugin-dialog`
-(npm) + `tauri-plugin-dialog` (crate Rust) + permissão `dialog:allow-open`.
-Botão "Escolher pasta" abre o diálogo nativo, preenche o campo (que continua
-editável). Backend não mudou.
+*(Havia aqui uma cópia mais curta do parágrafo "Seletor nativo de pasta na tela
+de Biblioteca" que se repetia poucas linhas adiante — **duplicata removida em
+2026-08-07**; a versão que ficou é a mais completa, logo abaixo.)*
 
 **Windows e macOS: código deveria funcionar, não foi testado rodando.**
 Tudo confirmado nesta sessão foi Linux local, de ponta a ponta (build,
@@ -3200,9 +3250,12 @@ mudanças. Para macOS: os cores baixam normalmente, mas **o binário do
 RetroArch em si não é empacotado** — decisão deliberada (buildbot distribui
 `.dmg`, sem rota simples em Go puro), documentada no ADR 0012; no Mac, o
 RetroArch segue pedindo instalação manual como antes desta sessão.
-**Próximo passo sugerido:** `gh workflow run build-windows.yml` (ou
-`build-macos.yml`) na branch atual, via `workflow_dispatch` — não precisa
-mesclar na main para gerar um instalador de teste real.
+~~**Próximo passo sugerido:** `gh workflow run build-windows.yml` (ou
+`build-macos.yml`) na branch atual, via `workflow_dispatch`.~~ **Instrução
+morta desde 2026-08-05, corrigida em 2026-08-07:** os dois workflows citados
+foram removidos (ver Sprint B) — rodar o comando falharia. O caminho vigente é
+`gh workflow run release.yml -f tag=<versão>`. *(Windows já foi confirmado
+pelo Douglas em 2026-08-05 de qualquer forma; o que sobra é macOS.)*
 
 **Seletor nativo de pasta na tela de Biblioteca (2026-08-04):** o campo de
 "apontar pasta" exigia digitar o caminho à mão — o próprio código já
@@ -3215,8 +3268,14 @@ diálogo nativo do SO e preenche o campo de texto, que continua editável
 (colar/ajustar manualmente ainda funciona). Backend não mudou — já aceitava
 caminho absoluto, que é o que o diálogo nativo devolve.
 
-**Build do instalador Windows via GitHub Actions (2026-08-02):**
-`.github/workflows/build-windows.yml` roda num runner `windows-latest` (que já
+**Build do instalador Windows via GitHub Actions (2026-08-02) — o workflow
+descrito abaixo NÃO EXISTE MAIS.** Removido em 2026-08-05 junto de
+`build-linux.yml`/`build-macos.yml` (ver Sprint B); o parágrafo fica como
+registro histórico do raciocínio, não como descrição do repositório de hoje.
+Marcado assim em 2026-08-07, depois de `ls .github/workflows/` devolver só
+`release.yml`.
+
+`.github/workflows/build-windows.yml` rodava num runner `windows-latest` (que já
 tem toolchain nativa) a cada push em `src/`, `src-tauri/`, `internal/`,
 `cmd/` ou dependências, e também sob demanda (`workflow_dispatch`). Instala
 Go, Node e Rust no runner, roda `npm run tauri build` (que já dispara
@@ -3351,9 +3410,14 @@ graph LR
         B --> C
         B --> D["Sprint D<br/>Biblioteca + banco<br/>(feita)"]
         C --> D
-        D --> G["Sprint G<br/>Biblioteca visual:<br/>capas + favoritos"]
-        D --> H["Sprint H<br/>Config do emulador<br/>+ controles"]
-        D --> I["Sprint I<br/>Emulador manual<br/>+ buscas"]
+        D --> G["Sprint G<br/>Biblioteca visual<br/>(só G5 aberto)"]
+        D --> H["Sprint H<br/>Config do emulador<br/>(só H3 aberto)"]
+        D --> I["Sprint I<br/>Emulador manual<br/>+ buscas (feita)"]
+        G --> K["Sprint K<br/>Layout e foco<br/>(feita)"]
+        K --> J["Sprint J<br/>shadcn + Playnite<br/>(feita)"]
+        J --> LG["Sprint L<br/>Navegação por controle<br/>(só L3 aberto)"]
+        J --> M["Sprint M<br/>Biblioteca: layout<br/>e usabilidade"]
+        LG --> M
     end
 
     subgraph v2["v2.0 — exige backend na nuvem e identidade"]
@@ -3361,43 +3425,75 @@ graph LR
         E["Sprint E<br/>Perfil + social"] --> F["Sprint F<br/>Compatibilidade<br/>+ compartilhamento"]
     end
 
-    G --> E
-    H --> E
-    I --> E
+    M --> E
 
     Design["Design: reduzir gaps e estranheza<br/>(contínuo, atravessa toda sprint)"] -.-> v1
     D2["D2 — calibrar limiares<br/>(depende da Sprint F, ou seja: v2.0)"] -.-> F
 ```
 
 A Sprint A veio primeiro porque era a única que podia invalidar código já
-escrito. **G, H e I não dependem umas das outras** — são paralelizáveis, e a
-ordem entre elas é escolha de prioridade, não de dependência técnica.
+escrito. **G, H e I não dependiam umas das outras** — eram paralelizáveis, e a
+ordem entre elas foi escolha de prioridade, não de dependência técnica.
+
+**Atualizado em 2026-08-07:** o diagrama acima ganhou K, J, L e M, que não
+existiam quando ele foi desenhado — o resultado era um mapa da v1.0 sem 4 das
+8 sprints dela. As dependências novas são as que as próprias sprints já
+declaram: J depende de K (trocar componente dentro de um `EmulatorCard`
+monolítico duplicaria trabalho), L depende de J (o `Dialog` do Radix já traz
+focus-trap) e de K (foco visível consistente), e M se apoia em L
+(`useGamepadNavigation`) em vez de reimplementar navegação por controle.
 
 Duas coisas no diagrama são pontilhadas de propósito, porque não são sprints:
 
 - **Design** é contínuo, sem critério de saída — ver a seção de princípio
-  contínuo acima. Ele atravessa G, H e I em vez de vir antes ou depois.
+  contínuo acima. Ele atravessa todas as sprints da v1.0 (G, H, I, K, J, L, M)
+  em vez de vir antes ou depois.
 - **D2** deixou de apontar para a Sprint D e passou a apontar para a F: a
   calibração agora depende do relato de compatibilidade da comunidade, que é
   v2.0. **A v1.0 sai sem os limiares calibrados**, e isso está declarado.
 
-**O diagrama mente em um ponto, e é de propósito que fica escrito aqui:** as
-Sprints B, C e D avançaram sem a Sprint A ter fechado — o D11 (abrir uma ROM de
-verdade) continua aberto e só o Douglas pode fechá-lo. Enquanto ele estiver
-aberto, tudo que veio depois está construído sobre uma suposição não verificada:
-a de que o `POST /games/launch` realmente abre um jogo.
+~~**O diagrama mente em um ponto:** as Sprints B, C e D avançaram sem a Sprint A
+ter fechado — o D11 continua aberto…~~ **Deixou de valer em 2026-08-04**,
+corrigido aqui em 2026-08-07: o D11 foi fechado (PS2/PCSX2 e N64/RMG abrindo
+jogos de verdade), e com ele a suposição não verificada que sustentava tudo
+que veio depois. Parágrafo mantido riscado porque o histórico de o que já
+mordeu o projeto tem valor — mas ele descrevia um risco que não existe mais.
 
 **Próximo passo recomendado (2026-08-03): D11.** Não é o item maior nem o mais
 empolgante — é o único que muda o significado de todo o resto. Ele custa uma
 tarde do Douglas com jogos que ele já tem, e nenhuma sessão de IA pode fazê-lo
 no lugar dele. Se a Sprint D inteira for construída antes e o D11 revelar que
 algum adapter não abre o jogo, o retrabalho cai justamente sobre a tela que
-acabou de ser feita. Depois dele, a ordem é L1 → L2 → L5 → L6 → L7, que é o
-caminho mais curto até o critério de saída da Sprint D.
+acabou de ser feita. Depois dele, a ordem é L1 → L2 → L5 → L6 → L7 (os `L` da
+**Sprint D**, biblioteca — ver a nota de colisão de numeração na Sprint L),
+que é o caminho mais curto até o critério de saída da Sprint D.
 *(D11 foi fechado em 2026-08-04 — parágrafo mantido como registro do raciocínio
 da época, não como recomendação vigente.)*
 
+**Próximo passo recomendado (2026-08-07): a Sprint M, começando pelo M2.**
+
+Recontada a tabela, o quadro ficou simples: das 8 sprints da v1.0, 5 estão
+fechadas e as outras 3 têm **um item aberto cada — e os três são verificação
+humana** (G5 é polimento visual, H3 e L3 precisam de controle físico plugado).
+Não sobrou trabalho de código na v1.0 fora da Sprint M.
+
+Dentro dela, o **M2** vem primeiro, e o motivo é a ordem de prioridade deste
+documento, não a gravidade do bug: **M2 é o único item de dívida de promessa
+descoberta da sprint.** O ADR 0009 e o ADR 0014 exigem foco como estado de
+primeira classe, e hoje, na grade de jogos, o foco é o estado **mais fraco da
+tela** — mais fraco que o hover. O produto está errado ali, não incompleto.
+Custa poucas horas e toca o componente que M1 e M5 vão reescrever em seguida.
+
+Os passos técnicos de M1–M15, com a ordem completa e as decisões que precisam
+da sua confirmação antes de codar, estão em
+[`sprint-m-plano.md`](sprint-m-plano.md).
+
+*(A recomendação abaixo é de 2026-08-04, e a do D11 logo acima é de
+2026-08-03. As duas ficam como registro do raciocínio da época — D11 e I1
+estão fechados.)*
+
 **Próximo passo recomendado (2026-08-04): o I1 — tela de emulador manual.**
+*(Fechado em 2026-08-05.)*
 
 Recomendo um, não um menu, e o motivo é a ordem de prioridade deste documento:
 dívida de promessa descoberta vem antes de funcionalidade nova. O I1 é o caso
