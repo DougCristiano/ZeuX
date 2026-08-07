@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **8** | M1–M15. **Atualizado 2026-08-07** (Lote 10, testado ao vivo com Chromium/Playwright): **M5, M8, M9, M10, M11, M12 e M13 fechados** (todo checkbox do critério marcado — M13 trocou a sigla derivada por `slice(0,3)` por um rail que expande no hover/foco de teclado, medido ao vivo que `<main>` nunca reflui: `boundingClientRect` idêntico recolhida/expandida/focada; achado e corrigido durante o teste — a largura inicial do painel cortava os dois rótulos mais longos, ajustada depois de medir `scrollWidth` de cada um). M1/M2/M3/M4/M6/M7/M10/M11 com código pronto e a maior parte do critério verificado ao vivo, cada um ainda com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M14–M15 sem começar |
+| **Sprint M (v1.0)** | **9** | M1–M15. **Atualizado 2026-08-07** (Lote 11, testado ao vivo com Chromium/Playwright): **M15 fechou** (zero checkbox aberto — scanline movida pro placeholder-only, botão "Buscar capas" parou de mudar de largura durante a busca, os dois verificados ao vivo interceptando rede pra não depender de credencial real do IGDB; `PAGE_SIZE`/`defaultLibraryPageSize` já estavam em 30 desde um lote anterior). Com M15, **só M14 continua sem começar** — precisa de controle físico real, fora do alcance de qualquer sessão de IA (mesma limitação de H3/L3). Os outros 8 itens (M1/M2/M3/M4/M6/M7/M10/M11) têm código pronto e a maior parte do critério verificado ao vivo, cada um com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). **6 dos 15 itens fechados sem ressalva nenhuma:** M5, M8, M9, M12, M13, M15. |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -3238,7 +3238,7 @@ nem escuta `gamepadconnected`. Então este item inclui expor esse estado.
 **Depende de:** L1
 **Bloqueia:** nada
 
-### M15 — Arestas cosméticas (P)
+### M15 — Arestas cosméticas (P) — **feito em 2026-08-07**
 
 Três achados pequenos, agrupados por serem do mesmo tamanho e da mesma tela:
 
@@ -3246,22 +3246,44 @@ Três achados pequenos, agrupados por serem do mesmo tamanho e da mesma tela:
 o front — os dois vão a 30 juntos, para não divergir em silêncio.
 
 **Critério de aceite:**
-- [ ] `PAGE_SIZE` de `AllGamesScreen.tsx:8` deixa de ser 24 (que nunca fecha
+- [x] `PAGE_SIZE` de `AllGamesScreen.tsx:8` deixa de ser 24 (que nunca fecha
       fileira numa grade de 5 ou 6 colunas) e passa a um múltiplo de 5 e 6
       — 30 serve, e continua abaixo de `maxLibraryPageSize = 100`
-      (`internal/api/server.go:1063`).
-- [ ] `defaultLibraryPageSize` no servidor também vai a 30, e
+      (`internal/api/server.go:1063`). Já feito num lote anterior desta
+      sprint (M3/M4) — conferido aqui, não refeito.
+- [x] `defaultLibraryPageSize` no servidor também vai a 30, e
       [`docs/api.md`](api.md) é atualizado onde o valor padrão de página é
-      citado.
-- [ ] A scanline (`ui.tsx:209`, `opacity-40`) deixa de ser aplicada sobre capa
+      citado. Idem — já feito e conferido.
+- [x] A scanline (`ui.tsx`, `opacity-40`) deixa de ser aplicada sobre capa
       real e fica só sobre o placeholder de sigla — ela existe para dar textura
-      ao vazio, não para degradar arte que o usuário acabou de baixar.
-- [ ] O botão "Buscar capas" (`AllGamesScreen.tsx:176-179`) para de mudar de
-      largura a cada item: o progresso sai do rótulo e vai para a `ProgressBar`
-      que já existe (`ui.tsx:329`), abaixo do botão.
+      ao vazio, não para degradar arte que o usuário acabou de baixar. Movida
+      pra dentro do ramo `!coverUrl` do ternário.
+- [x] O botão "Buscar capas" para de mudar de largura a cada item: o
+      progresso saiu do rótulo (fixo em "Buscando capas…" agora) e foi para a
+      `ProgressBar` que já existe, abaixo do botão, com a contagem "X/Y" como
+      texto pequeno junto.
 
 **Depende de:** nada
 **Bloqueia:** nada
+
+**Testado ao vivo** (Chromium/Playwright, interceptando as rotas de rede pra
+não depender de credencial real do IGDB nem de scraping de verdade):
+- **Scanline:** injetei um `cover_url` fake na resposta de
+  `GET /library/games` de um jogo (servindo a "capa" via `page.route`, sem
+  tocar no banco) e conferi por DOM — o tile com capa real não tem
+  `.game-cover-scanline` como filho; os outros seis (placeholder de sigla)
+  têm. Visualmente confirmado na captura: a capa real fica limpa, os
+  placeholders continuam com a textura.
+- **Botão "Buscar capas":** interceptei `POST
+  .../scrape-covers`/`GET /scrape-jobs/{id}` pra simular um job progredindo
+  sem chamar o IGDB — medi `boundingClientRect` do botão em dois momentos
+  diferentes de progresso (processado crescendo de 1 pra 4 de 10):
+  **largura idêntica nos dois** (antes só mudava a cada jogo). O rótulo
+  idle→buscando muda uma vez só ("Buscar capas" → "Buscando capas…"), o que é
+  esperado (mesma string fixa daí em diante); o que o critério pedia — parar
+  de mudar **durante** a busca — está confirmado. Ao concluir, o botão volta
+  a "Buscar capas" e o resumo ("0 capas encontradas.", já que o fake não
+  retorna resultado nenhum) aparece normalmente, sem regressão no fluxo real.
 
 **Critério de saída da Sprint M:** um usuário com 30 jogos e 3 consoles
 configurados consegue, sem sair da biblioteca: ver 3 fileiras de capa por tela,

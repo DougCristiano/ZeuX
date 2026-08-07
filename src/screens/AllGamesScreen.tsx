@@ -550,9 +550,24 @@ export function AllGamesScreen({
               a biblioteca fica exatamente como hoje, sem botão nenhum aqui
               (docs/roadmap.md: "nunca uma tela vazia ou travada"). */}
           {igdbConfigured && (
-            <Button variant="secondary" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
-              {scrapeJob ? `Buscando capas… ${scrapeJob.processed}/${scrapeJob.total}` : "Buscar capas"}
-            </Button>
+            <div className="flex flex-col items-stretch gap-1">
+              {/* M15 (docs/sprint-m-plano.md, 2026-08-07): o progresso saiu
+                  do rótulo do botão (`Buscando capas… 7/30` crescia e
+                  encolhia a cada jogo, empurrando o botão vizinho) e foi pra
+                  `ProgressBar`, abaixo — mesmo componente que a instalação
+                  inline já usa. Rótulo do botão agora é fixo. */}
+              <Button variant="secondary" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
+                {scrapeJob ? "Buscando capas…" : "Buscar capas"}
+              </Button>
+              {scrapeJob && (
+                <>
+                  <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
+                  <p className="text-center text-xs text-muted">
+                    {scrapeJob.processed}/{scrapeJob.total}
+                  </p>
+                </>
+              )}
+            </div>
           )}
           {/* Navegação de topo (Emuladores/Parecer) mudou para a sidebar
               (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui porque é

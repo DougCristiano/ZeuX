@@ -305,16 +305,24 @@ export function GameCover({
           <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
         </>
       ) : (
-        <div
-          className={`absolute inset-0 flex items-center justify-center font-pixel text-muted opacity-25 ${
-            size === "lg" ? "text-4xl" : "text-lg"
-          }`}
-          aria-hidden="true"
-        >
-          {label}
-        </div>
+        <>
+          <div
+            className={`absolute inset-0 flex items-center justify-center font-pixel text-muted opacity-25 ${
+              size === "lg" ? "text-4xl" : "text-lg"
+            }`}
+            aria-hidden="true"
+          >
+            {label}
+          </div>
+          {/* M15 (docs/sprint-m-plano.md, 2026-08-07): a scanline só entra
+              sobre o placeholder de sigla — ela existe para dar textura ao
+              vazio, não para degradar a capa que o usuário acabou de baixar
+              (G1). Movida pra dentro deste ramo do ternário; antes era
+              irmã dos dois ramos e caía por cima de qualquer capa real
+              também. */}
+          <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
+        </>
       )}
-      <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/75 to-transparent" />
 
       {/* Badge de plataforma (2026-08-05) — cor de identidade do console,

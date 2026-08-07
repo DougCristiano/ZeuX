@@ -808,6 +808,32 @@ consome 64px dos 192px disponíveis. Corrigido para `w-60` (240px) antes de
 publicar; reconferido depois, `clientWidth === scrollWidth` nos quatro
 rótulos.
 
+**Atualizado em 2026-08-07 (Lote 11): M15 fechou** — zero checkbox aberto,
+último item que uma sessão de IA conseguia fechar sozinha nesta sprint.
+`PAGE_SIZE`/`defaultLibraryPageSize` já estavam em 30 desde um lote anterior
+(conferido, não refeito). A scanline (`ui.tsx`) saiu do ternário como irmã
+dos dois ramos e entrou só no ramo `!coverUrl` — capa real fica limpa,
+placeholder de sigla continua com a textura. O botão "Buscar capas" trocou o
+rótulo dinâmico (`Buscando capas… X/Y`, que crescia e encolhia a cada jogo)
+por um rótulo fixo + `ProgressBar` abaixo, mesmo componente que a instalação
+inline já usa.
+
+Testado ao vivo interceptando rede (`page.route`) em vez de depender de
+credencial real do IGDB: um `cover_url` fake injetado na resposta de
+`GET /library/games` confirmou por DOM que só o tile sem capa real carrega
+`.game-cover-scanline`; um job de scrape fake com progresso controlado
+confirmou que `boundingClientRect` do botão fica idêntico entre dois
+momentos de progresso diferentes (1/10 e 4/10) — a mudança de largura
+"Buscar capas" → "Buscando capas…" acontece uma vez só, ao iniciar, não mais
+a cada jogo processado.
+
+Com M15, a sprint chega a **6 dos 15 itens fechados sem ressalva nenhuma**
+(M5, M8, M9, M12, M13, M15) e mais 8 com todo o critério verificado, cada um
+com 1 ressalva que só o Douglas fecha (julgamento visual ou build Tauri
+real). **M14 é o único item que não pôde nem começar** — depende de
+controle físico real, que nenhuma sessão de IA tem (mesma limitação
+registrada para H3/L3 desde sprints anteriores).
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
 `go test` e `npm run build`): M4, M5, M6, M8, M9, M10, M11, M12, M13, M15 — e
 as partes mecânicas de M1, M2, M3.
