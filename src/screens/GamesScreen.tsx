@@ -249,13 +249,21 @@ export function GamesScreen({
       )}
 
       {games && games.length > 0 && (
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar jogos..."
-          className="mb-4 w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        />
+        <>
+          <label htmlFor="games-search" className="sr-only">
+            Buscar jogos
+          </label>
+          <input
+            id="games-search"
+            type="text"
+            name="games-search"
+            autoComplete="off"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar jogos…"
+            className="mb-4 w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          />
+        </>
       )}
 
       {games && games.length > 0 && visibleGames && visibleGames.length === 0 && (

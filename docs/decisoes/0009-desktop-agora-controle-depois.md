@@ -1,6 +1,9 @@
 # 0009 — Interface de mouse e teclado agora, sem fechar a porta para controle
 
-**Status:** Aceito
+**Status:** Aceito — cláusula "sem navegação direcional" emendada pelo
+[ADR 0014](0014-navegacao-por-controle.md) (2026-08-06). O resto deste
+documento (interface de mesa como base, as três restrições de
+acessibilidade) continua valendo sem mudança.
 
 ## Contexto
 

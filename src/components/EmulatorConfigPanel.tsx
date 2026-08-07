@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { Renderer } from "../api/types";
-import { Button, Select } from "./ui";
+import { Button } from "./ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 const inputClass =
   "w-full rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -13,6 +14,11 @@ const RENDERER_LABEL: Record<Renderer, string> = {
   d3d12: "Direct3D 12",
   software: "Software",
 };
+
+// Mesmo motivo do sentinela em EmulatorsScreen.tsx (J3, docs/roadmap.md): o
+// `Select` do shadcn/Radix recusa `value=""` num `SelectItem`, e "" aqui é
+// "Padrão do emulador" (renderer não escolhido).
+const DEFAULT_RENDERER = "__default__";
 
 /**
  * Painel de configuração persistida (H2, docs/roadmap.md) — consome
@@ -118,12 +124,20 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
 
       <label className="flex flex-col gap-1 text-sm text-ink">
         Backend gráfico
-        <Select value={renderer} onChange={(e) => setRenderer(e.target.value as Renderer)}>
-          {(Object.keys(RENDERER_LABEL) as Renderer[]).map((r) => (
-            <option key={r} value={r}>
-              {RENDERER_LABEL[r]}
-            </option>
-          ))}
+        <Select
+          value={renderer || DEFAULT_RENDERER}
+          onValueChange={(v) => setRenderer((v === DEFAULT_RENDERER ? "" : v) as Renderer)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(RENDERER_LABEL) as Renderer[]).map((r) => (
+              <SelectItem key={r || DEFAULT_RENDERER} value={r || DEFAULT_RENDERER}>
+                {RENDERER_LABEL[r]}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </label>
 

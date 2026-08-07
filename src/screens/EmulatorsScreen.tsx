@@ -10,7 +10,8 @@ import type {
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
-import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar, Select } from "../components/ui";
+import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, Pagination, ProgressBar } from "../components/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
@@ -21,6 +22,13 @@ const PAGE_SIZE = 6;
 // emuladores de 1 console (ex.: xemu) e emuladores de 20+ (RetroArch) —
 // acima disso, o resto vira "···" (ConsoleMoreBadge).
 const MAX_CONSOLE_ICONS = 6;
+
+// O `Select` do shadcn/Radix recusa `value=""` num `SelectItem` (string
+// vazia é reservada para "nada selecionado") — este sentinela representa
+// "todos os consoles" no lugar do "" que o filtro usava com o <select>
+// nativo. Convertido de volta para "" ao sair do componente (J3,
+// docs/roadmap.md), então `consoleFilter` continua "" pro resto da tela.
+const ALL_CONSOLES = "__all__";
 
 // Item B10 (docs/sprint-b-plano.md): instalar com ressalva de hardware. O
 // servidor já faz a parte que importa — hardwareBlocks recusa com 409 e
@@ -61,7 +69,7 @@ function RetroArchCoresList() {
   }, []);
 
   if (error) return <p className="text-sm text-danger">{error}</p>;
-  if (!cores) return <p className="text-sm text-muted">Carregando cores...</p>;
+  if (!cores) return <p className="text-sm text-muted">Carregando cores…</p>;
 
   const missing = cores.filter((c) => !c.installed);
 
@@ -103,35 +111,170 @@ function IdentityDot({ color }: { color: string | undefined }) {
   );
 }
 
-function EmulatorCard({
+// Header com nome, ponto de identidade e badge de instalação — extraído do
+// EmulatorCard monolítico (K6, docs/roadmap.md) para o card parar de crescer
+// como um arquivo só. Puramente apresentacional, sem estado próprio.
+function EmulatorCardHeader({ entry, identityColor }: { entry: EmulatorEntry; identityColor: string | undefined }) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start gap-2">
+        <span className="mt-1.5">
+          <IdentityDot color={identityColor} />
+        </span>
+        <p className="font-semibold text-ink">{entry.name}</p>
+      </div>
+      {entry.installed && (
+        <div className="flex flex-col items-end gap-1">
+          <Badge variant="solid">{entry.installation?.managed ? "instalado pelo ZeuX" : "já estava na máquina"}</Badge>
+          {/* Só presente em instalação gerenciada (Sprint A) — o ZeuX não
+              executa o binário de uma instalação alheia para descobrir a
+              versão dela. */}
+          {entry.installation?.version && <span className="text-xs text-muted">{entry.installation.version}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Ícones de console em vez da lista de texto (2026-08-04, a pedido do
+ * Douglas): cada um abre ConsoleInfoModal com a descrição do console.
+ * Tamanho fixo do card — a partir de MAX_CONSOLE_ICONS o resto vira "···"
+ * (ConsoleMoreBadge), nunca clicável, pra não estourar altura entre um
+ * emulador de console único e o RetroArch (20+).
+ */
+function EmulatorCardConsoles({
+  entry,
+  verdictById,
+  onSelectConsole,
+}: {
+  entry: EmulatorEntry;
+  verdictById: Map<string, ConsoleVerdict>;
+  onSelectConsole: (consoleId: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {entry.consoles.slice(0, MAX_CONSOLE_ICONS).map((consoleId) => (
+        <ConsoleIcon
+          key={consoleId}
+          consoleId={consoleId}
+          label={verdictById.get(consoleId)?.short_name ?? consoleId}
+          onClick={() => onSelectConsole(consoleId)}
+        />
+      ))}
+      {entry.consoles.length > MAX_CONSOLE_ICONS && (
+        <ConsoleMoreBadge count={entry.consoles.length - MAX_CONSOLE_ICONS} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * H2/H3/H4 (docs/roadmap.md): configuração e mapeamento persistidos, só
+ * quando entry.configurable/bindable vêm true — hoje só PCSX2 e RetroArch
+ * (H1 piloto). Emulador ainda não coberto degrada visivelmente (H5): mostra
+ * que ainda é configurado por fora, em vez de simplesmente não ter nenhum
+ * botão. showConfig/showBindings são estado genuinamente local a este
+ * bloco — não precisam subir para o card.
+ */
+function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
+  const [showConfig, setShowConfig] = useState(false);
+  const [showBindings, setShowBindings] = useState(false);
+
+  if (!entry.installed) return null;
+
+  if (!entry.configurable && !entry.bindable) {
+    return <p className="text-xs text-muted">Configuração e controles ainda só dentro do próprio {entry.name}.</p>;
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {entry.configurable && (
+          <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
+            {showConfig ? "Ocultar configurações" : "Configurações"}
+          </Button>
+        )}
+        {entry.bindable && (
+          <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
+            {showBindings ? "Ocultar mapeamento" : "Mapear controles"}
+          </Button>
+        )}
+      </div>
+      {showConfig && entry.configurable && (
+        <EmulatorConfigPanel adapterId={entry.adapter_id} adapterName={entry.name} />
+      )}
+      {showBindings && entry.bindable && (
+        <EmulatorBindingsPanel adapterId={entry.adapter_id} adapterName={entry.name} />
+      )}
+    </>
+  );
+}
+
+/**
+ * "Abrir pasta do BIOS" (2026-08-05): existia só dentro da tela de jogos de
+ * um console (GamesScreen.tsx), a pedido do Douglas em 2026-08-04 — mas aí é
+ * preciso navegar Biblioteca → console → jogos pra achar. GET /emulators já
+ * traz bios_dir/bios_dir_empty por emulador (EmulatorEntry), então o botão
+ * cabe aqui direto. Só aparece quando alguém já verificou de verdade onde
+ * ESTE emulador lê o BIOS/firmware (BiosDir, internal/emulator/bios_dir.go)
+ * — nunca um palpite por convenção.
+ */
+function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
+  const [biosError, setBiosError] = useState<string | null>(null);
+
+  if (!entry.bios_dir) return null;
+
+  async function openBiosFolder() {
+    setBiosError(null);
+    try {
+      await openPath(entry.bios_dir!);
+    } catch (err) {
+      setBiosError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {entry.bios_dir_empty && (
+        <Callout label="BIOS ausente">
+          A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
+        </Callout>
+      )}
+      <Button type="button" variant="secondary" onClick={openBiosFolder}>
+        Abrir pasta do BIOS
+      </Button>
+      {biosError && <p className="text-sm text-danger">{biosError}</p>}
+    </div>
+  );
+}
+
+/**
+ * Instalar/remover/configurar externamente e as ações de emulador
+ * personalizado — o pedaço de verdade complexo do card (máquina de estados
+ * `RowState`), isolado num componente próprio (K6) para não se misturar com
+ * header/consoles/config/BIOS na leitura. `RowState` continua sendo union
+ * discriminada, sem mudança de comportamento — só de onde o código mora.
+ */
+function EmulatorCardActions({
   entry,
   source,
   customDef,
-  verdictById,
-  onSelectConsole,
   onChanged,
   onEditCustom,
 }: {
   entry: EmulatorEntry;
   source?: EmulatorSource;
-  /** Presente quando este entry veio de um cadastro manual (I1,
-   * docs/roadmap.md) — troca Instalar/Remover pelo par Editar/Excluir. */
   customDef?: CustomDefinition;
-  verdictById: Map<string, ConsoleVerdict>;
-  onSelectConsole: (consoleId: string) => void;
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
   const [state, setState] = useState<RowState>({ kind: "idle" });
-  const [showCores, setShowCores] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
-  const [biosError, setBiosError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
-  const [showBindings, setShowBindings] = useState(false);
 
   async function deleteCustom() {
     if (!customDef) return;
@@ -145,20 +288,6 @@ function EmulatorCard({
     } finally {
       setDeleting(false);
       setConfirmingDelete(false);
-    }
-  }
-
-  // "Abrir pasta do BIOS" (2026-08-05): existia só dentro da tela de jogos de
-  // um console (GamesScreen.tsx), a pedido do Douglas em 2026-08-04 — mas aí
-  // é preciso navegar Biblioteca → console → jogos pra achar. GET /emulators
-  // já traz bios_dir/bios_dir_empty por emulador (EmulatorEntry), então o
-  // botão cabe aqui direto, sem esperar ter um jogo pra ver a pasta.
-  async function openBiosFolder(dir: string) {
-    setBiosError(null);
-    try {
-      await openPath(dir);
-    } catch (err) {
-      setBiosError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -244,102 +373,8 @@ function EmulatorCard({
   // aqui é só para não convidar o clique.
   const canRemove = entry.installed && entry.installation?.managed && entry.adapter_id !== "retroarch";
 
-  // Só um console = a cor dele vira a identidade do card inteiro (12 dos 13
-  // adapters embutidos além do RetroArch atendem exatamente 1). Mais de um
-  // (RetroArch) não tem uma identidade só — fica neutro.
-  const identityColor = entry.consoles.length === 1 ? consoleAccentColor(entry.consoles[0]) : undefined;
-  const cardStyle: CSSProperties | undefined = identityColor
-    ? { borderLeftColor: identityColor, borderLeftWidth: 3 }
-    : undefined;
-
   return (
-    <Card className="flex flex-col gap-3" style={cardStyle}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2">
-          <span className="mt-1.5">
-            <IdentityDot color={identityColor} />
-          </span>
-          <p className="font-semibold text-ink">{entry.name}</p>
-        </div>
-        {entry.installed && (
-          <div className="flex flex-col items-end gap-1">
-            <Badge variant="solid">{entry.installation?.managed ? "instalado pelo ZeuX" : "já estava na máquina"}</Badge>
-            {/* Só presente em instalação gerenciada (Sprint A) — o ZeuX não
-                executa o binário de uma instalação alheia para descobrir a
-                versão dela. */}
-            {entry.installation?.version && <span className="text-xs text-muted">{entry.installation.version}</span>}
-          </div>
-        )}
-      </div>
-
-      {/* Ícones de console em vez da lista de texto (2026-08-04, a pedido do
-          Douglas): cada um abre ConsoleInfoModal com a descrição do console.
-          Tamanho fixo do card — a partir de MAX_CONSOLE_ICONS o resto vira
-          "···" (ConsoleMoreBadge), nunca clicável, pra não estourar altura
-          entre um emulador de console único e o RetroArch (20+). */}
-      <div className="flex flex-wrap gap-1.5">
-        {entry.consoles.slice(0, MAX_CONSOLE_ICONS).map((consoleId) => (
-          <ConsoleIcon
-            key={consoleId}
-            consoleId={consoleId}
-            label={verdictById.get(consoleId)?.short_name ?? consoleId}
-            onClick={() => onSelectConsole(consoleId)}
-          />
-        ))}
-        {entry.consoles.length > MAX_CONSOLE_ICONS && (
-          <ConsoleMoreBadge count={entry.consoles.length - MAX_CONSOLE_ICONS} />
-        )}
-      </div>
-
-      {/* H2/H3/H4 (docs/roadmap.md): configuração e mapeamento persistidos,
-          só quando entry.configurable/bindable vêm true — hoje só PCSX2 e
-          RetroArch (H1 piloto). Emulador ainda não coberto degrada
-          visivelmente (H5): mostra que ainda é configurado por fora, em vez
-          de simplesmente não ter nenhum botão. */}
-      {entry.installed && (entry.configurable || entry.bindable) && (
-        <div className="flex flex-wrap gap-2">
-          {entry.configurable && (
-            <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
-              {showConfig ? "Ocultar configurações" : "Configurações"}
-            </Button>
-          )}
-          {entry.bindable && (
-            <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
-              {showBindings ? "Ocultar mapeamento" : "Mapear controles"}
-            </Button>
-          )}
-        </div>
-      )}
-      {entry.installed && !entry.configurable && !entry.bindable && (
-        <p className="text-xs text-muted">Configuração e controles ainda só dentro do próprio {entry.name}.</p>
-      )}
-      {showConfig && entry.configurable && (
-        <EmulatorConfigPanel adapterId={entry.adapter_id} adapterName={entry.name} />
-      )}
-      {showBindings && entry.bindable && (
-        <EmulatorBindingsPanel adapterId={entry.adapter_id} adapterName={entry.name} />
-      )}
-
-      {/* Só aparece quando alguém já verificou de verdade onde ESTE emulador
-          lê o BIOS/firmware (BiosDir, internal/emulator/bios_dir.go) — nunca
-          um palpite por convenção. Cobertura hoje: PS1 (DuckStation) e PS2
-          (PCSX2); PS3 (RPCS3) não tem pasta certa pra apontar de propósito
-          (o firmware é instalado pelo próprio RPCS3, não colocado numa
-          pasta) — ver docs/roadmap.md, D8/L9. */}
-      {entry.bios_dir && (
-        <div className="flex flex-col gap-2">
-          {entry.bios_dir_empty && (
-            <Callout label="BIOS ausente">
-              A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
-            </Callout>
-          )}
-          <Button type="button" variant="secondary" onClick={() => openBiosFolder(entry.bios_dir!)}>
-            Abrir pasta do BIOS
-          </Button>
-          {biosError && <p className="text-sm text-danger">{biosError}</p>}
-        </div>
-      )}
-
+    <>
       {state.kind === "confirm-hardware" && (
         // Regra: recusar não some com o card nem desabilita o botão de
         // instalar — "Cancelar" só volta ao estado normal.
@@ -390,20 +425,6 @@ function EmulatorCard({
       )}
 
       {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
-
-      {entry.adapter_id === "retroarch" && (
-        <div>
-          <Button type="button" variant="ghost" onClick={() => setShowCores((v) => !v)}>
-            {showCores ? "Ocultar cores" : "Ver cores"}
-          </Button>
-          {showCores && (
-            <div className="mt-2">
-              <RetroArchCoresList />
-            </div>
-          )}
-        </div>
-      )}
-
       {openError && <p className="text-sm text-danger">{openError}</p>}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -471,6 +492,69 @@ function EmulatorCard({
           </Button>
         )}
       </div>
+    </>
+  );
+}
+
+// Orquestrador (pós-K6, docs/roadmap.md): compõe os pedaços acima em vez de
+// misturar header, consoles, config, BIOS e a máquina de estados de
+// instalação num único componente de ~370 linhas.
+function EmulatorCard({
+  entry,
+  source,
+  customDef,
+  verdictById,
+  onSelectConsole,
+  onChanged,
+  onEditCustom,
+}: {
+  entry: EmulatorEntry;
+  source?: EmulatorSource;
+  /** Presente quando este entry veio de um cadastro manual (I1,
+   * docs/roadmap.md) — troca Instalar/Remover pelo par Editar/Excluir. */
+  customDef?: CustomDefinition;
+  verdictById: Map<string, ConsoleVerdict>;
+  onSelectConsole: (consoleId: string) => void;
+  onChanged: () => void;
+  onEditCustom: (def: CustomDefinition) => void;
+}) {
+  const [showCores, setShowCores] = useState(false);
+
+  // Só um console = a cor dele vira a identidade do card inteiro (12 dos 13
+  // adapters embutidos além do RetroArch atendem exatamente 1). Mais de um
+  // (RetroArch) não tem uma identidade só — fica neutro.
+  const identityColor = entry.consoles.length === 1 ? consoleAccentColor(entry.consoles[0]) : undefined;
+  const cardStyle: CSSProperties | undefined = identityColor
+    ? { borderLeftColor: identityColor, borderLeftWidth: 3 }
+    : undefined;
+
+  return (
+    <Card className="flex flex-col gap-3" style={cardStyle}>
+      <EmulatorCardHeader entry={entry} identityColor={identityColor} />
+      <EmulatorCardConsoles entry={entry} verdictById={verdictById} onSelectConsole={onSelectConsole} />
+      <EmulatorCardConfigPanels entry={entry} />
+      <EmulatorCardBios entry={entry} />
+
+      {entry.adapter_id === "retroarch" && (
+        <div>
+          <Button type="button" variant="ghost" onClick={() => setShowCores((v) => !v)}>
+            {showCores ? "Ocultar cores" : "Ver cores"}
+          </Button>
+          {showCores && (
+            <div className="mt-2">
+              <RetroArchCoresList />
+            </div>
+          )}
+        </div>
+      )}
+
+      <EmulatorCardActions
+        entry={entry}
+        source={source}
+        customDef={customDef}
+        onChanged={onChanged}
+        onEditCustom={onEditCustom}
+      />
     </Card>
   );
 }
@@ -603,23 +687,39 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {emulators && emulators.length > PAGE_SIZE && (
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Buscar emulador ou console..."
-            className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          />
+          <>
+            <label htmlFor="emulators-search" className="sr-only">
+              Buscar emulador ou console
+            </label>
+            <input
+              id="emulators-search"
+              type="text"
+              name="emulators-search"
+              autoComplete="off"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Buscar emulador ou console…"
+              className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            />
+          </>
         )}
 
         {consoleOptions.length > 0 && (
-          <Select value={consoleFilter} onChange={(e) => handleConsoleFilter(e.target.value)} aria-label="Filtrar por console">
-            <option value="">Todos os consoles</option>
-            {consoleOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+          <Select
+            value={consoleFilter || ALL_CONSOLES}
+            onValueChange={(v) => handleConsoleFilter(v === ALL_CONSOLES ? "" : v)}
+          >
+            <SelectTrigger aria-label="Filtrar por console" className="w-full max-w-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CONSOLES}>Todos os consoles</SelectItem>
+              {consoleOptions.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         )}
       </div>

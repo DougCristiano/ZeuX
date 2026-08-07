@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, HardwareInfo, Report } from "../api/types";
-import { Callout, Card, ConsoleVerdictCard, LEVEL_LABEL, Pagination, PartialNotice } from "../components/ui";
+import { Callout, Card, ConsoleVerdictCard, FOCUS_RING, LEVEL_LABEL, Pagination, PartialNotice } from "../components/ui";
 
 const LEVEL_ORDER: ConsoleVerdict["level"][] = ["otimo", "bom", "limitado", "improvavel"];
 const PAGE_SIZE = 9;
@@ -40,7 +40,7 @@ function SpecsPanel() {
   if (!hardware) {
     return (
       <Card filled>
-        <p className="text-sm text-muted">Lendo hardware...</p>
+        <p className="text-sm text-muted">Lendo hardware…</p>
       </Card>
     );
   }
@@ -199,18 +199,24 @@ export function VerdictScreen({ report }: { report: Report }) {
           )}
 
           <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor="verdict-search" className="sr-only">
+              Buscar console
+            </label>
             <input
+              id="verdict-search"
               type="text"
+              name="verdict-search"
+              autoComplete="off"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Buscar console..."
+              placeholder="Buscar console…"
               className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             />
             <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
                 onClick={() => handleLevelFilter(null)}
-                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
                   levelFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
@@ -221,7 +227,7 @@ export function VerdictScreen({ report }: { report: Report }) {
                   key={level}
                   type="button"
                   onClick={() => handleLevelFilter(level)}
-                  className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${
+                  className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
                     levelFilter === level ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                   }`}
                 >
@@ -235,7 +241,12 @@ export function VerdictScreen({ report }: { report: Report }) {
             <p className="mt-4 text-base text-muted">Nenhum console encontrado para "{search}".</p>
           )}
 
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {/* 2xl, não xl (CLAUDE.md, regra de breakpoint): esta grade divide
+              espaço com a coluna lateral de 320px acima, então tem menos
+              largura disponível que uma grade de tela cheia — xl (1280,
+              quase o tamanho padrão da janela) já era o valor frágil que
+              causou o bug de 2026-08-04 em outro lugar; aqui seria pior. */}
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
             {pageItems.map((verdict) => (
               <ConsoleVerdictCard key={verdict.console_id} verdict={verdict} />
             ))}

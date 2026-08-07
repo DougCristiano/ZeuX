@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -8,6 +9,16 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react(), tailwindcss()],
+
+  // Alias exigido pelo shadcn/ui (J1, docs/roadmap.md) — espelha o "paths"
+  // de tsconfig.json, que resolve o import mas não o bundler. fileURLToPath
+  // em vez de `__dirname`: o projeto é "type": "module" (ESM), onde
+  // `__dirname` não existe.
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

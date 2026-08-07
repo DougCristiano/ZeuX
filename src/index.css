@@ -14,6 +14,16 @@
 @import "@fontsource/inter/600.css";
 @import "@fontsource/inter/700.css";
 @import "@fontsource/press-start-2p/400.css";
+/*
+ * `tw-animate-css` (utilitários de animação) e `shadcn/tailwind.css`
+ * (variantes data-state/data-open etc. e utilitários como scroll-fade que os
+ * componentes do Radix/shadcn usam) — infraestrutura do J1 (docs/roadmap.md).
+ * Nunca importar a fonte Geist do shadcn: o projeto só usa Inter
+ * self-hospedada (ver comentário acima) — a inicialização do CLI tentou
+ * trazê-la, removida aqui de propósito.
+ */
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 /*
  * Tokens de cor do ZeuX — identidade neon única (2026-08-04, ver ADR 0013).
@@ -55,6 +65,36 @@
   --amber-bg: #241a0f;
   --amber-line: #4a3320;
   --danger: #f0554a;
+
+  /*
+   * J1 (docs/roadmap.md): variáveis que o shadcn/Radix espera, mapeadas para
+   * os tokens ZeuX acima em vez da paleta padrão do CLI — o `shadcn init`
+   * grava valores próprios (oklch neutro claro/escuro com `.dark` para
+   * alternar) que substituiriam a identidade neon única do ADR 0013. Aqui
+   * elas só _apontam_ para o que já existe; nenhuma cor nova entra no
+   * projeto. Sem `.dark` — o ZeuX não tem alternância clara/escura (mesma
+   * razão do `color-scheme: dark` acima), então não existe um segundo
+   * conjunto de valores para alternar.
+   */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--panel);
+  --card-foreground: var(--ink);
+  --popover: var(--panel);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-ink);
+  --secondary: var(--fill);
+  --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--accent-ink);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line);
+  /* Mesmo roxo do FOCUS_RING (src/components/ui.tsx) — um anel de foco só
+     na interface inteira, não um segundo tom introduzido pelo shadcn. */
+  --ring: var(--accent);
+  --radius: 0.5rem;
 }
 
 @theme {
@@ -122,4 +162,44 @@ body {
 }
 .game-cover-scanline {
   background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
+}
+/*
+ * Expõe as variáveis acima como cores/raio do Tailwind (`border-border`,
+ * `ring-ring`, `rounded-lg` etc.) — é o que os componentes gerados pelo
+ * shadcn (`src/components/ui/*`) usam. Sem `--chart-*`/`--sidebar-*`: nada
+ * no ZeuX usa gráfico nem o componente `Sidebar` do shadcn (a navegação
+ * lateral já existe em `src/components/Sidebar.tsx`, própria) — não
+ * introduzir token sem uso (orçamento de complexidade,
+ * docs/arquitetura-a-preservar.md).
+ */
+@theme inline {
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+/* Default de borda/anel de foco que os componentes do shadcn assumem
+   (`border-border`, `outline-ring/50`) — não duplica o `body{}` abaixo, que
+   já cobre fundo/texto/fonte com os tokens ZeuX diretamente. */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 }

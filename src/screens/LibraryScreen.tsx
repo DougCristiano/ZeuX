@@ -53,7 +53,7 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
           </p>
         </div>
         <Button type="button" variant="primary" disabled={busy} onClick={handlePick}>
-          {busy ? "Varrendo..." : "Escolher pasta"}
+          {busy ? "Varrendo…" : "Escolher pasta"}
         </Button>
       </div>
 
@@ -311,8 +311,14 @@ export function LibraryScreen({
 
       <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
 
+      <label htmlFor="library-console-filter" className="sr-only">
+        Filtrar por nome do console
+      </label>
       <input
+        id="library-console-filter"
         type="text"
+        name="library-console-filter"
+        autoComplete="off"
         value={filter}
         onChange={(e) => handleFilter(e.target.value)}
         placeholder="Filtrar por nome do console"
