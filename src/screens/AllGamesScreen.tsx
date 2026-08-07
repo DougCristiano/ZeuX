@@ -1,14 +1,14 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
-import { api, ApiError, coverImageURL } from "../api";
+import { api, ApiError } from "../api";
 import type { LibraryGame, Report, ScrapeJob } from "../api/types";
-import { Badge, Button, ErrorModal, FavoriteToggle, FOCUS_RING, GameCover, Pagination } from "../components/ui";
+import { Button, ErrorModal, FOCUS_RING, Pagination } from "../components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { GameListRow } from "../components/GameListRow";
+import { GameTile } from "../components/GameTile";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
-import { formatPlaytime } from "../lib/format";
 
 // M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24 nunca
 // fechava fileira numa grade de 5 ou 6 colunas; 30 é múltiplo dos dois. O
@@ -552,69 +552,14 @@ export function AllGamesScreen({
                   {rowGames.map((game) => {
                     const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
                     return (
-                      <div key={game.id} className="flex flex-col gap-2">
-                        <div className="relative">
-                          {/*
-                           * M1 (docs/sprint-m-plano.md): deixou de ser
-                           * <button> — o overlay ▶ agora é um <button> real
-                           * dentro de GameCover (botão dentro de botão é
-                           * HTML inválido). `role="button"` +
-                           * `tabIndex`/`onKeyDown` repõem a semântica e o
-                           * alcance por teclado que o <button> dava de
-                           * graça. Continua sendo o único alvo alcançável
-                           * por Tab/D-pad do tile: quem navega por
-                           * teclado/controle abre o detalhe por aqui e
-                           * lança de lá (o overlay some da sequência via
-                           * tabIndex={-1}, ver comentário em GameCover) — é
-                           * o que sustenta "1 movimento por fileira" do
-                           * critério de aceite do item. "group" continua
-                           * aqui: é quem o `group-hover`/
-                           * `group-focus-visible` do overlay e do glow de
-                           * borda (M2) enxergam.
-                           */}
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            className={`group block w-full cursor-pointer rounded text-left ${FOCUS_RING}`}
-                            title={game.title}
-                            aria-label={`Ver detalhes de ${game.title}`}
-                            onClick={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
-                            onKeyDown={(e) => {
-                              if (e.key !== "Enter" && e.key !== " ") return;
-                              e.preventDefault();
-                              onOpenGame(game, consoleName, shortNameFor(game.console_id));
-                            }}
-                          >
-                            <GameCover
-                              label={shortNameFor(game.console_id)}
-                              title={game.title}
-                              consoleId={game.console_id}
-                              coverUrl={coverImageURL(game.cover_url)}
-                              showPlayOverlay
-                              onPlay={launchableGame(game)}
-                            />
-                          </div>
-                          <FavoriteToggle
-                            favorite={game.favorite}
-                            onToggle={() => toggleFavorite(game)}
-                            className="absolute top-1.5 right-1.5"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          {/* M7: line-clamp-2 (não mais truncate de 1 linha) — com
-                              capa real, este é o único título do tile (GameCover
-                              não desenha mais o dele por cima da arte). */}
-                          <p className="line-clamp-2 text-sm font-semibold text-ink" title={game.title}>
-                            {game.title}
-                          </p>
-                          <p className="text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
-                          {game.missing && (
-                            <div className="mt-1">
-                              <Badge>arquivo ausente</Badge>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <GameTile
+                        key={game.id}
+                        game={game}
+                        shortName={shortNameFor(game.console_id)}
+                        onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                        onPlay={launchableGame(game)}
+                        onToggleFavorite={() => toggleFavorite(game)}
+                      />
                     );
                   })}
                 </div>

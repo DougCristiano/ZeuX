@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
-import { Badge, Button, Callout, Card, ErrorModal, ProgressBar } from "../components/ui";
+import { Button, Callout, ErrorModal, ProgressBar } from "../components/ui";
+import { GameTile } from "../components/GameTile";
 
 type RowStatus =
   | { kind: "idle" }
@@ -29,23 +30,6 @@ function percentOf(job: InstallJob): number | null {
   return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
 }
 
-function formatPlaytime(seconds: number): string {
-  if (seconds <= 0) return "nunca jogado";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 1) return "menos de 1 min";
-  if (minutes < 60) return `${minutes} min jogados`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder > 0 ? `${hours}h${remainder}min jogados` : `${hours}h jogados`;
-}
-
-function formatLastPlayed(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return `último acesso em ${date.toLocaleString("pt-BR")}`;
-}
-
 /**
  * Tela 05 do wireframe: grid de jogos de um console, com o botão que fecha o
  * ciclo do produto — "Jogar" chama POST /games/launch sem mandar `options`,
@@ -53,6 +37,26 @@ function formatLastPlayed(iso: string | undefined): string | null {
  * também o L8 ("Instalar ao jogar": clicar em Jogar sem o emulador instalado
  * dispara a instalação inline) e o L9 (aviso genérico de arquivo externo,
  * L3), porque as três decisões vivem na mesma tela do wireframe.
+ *
+ * M5 (docs/sprint-m-plano.md, 2026-08-07): a célula do jogo (capa, badge,
+ * cor, favorito, clique-pro-detalhe) passou a ser `GameTile`, a mesma que
+ * `AllGamesScreen` usa — antes esta tela desenhava um quadrado 64×64
+ * `font-mono` sem capa, sem favorito e sem caminho pro detalhe. O que
+ * continua exclusivo daqui (não entrou no componente compartilhado):
+ * cabeçalho de parecer/BIOS, instalação inline (L8) e confirmação de BIOS
+ * vazio — vivem como blocos irmãos do tile, ligados por
+ * `installState.pendingGamePath`.
+ *
+ * **Limitação aceita, herdada do M1:** o botão "Jogar" full-width saiu —
+ * `handlePlay` (a checagem de instalado/BIOS antes de lançar) agora é o
+ * `onPlay` do overlay ▶, alcançável por mouse e por leitor de tela em modo
+ * de navegação por elementos, mas fora da ordem de Tab/D-pad (mesma decisão
+ * que M1 já tomou para `AllGamesScreen` — ver comentário em `GameTile`).
+ * Quem só usa teclado/controle chega em `handlePlay` só depois de abrir o
+ * detalhe (Enter no tile) e for até o botão "▶ Jogar" de lá — que hoje
+ * lança direto, sem passar pela checagem de instalado/BIOS deste console
+ * (`GameDetailScreen` ainda não conhece esse fluxo). Fica registrado como
+ * lacuna para o M6 fechar, não escondido.
  */
 export function GamesScreen({
   consoleId,
@@ -60,12 +64,14 @@ export function GamesScreen({
   shortName,
   report,
   onBack,
+  onOpenGame,
 }: {
   consoleId: string;
   consoleName: string;
   shortName: string;
   report: Report;
   onBack: () => void;
+  onOpenGame: (game: LibraryGame, consoleName: string, shortName: string) => void;
 }) {
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -190,6 +196,18 @@ export function GamesScreen({
     doLaunch(game.path);
   }
 
+  // Toggle otimista (G4), mesmo padrão de AllGamesScreen.tsx — esta tela
+  // nunca teve favoritos antes do M5 (não desenhava a estrela nenhuma).
+  function toggleFavorite(game: LibraryGame) {
+    const next = !game.favorite;
+    setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: next } : g)) : prev));
+    const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
+    call.catch(() => {
+      setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
+      setError("Não foi possível salvar o favorito. Tente de novo.");
+    });
+  }
+
   const trimmedSearch = search.trim();
   const visibleGames = trimmedSearch
     ? (games ?? []).filter((g) => g.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
@@ -271,7 +289,7 @@ export function GamesScreen({
       )}
 
       {visibleGames && visibleGames.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {visibleGames.map((game) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =
@@ -279,29 +297,17 @@ export function GamesScreen({
                 installState.kind === "confirm-hardware" ||
                 installState.kind === "confirm-bios") &&
               installState.pendingGamePath === game.path;
+            const canPlay = !game.missing && canAutoConfigure && status.kind !== "launching" && !isPendingInstall;
 
             return (
-              <Card key={game.id} className="flex flex-col gap-2">
-                <div className="flex gap-3">
-                  {/* Capa placeholder por console, não por jogo — sem scraper no MVP. */}
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-line-strong bg-fill font-mono text-xs text-muted">
-                    {shortName}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-ink" title={game.title}>
-                      {game.title}
-                    </p>
-                    <p className="text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
-                    {formatLastPlayed(game.last_played_at) && (
-                      <p className="text-xs text-muted">{formatLastPlayed(game.last_played_at)}</p>
-                    )}
-                    {game.missing && (
-                      <div className="mt-1">
-                        <Badge>arquivo ausente</Badge>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div key={game.id} className="flex flex-col gap-2">
+                <GameTile
+                  game={game}
+                  shortName={shortName}
+                  onOpenDetail={() => onOpenGame(game, consoleName, shortName)}
+                  onPlay={canPlay ? () => handlePlay(game) : undefined}
+                  onToggleFavorite={() => toggleFavorite(game)}
+                />
 
                 {isPendingInstall && installState.kind === "confirm-hardware" && (
                   <div className="rounded border border-dashed border-line-strong p-2">
@@ -369,15 +375,7 @@ export function GamesScreen({
                 )}
 
                 {status.kind === "error" && <p className="text-sm text-danger">{status.message}</p>}
-
-                <Button
-                  variant="primary"
-                  disabled={game.missing || !canAutoConfigure || status.kind === "launching" || isPendingInstall}
-                  onClick={() => handlePlay(game)}
-                >
-                  {status.kind === "launching" ? "Abrindo…" : "Jogar"}
-                </Button>
-              </Card>
+              </div>
             );
           })}
         </div>

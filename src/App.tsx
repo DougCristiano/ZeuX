@@ -69,8 +69,12 @@ function App() {
   // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
   // a tela por console (LibraryScreen) continua existindo.
   const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library">("all-games");
-  // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04) — sempre veio de
-  // AllGamesScreen hoje, então "Voltar" sempre volta pra lá.
+  // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04). M5
+  // (docs/sprint-m-plano.md, 2026-08-07): até aqui só vinha de
+  // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
+  // ver M5) — "Voltar" precisa saber pra qual fase retornar, senão sempre
+  // devolveria pra "all-games" mesmo vindo de dentro de um console.
+  const [gameDetailOrigin, setGameDetailOrigin] = useState<"all-games" | "games">("all-games");
   const [selectedGame, setSelectedGame] = useState<{
     game: LibraryGame;
     consoleName: string;
@@ -287,6 +291,7 @@ function App() {
             // chance de ler `mainRef.current.scrollTop` com a grade ainda
             // na tela.
             setAllGamesScrollTop(mainRef.current?.scrollTop ?? 0);
+            setGameDetailOrigin("all-games");
             setSelectedGame({ game, consoleName, shortName, year });
             setPhase("game-detail");
           }}
@@ -301,7 +306,7 @@ function App() {
           consoleName={selectedGame!.consoleName}
           shortName={selectedGame!.shortName}
           year={selectedGame!.year}
-          onBack={() => setPhase("all-games")}
+          onBack={() => setPhase(gameDetailOrigin)}
         />
       );
       break;
@@ -338,6 +343,15 @@ function App() {
           shortName={selectedConsole!.shortName}
           report={report!}
           onBack={() => setPhase(gamesOrigin)}
+          onOpenGame={(game, consoleName, shortName) => {
+            const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
+            // M5: "Voltar" do detalhe precisa devolver pra cá, não pra
+            // "all-games" — diferente de AllGamesScreen, esta tela não tem
+            // rolagem própria pra salvar (grade curta, sem paginação).
+            setGameDetailOrigin("games");
+            setSelectedGame({ game, consoleName, shortName, year });
+            setPhase("game-detail");
+          }}
         />
       );
       break;

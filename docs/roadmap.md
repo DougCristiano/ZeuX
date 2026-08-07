@@ -150,13 +150,13 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **15** | M1–M15. **Atualizado 2026-08-07** (Lote 2, testado ao vivo com Chromium/Playwright): M1/M2/M3/M4/M7 com código pronto e a maior parte do critério **verificada rodando o app de verdade** (não só `go test`/`npm run build`) — cada um ainda tem 1 checkbox que só o Douglas fecha (janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem"), exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). Por isso os cinco continuam contando como abertos pelo método desta tabela. M5/M6/M8–M15 sem começar |
+| **Sprint M (v1.0)** | **14** | M1–M15. **Atualizado 2026-08-07** (Lote 3, testado ao vivo com Chromium/Playwright): **M5 fechado** (0 checkbox aberto — célula única testada de ponta a ponta, incluindo a instalação inline do L8 disparando pelo overlay). M1/M2/M3/M4/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha (janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem"), exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M6/M8–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
 | **Total do MVP e da dívida** | **1** | só o D2 — dívida + A + B + C + D |
-| **Total para fechar a v1.0** | **18** | G5 + H3 + L3 + os 15 da Sprint M. **O D2 não entra**: depende da Sprint F (v2.0) e sai declarado como dívida, não resolvido |
-| **Total geral** | **37** | 18 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 5 (sem sprint) |
+| **Total para fechar a v1.0** | **17** | G5 + H3 + L3 + os 14 da Sprint M (M5 fechou em 2026-08-07). **O D2 não entra**: depende da Sprint F (v2.0) e sai declarado como dívida, não resolvido |
+| **Total geral** | **36** | 17 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 5 (sem sprint) |
 | Fora do MVP, registrado | 2 | G3 (identificação por hash) e J5 (`DropdownMenu`) — os dois fora **por decisão escrita**, não por esquecimento |
 
 **Leitura honesta do número:** dos 18 itens da v1.0, **3 são verificação humana
@@ -2763,7 +2763,7 @@ prop, `restoredScrollRef` pra aplicar uma vez só).
 **Depende de:** nada
 **Bloqueia:** M3
 
-### M5 — Duas telas desenham o mesmo jogo de dois jeitos (G)
+### M5 — Duas telas desenham o mesmo jogo de dois jeitos (G) — **feito em 2026-08-07**
 
 `AllGamesScreen.tsx:270-317` desenha um jogo como capa 3/4 com badge de
 plataforma, cor de console, estrela de favorito e clique para o detalhe.
@@ -2772,21 +2772,55 @@ texto `font-mono` — **sem capa mesmo quando `cover_url` existe**, sem
 favorito, sem cor de console, sem caminho para o detalhe e sem paginação. O
 usuário troca de tela e não reconhece o próprio acervo.
 
+**Feito em 2026-08-07** (Lote 3 da Sprint M) — `src/components/GameTile.tsx`
+novo: extraído de `AllGamesScreen`, `GamesScreen` ganhou o upgrade. Rodado ao
+vivo (`zeuxd` + `npm run dev` + Chromium/Playwright): apontei a pasta de
+teste do NES pela tela real, abri `GamesScreen`, favoritei um jogo (recurso
+que a tela nunca teve), cliquei fora do ▶ (abriu `GameDetailScreen` com o
+título certo, "Voltar" devolveu pra `GamesScreen`, não para "Todos os
+jogos" — precisou de um `gameDetailOrigin` novo em `App.tsx`) e cliquei no
+▶ (disparou `handlePlay` de verdade: pegou o RetroArch não instalado,
+tentou instalar, bateu no erro real do ADR 0012 — "o RetroArch já vem
+empacotado com o ZeuX", exatamente a armadilha conhecida documentada no
+`CLAUDE.md` — confirmando que o fluxo rico do L8 sobreviveu à migração).
+
+**Decisão de arquitetura tomada nesta sessão, não escrita no plano
+original:** o botão "Jogar" full-width de `GamesScreen` saiu, igual ao que o
+M1 já tinha feito em `AllGamesScreen` — `handlePlay` (a checagem de
+instalado/BIOS antes de lançar) virou o `onPlay` do overlay ▶ do tile
+compartilhado. Isso estende pra cá a mesma limitação que o M1 já aceitou:
+quem só usa teclado/controle chega em `handlePlay` só depois de abrir o
+detalhe e ir até o "▶ Jogar" de lá — que hoje lança direto, sem passar pela
+checagem de instalado/BIOS deste console (`GameDetailScreen` ainda não
+conhece esse fluxo). Registrado como lacuna para o **M6** fechar (dar a
+`GameDetailScreen` acesso ao veredito/preset do console), não escondido.
+
 **Critério de aceite:**
-- [ ] Um componente único de célula de jogo (`src/components/`) é usado pelas
-      duas telas — `grep -rn "GameCover" src/screens/` acha só o componente
-      novo, não duas montagens paralelas.
-- [ ] Um jogo com capa mostra **a mesma capa** nas duas telas (hoje
-      `GamesScreen.tsx:287-289` ignora `game.cover_url`).
-- [ ] Em `GamesScreen`, clicar na capa abre `GameDetailScreen` — hoje não
-      existe caminho para o detalhe a partir da tela por console — e a estrela
-      de favorito se comporta como em `AllGamesScreen`.
-- [ ] O que é exclusivo da tela por console **não** entra no componente
-      compartilhado e continua funcionando: cabeçalho de parecer/BIOS
-      (`GamesScreen.tsx:218-241`), instalação inline (L8, `:306-356`) e
-      confirmação de BIOS vazio (`:320-345`).
-- [ ] `npm run build` passa, e nenhuma das duas telas passa prop que a outra
-      ignora em silêncio.
+- [x] Um componente único de célula de jogo (`src/components/GameTile.tsx`) é
+      usado pelas duas telas — `grep -rn "GameCover" src/screens/` acha só
+      `GameDetailScreen.tsx` (capa grande solo, nunca fez parte da
+      duplicação que este item resolve) — nem `AllGamesScreen.tsx` nem
+      `GamesScreen.tsx` importam `GameCover` direto mais.
+- [x] Um jogo com capa mostra **a mesma capa** nas duas telas — `GameTile`
+      resolve `coverImageURL(game.cover_url)` uma vez só, para as duas.
+- [x] Em `GamesScreen`, clicar na capa abre `GameDetailScreen` — **verificado
+      ao vivo**, inclusive o "Voltar" devolvendo pro lugar certo — e a
+      estrela de favorito se comporta como em `AllGamesScreen` (a tela nunca
+      teve favoritos antes; `toggleFavorite` novo, otimista, mesmo padrão).
+      **Verificado ao vivo.**
+- [x] O que é exclusivo da tela por console **não** entra no componente
+      compartilhado e continua funcionando: cabeçalho de parecer/BIOS,
+      instalação inline (L8) e confirmação de BIOS vazio — continuam como
+      blocos irmãos do tile, ligados por `installState.pendingGamePath`.
+      **Instalação inline verificada ao vivo** (clique no ▶ disparou
+      `handlePlay` → `startInstall` → erro real do backend). Confirmação de
+      hardware insuficiente e de BIOS vazia não foram exercitadas nesta
+      sessão (exigem, respectivamente, um catálogo que recuse por hardware e
+      um emulador com `bios_dir` mapeado — nenhum dos dois estava no cenário
+      de teste), mas o código não mudou de estrutura, só a célula visual.
+- [x] `npm run build` passa, e nenhuma das duas telas passa prop que a outra
+      ignora em silêncio — `GameTile` recebe só o que usa (`game`,
+      `shortName`, `onOpenDetail`, `onPlay`, `onToggleFavorite`).
 
 **Depende de:** M1, M2
 **Bloqueia:** M8, M11, M12

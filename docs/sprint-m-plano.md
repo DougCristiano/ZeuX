@@ -686,6 +686,17 @@ julgamento visual" — e o M1 especificamente teve a densidade de fileiras
 **medida e não batendo o alvo** (2 fileiras cheias em 1280×800, não 3),
 registrado no próprio item do roadmap.
 
+**Atualizado em 2026-08-07 (Lote 3): M5 fechou** — zero checkbox aberto,
+único item da sprint sem nenhuma ressalva pendente do Douglas. Testado ao
+vivo o roteiro inteiro previsto na verificação do item: apontar pasta →
+`GamesScreen` com o tile novo → favoritar → abrir detalhe → voltar pro lugar
+certo → clicar no ▶ e disparar `handlePlay` de verdade (bateu no erro real
+do RetroArch empacotado, ADR 0012 — a mesma armadilha que fechou o L8). Uma
+decisão de arquitetura não prevista no plano original: o botão "Jogar"
+full-width de `GamesScreen` saiu, para consistência com o M1 — ver a nota no
+próprio item do roadmap sobre a lacuna de teclado/controle que isso herda
+(fica para o M6 fechar).
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
 `go test` e `npm run build`): M4, M5, M6, M9, M12, M13, M15 — e as partes
 mecânicas de M1, M2, M3, M8, M11.
