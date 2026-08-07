@@ -306,6 +306,7 @@ function App() {
           consoleName={selectedGame!.consoleName}
           shortName={selectedGame!.shortName}
           year={selectedGame!.year}
+          report={report!}
           onBack={() => setPhase(gameDetailOrigin)}
         />
       );

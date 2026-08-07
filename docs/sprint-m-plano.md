@@ -697,6 +697,19 @@ full-width de `GamesScreen` saiu, para consistência com o M1 — ver a nota no
 próprio item do roadmap sobre a lacuna de teclado/controle que isso herda
 (fica para o M6 fechar).
 
+**Atualizado em 2026-08-07 (Lote 4): M6.** Reaproveitou `ConsoleVerdictCard`
+em vez de escrever texto novo — corrige de quebra uma afirmação errada do
+próprio plano ("esse dado só aparece hoje em `GamesScreen`": conferido no
+código, nunca apareceu lá, só era usado internamente). Testado ao vivo com
+um jogo em patamar "ótimo" (emulador+preset visíveis) e um em "improvável"
+(headline + gargalos nomeados, sem preset) — os dois batendo o esperado.
+**Uma peça não pôde ser verificada nesta sessão:** "abrir a pasta do jogo"
+precisou de `revealItemInDir` (não `openPath`) e de uma permissão nova em
+`src-tauri/capabilities/default.json` — mudança em `src-tauri`, que esta
+sessão não pode compilar nem rodar (sem Rust instalado, ADR 0004). O lado do
+front foi confirmado (falha graciosa fora do Tauri), a permissão em si
+precisa do Douglas num build real.
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
 `go test` e `npm run build`): M4, M5, M6, M9, M12, M13, M15 — e as partes
 mecânicas de M1, M2, M3, M8, M11.

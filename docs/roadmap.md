@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **14** | M1–M15. **Atualizado 2026-08-07** (Lote 3, testado ao vivo com Chromium/Playwright): **M5 fechado** (0 checkbox aberto — célula única testada de ponta a ponta, incluindo a instalação inline do L8 disparando pelo overlay). M1/M2/M3/M4/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha (janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem"), exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M6/M8–M15 sem começar |
+| **Sprint M (v1.0)** | **14** | M1–M15. **Atualizado 2026-08-07** (Lote 4, testado ao vivo com Chromium/Playwright): **M5 fechado** (0 checkbox aberto — célula única testada de ponta a ponta, incluindo a instalação inline do L8 disparando pelo overlay). M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M8–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -2825,14 +2825,23 @@ conhece esse fluxo). Registrado como lacuna para o **M6** fechar (dar a
 **Depende de:** M1, M2
 **Bloqueia:** M8, M11, M12
 
-### M6 — O detalhe do jogo não diz com o que ele vai rodar (M)
+### M6 — O detalhe do jogo não diz com o que ele vai rodar (M) — **feito em 2026-08-07, com ressalva**
 
 `GameDetailScreen.tsx` mostra capa de 220px, título, 2 badges, botão Jogar e 3
 números. Falta justamente **o diferencial declarado do produto**: qual
-emulador e qual preset vão rodar aquele jogo. Esse dado só aparece hoje em
-`GamesScreen`, não na tela do próprio jogo. Falta também `autoFocus` no botão
-Jogar — o `ErrorModal` já faz isso certo (`ui.tsx:139`), o detalhe não — e
-qualquer ação secundária.
+emulador e qual preset vão rodar aquele jogo. Falta também `autoFocus` no
+botão Jogar — o `ErrorModal` já faz isso certo (`ui.tsx:139`), o detalhe não —
+e qualquer ação secundária.
+
+**Correção ao próprio item, achada implementando:** o texto acima ("esse dado
+só aparece hoje em `GamesScreen`") está errado — conferido no código,
+`GamesScreen` **nunca renderizou** `verdict.emulator`/`verdict.preset` como
+texto, só usava os dois campos internamente para decidir o fluxo de
+instalação (`handlePlay`). Quem já mostra esse texto é `ConsoleVerdictCard`
+(`src/components/ui.tsx`, usado em `VerdictScreen`/`ConsoleInfoModal`) — a
+implementação reaproveita esse componente em vez de inventar um novo, o que
+por sinal cumpre melhor o passo 2 do plano ("reaproveitar as frases que a API
+já devolve") do que copiar o texto hardcoded de `GamesScreen` teria feito.
 
 **Corte assumido, com a razão:** o relatório pediu hero com arte de fundo
 "porque o app já consulta o IGDB, que devolve screenshots/artworks". **O
@@ -2844,21 +2853,46 @@ entrega 80% aqui é usar **a capa que já está no disco**, desfocada e
 escurecida, como fundo do topo.
 
 **Critério de aceite:**
-- [ ] A tela mostra o emulador e o preset que vão rodar o jogo, do mesmo dado
-      que `GamesScreen` já usa (`verdict.emulator`/`verdict.preset` por
-      `console_id`), e mostra o aviso de "sem preset automático" no mesmo caso
-      em que `GamesScreen.tsx:234-241` mostra.
-- [ ] O texto sobre preset e hardware é descritivo, **nunca julgador**
-      (princípio 2 do `CLAUDE.md`) — diz o que a máquina alcança, não o que
-      ela deixa de ser.
-- [ ] O botão "▶ Jogar" (`GameDetailScreen.tsx:180-187`) recebe `autoFocus`:
-      entrar na tela por controle já deixa a ação principal focada.
-- [ ] Ações secundárias funcionando: abrir a pasta do jogo (`openPath` do
-      `@tauri-apps/plugin-opener`, já usado em `GamesScreen.tsx:88`) e exibir
-      o caminho completo (`game.path`). **Nenhum link, nenhuma sugestão de
-      onde obter o arquivo** — regra 6 do `CLAUDE.md`.
-- [ ] Com `cover_url` presente, o topo usa a própria capa desfocada e
-      escurecida como fundo; sem capa, o topo fica como está hoje.
+- [x] A tela mostra o emulador e o preset que vão rodar o jogo — via
+      `ConsoleVerdictCard`, reaproveitado — e mostra o aviso de "sem preset
+      automático" no mesmo caso (`level === "improvavel"`, único caso em que
+      `Emulator`/`Preset` ficam vazios — `internal/verdict/verdict.go:36-37`).
+      **Verificado ao vivo** (Chromium/Playwright contra um `zeuxd` real):
+      um jogo de NES mostrou "RetroArch (core Mesen) · Resolução interna 4x
+      com filtros de scanline"; um jogo de PS3 (nível `improvável` no
+      hardware do container de teste) mostrou só o headline e os gargalos
+      nomeados (CPU: threads e clock), sem linha de emulador/preset.
+- [x] O texto sobre preset e hardware é descritivo, **nunca julgador**
+      (princípio 2 do `CLAUDE.md`) — `grep -riE "fraco|ruim|insuficiente|não
+      aguenta|incapaz" src/screens/GameDetailScreen.tsx` não acha nada; o
+      texto vem inteiro de `verdict.headline`/`verdict.bottlenecks` (API),
+      já auditado nas outras telas que usam `ConsoleVerdictCard`.
+- [x] O botão "▶ Jogar" recebe `autoFocus` — **verificado ao vivo**:
+      `document.activeElement` ao entrar na tela é o botão "▶ Jogar".
+- [x] Exibir o caminho completo (`game.path`) — texto puro, sem link, sem
+      sugestão de onde obter o arquivo (regra 6 do `CLAUDE.md`). **Verificado
+      ao vivo.**
+- [ ] Abrir a pasta do jogo. Implementado com `revealItemInDir` (não
+      `openPath` + dirname calculado à mão, que exigiria lidar com os dois
+      separadores de caminho — Windows usa `\`) — **mudança de plano**, o
+      item original citava `openPath`. Isto exigiu uma permissão nova em
+      `src-tauri/capabilities/default.json`
+      (`opener:allow-reveal-item-in-dir`, escopo `**` — a pasta de um jogo
+      pode estar em qualquer lugar do disco, diferente da pasta de BIOS que
+      já tinha escopo fixo em `$HOME/.config/**`). **Não verificado de
+      verdade:** esta sessão não tem Rust instalado (adiamento deliberado,
+      ADR 0004) e não pôde compilar nem rodar `src-tauri` — a mudança de
+      capability não passou por nenhum binário Tauri real. O lado do front
+      foi confirmado (clique no botão sem o runtime do Tauri falha
+      graciosamente, erro capturado e mostrado inline, sem quebrar a tela) —
+      **precisa do Douglas confirmar num build de verdade** que o clique
+      realmente abre o explorador de arquivos com a permissão nova.
+- [x] Com `cover_url` presente, o topo usa a própria capa desfocada e
+      escurecida como fundo; sem capa, o topo fica exatamente como estava.
+      **Verificado por leitura de código** (condicional em
+      `GameDetailScreen.tsx`) — a biblioteca de teste desta sessão não tinha
+      nenhuma capa real baixada (G1/IGDB não configurado no ambiente), então
+      o caminho "com capa" não foi visto rodando, só o "sem capa".
 
 **Fora deste item, registrado para não sumir:** "jogar com outro emulador"
 tem meio caminho pronto no backend (`launchBody.EmulatorID`,
