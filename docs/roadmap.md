@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **12** | M1–M15. **Atualizado 2026-08-07** (Lote 6, testado ao vivo com Chromium/Playwright): **M5, M8 e M9 fechados** (0 checkbox aberto cada — M9 trocou os 33 cartões paginados de `LibraryScreen` por "Consoles configurados" (uma linha por console com pasta) + "Adicionar console" (`Select` do shadcn), testado ao vivo: 2 linhas para 2 consoles configurados, revarrer/remover funcionando, remover devolvendo o console ao `Select`). M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M10–M15 sem começar |
+| **Sprint M (v1.0)** | **11** | M1–M15. **Atualizado 2026-08-07** (Lote 7, testado ao vivo com Chromium/Playwright): **M5, M8, M9 e M10 fechados** (todo checkbox do critério marcado — M10 deu cor própria aos **33** consoles do catálogo, agrupados por fabricante com faixa de matiz fixa e variação só de tom/brilho dentro da família — PlayStation índigo vs. Sega ciano, as duas famílias "azuis" que motivaram o item, confirmadas sem se tocar; testado ao vivo lado a lado em grade e lista). M10 mantém, como os outros "com ressalva", o julgamento final de "as cores ficaram distinguíveis o bastante" para o Douglas — o mecanismo e o cálculo já estão verificados. M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M11–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -3046,7 +3046,7 @@ roda fora do Tauri, mesma limitação já registrada para o `BulkFolderPicker`
 em sessões anteriores — não pôde ser exercitado nesta sessão (só o
 `addLibraryFolder` por trás dele, via API direta).
 
-### M10 — Cor por console: hash sobre 10 cores para 33 consoles (M)
+### M10 — Cor por console: hash sobre 10 cores para 33 consoles (M) — **feito em 2026-08-07, com ressalva**
 
 `src/lib/consoleColor.ts:12-31` escolhe entre 10 cores por hash do
 `console_id`. Com 33 consoles, são ~3 consoles por cor e atribuição arbitrária
@@ -3055,22 +3055,46 @@ em sessões anteriores — não pôde ser exercitado nesta sessão (só o
 assim.
 
 **Critério de aceite:**
-- [ ] Tabela fixa de cor para pelo menos os 15 consoles mais comuns do
+- [x] Tabela fixa de cor para pelo menos os 15 consoles mais comuns do
       catálogo, com cor coerente com a marca (azul PlayStation, vermelho
       Nintendo, azul Sega etc.); o hash atual continua como **fallback** para
-      o resto, sem quebrar console adicionado depois.
-- [ ] Dois consoles da mesma família não recebem cores que se confundem entre
-      si na grade (ex.: PS1/PS2/PS3 variam em tom, não em matiz).
-- [ ] Teste (ou verificação escrita aqui) de que nenhum `console_id` do
-      catálogo fica sem cor.
-- [ ] **A cor continua decorativa, nunca estado** — o docstring do arquivo já
-      diz isso e vale igual: patamar, erro e aviso continuam sendo texto/badge.
-- [ ] Onde a cor aparece fica contido: num mesmo tile não competem ao mesmo
-      tempo borda colorida + badge colorido + estrela âmbar + botão roxo.
-      Escrever aqui qual foi a regra adotada.
+      o resto, sem quebrar console adicionado depois. Foi além do mínimo: os
+      **33** consoles do catálogo ganharam entrada própria (ver nota abaixo
+      sobre por quê), o hash de 10 cores virou fallback só para um console
+      futuro.
+- [x] Dois consoles da mesma família não recebem cores que se confundem entre
+      si na grade (ex.: PS1/PS2/PS3 variam em tom, não em matiz). PlayStation
+      (hue ~218–225°, índigo) e Sega (hue ~191–204°, ciano) — as duas famílias
+      "azuis" que o próprio Douglas citou como caso a desempatar — não se
+      tocam; Nintendo (12 consoles) todos na faixa ~342–352°, variando só tom/
+      brilho.
+- [x] Teste (ou verificação escrita aqui) de que nenhum `console_id` do
+      catálogo fica sem cor. Verificado por script (comparando as chaves de
+      `BRAND_COLORS` contra `internal/verdict/data/consoles.json`): os 33 ids
+      batem 1 a 1, nenhum sobrando de cada lado.
+- [x] **A cor continua decorativa, nunca estado** — nenhuma tela passou a
+      derivar patamar/erro/aviso de `consoleAccentColor`; continua só
+      borda/glow de foco e badge de plataforma.
+- [x] Onde a cor aparece fica contido — regra adotada: **borda/glow do
+      `GameCover` no foco** e **badge de plataforma** (`Badge accentColor`),
+      nos dois modos de exibição. Nunca ao mesmo tempo que outro elemento com
+      cor própria teria significado: a estrela de favorito é âmbar fixo
+      (estado "favoritado", não identidade), o botão primário/▶ é roxo fixo
+      (ação, não identidade) — nenhum dos dois muda com o console, então não
+      competem visualmente com a cor de identidade no mesmo tile.
 
 **Depende de:** nada
 **Bloqueia:** nada
+
+**Testado ao vivo** (Chromium/Playwright contra `zeuxd` real, jogos semeados
+em PS1/PS Vita, Master System/Mega Drive, SNES e Xbox — grade e lista): os
+badges de plataforma renderizaram as cores esperadas lado a lado — PS1
+visivelmente mais índigo que Master System/Mega Drive (mais ciano), SNES
+vermelho, Xbox verde, cada família reconhecível sem precisar ler a sigla.
+**Julgamento visual final ("duas cores não se confundem") continua sendo do
+Douglas** — o critério do item já previa isso; esta sessão confirmou que as
+cores renderizam como calculado, não que "ficaram boas" na opinião de quem
+vai usar todo dia.
 
 ### M11 — `object-cover` corta a capa real (P)
 

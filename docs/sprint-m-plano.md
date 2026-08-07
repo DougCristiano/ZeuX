@@ -739,9 +739,29 @@ manteve a contagem certa, "Remover" tirou a linha e devolveu o console ao
 (`@tauri-apps/plugin-dialog`), que não roda fora do Tauri — mesma limitação
 já registrada para o `BulkFolderPicker` em sessões anteriores.
 
+**Atualizado em 2026-08-07 (Lote 7): M10 fechou** — todo checkbox do critério
+marcado, com a mesma ressalva de M1/M2/M3 (julgamento visual final é do
+Douglas). `src/lib/consoleColor.ts` ganhou `BRAND_COLORS`, uma entrada por
+consoles dos **33** do catálogo (não só os 15 mínimos do critério — uma tabela
+parcial arriscaria o hash de fallback sortear, pra um console sem entrada
+própria, uma cor que colide com a família de outro fabricante, exatamente o
+problema que o item existe pra resolver), agrupadas por fabricante com faixa
+de matiz fixa e variação só de tom/brilho dentro da família. O par que o
+próprio Douglas citou como caso a desempatar — "azul PlayStation vs. azul
+Sega" — ficou em faixas de matiz que não se tocam (PlayStation ~218–225°,
+Sega ~191–204°), confirmado calculando HSL de cada cor e depois vendo lado a
+lado numa página de teste antes de aplicar no app. A cobertura dos 33
+`console_id` foi conferida por script comparando as chaves da tabela contra
+`internal/verdict/data/consoles.json` (não virou teste automatizado — o
+front não tem test runner, decisão registrada no próprio item pra não
+introduzir Vitest só por isto). Testado ao vivo em `AllGamesScreen` (grade e
+lista) com jogos de PS1, PS Vita, Master System, Mega Drive, SNES e Xbox: os
+badges de plataforma mostraram as cores calculadas, PlayStation visivelmente
+mais índigo que Sega.
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
-`go test` e `npm run build`): M4, M5, M6, M8, M9, M12, M13, M15 — e as partes
-mecânicas de M1, M2, M3, M11.
+`go test` e `npm run build`): M4, M5, M6, M8, M9, M10, M12, M13, M15 — e as
+partes mecânicas de M1, M2, M3, M11.
 
 **Precisa do Douglas olhando a tela de verdade:**
 - **M2** — se as cores de dois consoles são distinguíveis lado a lado.
