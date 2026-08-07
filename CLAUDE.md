@@ -139,6 +139,16 @@ produto que ele encarna. Mantenha isso ao criar pacotes novos.
 `level: "otimo"` é sem acento de propósito: é chave, não texto de UI. O texto
 que o usuário lê vem de `Level.Headline()`.
 
+**Exceção decidida pelo Douglas em 2026-08-07:** os valores de `?sort=` em
+`GET /library/games` (Sprint M, item M3) ficam em português —
+`recentes`/`titulo`/`tempo_jogado` — em vez de `recent`/`title`/`playtime`.
+Motivo: é preferência de tela consumida só pela própria UI do ZeuX, e o
+Douglas pretende gerar uma tradução da API para inglês depois; até lá, manter
+consistência com o restante do vocabulário em português custa menos do que
+traduzir só este parâmetro. Não use este caso como precedente para outra
+chave ou enum sem perguntar — é exceção pontual, registrada aqui pelo mesmo
+motivo que `level: "otimo"` está.
+
 ### Erros
 
 - Erros devolvidos ao usuário são frases completas em português, já exibíveis.

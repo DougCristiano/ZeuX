@@ -147,12 +147,8 @@ foco, mesma intensidade).
 
 ### M1 — O overlay ▶ não lança, e o botão embaixo do tile custa densidade (M)
 
-**Decisão de design necessária antes de codar:** **sim, uma.** Com o `<Button>`
-"Jogar" fora da célula, o caminho de erro muda: hoje o rótulo do botão vira
-"Tentar de novo". O critério do item já diz que a falha deve chegar pelo
-`ErrorModal` — mas **como o usuário tenta de novo?** Duas leituras: clicar o ▶
-outra vez (mais simples, nada a construir) ou um botão "Tentar de novo" dentro
-do próprio `ErrorModal`. Ver "Decisões em aberto" no fim.
+**Decidido pelo Douglas em 2026-08-07:** o `ErrorModal` ganha um botão "Tentar
+de novo" — não basta deixar o usuário clicar o ▶ de novo por conta própria.
 
 **Passos:**
 
@@ -171,8 +167,17 @@ do próprio `ErrorModal`. Ver "Decisões em aberto" no fim.
    `FavoriteToggle` que já vive sobreposto.
 3. `src/screens/AllGamesScreen.tsx` — passar `onPlay={() => launch(game)}` do
    `useLaunchGame` que a tela já usa; remover o `<Button variant="primary">`
-   full-width e o estado de rótulo "Tentar de novo".
-4. Conferir que o `ErrorModal` continua sendo aberto por `launchError` (a tela
+   full-width.
+4. `src/components/ui.tsx`, `ErrorModal` — ganha uma prop opcional
+   `onRetry?: () => void`; quando presente, renderiza um segundo botão "Tentar
+   de novo" ao lado de "Fechar", com `autoFocus` nele (mesmo padrão que o botão
+   principal já usa). `GameDetailScreen` (que já usa `ErrorModal` sem retry)
+   continua funcionando sem passar a prop.
+5. `AllGamesScreen.tsx` — guardar o jogo da última tentativa (o `launch(game)`
+   já sabe qual foi) e passar `onRetry={() => launch(lastGame)}` ao
+   `ErrorModal`; clicar "Tentar de novo" chama `launch` de novo sem fechar a
+   tela nem recarregar a grade.
+6. Conferir que o `ErrorModal` continua sendo aberto por `launchError` (a tela
    já faz isso) — o caminho de erro não pode sumir junto com o botão.
 
 **Verificação:**
@@ -190,16 +195,15 @@ do próprio `ErrorModal`. Ver "Decisões em aberto" no fim.
 
 ### M7 — Pixel font abaixo do piso, e título duplicado sobre a capa (P)
 
-**Decisão de design necessária:** **sim, uma.** O item manda tirar o título de
-cima da arte quando existe capa. Falta decidir o **badge de plataforma** —
-subir de `9px` para `11px` aumenta o badge em ~20% sobre uma capa pequena.
-Alternativa: manter o tamanho visual trocando a fonte pixel por Inter no badge
-(o piso de 11px é da fonte pixel, não de toda fonte). Ver "Decisões em aberto".
+**Decidido pelo Douglas em 2026-08-07:** o badge de plataforma sobe de `9px`
+para `11px` (mantém a fonte pixel), aceitando o aumento de ~20% sobre a capa.
+Ajuste fica em aberto para depois se não ficar legível na prática ("podemos
+alterar depois se não ficar bom").
 
 **Passos:**
 
-1. `src/components/ui.tsx` — badge de plataforma (`text-[9px]`) e `ConsoleIcon`
-   (`text-[8px]`) resolvidos conforme a decisão acima.
+1. `src/components/ui.tsx` — badge de plataforma (`text-[9px]` → `text-[11px]`)
+   e `ConsoleIcon` (`text-[8px]` → `text-[11px]`, mesma regra do piso).
 2. `GameCover` — o bloco de título sobre a capa passa a renderizar **só quando
    não há `coverUrl`**, com truncamento (`line-clamp-3`).
 3. `AllGamesScreen.tsx` — o rótulo em Inter embaixo do tile ganha
@@ -221,14 +225,10 @@ Este item tem **duas metades independentes** que o roadmap empacotou juntas:
 estado preservado (front) e chips honestos (back + front). Podem ser feitas em
 ordem, na mesma branch, mas falham por motivos diferentes.
 
-**Decisão de design necessária:** **sim, uma.** Onde mora o estado preservado?
-Duas opções, com custos diferentes:
-- **(a)** subir `page`/`search`/`platformFilter` para `App.tsx` e passar como
-  prop — simples, sem dependência, mas aumenta o estado do `App` (que hoje é
-  máquina de fases);
-- **(b)** manter `AllGamesScreen` montada e esconder com CSS quando a fase for
-  `game-detail` — preserva rolagem "de graça", mas mantém duas telas montadas.
-Ver "Decisões em aberto".
+**Decidido pelo Douglas em 2026-08-07:** opção (a) — subir
+`page`/`search`/`platformFilter` para `App.tsx` e passar como prop. A
+rolagem (que essa opção não cobre de graça) se resolve com `ref` no container
+rolável e restauração no `useEffect`, como o passo 7 abaixo já previa.
 
 **Passos — metade servidor:**
 
@@ -265,14 +265,19 @@ Ver "Decisões em aberto".
 
 ### M3 — Sem ordenação, sem modo lista, sem barra de controle única (G)
 
-**Decisões de design necessárias:** **duas.**
-- Os nomes dos valores de `?sort=`. O critério do roadmap propõe
-  `recentes`/`titulo`/`tempo_jogado` — em português, sem acento. **Isso
-  contraria a convenção do `CLAUDE.md`** ("chaves de JSON e valores de enum:
-  inglês/sem acento"). Ver "Decisões em aberto".
-- O layout da linha do modo lista (quais colunas, em que ordem). O critério
-  fixa o **conteúdo** (título, plataforma com cor, tempo jogado, ação) e a
-  **densidade** (12 linhas em 1280×800), não o desenho.
+**Decisões, tomadas pelo Douglas em 2026-08-07:**
+- **Nomes de `?sort=`: português**, mesmo contrariando a convenção do
+  `CLAUDE.md` de valor de enum em inglês sem acento. Ficam `recentes` (padrão,
+  hoje implícito), `titulo` e `tempo_jogado`. **Isto é uma exceção explícita à
+  convenção**, no mesmo espírito de `level: "otimo"` — registrar aqui e no
+  `CLAUDE.md` (tabela de convenções de idioma) para não virar "erro" numa
+  auditoria futura. O Douglas pretende criar uma tradução para inglês depois;
+  até lá, `?sort=` fica em português como o resto da API que é consumida só
+  pela própria UI do ZeuX.
+- **Grade virtualizada entra nesta sprint**, ao contrário da recomendação
+  deste plano (que sugeria deixar fora por falta de problema medido). O
+  Douglas quer validar virtualização já, não só quando um acervo real travar a
+  rolagem.
 
 **Passos:**
 
@@ -292,12 +297,29 @@ Ver "Decisões em aberto".
    primeiro render, gravar no `onChange`, com fallback silencioso se o valor
    salvo for lixo.
 7. Rótulo da ordem padrão dizendo o que ela é ("jogados por último").
+8. **Virtualização da grade e da lista** — isto é dependência de Node nova
+   (nenhuma lib de virtualização está no `package.json` hoje), então por
+   `CLAUDE.md` ("não instale dependências de Node sem pedir") registra-se
+   aqui que **o pedido já foi feito** por este item, não é decisão unilateral
+   da sessão. Candidata: `@tanstack/react-virtual` (headless, sem CSS
+   próprio para conflitar com Tailwind, mantida ativamente). Aplicar nos dois
+   modos (grade e lista), calculando altura de linha/célula a partir do
+   `PAGE_SIZE` (M15) e das colunas atuais do grid responsivo. Como a página já
+   é paginada pelo servidor (30 por página), a virtualização aqui é sobre o
+   **DOM da página carregada**, não substitui a paginação — os dois mecanismos
+   coexistem.
 
 **Verificação:**
 - `go test ./internal/api`, `npm run build`.
 - Roteiro de terminal por valor de `sort`.
+- Virtualização: contagem de nós DOM renderizados (`document.querySelectorAll`
+  dos tiles/linhas) enquanto a página tem `PAGE_SIZE` itens, confirmando que
+  fica abaixo do total quando a grade não cabe inteira na viewport —
+  verificável por sessão de IA com Playwright.
 - **Precisa do Douglas:** "cabe pelo menos 12 linhas em 1280×800" — mensurável
-  com Playwright, mas o julgamento de "a lista densa ficou legível" é dele.
+  com Playwright, mas o julgamento de "a lista densa ficou legível" é dele; e
+  se a virtualização não introduziu soluço perceptível ao rolar rápido (jank),
+  que é julgamento de sensação, não de número.
 
 ---
 
@@ -342,23 +364,43 @@ que o exclusivo de `GamesScreen` **fica fora** do componente compartilhado.
 
 ### M8 — A grade não sinaliza o jogo que não vai abrir (M)
 
-**Decisão de design necessária:** **sim, uma.** O texto exato dos badges. O
-critério fixa a regra (descreve o que falta, nunca julga a máquina, nunca
-bloqueia) e sugere "instalar emulador" / "sem preset" / "arquivo ausente" —
-mas "sem preset" é jargão do ZeuX, não do usuário. Ver "Decisões em aberto".
+**Decidido pelo Douglas em 2026-08-07:** a proposta de texto ("o ZeuX ainda
+não escolheu uma configuração para este console") foi aprovada **com uma
+condição** — o badge precisa trazer o motivo, não só o fato. "Não deixa claro
+o pq zeux nao escolheu. Traga um motivo."
+
+Isto só se aplica ao caso `!canAutoConfigure` — "instalar emulador" e "arquivo
+ausente" **já são motivos** (nomeiam exatamente o que falta, princípio 3 do
+`CLAUDE.md`). O caso sem preset é o único genérico, e o produto já tem de onde
+tirar o motivo: `ConsoleVerdict.Bottlenecks` nomeia o componente que barra
+(GPU/CPU/RAM), a mesma regra que a tela de veredito por console já usa. A
+resolução:
+- Badge curto: `"sem preset — {bottleneck}"` (ex.: `"sem preset — GPU"`), lido
+  do primeiro item de `verdict.bottlenecks` quando existir.
+- Sem `bottlenecks` (nível `"nada"` sem gargalo nomeado, ou dado `"parcial"`
+  por informação que não pôde ser lida — princípio 4) o badge cai no texto
+  genérico aprovado: `"sem preset automático para este console"`.
+- O `title` (tooltip nativo) do badge sempre carrega a frase completa, no
+  mesmo padrão que o caminho truncado do M9: `"O ZeuX ainda não escolheu uma
+  configuração para este console porque {frase do bottleneck, ou o texto
+  genérico}."` — descritivo, nunca julgador, sem adjetivo sobre a máquina.
 
 **Passos:**
 
 1. Extrair a regra de decisão para **um** lugar — `src/hooks/useGameLaunchability.ts`
    ou uma função pura em `src/lib/`. Ela precisa dos mesmos insumos que
    `GamesScreen.handlePlay` usa hoje: `game.missing`, `canAutoConfigure` (do
-   verdict do console), `adapterEntry.installed`, `adapterEntry.bios_dir_empty`.
-   **`AllGamesScreen` hoje não carrega `EmulatorEntry` nenhum** — vai precisar
-   de `GET /emulators` (a tela de emuladores já o consome; o dado existe).
+   verdict do console), `adapterEntry.installed`, `adapterEntry.bios_dir_empty`
+   — mais `verdict.bottlenecks`, que `handlePlay` hoje não consulta (só o
+   `Callout` da tela por console usa a frase pronta; o badge precisa do dado
+   estruturado). **`AllGamesScreen` hoje não carrega `EmulatorEntry` nenhum** —
+   vai precisar de `GET /emulators` (a tela de emuladores já o consome; o dado
+   existe).
 2. `GamesScreen.handlePlay` passa a chamar a mesma função, em vez de repetir a
    cadeia de `if` — é o "só uma implementação de 'este jogo pode abrir?'" que o
    critério exige por `grep`.
-3. `GameTile` (M5) ganha o esmaecimento e o badge, a partir do resultado.
+3. `GameTile` (M5) ganha o esmaecimento e o badge, a partir do resultado,
+   compondo o texto curto + o `title` conforme a regra acima.
 4. Clicar no badge de "instalar emulador" na grade dispara a instalação inline
    do L8. **Isso significa que o fluxo de instalação precisa sair de
    `GamesScreen` para um lugar compartilhado** — é o maior pedaço deste item, e
@@ -451,10 +493,7 @@ adjetivos de valor que o B9 estabeleceu
 
 ### M9 — "Onde estão minhas ROMs" tratado como formulário administrativo (G)
 
-**Decisão de design necessária:** **sim, uma.** A tela nova precisa de um
-seletor de console na seção "Adicionar console". Hoje não há nenhum — cada
-console tem seu próprio cartão. Com 33 consoles, isso é um `Select` do shadcn
-(J3 já instalou) ou um campo de busca com lista. Ver "Decisões em aberto".
+**Decidido pelo Douglas em 2026-08-07:** `Select` do shadcn (J3 já instalou).
 
 **Passos:**
 
@@ -483,14 +522,14 @@ caminho que fechou o L6.
 
 ### M10 — Cor por console: hash sobre 10 cores para 33 consoles (M)
 
-**Este item precisa de decisão do Douglas antes de qualquer linha de código.**
-A tabela de cores é escolha de design, não questão técnica — e o item traz um
-risco de produto que o roadmap não registra: **cor de marca de fabricante**
-(azul PlayStation, vermelho Nintendo) chega perto do mesmo terreno que o G5 já
-decidiu evitar ao descartar logo real de terceiro. Cor sozinha não é marca
-registrada da mesma forma que um logotipo, mas a decisão merece ser dele.
+**Decidido pelo Douglas em 2026-08-07:** usar cor associada à marca do
+fabricante (azul PlayStation, vermelho Nintendo, azul Sega etc.). Onde duas
+cores de marcas diferentes ficarem parecidas demais para distinguir na grade,
+resolver por **tom ou brilho**, não trocando de matiz — a mesma regra que já
+valia para famílias do mesmo fabricante (PS1/PS2/PS3, GB/GBC/GBA) agora também
+serve para desempatar marcas vizinhas (ex.: azul PlayStation vs. azul Sega).
 
-**Passos, depois da decisão:**
+**Passos:**
 
 1. Escrever a tabela em `src/lib/consoleColor.ts` como mapa explícito
    `console_id → cor`, cobrindo pelo menos 15 consoles.
@@ -514,20 +553,35 @@ confundem na grade" é julgamento visual.
 
 ### M13 — Rótulos da sidebar derivados por `slice(0, 3)` (P)
 
-**Decisão de design necessária:** **sim, uma.** O critério oferece duas saídas
-(rail que expande no hover/foco, ou sigla escrita à mão em `NAV_ITEMS`) e não
-escolhe. A segunda é muito menor e não mexe em layout; a primeira é mais
-comunicativa e traz o risco de refluxo da grade que o próprio critério manda
-evitar. Ver "Decisões em aberto".
+**Decidido pelo Douglas em 2026-08-07:** rail que expande no hover/foco,
+mostrando o nome inteiro — a opção mais comunicativa, aceitando o trabalho
+extra de garantir que a expansão não reflua a grade de conteúdo.
 
-**Passos (sigla à mão — a opção menor):**
+**Passos:**
 
-1. `Sidebar.tsx` — `NAV_ITEMS` ganha um campo `short`, escrito à mão.
-2. Apagar o `slice(0, 3).toUpperCase()` de `:109`.
-3. Atualizar o comentário de `:35-37`, que registra a escolha de 2026-08-04 —
+1. `Sidebar.tsx` — a sidebar (`w-16` hoje) ganha um estado de
+   hover/foco-dentro (`group` no `<nav>` ou `useState` em
+   `onMouseEnter`/`onFocus`/`onBlur`) que expande sua própria largura (ex.:
+   `w-16` → `w-48`) e revela o `item.label` completo ao lado do ícone.
+2. **A expansão precisa ser `position: absolute`/sobreposta ao conteúdo, não
+   `position: static` empurrando o `<main>`.** É exatamente o risco de
+   refluxo que o `CLAUDE.md` já registra para breakpoints: a sidebar expandida
+   não pode mudar a largura da área de conteúdo (`flex-1` em `App.tsx`) a cada
+   passada de mouse — isso re-dispara os breakpoints de colunas da grade
+   (M3/M15) em tempo real, o que é pior que a sigla truncada que este item
+   resolve.
+3. Expande também no **foco de teclado/gamepad** (`focus-within`), não só no
+   `:hover` — ADR 0009: nada só-hover. Ao perder o foco/hover, recolhe.
+4. Apagar o `slice(0, 3).toUpperCase()` de `:109` — o rótulo completo some
+   quando recolhida (só o ícone fica visível, como hoje) e aparece por inteiro
+   quando expandida; sem sigla derivada em nenhum dos dois estados.
+5. Atualizar o comentário de `:35-37`, que registra a escolha de 2026-08-04 —
    ele passa a registrar **por que ela foi revertida**, não some.
 
-**Verificação:** `npm run build`; leitura. **Verificável por sessão de IA.**
+**Verificação:** `npm run build`; leitura. Medir com Playwright que a
+`boundingClientRect` do `<main>` não muda ao expandir a sidebar (critério do
+passo 2) — **verificável por sessão de IA**. Julgar se a expansão em si "lê
+bem" fica com o Douglas.
 
 ---
 
@@ -560,15 +614,15 @@ aparece" **é** verificável por IA.
 
 ### M15 — Arestas cosméticas (P)
 
-**Decisão necessária:** **sim, uma pequena.** O `PAGE_SIZE` do front é 24 e o
-`defaultLibraryPageSize` do servidor **também é 24** (`server.go`). O item só
-cita o do front. Mudar só um deixa os dois divergentes em silêncio. Ver
-"Decisões em aberto".
+**Decidido pelo Douglas em 2026-08-07:** os dois acompanham — front e
+`defaultLibraryPageSize` do servidor vão a 30 juntos.
 
 **Passos:**
 
 1. `AllGamesScreen.tsx:8` — `PAGE_SIZE` para 30 (múltiplo de 5 e 6, abaixo de
-   `maxLibraryPageSize = 100`), e o servidor conforme a decisão.
+   `maxLibraryPageSize = 100`). `internal/api/server.go`,
+   `defaultLibraryPageSize` — também para 30, e [`docs/api.md`](api.md)
+   atualizado onde o valor padrão de página é citado.
 2. `ui.tsx` — a scanline (`opacity-40`) passa a ser renderizada só quando **não
    há** `coverUrl`.
 3. `AllGamesScreen.tsx` — o progresso de "Buscar capas" sai do rótulo do botão
@@ -587,33 +641,32 @@ parar de mudar de largura é mensurável com `getBoundingClientRect`).
 | **M5 quebra o fluxo rico de `GamesScreen`** (instalar inline, BIOS vazio) | O caminho mais valioso do produto (L8) some sem ninguém notar, porque `npm run build` passa | M5 tem passo dedicado a preservar esses três blocos, e a verificação repete o roteiro Playwright que fechou o L7/L8 |
 | **M8 exige `GET /emulators` numa tela que nunca o carregou** | Uma requisição a mais por abertura da biblioteca, em cima de uma rota que já custou uma otimização inteira (D9) | Registrado no "Estado verificado"; se pesar, cachear na camada de `App.tsx` em vez de por tela |
 | **M4 e M3 no mesmo handler Go** | Merge conflict em cima de si mesmo, ou um desfazendo o outro | Ordem fixada (M4 → M3), com o motivo escrito |
-| **M10 vira debate de gosto e trava a sprint** | Item M parado esperando decisão que não é técnica | Marcado como bloqueado por decisão do Douglas antes de codar, não descoberto no meio |
+| **M3 ganha dependência de Node nova (virtualização)** | Primeira lib de virtualização do front; risco de regressão de acessibilidade se a lib não preservar foco/D-pad ao rolar | Escolher lib headless (`@tanstack/react-virtual`) e testar `Tab`/D-pad explicitamente depois de integrar — mesma verificação dos outros itens de foco |
 | **Regressão de acessibilidade acumulada** — M1, M5, M9 e M13 mexem em foco, e o ADR 0009/0014 é o que mais erode | Cada item passa sozinho, o conjunto quebra a navegação por controle | Cada item tem `Tab`/D-pad na verificação, e L3 (verificação com hardware real, aberto) fica como rede final — **mas ela é do Douglas** |
 | **Escopo crescer para "prateleiras" e "modo TV"** | A sprint deixa de ter fim | O roadmap já cortou os dois explicitamente (M3 e a nota de inspiração no fim da sprint); este plano não os reabre |
 
 ---
 
-## Decisões em aberto — precisam do Douglas antes de codar
+## Decisões tomadas pelo Douglas em 2026-08-07
 
-Nenhuma delas é bloqueante para a sprint inteira; cada uma bloqueia o próprio
-item. Estão aqui em vez de resolvidas por conta própria porque são escolha de
-produto, não de implementação.
+As dez decisões de produto que bloqueavam itens desta sprint foram todas
+resolvidas na mesma conversa. Nenhuma ficou pendente — a sprint inteira pode
+ser codada sem parar para perguntar de novo. O detalhe de cada uma, com o
+raciocínio e os passos que ela muda, está na seção do próprio item; aqui fica
+só o registro compacto, na ordem em que foram perguntadas.
 
-| # | Item | Pergunta | Opção menor, se você não quiser decidir agora |
-|---|---|---|---|
-| 1 | **M10** | Tabela fixa de cor por console: quais 15+ consoles, e **usar cor associada à marca** (azul PlayStation, vermelho Nintendo) é aceitável? Cor não é logotipo, mas é o mesmo terreno que o G5 decidiu evitar ao descartar marca de terceiro | Tabela por **família de fabricante** com tons neutros escolhidos por você, sem referência a marca |
-| 2 | **M3** | Nomes dos valores de `?sort=`. O roadmap propôs `recentes`/`titulo`/`tempo_jogado` (português). O `CLAUDE.md` manda valor de enum em **inglês sem acento** (`level: "otimo"` é a exceção histórica, não a regra) | `recent`/`title`/`playtime` — segue a convenção sem discussão |
-| 3 | **M3** | Grade virtualizada: **não é necessária** e este plano não a inclui. A paginação de 24→30 por página (M15) já limita o DOM; virtualizar exigiria dependência nova. Confirma que fica fora? | Fica fora. Se um acervo real do Douglas travar a rolagem, vira item próprio com número medido |
-| 4 | **M1** | Com o `<Button>` "Jogar" fora do tile, como o usuário tenta de novo depois de uma falha? Clicar o ▶ outra vez, ou um "Tentar de novo" dentro do `ErrorModal`? | Clicar o ▶ outra vez — nada a construir, e o `ErrorModal` já mostra a mensagem do servidor |
-| 5 | **M4** | Onde mora o estado preservado: subir para `App.tsx` (mais estado no `App`) ou manter `AllGamesScreen` montada e escondida (duas telas montadas)? | Subir para `App.tsx` — mais explícito, e a rolagem se resolve com `ref` |
-| 6 | **M7** | O badge de plataforma sobe de `9px` para `11px` (fica ~20% maior sobre a capa) ou troca a fonte pixel por Inter no badge, preservando o tamanho visual? | Trocar para Inter — respeita o piso sem mudar a densidade da grade |
-| 7 | **M8** | Texto dos badges. "sem preset" é jargão do ZeuX. Qual redação? Ela precisa descrever o que falta sem julgar a máquina (princípio 2) | "o ZeuX ainda não escolheu uma configuração para este console" — descritivo, sem adjetivo |
-| 8 | **M9** | Como escolher o console na seção "Adicionar console", com 33 opções: `Select` do shadcn (J3, já instalado) ou campo de busca com lista? | `Select` do shadcn — já está no projeto, teclado nativo de graça |
-| 9 | **M13** | Rail que expande no hover/foco, ou sigla escrita à mão em `NAV_ITEMS`? | Sigla à mão — muito menor, e não arrisca o refluxo da grade que o próprio critério manda evitar |
-| 10 | **M15** | `PAGE_SIZE` do front vai a 30. O `defaultLibraryPageSize` do servidor (hoje 24, mesmo número) acompanha? | Acompanhar — dois números iguais que divergem em silêncio é armadilha futura |
-
-**Se você não responder nenhuma delas**, a sprint ainda anda: M2, M5, M6, M11,
-M12 e M14 não dependem de decisão sua. M2 é o primeiro passo de qualquer forma.
+| # | Item | Decisão |
+|---|---|---|
+| 1 | **M10** | Cor associada à marca do fabricante (azul PlayStation, vermelho Nintendo, azul Sega). Marcas vizinhas com cores parecidas se resolvem por tom/brilho, não por matiz |
+| 2 | **M3** | `?sort=` em português (`recentes`/`titulo`/`tempo_jogado`) — exceção deliberada à convenção de enum em inglês do `CLAUDE.md`, registrada como tal; tradução para inglês fica para depois |
+| 3 | **M3** | Grade virtualizada **entra** nesta sprint, para validar já — ao contrário da recomendação deste plano. Precisa de dependência de Node nova (candidata: `@tanstack/react-virtual`); o pedido explícito do Douglas já cobre a exigência do `CLAUDE.md` de não instalar dependência sem pedir |
+| 4 | **M1** | Botão "Tentar de novo" dentro do `ErrorModal`, não só clicar o ▶ de novo |
+| 5 | **M4** | Estado preservado sobe para `App.tsx` (opção a) |
+| 6 | **M7** | Badge de plataforma sobe de `9px` para `11px`, mantendo a fonte pixel. "Podemos alterar depois se não ficar bom" |
+| 7 | **M8** | Texto aprovado, com uma condição: o badge precisa trazer o motivo, não só o fato. Resolvido reaproveitando `verdict.bottlenecks` (ver item M8) |
+| 8 | **M9** | `Select` do shadcn |
+| 9 | **M13** | Rail que expande no hover/foco (não a sigla escrita à mão) |
+| 10 | **M15** | `PAGE_SIZE` do front e `defaultLibraryPageSize` do servidor vão juntos a 30 |
 
 ---
 

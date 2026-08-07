@@ -2531,10 +2531,10 @@ mente.
       medido depois fica escrito aqui, contra o ~1,7 de hoje.
 - [ ] Navegando só por D-pad/Tab, ir do primeiro jogo de uma fileira ao
       primeiro da fileira seguinte custa **1** movimento vertical, não 2.
-- [ ] O caminho de erro não some junto com o botão: hoje o rótulo vira
-      "Tentar de novo" (`AllGamesScreen.tsx:315`); com o botão fora, a falha
-      continua chegando ao usuário pelo `ErrorModal` e é possível tentar de
-      novo sem recarregar a tela.
+- [ ] O caminho de erro não some junto com o botão: o `ErrorModal` ganha um
+      botão "Tentar de novo" (decidido em 2026-08-07 — não basta reaproveitar
+      o clique no ▶), que relança o mesmo jogo sem fechar a tela nem
+      recarregar a grade.
 
 **Depende de:** nada
 **Bloqueia:** M5 (o tile unificado precisa nascer com este comportamento), M3
@@ -2592,12 +2592,23 @@ da lista padrão — falta rótulo, não mecanismo. Prateleira de verdade (seç�
 horizontais empilhadas) é escopo de sprint própria e fica registrada como
 candidata, não como parte deste item.
 
+**Decidido em 2026-08-07:** os valores de `?sort=` ficam em português
+(`recentes`/`titulo`/`tempo_jogado`), **exceção deliberada** à convenção do
+`CLAUDE.md` de valor de enum em inglês sem acento — registrada ali. E a grade
+ganha virtualização nesta sprint (dependência de Node nova, pedida
+explicitamente pelo Douglas — ver detalhe em
+[`sprint-m-plano.md`](sprint-m-plano.md)), em vez de ficar fora como este
+plano recomendava.
+
 **Critério de aceite:**
 - [ ] `GET /api/v1/library/games` aceita `?sort=` com pelo menos `recentes`
       (o padrão de hoje), `titulo` e `tempo_jogado`; valor desconhecido cai no
       padrão sem erro. A ordenação acontece **no servidor, antes de paginar** —
       `handleListLibraryGames` já ordena a lista inteira antes de fatiar
       (`server.go:1123-1163`), é ali que o `sort` entra, nunca no cliente.
+- [ ] A grade e a lista são virtualizadas: a contagem de nós DOM renderizados
+      fica abaixo do total de itens da página quando ela não cabe inteira na
+      viewport, sem quebrar navegação por Tab/D-pad ao rolar.
 - [ ] Teste em `internal/api/library_test.go` trava cada ordem: 3 jogos com
       títulos, tempos e datas diferentes, uma requisição por valor de `sort`.
 - [ ] `AllGamesScreen` tem **uma** barra no topo com busca, ordenação
@@ -2760,10 +2771,23 @@ preset disponível e BIOS vazia só existe em `GamesScreen`
 só descobre no clique, quando o `ErrorModal` aparece. Isso não contraria
 "informar, não bloquear": o jogo continua clicável, só deixa de ser surpresa.
 
+**Decidido em 2026-08-07:** o texto genérico "o ZeuX ainda não escolheu uma
+configuração para este console" foi aprovado **com uma condição** — precisa
+trazer o motivo, não só o fato. Resolvido reaproveitando
+`ConsoleVerdict.Bottlenecks` (o mesmo dado que já nomeia o componente que
+barra, princípio 3): quando há gargalo nomeado, o badge é `"sem preset —
+{componente}"`; sem gargalo nomeado (nível "nada" sem bottleneck, ou dado
+"parcial"), cai no texto genérico. Ver detalhe em
+[`sprint-m-plano.md`](sprint-m-plano.md).
+
 **Critério de aceite:**
 - [ ] Um jogo cujo emulador não está instalado, ou cujo console não alcançou
       patamar nenhum, aparece com a capa esmaecida e um badge curto dizendo o
-      que falta ("instalar emulador" / "sem preset" / "arquivo ausente").
+      que falta ("instalar emulador" / "sem preset — {componente}" /
+      "arquivo ausente").
+- [ ] O caso "sem preset" nomeia o motivo (o componente do
+      `verdict.bottlenecks`) sempre que o dado existir — nunca fica só no fato
+      genérico quando há um motivo para citar.
 - [ ] O texto do badge descreve o que falta, **nunca julga a máquina**
       (princípio 2) e **nunca bloqueia** o clique (princípio 5) — o jogo
       continua lançável por conta e risco.
@@ -2892,16 +2916,18 @@ como "console" — justamente na tela onde a palavra "console" é onipresente. O
 comentário de `Sidebar.tsx:35-37` registra que a sigla derivada foi escolha de
 2026-08-04; o que mudou é a evidência de que ela não comunica.
 
+**Decidido em 2026-08-07:** rail que expande no hover/foco (não a sigla
+escrita à mão).
+
 **Critério de aceite:**
-- [ ] Nenhum rótulo de navegação é derivado por `slice` — ou o rail expande no
-      hover/foco mostrando o nome inteiro, ou a sigla é escrita à mão num
-      campo próprio de `NAV_ITEMS`.
-- [ ] Se o rail expandir, ele expande também no **foco de teclado/gamepad**,
-      não só no hover (ADR 0009: nada só-hover).
+- [ ] Nenhum rótulo de navegação é derivado por `slice` — o rail expande no
+      hover/foco mostrando o nome inteiro.
+- [ ] O rail expande também no **foco de teclado/gamepad**, não só no hover
+      (ADR 0009: nada só-hover).
 - [ ] A sidebar continua `w-16` no estado normal (é chrome de navegação, a
-      exceção de largura fixa já registrada no `CLAUDE.md`) e a área de
-      conteúdo não muda de largura de forma que reflua a grade a cada passada
-      de mouse.
+      exceção de largura fixa já registrada no `CLAUDE.md`), a expansão é
+      sobreposta ao conteúdo (não empurra `<main>`), e a área de conteúdo não
+      muda de largura de forma que reflua a grade a cada passada de mouse.
 
 **Depende de:** nada
 **Bloqueia:** nada
@@ -2932,11 +2958,17 @@ nem escuta `gamepadconnected`. Então este item inclui expor esse estado.
 
 Três achados pequenos, agrupados por serem do mesmo tamanho e da mesma tela:
 
+**Decidido em 2026-08-07:** o `defaultLibraryPageSize` do servidor acompanha
+o front — os dois vão a 30 juntos, para não divergir em silêncio.
+
 **Critério de aceite:**
 - [ ] `PAGE_SIZE` de `AllGamesScreen.tsx:8` deixa de ser 24 (que nunca fecha
       fileira numa grade de 5 ou 6 colunas) e passa a um múltiplo de 5 e 6
       — 30 serve, e continua abaixo de `maxLibraryPageSize = 100`
       (`internal/api/server.go:1063`).
+- [ ] `defaultLibraryPageSize` no servidor também vai a 30, e
+      [`docs/api.md`](api.md) é atualizado onde o valor padrão de página é
+      citado.
 - [ ] A scanline (`ui.tsx:209`, `opacity-40`) deixa de ser aplicada sobre capa
       real e fica só sobre o placeholder de sigla — ela existe para dar textura
       ao vazio, não para degradar arte que o usuário acabou de baixar.
