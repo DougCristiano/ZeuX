@@ -363,13 +363,22 @@ export function AllGamesScreen({
 
   return (
     <div className="mx-auto max-w-6xl px-6 pt-16 pb-10">
-      {launchError && (
+      {/*
+       * Um só modal por vez — antes disto, `error` (falha ao listar/
+       * favoritar) aparecia como parágrafo vermelho solto no meio da tela
+       * (achado numa sessão anterior, 2026-08-07: "não tá bom, nem
+       * legível"). Mesmo motivo que criou o `ErrorModal` em 2026-08-04, só
+       * que este caso nunca ganhou o mesmo tratamento.
+       */}
+      {launchError ? (
         <ErrorModal
           title="Não foi possível abrir o jogo"
           message={launchError}
           onClose={clearLaunchError}
           onRetry={retryLaunch}
         />
+      ) : (
+        error && <ErrorModal title="Não foi possível carregar a biblioteca" message={error} onClose={() => setError(null)} />
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -491,8 +500,6 @@ export function AllGamesScreen({
           </div>
         )}
       </div>
-
-      {error && <p className="text-base text-danger">{error}</p>}
 
       {games && games.length === 0 && (
         <p className="text-base text-muted">

@@ -215,8 +215,24 @@ export function GamesScreen({
 
   return (
     <div className="mx-auto max-w-5xl px-6 pt-16 pb-10">
-      {launchError && (
+      {/*
+       * Um só modal de erro por vez, em ordem de prioridade — antes disto,
+       * `installState.kind === "error"` e o `error` genérico apareciam como
+       * parágrafo vermelho solto no meio da tela (achado numa sessão
+       * anterior, 2026-08-07: "não tá bom, nem legível"). Mesmo motivo que
+       * criou o `ErrorModal` em 2026-08-04 para `launchError`, só que os
+       * outros dois nunca ganharam o mesmo tratamento.
+       */}
+      {launchError ? (
         <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={() => setLaunchError(null)} />
+      ) : installState.kind === "error" ? (
+        <ErrorModal
+          title="Não foi possível instalar o emulador"
+          message={installState.message}
+          onClose={() => setInstallState({ kind: "idle" })}
+        />
+      ) : (
+        error && <ErrorModal title="Não foi possível carregar a tela" message={error} onClose={() => setError(null)} />
       )}
 
       <div className="mb-4 flex items-center justify-between">
@@ -257,10 +273,6 @@ export function GamesScreen({
           </Callout>
         </div>
       )}
-
-      {installState.kind === "error" && <p className="mb-4 text-base text-danger">{installState.message}</p>}
-
-      {error && <p className="text-base text-danger">{error}</p>}
 
       {games && games.length === 0 && (
         <p className="text-base text-muted">Nenhum jogo achado ainda para este console.</p>
