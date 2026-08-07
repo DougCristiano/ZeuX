@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **11** | M1–M15. **Atualizado 2026-08-07** (Lote 7, testado ao vivo com Chromium/Playwright): **M5, M8, M9 e M10 fechados** (todo checkbox do critério marcado — M10 deu cor própria aos **33** consoles do catálogo, agrupados por fabricante com faixa de matiz fixa e variação só de tom/brilho dentro da família — PlayStation índigo vs. Sega ciano, as duas famílias "azuis" que motivaram o item, confirmadas sem se tocar; testado ao vivo lado a lado em grade e lista). M10 mantém, como os outros "com ressalva", o julgamento final de "as cores ficaram distinguíveis o bastante" para o Douglas — o mecanismo e o cálculo já estão verificados. M1/M2/M3/M4/M6/M7 com código pronto e a maior parte do critério verificada ao vivo, cada um ainda com 1 checkbox que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", ou (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004) — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M11–M15 sem começar |
+| **Sprint M (v1.0)** | **10** | M1–M15. **Atualizado 2026-08-07** (Lote 8, testado ao vivo com Chromium/Playwright): **M5, M8, M9, M10 e M11 fechados** (todo checkbox do critério marcado — M11 trocou `object-cover` por `object-contain` + fundo desfocado em `GameCover`, verificado com duas imagens de teste sintéticas contra o CSS real compilado: sem corte em capa quadrada nem alta). M1/M2/M3/M4/M6/M7/M10/M11 com código pronto e a maior parte do critério verificado ao vivo, cada um ainda com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). M12–M15 sem começar |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -3096,7 +3096,7 @@ Douglas** — o critério do item já previa isso; esta sessão confirmou que as
 cores renderizam como calculado, não que "ficaram boas" na opinião de quem
 vai usar todo dia.
 
-### M11 — `object-cover` corta a capa real (P)
+### M11 — `object-cover` corta a capa real (P) — **feito em 2026-08-07**
 
 `GameCover` usa `aspect-[3/4]` com `object-cover` (`ui.tsx:198`). Capas reais
 não batem todas nessa proporção — SNES, Mega Drive e o jewel case de PS1
@@ -3104,17 +3104,36 @@ variam bastante —, então a arte é cortada. É reclamação clássica nas
 comunidades de LaunchBox. A célula 3/4 **fica**: grade uniforme importa.
 
 **Critério de aceite:**
-- [ ] A célula continua `aspect-[3/4]` (a grade não passa a ter alturas
-      diferentes por jogo).
-- [ ] A capa é exibida inteira (`object-contain`), com a própria capa
+- [x] A célula continua `aspect-[3/4]` (a grade não passa a ter alturas
+      diferentes por jogo) — a classe no wrapper não mudou, só o conteúdo do
+      ramo `coverUrl` do `GameCover`.
+- [x] A capa é exibida inteira (`object-contain`), com a própria capa
       desfocada e escurecida preenchendo o espaço que sobra — nenhuma faixa
-      cinza chapada.
-- [ ] Uma capa quadrada e uma capa alta, lado a lado, aparecem **sem corte**
-      e sem distorção de proporção.
-- [ ] O placeholder de sigla (sem capa) fica exatamente como está.
+      cinza chapada. Duas `<img>` sobrepostas: fundo (`object-cover` +
+      `blur-md` + `brightness-50` + `scale-110`, `aria-hidden`) e a capa real
+      por cima (`object-contain`).
+- [x] Uma capa quadrada e uma capa alta, lado a lado, aparecem **sem corte**
+      e sem distorção de proporção — verificado com duas imagens de teste
+      (SVG com borda branca de ponta a ponta, pra qualquer corte ficar
+      visível), renderizadas com o CSS real compilado do app: as duas bordas
+      aparecem inteiras, sem corte, a quadrada com barra clara em cima/baixo,
+      a alta com barra nas laterais — exatamente o comportamento esperado.
+- [x] O placeholder de sigla (sem capa) fica exatamente como está — o ramo
+      `else` do ternário não foi tocado (só o ramo `coverUrl` mudou).
 
 **Depende de:** M5
 **Bloqueia:** nada
+
+**Testado ao vivo**, com a ressalva do próprio item: sem uma capa real
+baixada pelo G1 nesta sessão (sem credencial IGDB configurada), a verificação
+usou duas imagens de teste (SVG quadrado e SVG alto, cada uma com borda
+branca de ponta a ponta) renderizadas com o **CSS real compilado** do build
+(`dist/assets/index-*.css`) e as mesmas classes Tailwind que `GameCover`
+usa — não uma reimplementação aproximada. As duas bordas saíram inteiras nas
+duas capturas, confirmando `object-contain` sem corte e o fundo desfocado
+preenchendo a faixa que sobrou. Falta o Douglas conferir com uma capa real do
+IGDB (proporção de capa oficial pode ter nuance que um SVG sintético não
+reproduz) — mesma ressalva que o próprio item já previa.
 
 ### M12 — Carregando fica em branco; vazio é uma frase cinza (M)
 

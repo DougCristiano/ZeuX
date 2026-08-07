@@ -759,9 +759,22 @@ lista) com jogos de PS1, PS Vita, Master System, Mega Drive, SNES e Xbox: os
 badges de plataforma mostraram as cores calculadas, PlayStation visivelmente
 mais índigo que Sega.
 
+**Atualizado em 2026-08-07 (Lote 8): M11 fechou** — todo checkbox marcado,
+com ressalva de "capa real ainda não conferida" (mesma família de ressalva de
+M1/M2/M3/M10). `GameCover` (`ui.tsx`) trocou a única `<img
+object-cover>` do ramo `coverUrl` por duas sobrepostas: fundo (`object-cover`
++ `blur-md` + `brightness-50` + `scale-110`, decorativo) e a capa real por
+cima (`object-contain`, sem corte). Verificado sem depender do IGDB — exatamente
+como o próprio item sugeria — com duas imagens SVG de teste (uma quadrada, uma
+alta, cada uma com borda branca de ponta a ponta pra qualquer corte ficar
+óbvio) renderizadas usando o **CSS real compilado** do build
+(`dist/assets/index-*.css`) e as mesmas classes do componente, não uma
+reimplementação aproximada. As duas bordas saíram inteiras nas duas capturas.
+Ramo `else` (placeholder de sigla) não foi tocado.
+
 **Fechável por sessão de IA** (Playwright/Chromium contra um `zeuxd` real, mais
-`go test` e `npm run build`): M4, M5, M6, M8, M9, M10, M12, M13, M15 — e as
-partes mecânicas de M1, M2, M3, M11.
+`go test` e `npm run build`): M4, M5, M6, M8, M9, M10, M11, M12, M13, M15 — e
+as partes mecânicas de M1, M2, M3.
 
 **Precisa do Douglas olhando a tela de verdade:**
 - **M2** — se as cores de dois consoles são distinguíveis lado a lado.

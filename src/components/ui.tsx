@@ -218,14 +218,22 @@ export function ConfirmModal({
  * gradiente/emoji fake — o placeholder é a sigla do console (mesmo dado que
  * `AllGamesScreen`/`GamesScreen` já mostravam antes), só com tratamento
  * visual novo (scanline, glow de borda no hover/foco, overlay de play
- * opcional). `coverUrl` fica preparado para o dia em que existir capa de
- * jogo de verdade (scraper — já fora do MVP, ver docs/roadmap.md); até lá,
- * nunca é passado.
+ * opcional). `coverUrl` chega preenchido desde o G1 (scraper de metadados
+ * IGDB, docs/roadmap.md) — quando `GET /library/games` devolve uma capa já
+ * baixada em disco.
  *
  * `consoleId` (2026-08-05, a pedido do Douglas): cor de identidade por
  * console (`consoleAccentColor`) no badge de plataforma e no glow de
  * hover/foco — decorativa, não estado. Sem `consoleId`, cai no cinza neutro
  * de sempre (nenhuma tela hoje deixa de passar, mas o componente não exige).
+ *
+ * M11 (docs/sprint-m-plano.md, 2026-08-07): com `coverUrl`, a capa vira duas
+ * `<img>` sobrepostas — fundo desfocado (`object-cover`, preenche a célula
+ * `aspect-[3/4]` inteira) e a capa real por cima (`object-contain`, sem
+ * corte). Antes, uma capa quadrada ou muito alta (comum em SNES, Mega Drive,
+ * o jewel case do PS1) era cortada pelo `object-cover` único que a célula
+ * usava. A célula continua `aspect-[3/4]` fixa — a correção é só de como a
+ * imagem preenche o espaço, não do tamanho da grade.
  */
 export function GameCover({
   label,
@@ -275,7 +283,27 @@ export function GameCover({
       className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border border-line-strong bg-fill transition-[border-color,box-shadow] duration-150 ease-in-out hover:border-[var(--console-accent,var(--accent))] group-focus-visible:border-[var(--console-accent,var(--accent))] hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] ${className}`}
     >
       {coverUrl ? (
-        <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <>
+          {/* M11 (docs/sprint-m-plano.md, 2026-08-07): fundo com a própria
+              capa, `object-cover` + desfocada + escurecida — preenche o
+              espaço que a capa real (que raramente bate 3/4 exato: SNES,
+              Mega Drive, o jewel case do PS1 variam) deixaria como faixa
+              cinza chapada atrás da capa de verdade (abaixo). `scale-110`
+              evita a borda transparente/clara que o blur revelaria na beira
+              do recorte; o `overflow-hidden` do wrapper corta o excesso.
+              Puramente decorativo — nunca a imagem que o usuário lê. */}
+          <img
+            src={coverUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full scale-110 object-cover blur-md brightness-50"
+          />
+          {/* A capa de verdade — `object-contain`, não `object-cover`: a
+              célula continua `aspect-[3/4]` fixa (grade uniforme, critério
+              do item), mas a arte agora aparece inteira, sem cortar os lados
+              de uma capa quadrada nem o topo/base de uma capa alta. */}
+          <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+        </>
       ) : (
         <div
           className={`absolute inset-0 flex items-center justify-center font-pixel text-muted opacity-25 ${
