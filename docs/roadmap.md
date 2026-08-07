@@ -5,7 +5,7 @@ Backlog organizado em sprints, derivado do PRD e do estado real do código.
 **Tamanho relativo:** P (poucas horas) · M (alguns dias) · G (uma sprint ou mais).
 Os tamanhos são relativos entre si, não estimativas de calendário.
 
-Última verificação contra o código: 2026-08-04.
+Última verificação contra o código: 2026-08-07.
 
 ---
 
@@ -126,6 +126,7 @@ da Sprint A, mas conta uma vez só.
 | Sprint K (v1.0) | **0** | K1–K6 — **fechada em 2026-08-06** |
 | Sprint J (v1.0) | **0** | J1–J5 — **fechada em 2026-08-06** (J5 avaliado e não aplicado, por decisão, não por pendência) |
 | **Sprint L (v1.0)** | **1** | L0–L2 feitos; L3 (verificação com controle físico real) só o Douglas fecha |
+| **Sprint M (v1.0)** | **15** | M1–M15 — biblioteca de jogos: layout e usabilidade (nenhum começado) |
 | Sprint E (**v2.0**) | **7** | — |
 | Sprint F (**v2.0**) | **6** | — |
 | Sem sprint | **7** | inclui o achado do RetroArch não ser 1-click (2026-08-03) |
@@ -140,6 +141,15 @@ Sprints K, J e L (15 itens novos) entraram na v1.0, a partir da revisão
 crítica do frontend e do pedido do Douglas de navegação por controle. Os
 "Total" desta tabela precisam de +15 para refletir isso — as linhas
 individuais (K/J/L acima) já estão certas.
+
+**Adicionado em 2026-08-07, também não recalculado nas linhas de Total**
+(mesma convenção das duas notas acima): a **Sprint M** (15 itens novos,
+M1–M15) entrou na v1.0, a partir da crítica de layout do subagente
+`critico-layout-biblioteca` aprovada pelo Douglas. Somando com a nota
+anterior, os "Total" desta tabela precisam de **+30** para refletir o estado
+real — a linha da Sprint M acima já está certa. Recontar a tabela inteira
+continua sendo trabalho futuro: as linhas individuais são a fonte confiável,
+os "Total" estão sinalizados como velhos de propósito.
 
 **Reorganização de 2026-08-04:** as sprints E e F foram rotuladas como **v2.0**
 e três sprints novas (G, H, I) entraram para a **v1.0**, a partir da direção
@@ -2378,6 +2388,526 @@ só lido e revisado. Checklist para o Douglas confirmar:
 Douglas com hardware real. **Sprint L parcialmente encerrada em
 2026-08-06** — L0/L1/L2 feitos e revisados, L3 aberto até a verificação
 humana.
+
+---
+
+## Sprint M — Biblioteca de jogos: layout e usabilidade (v1.0)
+
+**Origem incomum, registrada de propósito:** esta sprint inteira vem de uma
+crítica de design feita pelo subagente `critico-layout-biblioteca` em
+2026-08-07 — um especialista em layout de launcher de jogos (Steam, Epic, GOG
+Galaxy, Playnite, LaunchBox, EmulationStation) lendo as telas de biblioteca do
+ZeuX. O Douglas leu o relatório e aprovou o conteúdo ("achei bem coerente tudo
+que foi dito"), então os achados entram como backlog, não como proposta a
+discutir.
+
+**O que a crítica NÃO cobriu, e por isso precisa ficar escrito:** o subagente
+**não leu o `CLAUDE.md`, os ADRs nem este roadmap** — foi análise pura de
+layout, contra os arquivos de tela. Ele não sabia dos princípios de produto
+(texto descritivo e nunca julgador, informar em vez de bloquear, nunca
+facilitar obtenção de ROM), nem do que as Sprints K/J/L já tinham fechado nos
+mesmos arquivos. A tradução para itens aqui foi feita com esse contexto por
+cima: alguns achados viraram menos do que ele propôs (ver os cortes registrados
+em M3, M6 e M9), e cada item foi conferido contra o código antes de virar
+critério de aceite. Onde o relatório presumia uma funcionalidade que não
+existe, está dito no próprio item.
+
+**O que já estava certo e não virou item** (o crítico registrou como contexto):
+grade de capas 3/4 com badge de plataforma, placeholder com a sigla do console
+em vez de arte inventada, overlay de play, estrela de favorito sempre visível
+(nunca hover-only), navegação espacial por D-pad (`useGamepadNavigation.ts`),
+`ErrorModal` para falha de lançamento, identidade neon única.
+
+**Não duplica K/J/L:** K1/K2 já corrigiram `FOCUS_RING` nos filtros e os labels
+de busca; J2/J3 já trocaram modais e `<select>` pelo shadcn; J4 já corrigiu o
+`group-focus-visible` do **overlay de escurecimento** do `GameCover` — o M2
+abaixo é um bug diferente, de camada CSS, no **glow de borda**, que o J4 não
+tocou; L1/L2 já entregaram navegação por controle, e M14 se apoia nela em vez
+de reimplementar.
+
+| Item | Tam. | Depende de |
+|---|---|---|
+| M1 — overlay ▶ lança de verdade; tirar o botão "Jogar" do tile | M | nada |
+| M2 — glow de foco/hover: bug de `@layer` e seletor morto | P | nada |
+| M3 — ordenação, modo lista e barra de controle única | G | M4 |
+| M4 — preservar página/busca/rolagem ao voltar; chips que não mentem | M | nada |
+| M5 — uma só implementação de tile entre `GamesScreen` e `AllGamesScreen` | G | M1, M2 |
+| M6 — detalhe do jogo: com o que ele vai rodar, e ações secundárias | M | nada |
+| M7 — tipografia pixel abaixo do piso e título duplicado sobre a capa | P | nada |
+| M8 — sinalizar na grade o jogo que não vai abrir | M | M5 |
+| M9 — tela de pastas: lista compacta em vez de 33 formulários | G | nada |
+| M10 — cor por console: tabela fixa de marca em vez de hash | M | nada |
+| M11 — capa real cortada por `object-cover` | P | M5 |
+| M12 — estado de carregamento e estado vazio | M | M5 |
+| M13 — rótulos da sidebar derivados por `slice(0,3)` | P | nada |
+| M14 — prompts de botão de controle na tela | P | L1 |
+| M15 — arestas cosméticas (page size, scanline, botão que muda de largura) | P | nada |
+
+**Ordem recomendada de execução — diferente da ordem de gravidade, e o motivo
+é dependência técnica:** M2 → M1 → M4 → M3 → M5 → (M8, M11, M12) → o resto.
+M2 vem antes de tudo porque é o único item que é **promessa descoberta** (o
+ADR 0009 e o ADR 0014 exigem foco como estado de primeira classe, e hoje ele é
+o estado mais fraco da grade — mais fraco que o hover), custa poucas horas e
+toca o componente que os itens seguintes vão reescrever. M1 antes de M5 para
+que o tile unificado **nasça** com o comportamento certo, em vez de unificar
+dois tiles errados e consertar depois. M5 antes de M8/M11/M12 pelo mesmo
+motivo que o Douglas já apontou: implementar sinal de "não vai abrir",
+enquadramento de capa e skeleton em duas telas separadas é retrabalho
+garantido.
+
+### M1 — O overlay ▶ não lança, e o botão embaixo do tile custa densidade (M)
+
+O ícone ▶ que aparece no hover/foco da capa (`ui.tsx:225-243`) é decorativo:
+a div é `pointer-events-none`, e o clique cai no `<button>` de baixo, que
+chama `onOpenGame` (`AllGamesScreen.tsx:272-292`) — ou seja, **o overlay de
+play abre o detalhe, não o jogo**. Quem lança é um `<Button>` full-width
+embaixo de cada tile (`AllGamesScreen.tsx:310-316`), que rouba altura de toda
+fileira e cria um segundo alvo focável por jogo. O usuário aprende que ▶
+mente.
+
+**Critério de aceite:**
+- [ ] Clicar no ▶ do overlay chama `launch(game)` (o mesmo `useLaunchGame` de
+      hoje) e não `onOpenGame` — o overlay vira `<button>` de verdade, com
+      `aria-label` nomeando o jogo, em vez de div `pointer-events-none`.
+- [ ] Clicar na capa fora do ▶ continua abrindo `GameDetailScreen`.
+- [ ] O `<Button variant="primary">Jogar</Button>` sai da célula da grade:
+      `grep -n "Jogar" src/screens/AllGamesScreen.tsx` só acha o overlay e seu
+      rótulo acessível.
+- [ ] Na janela padrão (1280×800, `src-tauri/tauri.conf.json`) com 30 jogos,
+      **pelo menos 3 fileiras de capa ficam visíveis sem rolar** — o número
+      medido depois fica escrito aqui, contra o ~1,7 de hoje.
+- [ ] Navegando só por D-pad/Tab, ir do primeiro jogo de uma fileira ao
+      primeiro da fileira seguinte custa **1** movimento vertical, não 2.
+- [ ] O caminho de erro não some junto com o botão: hoje o rótulo vira
+      "Tentar de novo" (`AllGamesScreen.tsx:315`); com o botão fora, a falha
+      continua chegando ao usuário pelo `ErrorModal` e é possível tentar de
+      novo sem recarregar a tela.
+
+**Depende de:** nada
+**Bloqueia:** M5 (o tile unificado precisa nascer com este comportamento), M3
+
+### M2 — Foco mais fraco que hover: regra de `@layer` e seletor morto (P)
+
+Dois bugs no mesmo lugar, os dois confirmados no código:
+
+1. `GameCover` (`src/components/ui.tsx:189-196`) pede
+   `hover:border-[var(--console-accent)]` como utility do Tailwind, mas
+   `src/index.css:153-162` define `.game-cover:hover { border-color:
+   var(--accent) }` **fora de qualquer `@layer`** (o único `@layer base` do
+   arquivo começa na linha 201, depois). Pela regra de cascade layers, regra
+   sem layer vence regra dentro de layer independente de especificidade e de
+   ordem — e as utilities do Tailwind v4 entram via `@layer utilities` do
+   `@import "tailwindcss"` (linha 1). Resultado: **o glow nunca usa a cor do
+   console, sempre cai no roxo genérico `--accent`.**
+2. `.game-cover:focus-visible` (`index.css:159`) **nunca dispara**: quem
+   recebe foco de teclado/gamepad é o `<button>` que envolve a capa
+   (`AllGamesScreen.tsx:272-292`); a div `.game-cover` não tem `tabindex`.
+
+Isto **não** é o que o J4 corrigiu — J4 arrumou o `group-focus-visible` do
+overlay de escurecimento, que funciona por cascata do `group` no botão pai. O
+glow de borda é regra CSS solta e continua quebrado. Num app que quer ser
+jogável no controle (ADR 0014), foco ser o estado mais fraco da tela é o
+avesso do que foi decidido.
+
+**Critério de aceite:**
+- [ ] Um jogo de PS1 e um de SNES lado a lado mostram, no hover, **duas cores
+      de borda diferentes** (as de `consoleAccentColor`), não o mesmo roxo.
+- [ ] O glow aparece no foco de teclado/gamepad com a mesma intensidade do
+      hover, com o mouse fora da janela — distinguível numa captura de tela.
+- [ ] `grep -n "focus-visible" src/index.css` não deixa nenhum seletor
+      apontando para elemento não focável.
+- [ ] A correção não reintroduz cor fixa por card em `style` inline (o motivo
+      de a regra ter virado classe CSS em 2026-08-04 continua valendo).
+
+**Depende de:** nada
+**Bloqueia:** nada formalmente — mas M1 e M5 reescrevem o mesmo componente,
+então fazer antes evita conflito
+
+### M3 — Sem ordenação, sem modo lista, sem barra de controle única (G)
+
+`AllGamesScreen` oferece busca, chips de plataforma e favoritos — e nada mais.
+Não há como ordenar por nome, por mais recente ou por mais jogado, e não há
+visão de lista densa. Com a maior parte do acervo ainda sem capa (o
+placeholder é a sigla do console), a grade de imagens vira mosaico repetitivo
+— pior de ler que uma lista de texto.
+
+**Corte proposto e assumido:** o relatório pedia também "shelves" tipo
+"Continuar jogando" no topo. Isso **não vira construção nova aqui**: o backend
+já devolve os jogos ordenados por último jogado
+(`internal/api/server.go:1123-1133`), ou seja, "continuar jogando" já é o topo
+da lista padrão — falta rótulo, não mecanismo. Prateleira de verdade (seções
+horizontais empilhadas) é escopo de sprint própria e fica registrada como
+candidata, não como parte deste item.
+
+**Critério de aceite:**
+- [ ] `GET /api/v1/library/games` aceita `?sort=` com pelo menos `recentes`
+      (o padrão de hoje), `titulo` e `tempo_jogado`; valor desconhecido cai no
+      padrão sem erro. A ordenação acontece **no servidor, antes de paginar** —
+      `handleListLibraryGames` já ordena a lista inteira antes de fatiar
+      (`server.go:1123-1163`), é ali que o `sort` entra, nunca no cliente.
+- [ ] Teste em `internal/api/library_test.go` trava cada ordem: 3 jogos com
+      títulos, tempos e datas diferentes, uma requisição por valor de `sort`.
+- [ ] `AllGamesScreen` tem **uma** barra no topo com busca, ordenação
+      (`Select` do shadcn — J3), alternância grade/lista, favoritos e chips de
+      plataforma; nenhum desses controles fica solto fora dela.
+- [ ] O modo lista mostra por linha: título, plataforma com a cor do console,
+      tempo jogado e a ação de jogar — e **cabe pelo menos 12 linhas** na
+      janela padrão de 1280×800 sem rolar.
+- [ ] A escolha de ordem e de modo sobrevive a ir ao detalhe e voltar (M4) e a
+      reabrir o app. **Guardada em `localStorage`, não em tabela nova:** é
+      preferência de interface, não dado de domínio — `internal/store` hoje só
+      tem migrações de sessões e biblioteca (`0001`–`0005`), e abrir uma
+      tabela de preferências para isto custa mais do que resolve
+      (ADR 0002 / orçamento de complexidade).
+- [ ] O rótulo da ordem padrão diz o que ela é ("jogados por último"), em vez
+      de deixar o usuário adivinhar por que a lista está naquela sequência.
+
+**Depende de:** M4 (sem o estado preservado, escolher uma ordem e voltar do
+detalhe reseta tudo — a barra pareceria quebrada)
+**Bloqueia:** nada
+
+### M4 — Voltar do detalhe perde tudo, e os chips de plataforma mentem (M)
+
+`App.tsx` renderiza uma tela por `phase` num `switch` (`App.tsx:240-264`):
+abrir um jogo **desmonta** `AllGamesScreen`, e voltar remonta com `page=1`,
+busca vazia, filtro nulo e rolagem no topo. Quem estava na página 4 procurando
+algo perde a posição a cada jogo que abre.
+
+E os chips de plataforma são calculados só sobre a página atual
+(`AllGamesScreen.tsx:162`, `platformsOnPage`), com reset a cada carregamento
+(`:84`) — o filtro muda de conteúdo conforme a página, e um console some do
+filtro ao virar a página. O `docstring` da tela já admite isso desde
+2026-08-04; virou item porque um filtro que muda de opções sozinho é um filtro
+que mente.
+
+**Critério de aceite:**
+- [ ] Estar na página 3 com busca "mario" e filtro "PS1", abrir um jogo e
+      voltar devolve **exatamente** página 3, busca "mario", filtro "PS1" e a
+      mesma posição de rolagem.
+- [ ] `GET /library/games` passa a devolver os consoles presentes no
+      **resultado completo** (respeitando `q`/`favorite`), não na página — o
+      handler já tem `result` inteiro em mãos antes de fatiar
+      (`server.go:1153-1163`), o campo sai de lá.
+- [ ] `AllGamesScreen` consome esse campo e apaga `platformsOnPage`
+      (`AllGamesScreen.tsx:162`); o `setPlatformFilter(null)` de cada
+      `loadGames` (`:84`) deixa de existir.
+- [ ] O filtro de plataforma é aplicado no servidor (mesmo caminho de `?q=` e
+      `?favorite=`), de modo que "PS1, página 2" seja a segunda página **de
+      jogos de PS1**, e não a segunda página do acervo filtrada depois.
+- [ ] Teste em `internal/api/library_test.go` cobrindo o campo novo e o filtro
+      por console combinado com paginação.
+
+**Depende de:** nada
+**Bloqueia:** M3
+
+### M5 — Duas telas desenham o mesmo jogo de dois jeitos (G)
+
+`AllGamesScreen.tsx:270-317` desenha um jogo como capa 3/4 com badge de
+plataforma, cor de console, estrela de favorito e clique para o detalhe.
+`GamesScreen.tsx:284-304` desenha o **mesmo jogo** como um quadrado 64×64 de
+texto `font-mono` — **sem capa mesmo quando `cover_url` existe**, sem
+favorito, sem cor de console, sem caminho para o detalhe e sem paginação. O
+usuário troca de tela e não reconhece o próprio acervo.
+
+**Critério de aceite:**
+- [ ] Um componente único de célula de jogo (`src/components/`) é usado pelas
+      duas telas — `grep -rn "GameCover" src/screens/` acha só o componente
+      novo, não duas montagens paralelas.
+- [ ] Um jogo com capa mostra **a mesma capa** nas duas telas (hoje
+      `GamesScreen.tsx:287-289` ignora `game.cover_url`).
+- [ ] Em `GamesScreen`, clicar na capa abre `GameDetailScreen` — hoje não
+      existe caminho para o detalhe a partir da tela por console — e a estrela
+      de favorito se comporta como em `AllGamesScreen`.
+- [ ] O que é exclusivo da tela por console **não** entra no componente
+      compartilhado e continua funcionando: cabeçalho de parecer/BIOS
+      (`GamesScreen.tsx:218-241`), instalação inline (L8, `:306-356`) e
+      confirmação de BIOS vazio (`:320-345`).
+- [ ] `npm run build` passa, e nenhuma das duas telas passa prop que a outra
+      ignora em silêncio.
+
+**Depende de:** M1, M2
+**Bloqueia:** M8, M11, M12
+
+### M6 — O detalhe do jogo não diz com o que ele vai rodar (M)
+
+`GameDetailScreen.tsx` mostra capa de 220px, título, 2 badges, botão Jogar e 3
+números. Falta justamente **o diferencial declarado do produto**: qual
+emulador e qual preset vão rodar aquele jogo. Esse dado só aparece hoje em
+`GamesScreen`, não na tela do próprio jogo. Falta também `autoFocus` no botão
+Jogar — o `ErrorModal` já faz isso certo (`ui.tsx:139`), o detalhe não — e
+qualquer ação secundária.
+
+**Corte assumido, com a razão:** o relatório pediu hero com arte de fundo
+"porque o app já consulta o IGDB, que devolve screenshots/artworks". **O
+cliente do ZeuX não pede nem guarda isso:** `internal/igdb/client.go:216` pede
+só `name,cover.image_id,first_release_date`, e `:316` baixa só `t_cover_big`.
+Arte de fundo de verdade é scraping novo (campos novos, download novo,
+armazenamento novo) — vira item próprio se o Douglas quiser. A versão que
+entrega 80% aqui é usar **a capa que já está no disco**, desfocada e
+escurecida, como fundo do topo.
+
+**Critério de aceite:**
+- [ ] A tela mostra o emulador e o preset que vão rodar o jogo, do mesmo dado
+      que `GamesScreen` já usa (`verdict.emulator`/`verdict.preset` por
+      `console_id`), e mostra o aviso de "sem preset automático" no mesmo caso
+      em que `GamesScreen.tsx:234-241` mostra.
+- [ ] O texto sobre preset e hardware é descritivo, **nunca julgador**
+      (princípio 2 do `CLAUDE.md`) — diz o que a máquina alcança, não o que
+      ela deixa de ser.
+- [ ] O botão "▶ Jogar" (`GameDetailScreen.tsx:180-187`) recebe `autoFocus`:
+      entrar na tela por controle já deixa a ação principal focada.
+- [ ] Ações secundárias funcionando: abrir a pasta do jogo (`openPath` do
+      `@tauri-apps/plugin-opener`, já usado em `GamesScreen.tsx:88`) e exibir
+      o caminho completo (`game.path`). **Nenhum link, nenhuma sugestão de
+      onde obter o arquivo** — regra 6 do `CLAUDE.md`.
+- [ ] Com `cover_url` presente, o topo usa a própria capa desfocada e
+      escurecida como fundo; sem capa, o topo fica como está hoje.
+
+**Fora deste item, registrado para não sumir:** "jogar com outro emulador"
+tem meio caminho pronto no backend (`launchBody.EmulatorID`,
+`internal/api/server.go:613`), mas exige uma tela listando os emuladores que
+atendem o console — item próprio. "Remover jogo da biblioteca" **não tem rota
+nenhuma** hoje (só `DELETE /library/folders/{id}`); pedir isso na tela de
+detalhe seria prometer o que a API não faz.
+
+**Depende de:** nada
+**Bloqueia:** nada
+
+### M7 — Pixel font abaixo do piso, e título duplicado sobre a capa (P)
+
+`src/index.css:120-127` documenta o piso da fonte pixel: **nada abaixo de
+11px**. Duas violações, as duas em `ui.tsx`: badge de plataforma em `9px`
+(`:216`) e `ConsoleIcon` em `8px` (`:409` — este o relatório não citou, achado
+ao conferir). Além disso, o título sobre a capa (`:222`) é pixel font 11px sem
+truncamento — título longo quebra em várias linhas e sobe sobre a arte — e
+fica **duplicado** quando existe capa real: uma vez sobre a imagem, outra
+embaixo em Inter (`AllGamesScreen.tsx:300-302`). Nenhum launcher grande faz
+isso: a arte já traz o logotipo do jogo.
+
+**Critério de aceite:**
+- [ ] `grep -rn "font-pixel" src --include="*.tsx"` não acha nenhum
+      `text-[Npx]` com N < 11.
+- [ ] Com `coverUrl` presente, o título **não** é desenhado sobre a arte —
+      fica só o rótulo em Inter embaixo, com `line-clamp-2`.
+- [ ] Sem capa, o título continua sobre o placeholder (a "capa de texto" é o
+      único dado real que existe ali), com truncamento que impede mais de 3
+      linhas.
+- [ ] A fonte pixel segue restrita a chrome (sidebar, chips, títulos de
+      seção), como `index.css:120-127` já manda.
+
+**Depende de:** nada
+**Bloqueia:** nada
+
+### M8 — A grade não sinaliza o jogo que não vai abrir (M)
+
+Em `AllGamesScreen` todos os tiles parecem igualmente jogáveis: o único sinal
+existente é `arquivo ausente` (`:304-308`). A checagem de emulador instalado,
+preset disponível e BIOS vazia só existe em `GamesScreen`
+(`GamesScreen.tsx:177-191`, `handlePlay`) — na biblioteca principal o usuário
+só descobre no clique, quando o `ErrorModal` aparece. Isso não contraria
+"informar, não bloquear": o jogo continua clicável, só deixa de ser surpresa.
+
+**Critério de aceite:**
+- [ ] Um jogo cujo emulador não está instalado, ou cujo console não alcançou
+      patamar nenhum, aparece com a capa esmaecida e um badge curto dizendo o
+      que falta ("instalar emulador" / "sem preset" / "arquivo ausente").
+- [ ] O texto do badge descreve o que falta, **nunca julga a máquina**
+      (princípio 2) e **nunca bloqueia** o clique (princípio 5) — o jogo
+      continua lançável por conta e risco.
+- [ ] Clicar em "instalar emulador" a partir da grade dispara a mesma
+      instalação inline que o L8 já implementou em `GamesScreen`
+      (`:306-356`), em vez de só falhar depois.
+- [ ] A regra de decisão vive em **um** lugar (uma função/hook compartilhado),
+      não copiada nas duas telas — verificável por `grep`: só uma
+      implementação de "este jogo pode abrir?".
+
+**Depende de:** M5 (sem o tile unificado, isto vira duas implementações)
+**Bloqueia:** nada
+
+### M9 — "Onde estão minhas ROMs" tratado como formulário administrativo (G)
+
+`LibraryScreen.tsx` renderiza **um cartão grande por console dos 33**
+(`:85-240`, `ConsoleLibraryCard`), cada um com input de caminho cru e 3 botões,
+paginados de 6 em 6 (`:12`, `PAGE_SIZE = 6` → 6 páginas de formulário). É a
+única tela do app sem identidade visual de console — não usa `ConsoleIcon` nem
+`consoleAccentColor`. Nenhuma referência de mercado trata a configuração de
+fontes assim: o normal é um assistente uma vez, mais uma tabela compacta das
+fontes já configuradas.
+
+**Corte assumido:** o `BulkFolderPicker` (`:22-83`, "uma pasta com uma subpasta
+por console") **já é o assistente** — não construir outro. Este item reorganiza
+o que sobra ao redor dele.
+
+**Critério de aceite:**
+- [ ] A tela passa a ter duas seções: **"Consoles configurados"** (uma linha
+      compacta por console **que tem pasta apontada** — ícone/cor do console,
+      nome, caminho truncado com `title` completo, contagem de jogos, revarrer
+      e remover) e **"Adicionar console"** (escolher o console + escolher a
+      pasta).
+- [ ] Um usuário com 3 consoles configurados vê **3 linhas**, não 33 cartões
+      — hoje vê 6 cartões por página e precisa paginar até achar os dele.
+- [ ] `Pagination` desaparece desta tela (`LibraryScreen.tsx:344`): a lista
+      passa a ser do tamanho do que o usuário configurou.
+- [ ] A tela usa `ConsoleIcon`/`consoleAccentColor`, ficando consistente com
+      as outras.
+- [ ] Nada de link, sugestão de fonte ou transferência de ROM em lugar nenhum
+      — só caminho que já existe no disco (regra 6 do `CLAUDE.md`, que a tela
+      atual respeita e a nova precisa continuar respeitando).
+- [ ] Continua possível chegar a `GamesScreen` mesmo com 0 jogos achados — o
+      botão "Ver jogos" existe hoje justamente porque é lá que fica "Abrir
+      pasta do BIOS" (`LibraryScreen.tsx:231-237`); esse caminho não pode
+      sumir na reorganização.
+
+**Depende de:** nada
+**Bloqueia:** nada
+
+### M10 — Cor por console: hash sobre 10 cores para 33 consoles (M)
+
+`src/lib/consoleColor.ts:12-31` escolhe entre 10 cores por hash do
+`console_id`. Com 33 consoles, são ~3 consoles por cor e atribuição arbitrária
+— o SNES pode sair rosa. O objetivo declarado no próprio docstring do arquivo
+("reconhecer o console pela cor sem precisar ler a sigla") não é alcançável
+assim.
+
+**Critério de aceite:**
+- [ ] Tabela fixa de cor para pelo menos os 15 consoles mais comuns do
+      catálogo, com cor coerente com a marca (azul PlayStation, vermelho
+      Nintendo, azul Sega etc.); o hash atual continua como **fallback** para
+      o resto, sem quebrar console adicionado depois.
+- [ ] Dois consoles da mesma família não recebem cores que se confundem entre
+      si na grade (ex.: PS1/PS2/PS3 variam em tom, não em matiz).
+- [ ] Teste (ou verificação escrita aqui) de que nenhum `console_id` do
+      catálogo fica sem cor.
+- [ ] **A cor continua decorativa, nunca estado** — o docstring do arquivo já
+      diz isso e vale igual: patamar, erro e aviso continuam sendo texto/badge.
+- [ ] Onde a cor aparece fica contido: num mesmo tile não competem ao mesmo
+      tempo borda colorida + badge colorido + estrela âmbar + botão roxo.
+      Escrever aqui qual foi a regra adotada.
+
+**Depende de:** nada
+**Bloqueia:** nada
+
+### M11 — `object-cover` corta a capa real (P)
+
+`GameCover` usa `aspect-[3/4]` com `object-cover` (`ui.tsx:198`). Capas reais
+não batem todas nessa proporção — SNES, Mega Drive e o jewel case de PS1
+variam bastante —, então a arte é cortada. É reclamação clássica nas
+comunidades de LaunchBox. A célula 3/4 **fica**: grade uniforme importa.
+
+**Critério de aceite:**
+- [ ] A célula continua `aspect-[3/4]` (a grade não passa a ter alturas
+      diferentes por jogo).
+- [ ] A capa é exibida inteira (`object-contain`), com a própria capa
+      desfocada e escurecida preenchendo o espaço que sobra — nenhuma faixa
+      cinza chapada.
+- [ ] Uma capa quadrada e uma capa alta, lado a lado, aparecem **sem corte**
+      e sem distorção de proporção.
+- [ ] O placeholder de sigla (sem capa) fica exatamente como está.
+
+**Depende de:** M5
+**Bloqueia:** nada
+
+### M12 — Carregando fica em branco; vazio é uma frase cinza (M)
+
+Enquanto `games === null`, `AllGamesScreen` não renderiza nada
+(`:251-263`): a tela fica em branco entre abrir e carregar. E a **primeira
+tela real de um usuário novo** — biblioteca vazia — é uma frase cinza
+(`:259`). Falta também a contagem total em qualquer lugar visível, embora o
+backend já devolva `total` e a tela já o guarde em estado (`:56`, `:89`),
+usando só para calcular páginas.
+
+**Critério de aceite:**
+- [ ] Durante o carregamento aparece um skeleton de capas na mesma grade
+      (mesma quantidade de células da página), não tela em branco nem spinner
+      solto.
+- [ ] Biblioteca vazia mostra um painel centralizado com a ação principal
+      ("Escolher pasta com meus jogos") levando ao fluxo que já existe, em vez
+      de só descrever o que fazer.
+- [ ] O cabeçalho mostra a contagem total ("Todos os jogos · 1.204") a partir
+      do `total` que a rota já devolve — sem chamada nova.
+- [ ] Os outros dois estados vazios de hoje (busca sem resultado, favoritos
+      vazios — `:255-259`) continuam existindo e distintos entre si.
+
+**Depende de:** M5
+**Bloqueia:** nada
+
+### M13 — Rótulos da sidebar derivados por `slice(0, 3)` (P)
+
+`Sidebar.tsx:109` faz `item.label.slice(0, 3).toUpperCase()`, produzindo
+"BIB", "EMU", "ESP", "CON". "ESP" não comunica "Especificações" e "CON" lê
+como "console" — justamente na tela onde a palavra "console" é onipresente. O
+comentário de `Sidebar.tsx:35-37` registra que a sigla derivada foi escolha de
+2026-08-04; o que mudou é a evidência de que ela não comunica.
+
+**Critério de aceite:**
+- [ ] Nenhum rótulo de navegação é derivado por `slice` — ou o rail expande no
+      hover/foco mostrando o nome inteiro, ou a sigla é escrita à mão num
+      campo próprio de `NAV_ITEMS`.
+- [ ] Se o rail expandir, ele expande também no **foco de teclado/gamepad**,
+      não só no hover (ADR 0009: nada só-hover).
+- [ ] A sidebar continua `w-16` no estado normal (é chrome de navegação, a
+      exceção de largura fixa já registrada no `CLAUDE.md`) e a área de
+      conteúdo não muda de largura de forma que reflua a grade a cada passada
+      de mouse.
+
+**Depende de:** nada
+**Bloqueia:** nada
+
+### M14 — Nada na tela diz quais botões do controle fazem o quê (P)
+
+`useGamepadNavigation` já traduz D-pad/A/B (L1/L2), mas o usuário não tem como
+saber disso: nenhum prompt aparece. Correção ao relatório, conferida no
+código: o hook **não expõe** se há controle conectado — ele detecta o pad
+dentro do laço de poll (`useGamepadNavigation.ts:129-131`) e não devolve nada
+nem escuta `gamepadconnected`. Então este item inclui expor esse estado.
+
+**Critério de aceite:**
+- [ ] `useGamepadNavigation()` devolve se há controle conectado, atualizado
+      quando um é ligado ou desligado.
+- [ ] Com controle conectado, um rodapé fino mostra os prompts (Ⓐ Jogar · Ⓑ
+      Voltar); **sem controle, nada aparece** e o layout não reserva espaço.
+- [ ] Os prompts refletem o que o hook faz de verdade — incluindo a limitação
+      já registrada em L1/L2 (B procura um botão cujo texto começa com
+      "Voltar"; se a tela não tiver, B não volta). Prompt que promete o que
+      não acontece é pior que prompt nenhum.
+- [ ] Teclado e mouse continuam sem nenhuma mudança visual.
+
+**Depende de:** L1
+**Bloqueia:** nada
+
+### M15 — Arestas cosméticas (P)
+
+Três achados pequenos, agrupados por serem do mesmo tamanho e da mesma tela:
+
+**Critério de aceite:**
+- [ ] `PAGE_SIZE` de `AllGamesScreen.tsx:8` deixa de ser 24 (que nunca fecha
+      fileira numa grade de 5 ou 6 colunas) e passa a um múltiplo de 5 e 6
+      — 30 serve, e continua abaixo de `maxLibraryPageSize = 100`
+      (`internal/api/server.go:1063`).
+- [ ] A scanline (`ui.tsx:209`, `opacity-40`) deixa de ser aplicada sobre capa
+      real e fica só sobre o placeholder de sigla — ela existe para dar textura
+      ao vazio, não para degradar arte que o usuário acabou de baixar.
+- [ ] O botão "Buscar capas" (`AllGamesScreen.tsx:176-179`) para de mudar de
+      largura a cada item: o progresso sai do rótulo e vai para a `ProgressBar`
+      que já existe (`ui.tsx:329`), abaixo do botão.
+
+**Depende de:** nada
+**Bloqueia:** nada
+
+**Critério de saída da Sprint M:** um usuário com 30 jogos e 3 consoles
+configurados consegue, sem sair da biblioteca: ver 3 fileiras de capa por tela,
+ordenar por título, alternar para lista, filtrar por plataforma sem que o
+filtro mude sozinho de opções, voltar do detalhe de um jogo exatamente onde
+estava, e distinguir na própria grade o jogo que ainda não vai abrir. As duas
+telas de jogos desenham o mesmo jogo do mesmo jeito.
+
+**Inspiração registrada, sem virar item** (o crítico levantou como referência,
+não como pendência): jump-to-letter e "jogo aleatório" são muito valorizados
+em acervos grandes (EmulationStation/RetroPie/LaunchBox); o Playnite Fullscreen
+Mode é a planta baixa mais próxima do que o ZeuX quer ser — já há pesquisa de
+código-fonte real em [`referencias-playnite.md`](referencias-playnite.md), não
+repetir; e o Daijishō dá identidade própria por plataforma (wallpaper por
+console), possível inspiração para M9 e M10.
 
 ---
 
