@@ -10,6 +10,10 @@
       "identifier": "opener:allow-open-path",
       "allow": [{ "path": "$HOME/.config/**" }]
     },
+    {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [{ "path": "**" }]
+    },
     "dialog:allow-open",
     {
       "identifier": "shell:allow-execute",

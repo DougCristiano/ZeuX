@@ -1090,9 +1090,6 @@ curl "http://127.0.0.1:7777/api/v1/library/games?console_id=nes"
 }
 ```
 
-No modo "todos os jogos" (sem `console_id`), `?favorite=true` restringe aos
-jogos favoritados (G4) — combinável com `?q=`.
-
 | Campo | Tipo | Notas |
 |---|---|---|
 | `favorite` | bool | Marcado por `POST/DELETE .../favorite` (G4). **Sempre presente**, nunca ausente mesmo quando `false` — diferente de `cover_url`, este campo não representa um dado que pode não ter sido resolvido ainda. |
@@ -1100,7 +1097,51 @@ jogos favoritados (G4) — combinável com `?q=`.
 | `last_played_at` | string | **Ausente** (não `""`) quando `playtime_seconds` é `0`. |
 | `cover_url` | string | Capa já baixada em disco pelo scraper de metadados (G1) e servida por `GET /api/v1/covers/...` — **nunca** uma URL de terceiro (IGDB) renderizada direto. **Ausente** (não `""`) quando a capa ainda não foi resolvida ou o IGDB não tem o jogo; a tela cai no placeholder de sigla. |
 
-**400 `missing_fields`** — sem `console_id` na query string.
+### Modo "todos os jogos" (sem `console_id`)
+
+Sem `console_id` na query string, a rota lista o acervo inteiro (todos os
+consoles juntos), paginado — é o modo que alimenta a tela "Todos os jogos"
+(`AllGamesScreen.tsx`, 2026-08-04). Com `console_id`, a rota volta ao
+comportamento descrito acima (lista completa de um console só, sem paginar) —
+os dois modos vivem na mesma rota porque a tela por console (`GamesScreen`)
+continua usando o formato simples.
+
+```bash
+curl "http://127.0.0.1:7777/api/v1/library/games?page=1&page_size=30&q=mario&favorite=true&platform=nes&sort=titulo"
+```
+
+| Parâmetro | Tipo | Notas |
+|---|---|---|
+| `q` | string | Filtra por título, sem diferenciar maiúsculas/minúsculas — no SQL, então acha o jogo em qualquer página, não só na carregada (2026-08-04). |
+| `favorite` | `"true"` | Restringe aos jogos favoritados (G4). Qualquer outro valor (incluindo ausente) não filtra. |
+| `platform` | string | **M4** (`docs/sprint-m-plano.md`, 2026-08-07) — filtra por `console_id` exato (ex.: `nes`, não o `short_name` "NES"). Aplicado **depois** do campo `consoles` da resposta ser calculado e **antes** da paginação — "página 2 de PS1" é a segunda página só dos jogos de PS1. Nome deliberadamente diferente de `console_id`: esse parâmetro já troca a rota inteira para o outro modo (lista sem paginar) nesta mesma rota, então reusá-lo para filtrar dentro do modo paginado seria ambíguo. |
+| `sort` | string | **M3** (`docs/sprint-m-plano.md`, decidido pelo Douglas em 2026-08-07) — `recentes` (padrão: jogado mais recentemente primeiro, nunca jogado por último), `titulo` (alfabético, sem diferenciar maiúsculas/minúsculas) ou `tempo_jogado` (soma de `playtime_seconds`, maior primeiro). Valor ausente ou desconhecido cai no padrão sem erro — preferência de tela, não contrato quebrado. **Em português de propósito**, exceção à convenção de enum em inglês do `CLAUDE.md` (mesmo espírito de `level: "otimo"`, registrada lá). |
+| `page` | int | Base 1. Valor inválido ou ausente cai em `1`. |
+| `page_size` | int | Padrão `30` (`defaultLibraryPageSize`), teto `100` (`maxLibraryPageSize`). Valor fora da faixa cai no padrão. |
+
+**200 OK**
+
+```json
+{
+  "games": [ /* mesmo formato de cada jogo acima */ ],
+  "total": 47,
+  "page": 1,
+  "page_size": 30,
+  "consoles": ["megadrive", "nes", "ps1"]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `total` | int | Contagem **depois** de `q`/`favorite`/`platform`, antes de paginar — é sobre isto que a UI calcula o número de páginas. |
+| `consoles` | array de string | **M4**: `console_id` de todo jogo presente no resultado que respeita `q`/`favorite` — mas **não** `platform` nem a página atual. Existe para que os chips de filtro da tela não troquem de opção sozinhos ao mudar de página ou ao escolher uma plataforma (o bug que motivou o item: antes, a lista de chips vinha calculada no cliente, só sobre os jogos da página carregada). Ordenado alfabeticamente. |
+
+Não existe erro `400` para "sem `console_id`" — ausência de `console_id`
+**é** o modo "todos os jogos", não uma requisição malformada. *(Esta linha
+dizia `400 missing_fields — sem console_id na query string` até a auditoria
+de 2026-08-07; conferido contra `handleListLibraryGames`, que nunca chama
+`writeError` para esse caso — a linha estava errada desde que o modo "todos
+os jogos" foi adicionado em 2026-08-04.)*
 
 ---
 

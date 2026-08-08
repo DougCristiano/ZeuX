@@ -180,10 +180,25 @@ export const api = {
   // handleListLibraryGames em internal/api/server.go. `query` filtra por
   // título no servidor (acha o jogo mesmo fora da página atual) — omitido
   // quando vazio, em vez de mandar `q=`. `favoriteOnly` (G4) manda
-  // `favorite=true`, combinável com a busca.
-  getAllLibraryGames: (page: number, pageSize: number, query?: string, favoriteOnly?: boolean) =>
-    request<{ games: LibraryGame[]; total: number; page: number; page_size: number }>(
-      `/library/games?page=${page}&page_size=${pageSize}${query ? `&q=${encodeURIComponent(query)}` : ""}${favoriteOnly ? "&favorite=true" : ""}`,
+  // `favorite=true`, combinável com a busca. `platform` (M4,
+  // docs/sprint-m-plano.md) filtra por `console_id` — nome diferente de
+  // `console_id` de propósito: esse parâmetro já troca a rota inteira para o
+  // modo "por console" nesta mesma função (`getLibraryGames`, acima), ver
+  // docs/api.md. `sort` (M3) troca a ordenação — `recentes`/`titulo`/
+  // `tempo_jogado`, em português por exceção deliberada (CLAUDE.md). Objeto
+  // de opções (não mais parâmetros posicionais) porque a lista já passou de
+  // 4 pra 6 — mais fácil de ler no chamador do que contar posição.
+  // `consoles` na resposta é o campo novo do M4: os `console_id` presentes
+  // no resultado completo (respeitando `q`/`favorite`, não `platform`), para
+  // os chips de filtro não mudarem de opção sozinhos ao trocar de
+  // página/plataforma.
+  getAllLibraryGames: (
+    page: number,
+    pageSize: number,
+    opts: { query?: string; favoriteOnly?: boolean; platform?: string; sort?: string } = {},
+  ) =>
+    request<{ games: LibraryGame[]; total: number; page: number; page_size: number; consoles: string[] }>(
+      `/library/games?page=${page}&page_size=${pageSize}${opts.query ? `&q=${encodeURIComponent(opts.query)}` : ""}${opts.favoriteOnly ? "&favorite=true" : ""}${opts.platform ? `&platform=${encodeURIComponent(opts.platform)}` : ""}${opts.sort ? `&sort=${encodeURIComponent(opts.sort)}` : ""}`,
     ),
   // G4: favoritar/desfavoritar — resposta idêntica nas duas, só o valor
   // gravado muda.

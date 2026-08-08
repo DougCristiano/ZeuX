@@ -146,20 +146,25 @@ body {
 
 /*
  * Capa de jogo (GameCover, src/components/ui.tsx — Sprint 2 do plano de
- * migração visual, 2026-08-04). Glow de borda no hover/foco, inspirado no
- * mockup em layout/ (GameCard), mas como classe CSS reutilizando --accent em
- * vez de inline style com hex fixo por card.
+ * migração visual, 2026-08-04). O glow de borda/sombra no hover/foco (M2,
+ * docs/sprint-m-plano.md) **não mora mais aqui** — morava, em duas regras
+ * quebradas:
+ *   1. `.game-cover:hover { border-color: var(--accent) }` ficava fora de
+ *      qualquer `@layer`, e regra sem layer vence utility do Tailwind
+ *      (`@layer utilities`) por cascade layer, não por especificidade — o
+ *      glow nunca usava a cor do console (`--console-accent`), sempre caía
+ *      no roxo genérico.
+ *   2. `.game-cover:focus-visible` nunca disparava: quem recebe foco de
+ *      teclado/gamepad é o `<button>` que envolve a capa, não a própria div
+ *      `.game-cover` (sem `tabindex`).
+ * A correção (M2) moveu border-color e box-shadow para utilities do
+ * Tailwind direto em `GameCover` (`hover:border-[...]` +
+ * `group-focus-visible:border-[...]`, o mesmo mecanismo que o overlay de
+ * play já usa) — sem CSS solto para competir de layer, e com o foco
+ * verdadeiro do `<button>` ancestral via `group-focus-visible` em vez de
+ * `focus-within` (que também nunca dispararia: a div é descendente do
+ * botão, não o contrário).
  */
-.game-cover {
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-.game-cover:hover,
-.game-cover:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent);
-}
 .game-cover-scanline {
   background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
 }

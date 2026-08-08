@@ -1,10 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import type { LibraryGame } from "./api/types";
-import { AllGamesScreen } from "./screens/AllGamesScreen";
+import {
+  AllGamesScreen,
+  loadInitialAllGamesView,
+  persistAllGamesView,
+  type AllGamesViewState,
+} from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
@@ -64,14 +69,48 @@ function App() {
   // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
   // a tela por console (LibraryScreen) continua existindo.
   const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library">("all-games");
-  // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04) — sempre veio de
-  // AllGamesScreen hoje, então "Voltar" sempre volta pra lá.
+  // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04). M5
+  // (docs/sprint-m-plano.md, 2026-08-07): até aqui só vinha de
+  // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
+  // ver M5) — "Voltar" precisa saber pra qual fase retornar, senão sempre
+  // devolveria pra "all-games" mesmo vindo de dentro de um console.
+  const [gameDetailOrigin, setGameDetailOrigin] = useState<"all-games" | "games">("all-games");
   const [selectedGame, setSelectedGame] = useState<{
     game: LibraryGame;
     consoleName: string;
     shortName: string;
     year?: number;
   } | null>(null);
+
+  // M4 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): página,
+  // busca e filtro de plataforma de AllGamesScreen sobem para cá — a tela em
+  // si não guarda mais esse estado, só o consome. Sem isto, abrir um jogo e
+  // voltar resetava tudo (a tela desmontava no switch de `phase` abaixo).
+  // `loadInitialAllGamesView` (lazy initializer, roda uma vez só) traz
+  // `sort`/`viewMode` do `localStorage` — os únicos dois campos do M3 que
+  // precisam sobreviver a reabrir o app, não só a ir ao detalhe e voltar.
+  const [allGamesView, setAllGamesView] = useState<AllGamesViewState>(loadInitialAllGamesView);
+  function handleAllGamesViewChange(patch: Partial<AllGamesViewState>) {
+    persistAllGamesView(patch);
+    setAllGamesView((prev) => ({ ...prev, ...patch }));
+  }
+  // Posição de rolagem de "Todos os jogos" — a opção (a) do M4 não preserva
+  // isto de graça (ao contrário de manter a tela sempre montada), por isso o
+  // `ref` + guarda manual: `<main>` (abaixo) sobrevive à troca de `phase`
+  // (mesmo nó do DOM, só o filho `{screen}` muda), mas o conteúdo mais curto
+  // do detalhe encolhe `scrollHeight` e o navegador zera `scrollTop`
+  // sozinho — perdendo a posição quando a grade volta a ser mais alta.
+  //
+  // **A restauração em si não mora aqui** — mora dentro de `AllGamesScreen`
+  // (achado testando ao vivo com Playwright, 2026-08-07): um efeito neste
+  // componente pai, disparado só por `phase`, roda **antes** de
+  // `AllGamesScreen` buscar os jogos (a chamada é assíncrona) — nesse
+  // instante a grade ainda não tem altura nenhuma pra rolar, o navegador
+  // zera `scrollTop` de volta sozinho, e nada dispara de novo depois que os
+  // jogos chegam. `AllGamesScreen` recebe `initialScrollTop` e só aplica
+  // depois que `games` deixa de ser `null`.
+  const mainRef = useRef<HTMLElement>(null);
+  const [allGamesScrollTop, setAllGamesScrollTop] = useState(0);
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
@@ -242,8 +281,17 @@ function App() {
         <AllGamesScreen
           report={report!}
           onOpenLibrary={() => setPhase("library")}
+          view={allGamesView}
+          onViewChange={handleAllGamesViewChange}
+          scrollElementRef={mainRef}
+          initialScrollTop={allGamesScrollTop}
           onOpenGame={(game, consoleName, shortName) => {
             const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
+            // M4: guarda a rolagem antes de trocar de fase — é a última
+            // chance de ler `mainRef.current.scrollTop` com a grade ainda
+            // na tela.
+            setAllGamesScrollTop(mainRef.current?.scrollTop ?? 0);
+            setGameDetailOrigin("all-games");
             setSelectedGame({ game, consoleName, shortName, year });
             setPhase("game-detail");
           }}
@@ -258,7 +306,8 @@ function App() {
           consoleName={selectedGame!.consoleName}
           shortName={selectedGame!.shortName}
           year={selectedGame!.year}
-          onBack={() => setPhase("all-games")}
+          report={report!}
+          onBack={() => setPhase(gameDetailOrigin)}
         />
       );
       break;
@@ -295,6 +344,15 @@ function App() {
           shortName={selectedConsole!.shortName}
           report={report!}
           onBack={() => setPhase(gamesOrigin)}
+          onOpenGame={(game, consoleName, shortName) => {
+            const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
+            // M5: "Voltar" do detalhe precisa devolver pra cá, não pra
+            // "all-games" — diferente de AllGamesScreen, esta tela não tem
+            // rolagem própria pra salvar (grade curta, sem paginação).
+            setGameDetailOrigin("games");
+            setSelectedGame({ game, consoleName, shortName, year });
+            setPhase("game-detail");
+          }}
         />
       );
       break;
@@ -314,7 +372,9 @@ function App() {
     return (
       <div className="flex h-screen">
         <Sidebar active={active} onNav={navigateSidebar} />
-        <main className="flex-1 overflow-y-auto">{screen}</main>
+        <main ref={mainRef} className="flex-1 overflow-y-auto">
+          {screen}
+        </main>
       </div>
     );
   }

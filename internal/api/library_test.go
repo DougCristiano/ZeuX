@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -425,6 +426,156 @@ func TestLibraryGamesFilterByFavorite(t *testing.T) {
 	if got := int64(favGames[0].(map[string]any)["id"].(float64)); got != id {
 		t.Fatalf("jogo filtrado = %d, esperado %d", got, id)
 	}
+}
+
+// Trava o critério central do M4 (docs/sprint-m-plano.md): o campo
+// `consoles` da resposta reflete o resultado COMPLETO (antes de `?platform=`
+// e da paginação), e `?platform=<console_id>` pagina só dentro daquele
+// console — "página 2 de PS1" é a segunda página só dos jogos de PS1, não a
+// segunda página do acervo inteiro filtrada depois.
+func TestLibraryGamesFilterByPlatformAndConsolesField(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	dir := t.TempDir()
+
+	// 3 jogos de nes, 1 de snes — dá pra distinguir "não filtrado" (4) de
+	// "filtrado por nes, paginado de 2 em 2" (3, em duas páginas).
+	for _, name := range []string{"a.nes", "b.nes", "c.nes"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatalf("criando ROM %s: %v", name, err)
+		}
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+	snesDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(snesDir, "d.sfc"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM snes: %v", err)
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "snes",
+		"path":       snesDir,
+	})
+
+	// `consoles` no resultado sem filtro precisa trazer os dois, mesmo com
+	// page_size menor que o total — é o resultado completo, não a página.
+	allRec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=2", nil)
+	allBody := decodeBody(t, allRec)
+	consoles := toStringSlice(t, allBody["consoles"])
+	if !slices.Equal(consoles, []string{"nes", "snes"}) {
+		t.Fatalf("consoles = %v, esperado [nes snes] (ordenado, do resultado completo)", consoles)
+	}
+
+	// `consoles` continua trazendo os dois mesmo já filtrando por
+	// ?platform=nes — é calculado ANTES do filtro (senão o chip "snes"
+	// desapareceria do próprio filtro assim que o usuário o escolhesse).
+	page1 := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=2&platform=nes", nil)
+	page1Body := decodeBody(t, page1)
+	if got := toStringSlice(t, page1Body["consoles"]); !slices.Equal(got, []string{"nes", "snes"}) {
+		t.Fatalf("consoles com ?platform=nes = %v, esperado [nes snes] (não filtrado pelo platform)", got)
+	}
+	if total, _ := page1Body["total"].(float64); total != 3 {
+		t.Fatalf("total com ?platform=nes = %v, esperado 3 (só os jogos de nes)", page1Body["total"])
+	}
+	page1Games := page1Body["games"].([]any)
+	if len(page1Games) != 2 {
+		t.Fatalf("página 1 (?platform=nes&page_size=2) = %d jogos, esperado 2", len(page1Games))
+	}
+	for _, g := range page1Games {
+		if cid, _ := g.(map[string]any)["console_id"].(string); cid != "nes" {
+			t.Fatalf("jogo com console_id = %q na página filtrada por nes", cid)
+		}
+	}
+
+	page2 := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=2&page_size=2&platform=nes", nil)
+	page2Games := decodeBody(t, page2)["games"].([]any)
+	if len(page2Games) != 1 {
+		t.Fatalf("página 2 (?platform=nes&page_size=2) = %d jogos, esperado 1 (3 no total)", len(page2Games))
+	}
+}
+
+// Trava o critério central do M3 (docs/sprint-m-plano.md): cada valor de
+// `?sort=` ordena o resultado inteiro (antes de paginar), e um valor
+// desconhecido cai no padrão sem erro — 3 jogos com título, tempo jogado e
+// data de última sessão todos diferentes, para nenhuma ordenação empatar por
+// acidente.
+func TestLibraryGamesSortValues(t *testing.T) {
+	server, db := newTestServerWithDB(t, fakeProbe{})
+	dir := t.TempDir()
+
+	// Zebra: título por último, mas foi jogado por mais tempo e mais
+	// recentemente — só desempata por tempo_jogado ou recentes.
+	// Abacaxi: título primeiro, pouco tempo jogado, nunca jogado.
+	// Meio: título do meio, tempo do meio, jogado há mais tempo que Zebra.
+	paths := map[string]string{
+		"Zebra":   filepath.Join(dir, "Zebra.nes"),
+		"Abacaxi": filepath.Join(dir, "Abacaxi.nes"),
+		"Meio":    filepath.Join(dir, "Meio.nes"),
+	}
+	for _, p := range paths {
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatalf("criando ROM %s: %v", p, err)
+		}
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+
+	sessions := emulator.NewSQLiteSessions(db)
+	insertClosedSession(t, sessions, "nes", paths["Zebra"], time.Now().Add(-5*time.Minute), 600*time.Second)
+	insertClosedSession(t, sessions, "nes", paths["Meio"], time.Now().Add(-1*time.Hour), 120*time.Second)
+	// Abacaxi nunca foi jogado — sem sessão.
+
+	titlesInOrder := func(t *testing.T, sort string) []string {
+		t.Helper()
+		rec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10&sort="+sort, nil)
+		games := decodeBody(t, rec)["games"].([]any)
+		if len(games) != 3 {
+			t.Fatalf("?sort=%s: esperava 3 jogos, veio %d", sort, len(games))
+		}
+		out := make([]string, len(games))
+		for i, g := range games {
+			out[i] = g.(map[string]any)["title"].(string)
+		}
+		return out
+	}
+
+	if got := titlesInOrder(t, "titulo"); !slices.Equal(got, []string{"Abacaxi", "Meio", "Zebra"}) {
+		t.Fatalf("?sort=titulo = %v, esperado ordem alfabética [Abacaxi Meio Zebra]", got)
+	}
+	if got := titlesInOrder(t, "tempo_jogado"); !slices.Equal(got, []string{"Zebra", "Meio", "Abacaxi"}) {
+		t.Fatalf("?sort=tempo_jogado = %v, esperado [Zebra Meio Abacaxi] (600s, 120s, 0s)", got)
+	}
+	if got := titlesInOrder(t, "recentes"); !slices.Equal(got, []string{"Zebra", "Meio", "Abacaxi"}) {
+		t.Fatalf("?sort=recentes = %v, esperado [Zebra Meio Abacaxi] (jogado há 5min, 1h, nunca)", got)
+	}
+	// Valor desconhecido cai no padrão (recentes) sem erro 400 — é
+	// preferência de tela, não contrato quebrado.
+	recAlgo := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10&sort=lixo-total", nil)
+	if recAlgo.Code != http.StatusOK {
+		t.Fatalf("?sort=lixo-total: status = %d, esperado 200 (cai no padrão)", recAlgo.Code)
+	}
+	if got := titlesInOrder(t, "lixo-total"); !slices.Equal(got, []string{"Zebra", "Meio", "Abacaxi"}) {
+		t.Fatalf("?sort=lixo-total = %v, esperado o mesmo do padrão (recentes)", got)
+	}
+}
+
+func toStringSlice(t *testing.T, raw any) []string {
+	t.Helper()
+	list, ok := raw.([]any)
+	if !ok {
+		t.Fatalf("campo não é array: %#v", raw)
+	}
+	out := make([]string, len(list))
+	for i, v := range list {
+		s, ok := v.(string)
+		if !ok {
+			t.Fatalf("elemento %d não é string: %#v", i, v)
+		}
+		out[i] = s
+	}
+	return out
 }
 
 func insertClosedSession(t *testing.T, sessions *emulator.SQLiteSessions, consoleID, romPath string, startedAt time.Time, duration time.Duration) {

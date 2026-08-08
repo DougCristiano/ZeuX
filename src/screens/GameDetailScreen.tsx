@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, ApiError, coverImageURL } from "../api";
-import type { LibraryGame } from "../api/types";
-import { Badge, Button, Card, ErrorModal, FavoriteToggle, GameCover } from "../components/ui";
+import type { LibraryGame, Report } from "../api/types";
+import { Badge, Button, Card, ConsoleVerdictCard, ErrorModal, FavoriteToggle, GameCover } from "../components/ui";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -37,12 +38,26 @@ function formatLastPlayed(iso: string | undefined): string {
  * não precisa recalcular). A contagem de sessões é a única coisa que exige
  * uma chamada própria (`GET /sessions`, filtrando por `rom_path` — o
  * launcher não conhece a biblioteca, ver docs/arquitetura-a-preservar.md).
+ *
+ * M6 (docs/sprint-m-plano.md, 2026-08-07): a tela ganhou `report`, pra
+ * mostrar com o que o jogo vai rodar — o dado que faltava era exatamente
+ * "o diferencial declarado do produto". Reaproveita `ConsoleVerdictCard`
+ * (o mesmo cartão de `VerdictScreen`/`ConsoleInfoModal`), não um texto
+ * novo: `verdict.headline` já cobre o caso "sem preset automático"
+ * (`Level.Headline()`, `internal/verdict/catalog.go` — a frase para o
+ * patamar "improvável" já diz "este hardware não alcança o mínimo
+ * necessário", sem julgar a máquina, princípio 2 do `CLAUDE.md`). A
+ * correção ao próprio plano: `GamesScreen` **não** mostrava
+ * `verdict.emulator`/`verdict.preset` como texto — só usava esses campos
+ * internamente para decidir o fluxo de instalação; o roadmap dizia que sim,
+ * ficou desatualizado.
  */
 export function GameDetailScreen({
   game,
   consoleName,
   shortName,
   year,
+  report,
   onBack,
 }: {
   game: LibraryGame;
@@ -50,6 +65,7 @@ export function GameDetailScreen({
   shortName: string;
   /** Ano do console no catálogo — dado real (verdict.year), não inventado. */
   year?: number;
+  report: Report;
   onBack: () => void;
 }) {
   const [sessionCount, setSessionCount] = useState<number | null>(null);
@@ -66,6 +82,9 @@ export function GameDetailScreen({
   // porque o snapshot em App.tsx não muda sozinho depois do toggle aqui.
   const [favorite, setFavorite] = useState(game.favorite);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  // M6: "abrir a pasta do jogo" — erro fica colado no botão (mesmo padrão
+  // de favoriteError/coverError), não solto pela tela.
+  const [folderError, setFolderError] = useState<string | null>(null);
 
   useEffect(() => {
     setCoverUrl(game.cover_url);
@@ -132,6 +151,21 @@ export function GameDetailScreen({
       });
   }
 
+  // M6 — abrir a pasta do jogo no explorador de arquivos do SO, com o
+  // arquivo já selecionado. `revealItemInDir` (não `openPath` + dirname
+  // calculado à mão): evita reimplementar dirname pros dois separadores de
+  // caminho (Windows usa `\`, o resto usa `/`) e já entrega o arquivo em
+  // destaque, não só a pasta aberta. Nunca um link — só revela o que já
+  // está no disco do usuário (regra 6 do CLAUDE.md).
+  async function openGameFolder() {
+    setFolderError(null);
+    try {
+      await revealItemInDir(game.path);
+    } catch (err) {
+      setFolderError(`Não foi possível abrir a pasta do jogo: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   useEffect(() => {
     api
       .getSessions()
@@ -143,60 +177,114 @@ export function GameDetailScreen({
   }, [game.path]);
 
   const status = statusFor(game.id);
+  const verdict = report.verdicts.find((v) => v.console_id === game.console_id);
+  const heroCoverUrl = coverImageURL(coverUrl);
+
+  const heroContent = (
+    <>
+      <div className="relative w-full max-w-[220px]">
+        <GameCover label={shortName} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
+        <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
+        {favoriteError && <p className="mt-1 text-xs text-danger">{favoriteError}</p>}
+        {igdbConfigured && (
+          <div className="mt-2">
+            <Button variant="secondary" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full text-xs">
+              {scrapingCover ? "Buscando…" : coverUrl ? "Buscar capa de novo" : "Buscar capa"}
+            </Button>
+            {coverError && <p className="mt-1 text-xs text-danger">{coverError}</p>}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">{game.title}</h1>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Badge accentColor={consoleAccentColor(game.console_id)}>{consoleName}</Badge>
+            {year !== undefined && <Badge>{year}</Badge>}
+            {game.missing && <Badge>arquivo ausente</Badge>}
+          </div>
+        </div>
+
+        <Button
+          variant="primary"
+          autoFocus
+          disabled={game.missing || status.kind === "launching"}
+          onClick={() => launch(game)}
+          className="w-fit px-8 py-3 text-lg"
+        >
+          {status.kind === "error" ? "Tentar de novo" : "▶ Jogar"}
+        </Button>
+
+        {game.missing && (
+          <p className="text-sm text-danger">
+            O arquivo deste jogo não foi encontrado na última varredura da pasta.
+          </p>
+        )}
+
+        {/* M6: nenhum link, nenhuma sugestão de onde obter o arquivo (regra
+            6 do CLAUDE.md) — só revela o que já está no disco do usuário. */}
+        <div className="flex flex-col gap-1">
+          <Button variant="secondary" onClick={openGameFolder} className="w-fit">
+            Abrir pasta do jogo
+          </Button>
+          {folderError && <p className="text-xs text-danger">{folderError}</p>}
+          <p className="truncate text-xs text-muted" title={game.path}>
+            {game.path}
+          </p>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="mx-auto max-w-4xl px-6 pt-16 pb-10">
-      {launchError && <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={clearLaunchError} />}
+      {/* A contagem de sessões falhar não impede o resto da tela de
+          funcionar — mas o texto vermelho solto dentro do card de
+          estatísticas era fácil de perder (mesmo achado do Douglas em
+          GamesScreen/AllGamesScreen, 2026-08-07). `favoriteError`/
+          `coverError`/`folderError` continuam inline, de propósito: aparecem
+          colados no botão que falhou (favoritar, buscar capa, abrir pasta),
+          não soltos pela tela. */}
+      {launchError ? (
+        <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={clearLaunchError} />
+      ) : (
+        error && <ErrorModal title="Não foi possível ler as estatísticas" message={error} onClose={() => setError(null)} />
+      )}
 
       <Button variant="secondary" onClick={onBack} className="mb-4">
         Voltar
       </Button>
 
-      <div className="flex flex-col gap-5 sm:flex-row">
-        <div className="relative w-full max-w-[220px]">
-          <GameCover label={shortName} consoleId={game.console_id} coverUrl={coverImageURL(coverUrl)} size="lg" />
-          <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
-          {favoriteError && <p className="mt-1 text-xs text-danger">{favoriteError}</p>}
-          {igdbConfigured && (
-            <div className="mt-2">
-              <Button variant="secondary" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full text-xs">
-                {scrapingCover ? "Buscando…" : coverUrl ? "Buscar capa de novo" : "Buscar capa"}
-              </Button>
-              {coverError && <p className="mt-1 text-xs text-danger">{coverError}</p>}
-            </div>
-          )}
+      {/* M6: fundo do topo com a própria capa desfocada — só quando existe
+          capa real. Sem capa, o topo fica exatamente como estava (nada de
+          padding/fundo novo por cima do placeholder de sigla). */}
+      {heroCoverUrl ? (
+        <div className="relative overflow-hidden rounded-lg">
+          <img
+            src={heroCoverUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full scale-125 object-cover opacity-30 blur-3xl"
+          />
+          <div className="relative flex flex-col gap-5 p-6 sm:flex-row">{heroContent}</div>
         </div>
+      ) : (
+        <div className="flex flex-col gap-5 sm:flex-row">{heroContent}</div>
+      )}
 
-        <div className="flex flex-1 flex-col gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-ink">{game.title}</h1>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <Badge accentColor={consoleAccentColor(game.console_id)}>{consoleName}</Badge>
-              {year !== undefined && <Badge>{year}</Badge>}
-              {game.missing && <Badge>arquivo ausente</Badge>}
-            </div>
-          </div>
-
-          <Button
-            variant="primary"
-            disabled={game.missing || status.kind === "launching"}
-            onClick={() => launch(game)}
-            className="w-fit px-8 py-3 text-lg"
-          >
-            {status.kind === "error" ? "Tentar de novo" : "▶ Jogar"}
-          </Button>
-
-          {game.missing && (
-            <p className="text-sm text-danger">
-              O arquivo deste jogo não foi encontrado na última varredura da pasta.
-            </p>
-          )}
+      {/* M6: com o que o jogo vai rodar — o diferencial declarado do
+          produto, que faltava nesta tela. Mesmo cartão de VerdictScreen/
+          ConsoleInfoModal, não um texto novo: já cobre emulador+preset,
+          "sem preset automático" (via headline) e o gargalo nomeado. */}
+      {verdict && (
+        <div className="mt-6">
+          <ConsoleVerdictCard verdict={verdict} />
         </div>
-      </div>
+      )}
 
       <Card className="mt-6">
         <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Suas estatísticas</h2>
-        {error && <p className="text-sm text-danger">{error}</p>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs text-muted">Tempo jogado</p>

@@ -70,15 +70,19 @@ export function Badge({
   children,
   variant = "default",
   accentColor,
+  title,
 }: {
   children: ReactNode;
   variant?: BadgeVariant;
   accentColor?: string;
+  /** M8 (docs/sprint-m-plano.md): tooltip nativo com a frase completa, quando o texto do badge é um resumo curto. */
+  title?: string;
 }) {
   const styles =
     variant === "solid" ? "border-accent bg-accent text-accent-ink" : "border-line-strong text-muted";
   return (
     <span
+      title={title}
       className={`inline-block rounded-sm border px-1.5 py-0.5 font-mono text-xs tracking-wide ${accentColor ? "" : styles}`}
       style={accentColor ? { borderColor: accentColor, color: accentColor, background: `${accentColor}1a` } : undefined}
     >
@@ -125,8 +129,25 @@ export function PartialNotice({ children }: { children: ReactNode }) {
  * `ConsoleInfoModal` duplicava por conta própria. Conteúdo (título,
  * mensagem, botão) continua usando o `Button` do ZeuX, não o do shadcn — a
  * identidade visual das ações não muda.
+ *
+ * `onRetry` (M1, docs/sprint-m-plano.md, decidido pelo Douglas em
+ * 2026-08-07): com o botão "Jogar" saindo da célula da grade em
+ * `AllGamesScreen`, o jeito de tentar de novo depois de uma falha deixou de
+ * ser "clicar o botão embaixo do tile de novo" — vira este botão aqui. Opcional
+ * porque `GameDetailScreen` continua usando `ErrorModal` sem retry embutido
+ * (o botão "▶ Jogar" da própria tela já cumpre esse papel).
  */
-export function ErrorModal({ title, message, onClose }: { title: string; message: string; onClose: () => void }) {
+export function ErrorModal({
+  title,
+  message,
+  onClose,
+  onRetry,
+}: {
+  title: string;
+  message: string;
+  onClose: () => void;
+  onRetry?: () => void;
+}) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -135,11 +156,56 @@ export function ErrorModal({ title, message, onClose }: { title: string; message
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-danger">{title}</DialogTitle>
         <p className="text-base text-ink">{message}</p>
-        <div className="mt-4 flex justify-end">
-          <Button variant="primary" autoFocus onClick={onClose}>
-            Entendi
+        <div className="mt-4 flex justify-end gap-2">
+          {onRetry && (
+            <Button variant="secondary" onClick={onClose}>
+              Fechar
+            </Button>
+          )}
+          <Button variant="primary" autoFocus onClick={onRetry ?? onClose}>
+            {onRetry ? "Tentar de novo" : "Entendi"}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Modal de confirmação: mesmo shell do `ErrorModal` (Dialog do shadcn, sem
+ * fechar clicando fora), mas para decisões com mais de um botão de saída —
+ * "instalar mesmo assim"/"cancelar", ou "abrir pasta"/"jogar mesmo
+ * assim"/"cancelar". `ErrorModal` fixa o par retry/fechar; aqui quem chama
+ * monta os próprios botões em `actions`, porque cada fluxo tem sua própria
+ * sequência (M8, docs/sprint-m-plano.md).
+ *
+ * Criado para `AllGamesScreen`: a grade é virtualizada (M3), então um painel
+ * inline de confirmação por tile — o que `GamesScreen` faz, sem
+ * virtualização — quebraria a altura uniforme que o `useVirtualizer` exige
+ * por linha. Como só existe uma instalação pendente por vez (estado
+ * compartilhado de `useInlineInstall`), um modal por tela resolve sem
+ * precisar ensinar a virtualização a lidar com altura variável.
+ */
+export function ConfirmModal({
+  title,
+  message,
+  actions,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  actions: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="max-w-md rounded border border-line bg-fill p-5 ring-0"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <DialogTitle className="mb-2 text-lg font-semibold text-ink">{title}</DialogTitle>
+        <p className="text-base text-ink">{message}</p>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">{actions}</div>
       </DialogContent>
     </Dialog>
   );
@@ -152,14 +218,22 @@ export function ErrorModal({ title, message, onClose }: { title: string; message
  * gradiente/emoji fake — o placeholder é a sigla do console (mesmo dado que
  * `AllGamesScreen`/`GamesScreen` já mostravam antes), só com tratamento
  * visual novo (scanline, glow de borda no hover/foco, overlay de play
- * opcional). `coverUrl` fica preparado para o dia em que existir capa de
- * jogo de verdade (scraper — já fora do MVP, ver docs/roadmap.md); até lá,
- * nunca é passado.
+ * opcional). `coverUrl` chega preenchido desde o G1 (scraper de metadados
+ * IGDB, docs/roadmap.md) — quando `GET /library/games` devolve uma capa já
+ * baixada em disco.
  *
  * `consoleId` (2026-08-05, a pedido do Douglas): cor de identidade por
  * console (`consoleAccentColor`) no badge de plataforma e no glow de
  * hover/foco — decorativa, não estado. Sem `consoleId`, cai no cinza neutro
  * de sempre (nenhuma tela hoje deixa de passar, mas o componente não exige).
+ *
+ * M11 (docs/sprint-m-plano.md, 2026-08-07): com `coverUrl`, a capa vira duas
+ * `<img>` sobrepostas — fundo desfocado (`object-cover`, preenche a célula
+ * `aspect-[3/4]` inteira) e a capa real por cima (`object-contain`, sem
+ * corte). Antes, uma capa quadrada ou muito alta (comum em SNES, Mega Drive,
+ * o jewel case do PS1) era cortada pelo `object-cover` único que a célula
+ * usava. A célula continua `aspect-[3/4]` fixa — a correção é só de como a
+ * imagem preenche o espaço, não do tamanho da grade.
  */
 export function GameCover({
   label,
@@ -167,6 +241,7 @@ export function GameCover({
   consoleId,
   size = "md",
   showPlayOverlay = false,
+  onPlay,
   coverUrl,
   className = "",
 }: {
@@ -178,6 +253,13 @@ export function GameCover({
   size?: "md" | "lg";
   /** Mostra um ícone de play sobreposto no hover/foco (ex.: card clicável que lança direto). */
   showPlayOverlay?: boolean;
+  /**
+   * M1 (docs/sprint-m-plano.md): sem `onPlay`, o overlay continua
+   * decorativo (`pointer-events-none`) — é o caso de `GameDetailScreen`,
+   * onde um segundo botão de jogar dentro da capa não faz sentido. Com
+   * `onPlay`, o overlay vira um `<button>` de verdade que lança o jogo.
+   */
+  onPlay?: () => void;
   /** Preparado para o futuro — nenhuma tela passa isto ainda. */
   coverUrl?: string;
   className?: string;
@@ -188,59 +270,137 @@ export function GameCover({
   return (
     <div
       style={accentVars}
-      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border bg-fill transition-colors ${
-        accent
-          ? "border-line-strong hover:border-[var(--console-accent)] focus-within:border-[var(--console-accent)]"
-          : "border-line-strong"
-      } ${className}`}
+      // M2 (docs/sprint-m-plano.md): borda e glow no hover/foco vivem aqui,
+      // não em CSS solto — evita o bug de cascade layer que fazia o glow
+      // nunca usar --console-accent (ver comentário em src/index.css).
+      // `var(--console-accent, var(--accent))` funciona com ou sem
+      // `consoleId`: cai no roxo genérico quando não há cor de console.
+      // `group-focus-visible`, não `focus-within`: quem recebe foco de
+      // teclado/gamepad é o `<button>` ancestral (quando existe um — ver
+      // AllGamesScreen.tsx), nunca esta div; `group-focus-visible` cascateia
+      // por qualquer ancestral `.group` com foco visível, `focus-within`
+      // olharia só para dentro desta div e nunca dispararia.
+      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border border-line-strong bg-fill transition-[border-color,box-shadow] duration-150 ease-in-out hover:border-[var(--console-accent,var(--accent))] group-focus-visible:border-[var(--console-accent,var(--accent))] hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] ${className}`}
     >
       {coverUrl ? (
-        <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <>
+          {/* M11 (docs/sprint-m-plano.md, 2026-08-07): fundo com a própria
+              capa, `object-cover` + desfocada + escurecida — preenche o
+              espaço que a capa real (que raramente bate 3/4 exato: SNES,
+              Mega Drive, o jewel case do PS1 variam) deixaria como faixa
+              cinza chapada atrás da capa de verdade (abaixo). `scale-110`
+              evita a borda transparente/clara que o blur revelaria na beira
+              do recorte; o `overflow-hidden` do wrapper corta o excesso.
+              Puramente decorativo — nunca a imagem que o usuário lê. */}
+          <img
+            src={coverUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full scale-110 object-cover blur-md brightness-50"
+          />
+          {/* A capa de verdade — `object-contain`, não `object-cover`: a
+              célula continua `aspect-[3/4]` fixa (grade uniforme, critério
+              do item), mas a arte agora aparece inteira, sem cortar os lados
+              de uma capa quadrada nem o topo/base de uma capa alta. */}
+          <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+        </>
       ) : (
-        <div
-          className={`absolute inset-0 flex items-center justify-center font-pixel text-muted opacity-25 ${
-            size === "lg" ? "text-4xl" : "text-lg"
-          }`}
-          aria-hidden="true"
-        >
-          {label}
-        </div>
+        <>
+          <div
+            className={`absolute inset-0 flex items-center justify-center font-pixel text-muted opacity-25 ${
+              size === "lg" ? "text-4xl" : "text-lg"
+            }`}
+            aria-hidden="true"
+          >
+            {label}
+          </div>
+          {/* M15 (docs/sprint-m-plano.md, 2026-08-07): a scanline só entra
+              sobre o placeholder de sigla — ela existe para dar textura ao
+              vazio, não para degradar a capa que o usuário acabou de baixar
+              (G1). Movida pra dentro deste ramo do ternário; antes era
+              irmã dos dois ramos e caía por cima de qualquer capa real
+              também. */}
+          <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
+        </>
       )}
-      <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/75 to-transparent" />
 
       {/* Badge de plataforma (2026-08-05) — cor de identidade do console,
           não estado. Substitui a repetição da sigla que existia no centro E
-          no rodapé antes do título entrar aqui. */}
+          no rodapé antes do título entrar aqui.
+          M7 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07):
+          9px → 11px — o piso da fonte pixel (src/index.css, "nada abaixo de
+          11px"). Fica ~20% maior sobre a capa; "podemos alterar depois se
+          não ficar bom" foi a condição do próprio Douglas. */}
       <span
-        className="pointer-events-none absolute top-1.5 left-1.5 rounded-sm border px-1.5 py-0.5 font-pixel text-[9px]"
+        className="pointer-events-none absolute top-1.5 left-1.5 rounded-sm border px-1.5 py-0.5 font-pixel text-[11px]"
         style={{ borderColor: accent ?? "var(--line-strong)", color: accent ?? "var(--muted)", background: "rgba(0,0,0,0.7)" }}
       >
         {label}
       </span>
 
-      <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 font-pixel text-[11px] text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
-        {title ?? label}
-      </div>
-      {showPlayOverlay && (
-        // Escurecimento mais forte (J4, docs/roadmap.md — referência real do
-        // Playnite em docs/referencias-playnite.md: overlay de hover em
-        // `#AA000000`, ~67% opaco, mais forte que o glow de borda que o ZeuX
-        // já tinha) — o placeholder de sigla continua legível por baixo.
-        <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/60 group-hover:flex group-focus-visible:flex">
-          <div
-            className={`flex h-11 w-11 items-center justify-center rounded-full border-2 ${
-              accent
-                ? "border-[var(--console-accent)] shadow-[0_0_16px_var(--console-accent)]"
-                : "border-accent shadow-[0_0_16px_var(--accent)]"
-            }`}
-          >
+      {/* M7: título sobre a arte só quando NÃO há capa real — com capa, ele
+          duplicava o rótulo em Inter que AllGamesScreen já desenha embaixo
+          do tile (um title longo, sem truncamento, ainda subia sobre a
+          arte). `line-clamp-3` deixa a "capa de texto" (placeholder de
+          sigla) legível sem estourar a célula. */}
+      {!coverUrl && (
+        <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 line-clamp-3 font-pixel text-[11px] text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
+          {title ?? label}
+        </div>
+      )}
+      {showPlayOverlay &&
+        (() => {
+          const circleClass = `flex h-11 w-11 items-center justify-center rounded-full border-2 ${
+            accent
+              ? "border-[var(--console-accent)] shadow-[0_0_16px_var(--console-accent)]"
+              : "border-accent shadow-[0_0_16px_var(--accent)]"
+          }`;
+          const icon = (
             <svg width="14" height="16" viewBox="0 0 14 16" fill={accent ?? "var(--accent)"} aria-hidden="true">
               <path d="M0 0 L14 8 L0 16 Z" />
             </svg>
-          </div>
-        </div>
-      )}
+          );
+          return (
+            // Escurecimento mais forte (J4, docs/roadmap.md — referência real
+            // do Playnite em docs/referencias-playnite.md: overlay de hover em
+            // `#AA000000`, ~67% opaco, mais forte que o glow de borda que o
+            // ZeuX já tinha) — o placeholder de sigla continua legível por
+            // baixo. O wrapper continua `pointer-events-none`: só o círculo
+            // (quando `onPlay` existe) reativa clique, o resto da capa
+            // continua abrindo o detalhe por baixo (M1).
+            <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/60 group-hover:flex group-focus-visible:flex">
+              {onPlay ? (
+                // M1 (docs/sprint-m-plano.md): botão real, não mais
+                // decorativo. `tabIndex={-1}` tira este botão da ordem
+                // sequencial de Tab e — como ele fica sobreposto ao centro
+                // exato do wrapper focável (AllGamesScreen.tsx) — nenhuma
+                // direção do D-pad o alcançaria mesmo sem isso
+                // (`findNextFocus` exige distância estritamente positiva na
+                // direção pressionada). É assim que o critério "1 movimento
+                // por fileira" se sustenta com dois alvos por tile: quem
+                // navega por Tab/D-pad chega ao jogo pelo wrapper (abre o
+                // detalhe) e lança de lá; mouse e leitor de tela em modo de
+                // navegação por elementos continuam alcançando este botão
+                // direto, só não entram nele pela sequência linear de Tab.
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label={`Jogar ${title ?? label}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPlay();
+                  }}
+                  className={`pointer-events-auto ${circleClass}`}
+                >
+                  {icon}
+                </button>
+              ) : (
+                <div className={circleClass}>{icon}</div>
+              )}
+            </div>
+          );
+        })()}
     </div>
   );
 }
@@ -398,6 +558,27 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
  * badge de plataforma — decorativa, não estado. `label` continua sendo o que
  * é exibido (sigla); `consoleId` só resolve a cor.
  */
+// G5 (docs/roadmap.md, achado em 2026-08-07): `label.slice(0, 4)` colidia de
+// verdade pra 5 consoles — verificado por script contra os 33 `short_name`
+// do catálogo, não "parece parecido": `gb` ("Game Boy"), `gamegear` ("Game
+// Gear") e `gamecube` ("GameCube") resolviam os três pra "GAME"; `xbox`
+// ("Xbox") e `xbox360` ("Xbox 360") resolviam os dois pra "XBOX". A cor por
+// fabricante (M10) ajuda em parte — `gamegear` é Sega (ciano), longe de
+// `gb`/`gamecube` (Nintendo, vermelho) — mas não separa `gb` de `gamecube`,
+// mesma família de cor.
+//
+// Corrigido aqui, não em `short_name` (usado como texto **completo** em
+// badge/chip por toda a biblioteca) — trocar `short_name` pra abreviar
+// resolveria a colisão do ícone mas quebraria o texto legível nas outras
+// telas. Mapa pequeno, só pros 4 casos que colidem de verdade; o resto
+// continua caindo no `slice(0, 4)` de sempre.
+const ICON_LABEL_OVERRIDES: Readonly<Record<string, string>> = {
+  gb: "GB", // short_name é "Game Boy" por inconsistência com gba/gbc (já abreviados) — "GB" também resolve isso
+  gamegear: "GG", // abreviação comum em comunidade retro
+  gamecube: "GC", // idem
+  xbox360: "X360", // `xbox` sozinho continua "XBOX" (slice normal, sem entrada aqui)
+};
+
 export function ConsoleIcon({ label, consoleId, onClick }: { label: string; consoleId: string; onClick: () => void }) {
   const accent = consoleAccentColor(consoleId);
   return (
@@ -406,9 +587,11 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       onClick={onClick}
       title={label}
       style={{ borderColor: `${accent}66`, color: accent }}
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[8px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
+      // M7 (docs/sprint-m-plano.md): 8px violava o piso de 11px da fonte
+      // pixel (src/index.css) — mesma regra do badge de GameCover.
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
-      {label.slice(0, 4).toUpperCase()}
+      {(ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase()}
     </button>
   );
 }

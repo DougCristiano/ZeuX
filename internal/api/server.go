@@ -1059,7 +1059,11 @@ func coverURLFor(coverPath string) string {
 // antigo, lista inteira sem paginar, porque GamesScreen já lida bem com o
 // tamanho normal de uma pasta de um console só.
 const (
-	defaultLibraryPageSize = 24
+	// M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24
+	// nunca fechava fileira numa grade de 5 ou 6 colunas; 30 é múltiplo dos
+	// dois. O `PAGE_SIZE` do front (AllGamesScreen.tsx) acompanha o mesmo
+	// valor de propósito — os dois divergiam em silêncio antes desta sprint.
+	defaultLibraryPageSize = 30
 	maxLibraryPageSize     = 100
 )
 
@@ -1135,8 +1139,60 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 	response := map[string]any{"games": result}
 
 	if consoleID == "" {
+		// M4 (docs/sprint-m-plano.md): consoles presentes no resultado
+		// COMPLETO — antes do filtro de `?platform=` e da paginação —, para
+		// que os chips da tela não mudem de opção sozinhos ao trocar de
+		// página ou de plataforma escolhida (o bug que motivou o item:
+		// platformsOnPage calculado só sobre a página atual, no cliente).
+		consoleSet := make(map[string]struct{}, len(result))
+		for _, g := range result {
+			consoleSet[g.ConsoleID] = struct{}{}
+		}
+		consoles := make([]string, 0, len(consoleSet))
+		for id := range consoleSet {
+			consoles = append(consoles, id)
+		}
+		sort.Strings(consoles)
+
+		// M3 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07):
+		// ?sort= troca a ordenação, substituindo a padrão (por último jogado,
+		// já aplicada acima e que continua sendo o comportamento do modo por
+		// console, sem UI de ordenação). Valores em português de propósito —
+		// exceção registrada no CLAUDE.md. Valor vazio ou desconhecido cai no
+		// padrão sem erro: é preferência de tela, não contrato quebrado.
+		switch r.URL.Query().Get("sort") {
+		case "titulo":
+			sort.SliceStable(result, func(i, j int) bool {
+				return strings.ToLower(result[i].Title) < strings.ToLower(result[j].Title)
+			})
+		case "tempo_jogado":
+			sort.SliceStable(result, func(i, j int) bool {
+				return result[i].PlaytimeSeconds > result[j].PlaytimeSeconds
+			})
+		}
+
+		// ?platform=<console_id> filtra o modo "todos os jogos" a um único
+		// console, antes de paginar — em Go, não em SQL: ListAllGames já
+		// devolve a lista inteira em memória (comentário na própria função:
+		// a ordenação por último jogado só é possível depois da junção com
+		// sessões, que a store não conhece), e `consoles` acima já precisa
+		// do resultado completo de qualquer forma. Nome do parâmetro
+		// deliberado: `console_id` já significa outra coisa nesta mesma
+		// rota (troca para o modo antigo, por console, sem paginação) —
+		// reusar gerraria ambiguidade, ver docs/api.md.
+		if platform := r.URL.Query().Get("platform"); platform != "" {
+			filtered := make([]gameWithStats, 0, len(result))
+			for _, g := range result {
+				if g.ConsoleID == platform {
+					filtered = append(filtered, g)
+				}
+			}
+			result = filtered
+		}
+
 		// Paginação só no modo "todos os jogos" — depois de ordenar por
-		// último jogado, nunca antes (ver comentário de ListAllGames).
+		// último jogado e filtrar por plataforma, nunca antes (ver
+		// comentário de ListAllGames).
 		page := 1
 		if raw := r.URL.Query().Get("page"); raw != "" {
 			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -1164,6 +1220,7 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		response["total"] = total
 		response["page"] = page
 		response["page_size"] = pageSize
+		response["consoles"] = consoles
 	}
 
 	writeJSON(w, http.StatusOK, response)
