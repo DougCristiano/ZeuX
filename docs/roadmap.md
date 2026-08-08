@@ -144,7 +144,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint B | **0** | fechada 2026-08-05; B11 verificado em máquina limpa dos 3 SOs pelo Douglas |
 | Sprint C | **0** | fechada; cores do RetroArch resolvidos via [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md), confirmados pelo Douglas em 2026-08-05 |
 | Sprint D (MVP) | **0** | os 11 itens fechados, critério de saída cumprido |
-| **Sprint G (v1.0)** | **1** | **G5** — 1 checkbox aberto (o outro fechou em 2026-08-07: nenhum console cai num estado vazio, verificado por script). O que resta é achado concreto, não verificado antes: `gb`/`gamegear`/`gamecube` colidem em "GAME", `xbox`/`xbox360` colidem em "XBOX" — decisão de design de como desempatar fica com o Douglas. G1/G2/G4 fechados; G3 fora da v1.0 por decisão |
+| Sprint G (v1.0) | **0** | **Fechada em 2026-08-07** — G5 fechou os dois checkboxes (nenhum console cai num estado vazio; colisão de sigla de 4 letras achada por script e corrigida com `ICON_LABEL_OVERRIDES`). G1/G2/G4 já fechados; G3 fora da v1.0 por decisão |
 | **Sprint H (v1.0)** | **1** | **H3** — 1 checkbox: mapeamento respeitado com controle físico real. Só o Douglas fecha. H1/H2/H4/H5 fechados |
 | **Sprint I (v1.0)** | **0** | I1/I2 fechados 2026-08-05; I3 já era feito 2026-08-04 |
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
@@ -155,8 +155,8 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
 | **Total do MVP e da dívida** | **1** | só o D2 — dívida + A + B + C + D |
-| **Total para fechar a v1.0** | **12** | G5 + H3 + L3 + os 9 restantes da Sprint M (recontado em 2026-08-07, Lote 11 — a Sprint M foi de 14 abertos no início do dia a 9: M5/M8/M9/M12/M13/M15 fecharam sem ressalva). **Esta linha dizia 17** até esta recontagem — desatualizada desde antes do início da Sprint M ter sido trabalhada nesta sessão. **O D2 não entra**: depende da Sprint F (v2.0) e sai declarado como dívida, não resolvido |
-| **Total geral** | **31** | 12 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 5 (sem sprint). **Esta linha dizia 36** — mesma causa da linha acima |
+| **Total para fechar a v1.0** | **11** | H3 + L3 + os 9 restantes da Sprint M. **G5 fechou em 2026-08-07** (achado e corrigido: colisão de sigla de 4 letras em `ConsoleIcon`) e saiu desta conta. Recontado em 2026-08-07, Lote 11 — a Sprint M foi de 14 abertos no início do dia a 9 (M5/M8/M9/M12/M13/M15 fecharam sem ressalva). **Esta linha dizia 17** antes desta sessão recontar — desatualizada desde antes da Sprint M ter sido trabalhada. **O D2 não entra**: depende da Sprint F (v2.0) e sai declarado como dívida, não resolvido |
+| **Total geral** | **30** | 11 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 5 (sem sprint). **Esta linha dizia 36** — mesma causa da linha acima |
 | Fora do MVP, registrado | 2 | G3 (identificação por hash) e J5 (`DropdownMenu`) — os dois fora **por decisão escrita**, não por esquecimento |
 
 **Leitura honesta do número:** dos 18 itens da v1.0, **3 são verificação humana
@@ -1635,20 +1635,24 @@ fica descartado, não só adiado.
       (`EmulatorsScreen`, `LibraryScreen`) sempre passam `short_name` de
       `report.verdicts` ou caem no `console_id` cru como fallback — nunca
       `undefined`/`""`.
-- [ ] Reavaliar se a sigla de 4 letras basta visualmente para os consoles cujo
+- [x] Reavaliar se a sigla de 4 letras basta visualmente para os consoles cujo
       nome curto colide de perto (ex. "PS1"/"PSP", "GB"/"GBC"/"GBA") — ajuste de
-      contraste/estilo, não de arquitetura. **Investigado em 2026-08-07**, não
-      fechado — achado concreto por script (`label.slice(0,4).toUpperCase()`
-      sobre os 33 `short_name`): **duas colisões exatas**, não só "parecidas":
-      `gb` ("Game Boy"), `gamegear` ("Game Gear") e `gamecube` ("GameCube")
-      resolvem os três para **"GAME"**; `xbox` ("Xbox") e `xbox360`
-      ("Xbox 360") resolvem os dois para **"XBOX"**. M10 (cor por fabricante)
-      atenua parcialmente — `gamegear` (Sega, ciano) fica visualmente longe
-      de `gb`/`gamecube` (Nintendo, vermelho) — mas `gb` e `gamecube` são os
-      dois vermelhos, então continuam quase idênticos (mesma sigla, cor da
-      mesma família). Não corrigido nesta sessão: a correção em si é decisão
-      de design (abreviar diferente? alargar o ícone só para os que colidem?),
-      não código puro — fica para o Douglas escolher.
+      contraste/estilo, não de arquitetura. **Corrigido em 2026-08-07** —
+      achado concreto por script (`label.slice(0,4).toUpperCase()` sobre os
+      33 `short_name`): **duas colisões exatas**, não só "parecidas": `gb`
+      ("Game Boy"), `gamegear` ("Game Gear") e `gamecube` ("GameCube")
+      resolviam os três para **"GAME"**; `xbox` ("Xbox") e `xbox360`
+      ("Xbox 360") resolviam os dois para **"XBOX"**. Resolvido com
+      `ICON_LABEL_OVERRIDES` em `ConsoleIcon` (`ui.tsx`) — mapa pequeno, só
+      pros 4 casos que colidiam de verdade (`gb`→"GB", `gamegear`→"GG",
+      `gamecube`→"GC", `xbox360`→"X360"; `xbox` sozinho continua "XBOX"),
+      **não** mudando `short_name` (usado como texto completo em badge/chip
+      por toda a biblioteca — mudar lá resolveria o ícone e quebraria o
+      texto legível nas outras telas). Reconferido por script: nenhuma
+      colisão restante entre os 33 consoles. Testado ao vivo (Playwright):
+      os cinco ícones lado a lado em `LibraryScreen` mostram "GB"/"GC"
+      (Nintendo, vermelho) e "XBOX"/"X360" (Microsoft, verde) — mesma família
+      de cor, texto agora distinto.
 
 **Depende de:** nada · **Bloqueia:** nada
 

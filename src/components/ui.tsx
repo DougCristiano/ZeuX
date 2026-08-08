@@ -558,6 +558,27 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
  * badge de plataforma — decorativa, não estado. `label` continua sendo o que
  * é exibido (sigla); `consoleId` só resolve a cor.
  */
+// G5 (docs/roadmap.md, achado em 2026-08-07): `label.slice(0, 4)` colidia de
+// verdade pra 5 consoles — verificado por script contra os 33 `short_name`
+// do catálogo, não "parece parecido": `gb` ("Game Boy"), `gamegear` ("Game
+// Gear") e `gamecube` ("GameCube") resolviam os três pra "GAME"; `xbox`
+// ("Xbox") e `xbox360` ("Xbox 360") resolviam os dois pra "XBOX". A cor por
+// fabricante (M10) ajuda em parte — `gamegear` é Sega (ciano), longe de
+// `gb`/`gamecube` (Nintendo, vermelho) — mas não separa `gb` de `gamecube`,
+// mesma família de cor.
+//
+// Corrigido aqui, não em `short_name` (usado como texto **completo** em
+// badge/chip por toda a biblioteca) — trocar `short_name` pra abreviar
+// resolveria a colisão do ícone mas quebraria o texto legível nas outras
+// telas. Mapa pequeno, só pros 4 casos que colidem de verdade; o resto
+// continua caindo no `slice(0, 4)` de sempre.
+const ICON_LABEL_OVERRIDES: Readonly<Record<string, string>> = {
+  gb: "GB", // short_name é "Game Boy" por inconsistência com gba/gbc (já abreviados) — "GB" também resolve isso
+  gamegear: "GG", // abreviação comum em comunidade retro
+  gamecube: "GC", // idem
+  xbox360: "X360", // `xbox` sozinho continua "XBOX" (slice normal, sem entrada aqui)
+};
+
 export function ConsoleIcon({ label, consoleId, onClick }: { label: string; consoleId: string; onClick: () => void }) {
   const accent = consoleAccentColor(consoleId);
   return (
@@ -570,7 +591,7 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       // pixel (src/index.css) — mesma regra do badge de GameCover.
       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
-      {label.slice(0, 4).toUpperCase()}
+      {(ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase()}
     </button>
   );
 }
