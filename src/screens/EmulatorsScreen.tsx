@@ -405,8 +405,28 @@ function EmulatorCardActions({
         </div>
       )}
 
-      {state.kind === "error" && <p className="text-sm text-danger">{state.message}</p>}
-      {state.kind === "remove-error" && <p className="text-sm text-danger">{state.message}</p>}
+      {/* Achado pelo Douglas em 2026-08-08: este card ficou de fora da
+          varredura de 2026-08-07 que trocou parágrafo vermelho solto por
+          `ErrorModal` no resto do app — o erro de instalar/remover aqui
+          nunca tinha passado por essa troca (a máquina de estados deste
+          card, `RowState`, é local, não o `useInlineInstall` compartilhado
+          que `GamesScreen`/`AllGamesScreen` usam). Mesmo tratamento: modal,
+          não texto solto. Sem `onRetry` — o botão "Tentar de novo"/"Tentar
+          remover de novo" abaixo já cobre isso, fora do modal. */}
+      {state.kind === "error" && (
+        <ErrorModal
+          title="Não foi possível instalar o emulador"
+          message={state.message}
+          onClose={() => setState({ kind: "idle" })}
+        />
+      )}
+      {state.kind === "remove-error" && (
+        <ErrorModal
+          title="Não foi possível remover o emulador"
+          message={state.message}
+          onClose={() => setState({ kind: "idle" })}
+        />
+      )}
 
       {/* Fontes "manual" (hoje só o Dolphin) não distribuem por releases do
           GitHub — não há como o ZeuX resolver a versão mais recente por API

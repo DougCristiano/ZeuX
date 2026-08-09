@@ -90,8 +90,23 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
  * sempre); no hover **ou** foco de teclado/gamepad, expande e revela o
  * `item.label` inteiro — nada de sigla derivada em nenhum dos dois estados
  * (ADR 0009, "nenhuma ação existe apenas em hover": o painel expandido
- * também abre por `:focus-within`, então quem navega só por teclado/D-pad
- * chega ao mesmo texto completo que quem usa mouse).
+ * também abre por foco, então quem navega só por teclado/D-pad chega ao
+ * mesmo texto completo que quem usa mouse).
+ *
+ * **Achado pelo Douglas em 2026-08-08, corrigido no mesmo dia:** a primeira
+ * versão disparava a expansão em `group-focus-within`, que reage a
+ * **qualquer** foco — inclusive o foco que o próprio `<button>` recebe
+ * depois de um clique de mouse normal (comportamento padrão do navegador,
+ * não bug do ZeuX). Resultado: clicar num item da sidebar deixava o painel
+ * expandido **preso aberto**, cobrindo o conteúdo, até o usuário focar outra
+ * coisa. Trocado para `group-has-[:focus-visible]`: `:focus-visible` é a
+ * mesma heurística do navegador que já rege `FOCUS_RING` no resto do app —
+ * verdadeira só quando o foco chegou por teclado/gamepad (ou
+ * `element.focus()` programático), falsa depois de um clique de mouse.
+ * Confirmado ao vivo (Playwright): `document.activeElement.matches(
+ * ':focus-visible')` é `false` logo após clicar um item, `true` logo após
+ * `Tab` — o painel agora só fica preso aberto na segunda situação, que é
+ * exatamente a que precisa (ADR 0009).
  *
  * A expansão é `position: absolute`, sobreposta ao conteúdo — **nunca**
  * `position: static` empurrando `<main>`. É o mesmo risco de refluxo que o
@@ -111,7 +126,7 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
         // (o rótulo mais longo) precisa de ~158px, e o slot do ícone já
         // consome 64px; `w-48` (192px) cortava as duas palavras mais longas
         // no meio.
-        className={`absolute inset-y-0 left-0 z-20 flex w-16 flex-col items-center overflow-hidden border-r border-line bg-panel py-5 transition-[width] duration-150 ease-in-out group-hover:w-60 group-hover:shadow-xl group-focus-within:w-60 group-focus-within:shadow-xl`}
+        className={`absolute inset-y-0 left-0 z-20 flex w-16 flex-col items-center overflow-hidden border-r border-line bg-panel py-5 transition-[width] duration-150 ease-in-out group-hover:w-60 group-hover:shadow-xl group-has-[:focus-visible]:w-60 group-has-[:focus-visible]:shadow-xl`}
       >
         <div className="mb-7 shrink-0" aria-hidden="true">
           <img src={logoZeux} alt="" width={36} height={36} className="object-contain" />
@@ -142,7 +157,7 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
                     `width: auto` não anima em CSS — a técnica de "chutar" um
                     teto de largura maior que qualquer rótulo real é o jeito
                     padrão de contornar isso. */}
-                <span className="max-w-0 overflow-hidden font-pixel text-[11px] whitespace-nowrap tracking-wide opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[176px] group-hover:opacity-100 group-focus-within:max-w-[176px] group-focus-within:opacity-100">
+                <span className="max-w-0 overflow-hidden font-pixel text-[11px] whitespace-nowrap tracking-wide opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[176px] group-hover:opacity-100 group-has-[:focus-visible]:max-w-[176px] group-has-[:focus-visible]:opacity-100">
                   {item.label}
                 </span>
               </button>

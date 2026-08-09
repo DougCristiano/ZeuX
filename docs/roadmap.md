@@ -150,7 +150,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Sprint K (v1.0) | **0** | K1–K6 — fechada em 2026-08-06 |
 | Sprint J (v1.0) | **0** | J1–J5 — fechada em 2026-08-06 (J5 avaliado e não aplicado, por decisão) |
 | **Sprint L (v1.0)** | **1** | **L3** (verificação com controle físico real). Só o Douglas fecha |
-| **Sprint M (v1.0)** | **9** | M1–M15. **Atualizado 2026-08-07** (Lote 11, testado ao vivo com Chromium/Playwright): **M15 fechou** (zero checkbox aberto — scanline movida pro placeholder-only, botão "Buscar capas" parou de mudar de largura durante a busca, os dois verificados ao vivo interceptando rede pra não depender de credencial real do IGDB; `PAGE_SIZE`/`defaultLibraryPageSize` já estavam em 30 desde um lote anterior). Com M15, **só M14 continua sem começar** — precisa de controle físico real, fora do alcance de qualquer sessão de IA (mesma limitação de H3/L3). Os outros 8 itens (M1/M2/M3/M4/M6/M7/M10/M11) têm código pronto e a maior parte do critério verificado ao vivo, cada um com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). **6 dos 15 itens fechados sem ressalva nenhuma:** M5, M8, M9, M12, M13, M15. |
+| **Sprint M (v1.0)** | **9** | M1–M15. **Atualizado 2026-08-07** (Lote 11, testado ao vivo com Chromium/Playwright): **M15 fechou** (zero checkbox aberto — scanline movida pro placeholder-only, botão "Buscar capas" parou de mudar de largura durante a busca, os dois verificados ao vivo interceptando rede pra não depender de credencial real do IGDB; `PAGE_SIZE`/`defaultLibraryPageSize` já estavam em 30 desde um lote anterior). Com M15, **só M14 continua sem começar** — precisa de controle físico real, fora do alcance de qualquer sessão de IA (mesma limitação de H3/L3). Os outros 8 itens (M1/M2/M3/M4/M6/M7/M10/M11) têm código pronto e a maior parte do critério verificado ao vivo, cada um com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). **6 dos 15 itens fechados sem ressalva nenhuma:** M5, M8, M9, M12, M13, M15. **Atualizado 2026-08-08** — o Douglas rodou um build de verdade e achou dois problemas reais que a verificação por sessão de IA não pegou: (1) a sidebar do M13 ficava presa expandida depois de um clique de mouse, cobrindo conteúdo (corrigido, ver M13); (2) `EmulatorsScreen` tinha um card de instalação com erro em parágrafo vermelho solto, fora de qualquer modal — ficou de fora da varredura de `ErrorModal` de 2026-08-07 porque usa uma máquina de estados própria (`RowState`), não o `useInlineInstall` compartilhado. Corrigido: mesmo `ErrorModal` do resto do app. |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
 | Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
@@ -3213,8 +3213,9 @@ escrita à mão).
       removido; sem sigla em nenhum dos dois estados (recolhida mostra só o
       ícone).
 - [x] O rail expande também no **foco de teclado/gamepad**, não só no hover
-      (ADR 0009: nada só-hover) — `group-focus-within` ao lado de
-      `group-hover`, testado ao vivo via `Tab` real.
+      (ADR 0009: nada só-hover) — `group-has-[:focus-visible]` ao lado de
+      `group-hover` (era `group-focus-within` até 2026-08-08, ver correção
+      abaixo), testado ao vivo via `Tab` real.
 - [x] A sidebar continua `w-16` no estado normal (é chrome de navegação, a
       exceção de largura fixa já registrada no `CLAUDE.md`), a expansão é
       sobreposta ao conteúdo (não empurra `<main>`), e a área de conteúdo não
@@ -3237,6 +3238,20 @@ real que cada rótulo precisa (`scrollWidth`, até 158px) e ajustei o painel
 para `w-60` (240px, sobra pro slot do ícone de 64px + o rótulo mais longo);
 reconferido depois: `clientWidth === scrollWidth` nos quatro rótulos, nenhum
 cortado.
+
+**Regressão achada pelo Douglas em 2026-08-08 num build de verdade, corrigida
+no mesmo dia:** clicar num item da sidebar (mouse) deixava o painel expandido
+**preso aberto**, cobrindo o conteúdo — o botão "Instalar" de um card de
+`EmulatorsScreen` ficava fisicamente atrás do painel e o clique nem chegava
+até ele. Causa: `group-focus-within` reage a **qualquer** foco, e um
+`<button>` retém `:focus` depois de um clique de mouse comum (comportamento
+padrão do navegador) — diferente de `:hover`, que desliga sozinho assim que o
+mouse sai. Corrigido trocando para `group-has-[:focus-visible]`: a mesma
+heurística que já rege `FOCUS_RING` no resto do app, verdadeira só quando o
+foco chegou por teclado/gamepad, falsa depois de clique de mouse. Confirmado
+ao vivo: `document.activeElement.matches(':focus-visible')` é `false` logo
+após um clique (painel recolhe assim que o mouse se afasta) e `true` logo
+após `Tab` (painel continua expandido, como o critério de aceite exige).
 
 ### M14 — Nada na tela diz quais botões do controle fazem o quê (P)
 
