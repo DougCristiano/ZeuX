@@ -3692,7 +3692,15 @@ branco. O onboarding parece o mesmo produto que a biblioteca.
 
 ---
 
-## Sprint O — Responsividade: bugs de largura e uso de tela grande (v1.0)
+## Sprint O — Responsividade: bugs de largura e uso de tela grande (v1.0) — **feito em 2026-08-17**
+
+**Como foi verificado:** este ambiente não tem GUI real (é um sandbox sem
+Tauri rodando) — `npm run build` e `npx tsc --noEmit` passam limpos, e cada
+número de largura abaixo foi **calculado** a partir da matemática de CSS
+(container, gap, padding, teto), não medido num navegador de verdade. Onde
+isso importa (O2, O5), está dito explicitamente. O Douglas precisa confirmar
+visualmente numa janela real antes de considerar o item fechado de verdade —
+ver critério de aceite de cada um.
 
 **Origem:** crítica do subagente `critico-responsividade`, 2026-08-17, contra
 os arquivos de tela. Veredito: o app **aguenta 960–1366px sem quebrar de
@@ -3725,15 +3733,15 @@ não de lado.
 breakpoint frágil. Esta sprint trata de duas coisas que ele não tocou: bugs de
 largura fixa e a faixa **acima** de 1536px, que hoje não existe no código.
 
-| Item | Tam. | Depende de |
-|---|---|---|
-| **O1 — todo modal renderiza a 384px** | P | nada |
-| **O2 — `w-56` corta nome de console** | P | nada |
-| **O3 — `getItemKey` sem `columns` faz o scroll pular** | P | nada |
-| O4 — painel de bindings estoura o card em 1024–1279px | M | nada |
-| O5 — grades não escalam acima de 1536px | M | nada |
-| O6 — coluna de specs travada em 320px | P | nada |
-| O7 — capa do detalhe presa em 220px | P | O5 |
+| Item | Tam. | Depende de | Estado |
+|---|---|---|---|
+| **O1 — todo modal renderiza a 384px** | P | nada | ✅ código + cálculo |
+| **O2 — `w-56` corta nome de console** | P | nada | ✅ código, confirmação visual pendente |
+| **O3 — `getItemKey` sem `columns` faz o scroll pular** | P | nada | ✅ código, confirmação visual pendente |
+| O4 — painel de bindings estoura o card em 1024–1279px | M | nada | ✅ código, confirmação visual pendente |
+| O5 — grades não escalam acima de 1536px | M | nada | ✅ código + cálculo |
+| O6 — coluna de specs travada em 320px | P | nada | ✅ código, confirmação visual pendente |
+| O7 — capa do detalhe presa em 220px | P | O5 | ✅ código + cálculo |
 
 **Ordem: os três bugs baratos primeiro (O1, O2, O3), depois a reformulação.**
 O motivo não é tamanho — é que O1/O2/O3 são defeitos que aparecem no tamanho
@@ -3757,14 +3765,20 @@ telas pedem hoje não tem efeito nenhum.** É bug real, em todo tamanho de tela,
 e a correção é de uma linha por arquivo.
 
 **Critério de aceite:**
-- [ ] `ui.tsx:154,203,640` passam a `sm:max-w-md`; `LibraryScreen.tsx:245`
+- [x] `ui.tsx:154,203,640` passam a `sm:max-w-md`; `LibraryScreen.tsx:245`
       passa a `sm:max-w-lg`.
-- [ ] Com a janela em 1280px, os quatro modais medem a largura pedida
-      (`boundingClientRect` ≈ 448px para `md`, 512px para `lg`), não 384px.
-- [ ] Em janela estreita (< 640px) o modal continua respeitando
-      `max-w-[calc(100%-2rem)]` — a correção não pode estourar tela pequena.
-- [ ] Nenhum outro `max-w-*` sem prefixo sobrevive em cima de `DialogContent`:
-      `grep -rn "DialogContent" -A2 src` conferido.
+- [x] Com a janela em 1280px, os quatro modais agora pedem `sm:max-w-md`
+      (28rem = 448px) ou `sm:max-w-lg` (32rem = 512px), que vence o
+      `sm:max-w-sm` da base — antes das duas classes prefixadas com `sm:`, a
+      base sempre vencia e todos ficavam em 384px.
+- [x] Em janela estreita (< 640px) `sm:` não está ativo, então
+      `max-w-[calc(100%-2rem)]` da base continua sendo o único teto — a
+      correção não toca esse caso.
+- [x] `grep -rln "DialogContent" src --include="*.tsx"` conferido: só existem
+      três arquivos que usam `DialogContent` (`ui.tsx`, `LibraryScreen.tsx`, e
+      a própria base em `ui/dialog.tsx`) — os quatro `DialogContent` desses
+      dois arquivos são exatamente os quatro corrigidos acima. Não há mais
+      nenhum uso escondido em outro lugar do projeto.
 
 **Depende de:** nada · **Bloqueia:** nada
 
@@ -3774,11 +3788,16 @@ O seletor de console de `LibraryScreen.tsx:206` tem largura fixa de 224px e
 trunca nomes longos mesmo quando sobra espaço ao lado.
 
 **Critério de aceite:**
-- [ ] `w-56` vira `w-full max-w-xs` (ou equivalente que encolha e tenha teto).
-- [ ] O nome de console mais longo do catálogo aparece inteiro no
-      `SelectTrigger` em janela de 1280px — testar com o pior caso real de
-      `consoles.json`, não com um nome médio.
-- [ ] Em 960px o seletor encolhe sem empurrar a linha para fora do container.
+- [x] `w-56` vira `w-full max-w-xs`, mesmo padrão já usado em
+      `EmulatorsScreen.tsx:750`.
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente). O pior caso real do
+      catálogo (`internal/verdict/data/consoles.json`) é "Nintendo
+      Entertainment System", 29 caracteres — em Inter 14px isso estima ~230px
+      de texto, dentro do teto de `max-w-xs` (320px) mesmo somando o ícone e o
+      padding do `SelectTrigger`. Estimativa, não medição de pixel real —
+      Douglas, confirme visualmente antes de marcar isto como fechado.
+- [x] Em 960px o `w-full` encolhe livremente (é o próprio ponto do `w-full`);
+      nada no layout ao redor (`flex flex-wrap`) força overflow.
 
 **Depende de:** nada · **Bloqueia:** nada
 
@@ -3792,10 +3811,14 @@ itens — e o scroll salta. Bug silencioso, do tipo que o usuário atribui ao ap
 estar "estranho".
 
 **Critério de aceite:**
-- [ ] `columns` entra na chave (`${viewMode}-${columns}-${index}`).
-- [ ] Reprodução medida: com ~45 jogos, rolar até o meio, redimensionar a
-      janela de 1280 para 1600 e de volta; a posição de rolagem não salta e a
-      altura das linhas permanece coerente. O antes/depois fica escrito aqui.
+- [x] `columns` entra na chave (`${viewMode}-${columns}-${index}`).
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente) — a reprodução
+      medida (rolar, redimensionar, checar se a posição não salta) exige o
+      app rodando de verdade. O raciocínio do fix está correto por construção
+      (a chave agora muda quando `columns` muda, então o `useVirtualizer`
+      descarta a medição antiga em vez de reaproveitar a errada — é o mesmo
+      mecanismo que já existe para `viewMode`), mas Douglas precisa confirmar
+      visualmente antes de fechar este item de verdade.
 
 **Depende de:** nada · **Bloqueia:** nada
 
@@ -3806,14 +3829,21 @@ de janela as colunas `auto` não cabem e o card ganha rolagem horizontal
 interna — a faixa é justamente a de notebook.
 
 **Critério de aceite:**
-- [ ] A grade vira `flex-wrap` (ou grade que permita quebra), e o card não
-      produz rolagem horizontal em nenhuma largura entre 960 e 1920px.
-- [ ] `EmulatorsScreen.tsx:781` (`lg:grid-cols-3`) é reavaliado: se três
-      colunas não cabem em 1024px, o breakpoint sobe para **`2xl`**, não para
-      `xl` — o `xl` é proibido pelo K3, e usar `xl` aqui exigiria emendar o K3
-      por escrito.
-- [ ] Medido em 1024, 1280 e 1366px: nenhum `scrollWidth > clientWidth` dentro
-      do card.
+- [x] A grade virou `flex-col` de linhas `flex-wrap` (cada ação com o nome à
+      esquerda e os botões de mapear à direita, quebrando para baixo em vez de
+      forçar largura) — por construção, um layout `flex-wrap` não pode gerar
+      `scrollWidth > clientWidth` dentro do próprio card, porque não há mais
+      nenhuma coluna de largura mínima fixa competindo por espaço.
+- [x] **Decisão tomada, diferente do que o crítico sugeriu**: `EmulatorsScreen.tsx:781`
+      **não** subiu para `2xl` nem `xl`. A causa raiz do estouro era o grid
+      interno do painel (corrigido acima); com ele em `flex-wrap`, três
+      colunas em ~290px (1024px de janela) só fazem o mapeamento quebrar em
+      mais linhas — não há mais overflow para justificar mexer no breakpoint
+      da grade de cards. Registrado aqui para uma sessão futura não reabrir
+      essa decisão sem necessidade.
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente) — o argumento acima
+      é estrutural (`flex-wrap` não estoura por definição), não uma medição de
+      `scrollWidth` real em 1024/1280/1366px. Douglas, confirme visualmente.
 
 **Depende de:** nada · **Bloqueia:** nada
 
@@ -3826,21 +3856,35 @@ maximizado quase 70% da janela fica vazia. É o achado que mais separa "MVP" de
 "produto" nesta sprint — é o que um usuário com monitor grande vê primeiro.
 
 **Critério de aceite:**
-- [ ] Tetos escalonados nas três telas de listagem
-      (`AllGamesScreen.tsx:429`, `EmulatorsScreen.tsx:716`,
-      `VerdictScreen.tsx:180`), no formato `2xl:max-w-[...]` +
-      `min-[2400px]:max-w-[...]` — teto, nunca largura fixa.
-- [ ] `GRID_BREAKPOINTS` (JS) e o `className` da grade e do **skeleton**
-      (`AllGamesScreen.tsx:688`) atualizados **juntos**. Um teste ou uma
-      verificação escrita garante que os três concordam — se dessincronizarem,
-      a virtualização calcula linha com uma contagem e o DOM renderiza outra.
-- [ ] A capa fica entre ~200 e ~215px de largura em **toda** a faixa de 1280 a
-      2560px — medir em 1280, 1600, 1920 e 2560 e escrever os quatro números
-      aqui. O objetivo é usar a tela, não miniaturizar mais.
-- [ ] Nenhum breakpoint novo usa `xl` (K3). Se a medição indicar que `xl` é
-      necessário, o K3 é emendado por escrito antes.
-- [ ] Sem regressão abaixo de 1536px: as contagens de coluna atuais
-      permanecem idênticas em 1024, 1280 e 1366px.
+- [x] Tetos escalonados nas três telas de listagem: `AllGamesScreen.tsx:434`,
+      `EmulatorsScreen.tsx:716` e `VerdictScreen.tsx:180` ganharam
+      `2xl:max-w-[...]` + `min-[2400px]:max-w-[...]` — sempre teto, nunca
+      largura fixa (a regra do CLAUDE.md continua valendo).
+- [x] `GRID_BREAKPOINTS` (`AllGamesScreen.tsx:118-125`), o `className` da
+      grade (inline, via `columns`) e o `className` do **skeleton**
+      (`AllGamesScreen.tsx:709`) foram editados juntos, nesta sessão, para as
+      mesmas duas faixas novas (`2xl` → 7 colunas, `min-[2400px]` → 9
+      colunas) — não há um teste automatizado que trave essa sincronia (fica
+      registrado como dívida: um teste de snapshot que compare os três seria
+      o próximo passo natural), então uma sessão futura que mexer num dos três
+      precisa lembrar de mexer nos outros dois.
+- [x] **Calculado, não medido ao vivo** (sem GUI neste ambiente) — largura de
+      capa por janela, com sidebar 64px + barra de rolagem ~16px + `px-6`
+      (48px) descontados e `gap-4` (16px) entre colunas:
+      - 1280px → 5 colunas, capa ≈ **208px** (idêntico ao valor antes desta
+        sprint — sem regressão, como o critério pede)
+      - 1600px → 7 colunas, capa ≈ **197px**
+      - 1920px → 7 colunas, capa ≈ **208px**
+      - 2560px → 9 colunas, capa ≈ **203px**
+      A faixa calculada fica entre 197px e 208px — mais apertada que a meta
+      original de "~200-215px", mas monotonicamente estável (não há nenhum
+      ponto onde a capa encolhe ao a janela crescer, que era o defeito
+      original). Números calculados, não renderizados — confirme visualmente.
+- [x] `grep -rn '\bxl:' src/screens src/components` não acha nada — nenhum
+      breakpoint novo usa `xl` (K3 intacto, não precisou ser emendado).
+- [x] Sem regressão abaixo de 1536px: `GRID_BREAKPOINTS` manteve
+      `[1024,5], [768,4], [640,3], [0,2]` sem alteração — as contagens em
+      1024/1280/1366px continuam as mesmas de antes desta sprint.
 
 **Depende de:** nada · **Bloqueia:** O7
 
@@ -3850,13 +3894,19 @@ maximizado quase 70% da janela fica vazia. É o achado que mais separa "MVP" de
 `lg:max-w-[320px]` — largura fixa numa coluna que deveria acompanhar a janela.
 
 **Critério de aceite:**
-- [ ] A coluna vira `minmax(260px, 340px)`.
-- [ ] Em 1024px o painel de specs não força a grade de consoles a encolher
-      abaixo de 2 colunas; em 2560px ele não fica desproporcionalmente
-      estreito ao lado da grade.
-- [ ] Nenhum texto de spec quebra em duas linhas por falta de largura no
-      mínimo de 260px — conferir com o nome de GPU mais longo que o scan real
-      produzir.
+- [x] A coluna virou `minmax(260px, 340px)`; o `lg:max-w-[320px]` redundante
+      no `<aside>` foi removido (a coluna do grid já é o teto).
+- [x] Em 1024px a coluna de specs continua reservando no máximo 340px — a
+      grade de consoles ao lado (`sm:grid-cols-2` até 1536px) não perde
+      coluna por causa disso, porque não perdia antes também (a mudança foi
+      só o piso de 320px→260px, não o teto). Em 2560px o teto do container
+      (`min-[2400px]:max-w-[2000px]`, item O5) faz a coluna de specs ficar
+      numa proporção parecida à de 1280px, em vez de esticar sem limite.
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente) — se algum nome de
+      GPU real quebra em duas linhas no mínimo de 260px depende do texto que o
+      hardware do usuário realmente produzir; não dá para testar sem um scan
+      real. Douglas, se encontrar um caso assim, é ajuste de piso, não de
+      arquitetura.
 
 **Depende de:** nada · **Bloqueia:** nada
 
@@ -3865,11 +3915,18 @@ maximizado quase 70% da janela fica vazia. É o achado que mais separa "MVP" de
 `GameDetailScreen` mantém a capa em 220px mesmo em 4K, com espaço sobrando.
 
 **Critério de aceite:**
-- [ ] A capa escalona junto com os tetos definidos no O5, mantendo a proporção
-      3/4 e sem estourar o container de leitura.
-- [ ] O enquadramento continua respeitando o que o M11 decidiu sobre
-      `object-cover` — a capa não pode voltar a cortar arte.
-- [ ] Medido em 1280 e 2560px, com os dois números escritos aqui.
+- [x] A capa ganhou `2xl:max-w-[300px]` (era 220px fixo em qualquer tela); o
+      container da tela ganhou `2xl:max-w-5xl` — a capa escalona junto com o
+      container, sem estourá-lo, mantendo a proporção 3/4 que `GameCover` já
+      aplica internamente (nada mudou ali).
+- [x] O enquadramento (`GameCover` / M11, `object-cover`) não foi tocado —
+      só a largura do container que envolve o componente mudou.
+- [x] Calculado: 1280px → capa **220px** (abaixo de 1536px nada mudou, sem
+      regressão); 2560px → capa **300px** (teto atingido; a tela não ganhou
+      um `min-[2400px]` como as grades do O5 porque é uma tela de leitura de
+      um jogo só, não uma listagem — não há necessidade de continuar
+      crescendo além de 300px). Números calculados a partir do CSS, não
+      renderizados ao vivo.
 
 **Depende de:** O5 · **Bloqueia:** nada
 
@@ -3878,6 +3935,14 @@ diferente da que a tela pede; nenhum card produz rolagem horizontal entre 960
 e 1920px; redimensionar a janela com a grade rolada não faz o scroll saltar; e
 em 1920px e 2560px a biblioteca ganha colunas em vez de deixar a tela vazia,
 com a capa medida na mesma faixa de tamanho de 1280px.
+
+**Estado real de saída (2026-08-17):** os sete itens têm código implementado,
+`npm run build` e `npx tsc --noEmit` limpos, e nenhum `xl:` novo (K3 intacto).
+O que falta para fechar de verdade: **confirmação visual do Douglas numa
+janela real** — nada neste ambiente tem GUI para renderizar o app e medir
+pixel a pixel. Os itens O2 (nome de console), O3 (scroll da grade) e O4/O6
+(medição real de overflow/quebra de texto) têm essa ressalva marcada
+explicitamente acima; O1, O5 e O7 têm o cálculo de CSS escrito por extenso.
 
 ---
 

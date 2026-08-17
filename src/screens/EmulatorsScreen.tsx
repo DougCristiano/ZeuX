@@ -713,7 +713,10 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 pt-16 pb-10">
+    // O5 (docs/roadmap.md, Sprint O): mesmo teto escalonado de AllGamesScreen —
+    // nada muda abaixo de 1536px, evita o container travar em 1152px de
+    // conteúdo útil em janela grande/4K.
+    <div className="mx-auto max-w-6xl px-6 pt-16 pb-10 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">Emuladores</h1>
         {onBack && (
@@ -778,7 +781,16 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
 
       {pageItems.length > 0 && (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {/* O4 (docs/roadmap.md, Sprint O): a causa raiz do estouro em
+              1024-1279px era o grid interno do EmulatorBindingsPanel, já
+              corrigido lá para flex-wrap — um card de ~290px (3 colunas em
+              1024px) agora só quebra o mapeamento em mais linhas, sem gerar
+              rolagem horizontal. Por isso o breakpoint continua em `lg`, sem
+              usar `xl` (proibido pelo K3). O5: `2xl`/`min-[2400px]` acompanham
+              o teto do container acima — sem eles, o card ficaria cada vez
+              mais largo (e mais vazio) conforme a janela cresce, em vez de
+              ganhar mais uma coluna. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
             {pageItems.map((entry) => (
               <EmulatorCard
                 key={entry.adapter_id}

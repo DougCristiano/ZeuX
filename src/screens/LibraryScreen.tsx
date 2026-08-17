@@ -203,7 +203,11 @@ function AddConsoleSection({
       <p className="font-semibold text-ink">Adicionar console</p>
       <div className="flex flex-wrap items-center gap-2">
         <Select value={consoleId} onValueChange={setConsoleId}>
-          <SelectTrigger aria-label="Escolher console" className="w-56">
+          {/* O2 (docs/roadmap.md, Sprint O): largura fixa cortava nomes longos de
+              console ("Nintendo Entertainment System") mesmo sobrando espaço ao lado —
+              mesmo padrão de EmulatorsScreen.tsx (w-full max-w-xs) para encolher e ter
+              teto ao mesmo tempo. */}
+          <SelectTrigger aria-label="Escolher console" className="w-full max-w-xs">
             <SelectValue placeholder="Escolher console" />
           </SelectTrigger>
           <SelectContent>
@@ -242,7 +246,10 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto rounded border border-line bg-fill p-5 ring-0">
+      {/* O1 (docs/roadmap.md, Sprint O): precisa do prefixo "sm:" para vencer o
+          "sm:max-w-sm" da base do DialogContent — sem ele o modal renderiza em
+          384px, cortando a lista de 33 consoles em vez de usar a largura pedida. */}
+      <DialogContent className="max-h-[85vh] sm:max-w-lg overflow-y-auto rounded border border-line bg-fill p-5 ring-0">
         <DialogTitle className="mb-1 text-lg font-semibold text-ink">Nomes de pasta aceitos</DialogTitle>
         <p className="mb-4 text-sm text-muted">
           Em "Selecionar pasta para todos os jogos", cada subpasta é reconhecida pelo nome — copie um dos valores

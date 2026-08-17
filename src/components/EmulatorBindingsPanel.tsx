@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { InputBinding } from "../api/types";
 import { translateKeyForAdapter } from "../lib/keyMapping";
@@ -186,37 +186,42 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </div>
       )}
 
-      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2">
+      {/* O4 (docs/roadmap.md, Sprint O): era `grid grid-cols-[1fr_auto_auto]` —
+          em janela de notebook (1024-1279px) o card fica estreito demais para
+          duas colunas `auto` de botão + a coluna `1fr` do nome da ação, e o
+          grid estourava o card com rolagem horizontal. `flex-wrap` deixa os
+          botões quebrarem para a linha de baixo em vez de forçar largura. */}
+      <div className="flex flex-col gap-2">
         {actions.map((action) => {
           const binding = bindings.find((b) => b.action === action);
           return (
-            <Fragment key={action}>
-              <span className="text-sm text-ink">
+            <div key={action} className="flex flex-wrap items-center justify-between gap-2">
+              <span className="min-w-0 shrink text-sm break-words text-ink">
                 {action}
                 <span className="ml-2 text-xs text-muted">
                   {binding?.key ?? "sem tecla"}
                   {binding?.button ? ` · botão ${binding.button}` : ""}
                 </span>
               </span>
-              <Button
-                variant="secondary"
-                disabled={listeningKeyFor !== null}
-                onClick={() => setListeningKeyFor(action)}
-              >
-                {listeningKeyFor === action ? "Aperte uma tecla…" : "Mapear tecla"}
-              </Button>
-              {gamepadConnected ? (
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
-                  disabled={listeningButtonFor !== null}
-                  onClick={() => setListeningButtonFor(action)}
+                  disabled={listeningKeyFor !== null}
+                  onClick={() => setListeningKeyFor(action)}
                 >
-                  {listeningButtonFor === action ? "Aperte um botão…" : "Mapear controle"}
+                  {listeningKeyFor === action ? "Aperte uma tecla…" : "Mapear tecla"}
                 </Button>
-              ) : (
-                <span />
-              )}
-            </Fragment>
+                {gamepadConnected && (
+                  <Button
+                    variant="secondary"
+                    disabled={listeningButtonFor !== null}
+                    onClick={() => setListeningButtonFor(action)}
+                  >
+                    {listeningButtonFor === action ? "Aperte um botão…" : "Mapear controle"}
+                  </Button>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>

@@ -109,14 +109,22 @@ export function persistAllGamesView(patch: Partial<AllGamesViewState>) {
 }
 
 // M3 (virtualização): quantas colunas a grade tem, replicando os
-// breakpoints do próprio className abaixo (`grid-cols-2 sm: md: lg: 2xl:`).
+// breakpoints do próprio className abaixo (`grid-cols-2 sm: md: lg: 2xl:
+// min-[2400px]:`).
 // Precisa ser calculado em JS porque a virtualização substitui o
 // `display: grid` que faria isso sozinho — cada "linha" virtualizada tem
 // que saber quantos jogos ela carrega. Mede a LARGURA DA JANELA, não a do
 // container: os breakpoints do Tailwind são media query sobre viewport,
 // não sobre elemento (CLAUDE.md, "layout responsivo").
+// O5 (docs/roadmap.md, Sprint O): as duas faixas acima de 1536px são novas —
+// antes a densidade parava em 6 colunas para sempre a partir daí, e como o
+// container também tinha teto fixo (ver o comentário no JSX abaixo), a capa
+// só encolhia (208px em 1280px de janela -> 170px em 1536px+) sem nunca
+// ganhar coluna nenhuma. Nada abaixo de 1536 muda — é o que o critério de
+// aceite do O5 exige (sem regressão em 1024/1280/1366px).
 const GRID_BREAKPOINTS: readonly [minWidth: number, columns: number][] = [
-  [1536, 6], // 2xl
+  [2400, 9], // janela ~4K
+  [1536, 7], // 2xl
   [1024, 5], // lg
   [768, 4], // md
   [640, 3], // sm
@@ -410,7 +418,12 @@ export function AllGamesScreen({
     overscan: viewMode === "grade" ? 2 : 6,
     // Cola o offset do scroll ao trocar de página/ordenação/modo — sem isto
     // o virtualizer tentaria reaproveitar posições da lista anterior.
-    getItemKey: (index) => `${viewMode}-${index}`,
+    // O3 (docs/roadmap.md, Sprint O): `columns` também entra na chave —
+    // redimensionar a janela muda quantos jogos cabem por linha, então a
+    // altura medida de uma linha em cache (calculada para o `columns`
+    // antigo) ficava errada para o novo, e o scroll saltava (mais visível
+    // ao arrastar a janela para um monitor de tamanho diferente).
+    getItemKey: (index) => `${viewMode}-${columns}-${index}`,
   });
 
   // M8: mesma cadeia de decisão de GamesScreen — só varia o que cada tela
@@ -426,7 +439,16 @@ export function AllGamesScreen({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 pt-16 pb-10">
+    // O5 (docs/roadmap.md, Sprint O): teto ESCALONADO, não removido — abaixo de
+    // 1536px de janela nada muda (max-w-6xl continua o teto, sem regressão).
+    // A partir de 1536px (2xl) o teto sobe para 1600px, e a partir de 2400px
+    // (janela 4K típica) sobe de novo para 2000px. Sem isso, o container
+    // ficava travado em 1152px de conteúdo útil em qualquer janela acima de
+    // 1280px — em 4K, ~70% da largura da janela sobrava vazia. O teto de
+    // 2000px em vez de "sem teto" é deliberado: mesmo numa janela 4K, uma
+    // grade de capas 3/4 esticada a mais de 2000px de largura vira mais
+    // difícil de escanear com o olho, não mais útil.
+    <div className="mx-auto max-w-6xl px-6 pt-16 pb-10 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]">
       {/*
        * Um só modal por vez — antes disto, `error` (falha ao listar/
        * favoritar) aparecia como parágrafo vermelho solto no meio da tela
@@ -685,7 +707,7 @@ export function AllGamesScreen({
       {games === null && (
         <div role="status" aria-live="polite">
           <span className="sr-only">Carregando jogos…</span>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
             {Array.from({ length: PAGE_SIZE }, (_, i) => (
               <GameTileSkeleton key={i} />
             ))}

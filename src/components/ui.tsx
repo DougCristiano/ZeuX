@@ -150,8 +150,14 @@ export function ErrorModal({
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
+      {/* O1 (docs/roadmap.md, Sprint O): a base do DialogContent (src/components/ui/dialog.tsx)
+          já traz "sm:max-w-sm". Como o tailwind-merge não considera "max-w-md" e
+          "sm:max-w-sm" conflitantes (modificador diferente), as duas sobreviviam no
+          className final e a variante prefixada vencia — todo modal ficava em 384px
+          na prática, ignorando o teto que cada tela pedia. Por isso o teto aqui também
+          precisa do prefixo "sm:", para sobrescrever de verdade. */}
       <DialogContent
-        className="max-w-md rounded border border-line bg-fill p-5 ring-0"
+        className="sm:max-w-md rounded border border-line bg-fill p-5 ring-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-danger">{title}</DialogTitle>
@@ -200,7 +206,7 @@ export function ConfirmModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-md rounded border border-line bg-fill p-5 ring-0"
+        className="sm:max-w-md rounded border border-line bg-fill p-5 ring-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-ink">{title}</DialogTitle>
@@ -637,7 +643,7 @@ export function ConsoleInfoModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-md rounded border border-line bg-fill p-5 ring-0"
+        className="sm:max-w-md rounded border border-line bg-fill p-5 ring-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <div className="mb-3 flex items-start justify-between gap-2">

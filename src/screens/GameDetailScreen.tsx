@@ -204,7 +204,10 @@ export function GameDetailScreen({
 
   const heroContent = (
     <>
-      <div className="relative w-full max-w-[220px]">
+      {/* O7 (docs/roadmap.md, Sprint O): a capa era 220px fixo mesmo em 4K,
+          perdida no meio do espaço sobrando — escalona junto com o container
+          acima, mantendo a proporção 3/4 que GameCover já aplica. */}
+      <div className="relative w-full max-w-[220px] 2xl:max-w-[300px]">
         <GameCover label={shortName} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
         <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
         {favoriteError && <p className="mt-1 text-xs text-danger">{favoriteError}</p>}
@@ -279,7 +282,10 @@ export function GameDetailScreen({
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-6 pt-16 pb-10">
+    // O7 (docs/roadmap.md, Sprint O): teto escalonado a partir de 1536px,
+    // acompanhando o O5 — sem isso a tela de detalhe fica com a mesma largura
+    // de leitura em qualquer monitor, capa incluída (abaixo).
+    <div className="mx-auto max-w-4xl px-6 pt-16 pb-10 2xl:max-w-5xl">
       {/* A contagem de sessões falhar não impede o resto da tela de
           funcionar — mas o texto vermelho solto dentro do card de
           estatísticas era fácil de perder (mesmo achado do Douglas em
