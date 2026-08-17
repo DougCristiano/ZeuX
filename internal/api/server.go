@@ -823,6 +823,9 @@ func (s *Server) handleAddLibraryFolder(w http.ResponseWriter, r *http.Request) 
 		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
 		return
 	}
+	if found > 0 {
+		go s.autoScrapeCovers()
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"folder":      folder,
@@ -923,6 +926,15 @@ func (s *Server) handleBulkAddLibraryFolders(w http.ResponseWriter, r *http.Requ
 		matched = append(matched, matchedFolder{
 			ConsoleID: console.ID, Name: console.Name, Path: subPath, GamesFound: found,
 		})
+	}
+
+	// Uma única chamada depois do laço inteiro, não uma por subpasta: assim
+	// a busca automática enxerga os jogos de todas as subpastas casadas de
+	// uma vez (UncoveredGames lê o estado do banco no momento em que roda),
+	// em vez de eventualmente empacar em ErrScrapeInProgress a partir da
+	// segunda subpasta e nunca cobrir a terceira em diante.
+	if len(matched) > 0 {
+		go s.autoScrapeCovers()
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -1027,6 +1039,9 @@ func (s *Server) handleScanLibraryFolder(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
 		return
+	}
+	if found > 0 {
+		go s.autoScrapeCovers()
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"games_found": found})
@@ -1380,6 +1395,29 @@ func (s *Server) handleCoverFile(w http.ResponseWriter, r *http.Request) {
 // syncLibraryFolder varre o disco a partir de folder, usando as extensões do
 // console, e reconcilia o resultado com o banco. Devolve quantos jogos a
 // varredura encontrou desta vez.
+// autoScrapeCovers dispara a busca de capas sozinha depois que uma pasta é
+// adicionada ou revarrida (2026-08-17, a pedido do Douglas — antes só
+// buscava quando o usuário clicava "Buscar capas" na tela). Roda em
+// goroutine própria, com contexto próprio (não o da requisição HTTP: o lote
+// pode levar minutos e precisa sobreviver à resposta que o disparou, mesmo
+// raciocínio de internal/install.Manager).
+//
+// Silenciosa de propósito quanto a dois erros que não são falha real: sem
+// conta do IGDB conectada (ErrNotConfigured — a maioria das varreduras vai
+// bater nisso até o usuário conectar a conta em Configurações) e um lote já
+// em andamento (ErrScrapeInProgress — outra varredura recente já disparou o
+// dela). Nenhum dos dois foi pedido pelo usuário nesta chamada, então não
+// tem "erro" para mostrar aqui — a tela de biblioteca mostra o estado real
+// de cada jogo (capa, placeholder, ou "sem capa encontrada")
+// independentemente de qual chamada disparou a busca.
+func (s *Server) autoScrapeCovers() {
+	if _, err := s.igdbJobs.Start(context.Background(), nil); err != nil {
+		if !errors.Is(err, igdb.ErrNotConfigured) && !errors.Is(err, igdb.ErrScrapeInProgress) {
+			s.logger.Warn("busca automática de capas não pôde iniciar", "erro", err)
+		}
+	}
+}
+
 func (s *Server) syncLibraryFolder(ctx context.Context, folder library.Folder, console verdict.Console) (int, error) {
 	paths, err := library.FindROMs(folder.Path, console.Extensions)
 	if err != nil {

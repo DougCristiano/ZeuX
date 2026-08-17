@@ -163,6 +163,20 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game) {
 		m.mu.Unlock()
 	}()
 
+	// Lote vazio (nenhum jogo elegível) não precisa autenticar contra o
+	// IGDB — poupa uma chamada de rede que aconteceria toda vez que a busca
+	// automática (2026-08-17: dispara sozinha depois de toda pasta
+	// adicionada/revarrida, não só quando o usuário clica "Buscar capas")
+	// encontrasse a biblioteca já 100% coberta.
+	if len(games) == 0 {
+		finished := time.Now().UTC()
+		m.mu.Lock()
+		job.Phase = PhaseDone
+		job.FinishedAt = &finished
+		m.mu.Unlock()
+		return
+	}
+
 	client := NewClient(creds)
 
 	// Autentica uma vez, fora do laço por jogo: uma credencial errada falha

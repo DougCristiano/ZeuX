@@ -1002,6 +1002,17 @@ curl -X POST http://127.0.0.1:7777/api/v1/library/folders \
 Apontar a mesma pasta para o mesmo console duas vezes devolve a pasta já
 existente (mesmo `id`), não uma segunda linha — e revarre na mesma chamada.
 
+**Busca de capas automática (2026-08-17):** se a varredura achou pelo menos
+um jogo, o servidor dispara sozinho (em segundo plano, sem atrasar esta
+resposta) a mesma busca de capas de `POST /library/games/scrape-covers`, sem
+`game_ids` — ou seja, o lote de todo jogo que ainda nunca tentou buscar capa
+(`cover_status == ""`), não só os desta pasta. Sem conta do IGDB conectada
+(`GET /igdb/credentials`) ou com uma busca já em andamento, o disparo é
+silenciosamente ignorado — não é um erro desta rota, e não aparece em
+`Erro` abaixo. Acompanhe o progresso pela tela (ou por
+`GET /library/games`, olhando `cover_path`/`cover_status` mudarem), não por
+esta resposta.
+
 | Erro | Status | Motivo |
 |---|---|---|
 | `invalid_body` | 400 | JSON malformado. |
@@ -1062,6 +1073,9 @@ curl -X POST http://127.0.0.1:7777/api/v1/library/folders/1/scan
 
 **200 OK** `{"games_found": 12}` — `games_found` é o total encontrado *nesta*
 varredura, não um delta desde a anterior.
+
+Mesmo disparo automático de busca de capas de `POST /library/folders`,
+descrito acima, acontece aqui também quando `games_found > 0`.
 
 | Erro | Status | Motivo |
 |---|---|---|
