@@ -4,8 +4,13 @@ import { api } from "../api";
 /**
  * Estado de conexão com o IGDB (G1), compartilhado por AllGamesScreen e
  * GameDetailScreen para não duplicar o fetch-on-mount nas duas telas — as
- * duas só precisam saber "tem conta conectada sim/não" para decidir se
- * mostram o botão de buscar capa.
+ * duas só precisam saber "a busca de capa está disponível sim/não" para
+ * decidir se mostram o botão de buscar capa.
+ *
+ * `configured` é praticamente sempre `true` desde 2026-08-17: sem conta
+ * pessoal conectada, o ZeuX cai numa credencial de teste embutida (ver
+ * SettingsScreen e internal/igdb/credentials.go) — só fica `false` quando a
+ * própria consulta a GET /igdb/credentials falha (ver `.catch` abaixo).
  *
  * `null` enquanto carrega: as telas escondem o botão nesse meio-tempo em vez
  * de mostrar e esconder de novo (evita o "pisca" de aparecer e sumir).

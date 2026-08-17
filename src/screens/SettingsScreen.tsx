@@ -4,7 +4,12 @@ import { api, ApiError } from "../api";
 import type { SystemInfo } from "../api/types";
 import { Button, Card } from "../components/ui";
 
-type LoadState = { kind: "loading" } | { kind: "loaded"; configured: boolean } | { kind: "error"; message: string };
+// `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
+// sem conta pessoal, o ZeuX cai numa credencial de teste embutida (ver
+// docs/api.md e internal/igdb/credentials.go). `personal` é o campo que
+// importa aqui: distingue "conta própria conectada" de "usando o padrão
+// compartilhado".
+type LoadState = { kind: "loading" } | { kind: "loaded"; personal: boolean } | { kind: "error"; message: string };
 
 type SystemInfoState =
   | { kind: "loading" }
@@ -81,7 +86,7 @@ export function SettingsScreen() {
     setState({ kind: "loading" });
     api
       .getIGDBCredentials()
-      .then((status) => setState({ kind: "loaded", configured: status.configured }))
+      .then((status) => setState({ kind: "loaded", personal: status.personal }))
       .catch((err) =>
         setState({ kind: "error", message: err instanceof ApiError ? err.message : "Não foi possível ler o estado da conta." }),
       );
@@ -180,10 +185,10 @@ export function SettingsScreen() {
       <Card>
         <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Capas de jogo (IGDB)</h2>
         <p className="mb-4 text-sm text-muted">
-          O ZeuX pode buscar a capa e a data de lançamento dos seus jogos no IGDB. Cada pessoa conecta a própria
-          conta — o ID e o segredo do cliente, obtidos no painel de desenvolvedor do Twitch — para que a busca de
-          todo mundo que usa o ZeuX não divida a mesma cota. A credencial fica guardada só nesta máquina, nunca é
-          enviada a nenhum servidor do ZeuX.
+          O ZeuX pode buscar a capa e a data de lançamento dos seus jogos no IGDB. O ideal é cada pessoa conectar a
+          própria conta — o ID e o segredo do cliente, obtidos no painel de desenvolvedor do Twitch — para que a
+          busca de todo mundo que usa o ZeuX não divida a mesma cota. A credencial fica guardada só nesta máquina,
+          nunca é enviada a nenhum servidor do ZeuX.
         </p>
 
         {state.kind === "loading" && <p className="text-sm text-muted">Lendo o estado da conta…</p>}
@@ -197,15 +202,15 @@ export function SettingsScreen() {
           </div>
         )}
 
-        {state.kind === "loaded" && state.configured && (
+        {state.kind === "loaded" && state.personal && (
           <div>
             <p className="mb-3 text-sm text-ink">Conta conectada.</p>
             {formError && <p className="mb-3 text-sm text-danger">{formError}</p>}
             {confirmingDisconnect ? (
               <div className="flex flex-wrap gap-2">
                 <p className="w-full text-sm text-ink">
-                  Desconectar a conta? A biblioteca volta a mostrar o placeholder de sigla até você conectar de
-                  novo.
+                  Desconectar a conta? O ZeuX volta a usar a credencial de teste compartilhada (abaixo) até você
+                  conectar de novo.
                 </p>
                 <Button variant="primary" disabled={saving} onClick={handleDisconnect}>
                   Desconectar
@@ -222,8 +227,20 @@ export function SettingsScreen() {
           </div>
         )}
 
-        {state.kind === "loaded" && !state.configured && (
+        {state.kind === "loaded" && !state.personal && (
           <div className="flex flex-col gap-3">
+            {/* Achado real, 2026-08-17: pequenos grupos de testadores não têm
+                conta própria do IGDB ainda quando começam a usar o ZeuX — em
+                vez de deixar a busca de capa travada até alguém configurar
+                algo, o ZeuX já busca sozinho com uma credencial de teste
+                embutida (internal/igdb/credentials.go, defaultCredentials).
+                O formulário abaixo continua disponível pra quem quiser
+                conectar a própria conta e sair da cota compartilhada. */}
+            <p className="text-sm text-ink">
+              Usando a credencial de teste do ZeuX — a busca de capa já funciona, sem precisar configurar nada.
+              Ela é compartilhada com quem também não conectou a própria conta; conecte a sua para não depender
+              dessa cota.
+            </p>
             {formError && <p className="text-sm text-danger">{formError}</p>}
             <label className="flex flex-col gap-1 text-sm text-ink">
               ID do cliente

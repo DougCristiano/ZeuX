@@ -168,17 +168,27 @@ func TestScrapeBatchPartialSuccess(t *testing.T) {
 	}
 }
 
-// Trava o critério de aceite do G1: sem credencial conectada, Start nem
-// tenta a rede — devolve ErrNotConfigured na hora.
-func TestScrapeStartWithoutCredentialsRefuses(t *testing.T) {
+// Trava a mudança de 2026-08-17: sem credencial PESSOAL conectada, Start não
+// recusa mais com ErrNotConfigured — cai na credencial de teste embutida
+// (defaultCredentials, credentials.go), pensada para pequenos grupos de
+// testadores não precisarem configurar nada antes da busca funcionar. Sem
+// jogo na biblioteca (lote vazio), o job conclui sem tentar a rede (mesma
+// otimização que a busca automática depende), então este teste não precisa
+// de um servidor IGDB falso para travar a regra.
+func TestScrapeStartWithoutPersonalCredentialsFallsBackToDefault(t *testing.T) {
 	setManagedRootEnv(t)
 	lib := newTestLibrary(t)
-	credsStore := newTestCredentialsStore(t) // nunca Save() — sem credencial
+	credsStore := newTestCredentialsStore(t) // nunca Save() — sem credencial pessoal
 
 	manager := NewScrapeManager(lib, credsStore, silentLogger())
-	_, err := manager.Start(context.Background(), nil)
-	if err != ErrNotConfigured {
-		t.Fatalf("Start sem credencial: erro = %v, esperado ErrNotConfigured", err)
+	job, err := manager.Start(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Start sem credencial pessoal: erro = %v, esperava cair na credencial padrão", err)
+	}
+
+	done := waitJobDone(t, manager, job.ID)
+	if done.Phase != PhaseDone {
+		t.Fatalf("phase = %q, esperado %q", done.Phase, PhaseDone)
 	}
 }
 

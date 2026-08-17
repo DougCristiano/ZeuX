@@ -385,8 +385,14 @@ export type LibraryGame = {
 // --- Scraper de metadados IGDB (G1, docs/roadmap.md) ---
 
 export type IGDBCredentialsStatus = {
-  /** Nunca traz o client_secret de volta — só se há conta conectada. */
+  /** Nunca traz o client_secret de volta — só se há conta conectada.
+   * Sempre `true` desde 2026-08-17: sem conta pessoal, o ZeuX cai numa
+   * credencial de teste embutida (ver `personal`). */
   configured: boolean;
+  /** `true` = conta pessoal conectada em Configurações. `false` = usando a
+   * credencial de teste compartilhada embutida no ZeuX (cota dividida com
+   * quem também não conectou a própria conta). */
+  personal: boolean;
 };
 
 export type ScrapePhase = "buscando" | "baixando" | "concluido" | "falhou";
