@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -84,6 +85,7 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
+	mux.HandleFunc("GET /api/v1/system/info", s.handleSystemInfo)
 	mux.HandleFunc("GET /api/v1/consent", s.handleGetConsent)
 	mux.HandleFunc("POST /api/v1/consent", s.handlePostConsent)
 	mux.HandleFunc("POST /api/v1/hardware/scan", s.handleScan)
@@ -821,6 +823,9 @@ func (s *Server) handleAddLibraryFolder(w http.ResponseWriter, r *http.Request) 
 		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
 		return
 	}
+	if found > 0 {
+		go s.autoScrapeCovers()
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"folder":      folder,
@@ -921,6 +926,15 @@ func (s *Server) handleBulkAddLibraryFolders(w http.ResponseWriter, r *http.Requ
 		matched = append(matched, matchedFolder{
 			ConsoleID: console.ID, Name: console.Name, Path: subPath, GamesFound: found,
 		})
+	}
+
+	// Uma única chamada depois do laço inteiro, não uma por subpasta: assim
+	// a busca automática enxerga os jogos de todas as subpastas casadas de
+	// uma vez (UncoveredGames lê o estado do banco no momento em que roda),
+	// em vez de eventualmente empacar em ErrScrapeInProgress a partir da
+	// segunda subpasta e nunca cobrir a terceira em diante.
+	if len(matched) > 0 {
+		go s.autoScrapeCovers()
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -1025,6 +1039,9 @@ func (s *Server) handleScanLibraryFolder(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
 		return
+	}
+	if found > 0 {
+		go s.autoScrapeCovers()
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"games_found": found})
@@ -1263,15 +1280,19 @@ func (s *Server) setFavorite(w http.ResponseWriter, r *http.Request, favorite bo
 }
 
 // handleGetIGDBCredentials nunca ecoa client_secret de volta — mesmo
-// instinto de nunca logar uma senha. A interface só precisa saber se há
-// conta conectada, não o valor guardado.
+// instinto de nunca logar uma senha. `configured` é sempre `true` desde
+// 2026-08-17 (igdb.CredentialsStore.Load cai numa credencial de teste
+// embutida quando ninguém conectou a própria conta — ver
+// internal/igdb/credentials.go) — `personal` é o campo que distingue "conta
+// própria conectada" de "usando o padrão compartilhado de teste", para a
+// tela de Configurações mostrar o texto certo em cada caso.
 func (s *Server) handleGetIGDBCredentials(w http.ResponseWriter, r *http.Request) {
-	_, configured, err := s.igdbCreds.Load()
+	_, personal, err := s.igdbCreds.LoadPersonal()
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "igdb_credentials_read_failed", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"configured": configured})
+	writeJSON(w, http.StatusOK, map[string]any{"configured": true, "personal": personal})
 }
 
 // handleSetIGDBCredentials não valida contra o IGDB na hora — fica
@@ -1300,17 +1321,19 @@ func (s *Server) handleSetIGDBCredentials(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"configured": true})
+	writeJSON(w, http.StatusOK, map[string]any{"configured": true, "personal": true})
 }
 
-// handleClearIGDBCredentials desconecta a conta — reversível (o usuário só
-// reconecta), por isso não exige nenhuma confirmação especial no servidor.
+// handleClearIGDBCredentials desconecta a conta pessoal — reversível (o
+// usuário só reconecta), por isso não exige nenhuma confirmação especial no
+// servidor. `configured` continua `true` depois: sem conta pessoal, o ZeuX
+// volta a usar a credencial de teste embutida (ver handleGetIGDBCredentials).
 func (s *Server) handleClearIGDBCredentials(w http.ResponseWriter, r *http.Request) {
 	if err := s.igdbCreds.Clear(); err != nil {
 		s.writeError(w, http.StatusInternalServerError, "igdb_credentials_write_failed", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"configured": false})
+	writeJSON(w, http.StatusOK, map[string]any{"configured": true, "personal": false})
 }
 
 // handleScrapeCovers dispara uma busca de capas — em lote (corpo vazio ou
@@ -1375,6 +1398,31 @@ func (s *Server) handleCoverFile(w http.ResponseWriter, r *http.Request) {
 	http.StripPrefix("/api/v1/covers/", http.FileServer(http.Dir(root))).ServeHTTP(w, r)
 }
 
+// autoScrapeCovers dispara a busca de capas sozinha depois que uma pasta é
+// adicionada ou revarrida (2026-08-17, a pedido do Douglas — antes só
+// buscava quando o usuário clicava "Buscar capas" na tela). Roda em
+// goroutine própria, com contexto próprio (não o da requisição HTTP: o lote
+// pode levar minutos e precisa sobreviver à resposta que o disparou, mesmo
+// raciocínio de internal/install.Manager).
+//
+// Silenciosa de propósito quanto a dois erros que não são falha real: um
+// lote já em andamento (ErrScrapeInProgress — outra varredura recente já
+// disparou o dela) e, defensivamente, ErrNotConfigured — na prática
+// inalcançável hoje (igdb.CredentialsStore.Load sempre cai na credencial de
+// teste embutida quando não há conta pessoal, ver
+// internal/igdb/credentials.go), mas Start() ainda pode devolvê-lo se essa
+// regra mudar, e nenhum dos dois foi pedido pelo usuário nesta chamada —
+// não tem "erro" para mostrar aqui. A tela de biblioteca mostra o estado
+// real de cada jogo (capa, placeholder, ou "sem capa encontrada")
+// independentemente de qual chamada disparou a busca.
+func (s *Server) autoScrapeCovers() {
+	if _, err := s.igdbJobs.Start(context.Background(), nil); err != nil {
+		if !errors.Is(err, igdb.ErrNotConfigured) && !errors.Is(err, igdb.ErrScrapeInProgress) {
+			s.logger.Warn("busca automática de capas não pôde iniciar", "erro", err)
+		}
+	}
+}
+
 // syncLibraryFolder varre o disco a partir de folder, usando as extensões do
 // console, e reconcilia o resultado com o banco. Devolve quantos jogos a
 // varredura encontrou desta vez.
@@ -1405,6 +1453,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"status":         "ok",
 		"schema_version": s.catalog.SchemaVersion,
 		"consoles":       len(s.catalog.Consoles),
+	})
+}
+
+// handleSystemInfo devolve onde o ZeuX guarda os dados desta instalação e o
+// sistema operacional atual — a tela de Configurações usa isso pro botão
+// "Abrir pasta de instalação" (achado real, 2026-08-17: %AppData%\ZeuX\ é
+// difícil de chegar sem saber o caminho) e para decidir se mostra o atalho
+// de desinstalação nativo do Windows, que não existe nos outros SOs.
+func (s *Server) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
+	dir, err := emulator.AppDataDir()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "app_data_dir_unavailable",
+			"Não foi possível localizar a pasta de dados do ZeuX.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"app_data_dir": dir,
+		"os":           runtime.GOOS,
 	})
 }
 

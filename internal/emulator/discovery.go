@@ -25,13 +25,30 @@ const ManagedDirName = "emulators"
 // pertence a um console só.
 const SharedDirName = "compartilhados"
 
-// ManagedRoot devolve a raiz das instalações gerenciadas pelo ZeuX.
-func ManagedRoot() (string, error) {
+// AppDataDir devolve a pasta onde o ZeuX guarda tudo desta instalação:
+// banco local (sessões, biblioteca), consentimento, emuladores
+// personalizados e a raiz gerenciada de emuladores (ManagedRoot, uma
+// subpasta dela). internal/consent, internal/store, internal/emulator
+// (custom.go) e internal/igdb resolvem esse mesmo caminho cada um por conta
+// própria hoje — função extraída aqui só para a tela de Configurações ter
+// um único lugar para perguntar "onde fica tudo" (botão "Abrir pasta de
+// instalação", 2026-08-17), sem duplicar a lógica de novo numa quinta
+// chamada a os.UserConfigDir().
+func AppDataDir() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "ZeuX", ManagedDirName), nil
+	return filepath.Join(dir, "ZeuX"), nil
+}
+
+// ManagedRoot devolve a raiz das instalações gerenciadas pelo ZeuX.
+func ManagedRoot() (string, error) {
+	dir, err := AppDataDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, ManagedDirName), nil
 }
 
 // ManagedEmulatorDir devolve onde o binário deste adapter deve morar dentro

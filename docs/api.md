@@ -128,6 +128,37 @@ nem teria subido (`verdict.LoadCatalog` falha em `run()`).
 
 ---
 
+## GET /api/v1/system/info
+
+Devolve onde o ZeuX guarda os dados desta instalação e o sistema operacional
+atual. A tela de Configurações usa isso no botão "Abrir pasta de instalação"
+e para decidir se mostra o atalho de desinstalação nativo (só existe de
+verdade no Windows — ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)
+para a estrutura de dentro dessa pasta).
+
+```bash
+curl http://127.0.0.1:7777/api/v1/system/info
+```
+
+**200 OK**
+
+```json
+{
+  "app_data_dir": "C:\\Users\\doufl\\AppData\\Roaming\\ZeuX",
+  "os": "windows"
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `app_data_dir` | string | `emulator.AppDataDir()` — pasta raiz onde ficam o banco local, consentimento, emuladores personalizados e `ManagedRoot()` (subpasta `emulators/`). |
+| `os` | string | `runtime.GOOS` (`"windows"`, `"linux"` ou `"darwin"`). |
+
+**500** `app_data_dir_unavailable` — `os.UserConfigDir()` falhou (ambiente sem
+diretório de configuração resolvível).
+
+---
+
 ## GET /api/v1/consent
 
 Consulta o consentimento e devolve o texto exato da política. A interface **deve
@@ -971,6 +1002,19 @@ curl -X POST http://127.0.0.1:7777/api/v1/library/folders \
 Apontar a mesma pasta para o mesmo console duas vezes devolve a pasta já
 existente (mesmo `id`), não uma segunda linha — e revarre na mesma chamada.
 
+**Busca de capas automática (2026-08-17):** se a varredura achou pelo menos
+um jogo, o servidor dispara sozinho (em segundo plano, sem atrasar esta
+resposta) a mesma busca de capas de `POST /library/games/scrape-covers`, sem
+`game_ids` — ou seja, o lote de todo jogo que ainda nunca tentou buscar capa
+(`cover_status == ""`), não só os desta pasta. Autentica com a conta pessoal
+se houver uma conectada, ou com a credencial de teste embutida caso
+contrário (`GET /igdb/credentials` — `configured` é sempre `true`, ver
+aquela rota); só fica de fato sem efeito se já houver uma busca em
+andamento, silenciosamente — não é um erro desta rota, e não aparece em
+`Erro` abaixo. Acompanhe o progresso pela tela (ou por
+`GET /library/games`, olhando `cover_path`/`cover_status` mudarem), não por
+esta resposta.
+
 | Erro | Status | Motivo |
 |---|---|---|
 | `invalid_body` | 400 | JSON malformado. |
@@ -1031,6 +1075,9 @@ curl -X POST http://127.0.0.1:7777/api/v1/library/folders/1/scan
 
 **200 OK** `{"games_found": 12}` — `games_found` é o total encontrado *nesta*
 varredura, não um delta desde a anterior.
+
+Mesmo disparo automático de busca de capas de `POST /library/folders`,
+descrito acima, acontece aqui também quando `games_found > 0`.
 
 | Erro | Status | Motivo |
 |---|---|---|
@@ -1192,6 +1239,15 @@ curl -X DELETE http://127.0.0.1:7777/api/v1/library/games/5/favorite
 Estado da conexão com o IGDB (G1) — nunca devolve o `client_secret` de volta,
 só se há credencial configurada. Mesmo instinto de nunca logar uma senha.
 
+> **Credencial de teste embutida (2026-08-17):** sem conta pessoal
+> conectada, o ZeuX autentica contra o IGDB com uma credencial de teste
+> embutida no binário (`internal/igdb/credentials.go`,
+> `defaultCredentials`) — decisão pontual para poucos testadores não
+> precisarem configurar nada antes da busca de capa funcionar. Por isso
+> `configured` é **sempre `true`** a partir desta versão; `personal` é o
+> campo que diz se é a conta do próprio usuário ou o padrão compartilhado
+> (cota dividida entre todo mundo que não conectar a própria conta).
+
 ```bash
 curl http://127.0.0.1:7777/api/v1/igdb/credentials
 ```
@@ -1199,7 +1255,7 @@ curl http://127.0.0.1:7777/api/v1/igdb/credentials
 **200 OK**
 
 ```json
-{ "configured": false }
+{ "configured": true, "personal": false }
 ```
 
 Esta rota não tem caminho de erro além de falha de leitura do disco
@@ -1209,10 +1265,13 @@ Esta rota não tem caminho de erro além de falha de leitura do disco
 
 ## POST /api/v1/igdb/credentials
 
-Conecta a conta do IGDB do usuário — `client_id`/`client_secret` obtidos no
-painel de desenvolvedor do Twitch (o IGDB usa a mesma autenticação). Guardado
-localmente (`~/.config/ZeuX/igdb_credentials.json` no Linux), nunca no
-repositório, nunca em variável de ambiente do processo.
+Conecta a conta pessoal do IGDB do usuário — `client_id`/`client_secret`
+obtidos no painel de desenvolvedor do Twitch (o IGDB usa a mesma
+autenticação). Guardado localmente
+(`~/.config/ZeuX/igdb_credentials.json` no Linux), nunca no repositório,
+nunca em variável de ambiente do processo. Uma vez conectada, a conta
+pessoal sempre tem prioridade sobre a credencial de teste embutida (ver
+`GET /igdb/credentials` acima).
 
 **Não valida contra o IGDB na hora** — fica instantânea e funciona offline. A
 validação real acontece na primeira busca (`POST
@@ -1228,7 +1287,7 @@ curl -X POST http://127.0.0.1:7777/api/v1/igdb/credentials \
 **200 OK**
 
 ```json
-{ "configured": true }
+{ "configured": true, "personal": true }
 ```
 
 **Erros**
@@ -1243,8 +1302,10 @@ curl -X POST http://127.0.0.1:7777/api/v1/igdb/credentials \
 
 ## DELETE /api/v1/igdb/credentials
 
-Desconecta a conta — reversível (o usuário só reconecta depois), por isso
-sem confirmação especial no servidor.
+Desconecta a conta pessoal — reversível (o usuário só reconecta depois), por
+isso sem confirmação especial no servidor. `configured` continua `true`
+depois: sem conta pessoal, o ZeuX volta a usar a credencial de teste
+embutida.
 
 ```bash
 curl -X DELETE http://127.0.0.1:7777/api/v1/igdb/credentials
@@ -1253,7 +1314,7 @@ curl -X DELETE http://127.0.0.1:7777/api/v1/igdb/credentials
 **200 OK**
 
 ```json
-{ "configured": false }
+{ "configured": true, "personal": false }
 ```
 
 ---
