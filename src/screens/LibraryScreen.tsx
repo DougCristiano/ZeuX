@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { BulkMatchedFolder, LibraryFolder, LibraryGame, Report } from "../api/types";
 import { Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ErrorModal } from "../components/ui";
+import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 
 type ConsoleInfo = { console_id: string; name: string; short_name: string };
@@ -223,6 +224,55 @@ function AddConsoleSection({
 }
 
 /**
+ * Nomes de subpasta que `POST /library/folders/bulk` reconhece (2026-08-17,
+ * a pedido do Douglas): antes disso só existia o caminho de tentativa e
+ * erro (escolher a pasta e, se algo não bateu, `BulkFolderPicker` mostra
+ * quem ficou de fora em "Subpastas não reconhecidas") — sem lugar nenhum
+ * que dissesse os nomes aceitos ANTES de organizar as pastas. Espelha
+ * `normalizeConsoleMatch`/`byNormalized` (internal/api/server.go,
+ * handleBulkAddLibraryFolders) sem reimplementar a comparação aqui: mostra
+ * os três valores que o servidor aceita — id, nome e sigla — e cabe ao
+ * usuário copiar um deles. Maiúscula/minúscula, espaço e hífen não
+ * importam pro servidor (ex.: "Mega Drive", "megadrive" e "MEGA-DRIVE"
+ * casam igual), então isso não precisa ser explicado campo a campo, só uma
+ * vez no topo do modal.
+ */
+function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: () => void }) {
+  const consoles = [...report.verdicts].sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto rounded border border-line bg-fill p-5 ring-0">
+        <DialogTitle className="mb-1 text-lg font-semibold text-ink">Nomes de pasta aceitos</DialogTitle>
+        <p className="mb-4 text-sm text-muted">
+          Em "Selecionar pasta para todos os jogos", cada subpasta é reconhecida pelo nome — copie um dos valores
+          abaixo (id, nome completo ou sigla) para nomear a subpasta daquele console. Maiúscula/minúscula, espaço e
+          hífen não importam.
+        </p>
+        <ul className="flex flex-col gap-2">
+          {consoles.map((c) => {
+            // Dedup: em vários consoles o id e a sigla coincidem (ex.: n64,
+            // gba) — mostrar o mesmo valor duas vezes só confundiria.
+            const names = [...new Set([c.name, c.short_name, c.console_id])];
+            return (
+              <li key={c.console_id} className="rounded border border-line bg-fill px-3 py-2">
+                <p className="text-xs text-muted">{c.name}</p>
+                <p className="select-all font-mono text-sm text-ink">{names.join(" · ")}</p>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-4 flex justify-end">
+          <Button variant="primary" autoFocus onClick={onClose}>
+            Fechar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * Tela 04 do wireframe, redesenhada no M9 (docs/sprint-m-plano.md,
  * 2026-08-07): antes, um cartão grande por console dos 33 do catálogo,
  * paginado de 6 em 6 — quem tinha 3 consoles configurados via até a página 2
@@ -251,6 +301,7 @@ export function LibraryScreen({
   const [folders, setFolders] = useState<LibraryFolder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [showNameGuide, setShowNameGuide] = useState(false);
   // Ausente = ainda não contado para aquele console (GET /library/games
   // por console não devolve total, só a lista — critério do M9 exige a
   // contagem na própria linha, então cada console configurado dispara sua
@@ -353,6 +404,13 @@ export function LibraryScreen({
       </div>
 
       <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
+
+      <div className="mb-4 -mt-2 flex justify-end">
+        <Button type="button" variant="ghost" onClick={() => setShowNameGuide(true)}>
+          Ver nomes de pasta aceitos
+        </Button>
+      </div>
+      {showNameGuide && <FolderNameGuideModal report={report} onClose={() => setShowNameGuide(false)} />}
 
       {/* Falha ao listar as pastas é erro de tela inteira (nada renderiza
           sem essa lista) — vira modal, não parágrafo vermelho solto (mesmo

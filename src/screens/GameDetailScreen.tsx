@@ -85,6 +85,15 @@ export function GameDetailScreen({
   // M6: "abrir a pasta do jogo" — erro fica colado no botão (mesmo padrão
   // de favoriteError/coverError), não solto pela tela.
   const [folderError, setFolderError] = useState<string | null>(null);
+  // "Revarrer pasta" (2026-08-17, a pedido do Douglas): mesma ação que já
+  // existia em LibraryScreen (Revarrer/Remover por pasta), só que acessível
+  // sem sair da tela do jogo — não precisa voltar até a Biblioteca e achar
+  // o console/pasta certos lá. Só "revarrer" aqui, não "remover": remover
+  // apagaria a pasta inteira (todos os jogos dela), ação grande demais para
+  // botão perdido na tela de UM jogo — essa continua só em LibraryScreen.
+  const [rescanState, setRescanState] = useState<
+    { kind: "idle" } | { kind: "rescanning" } | { kind: "done"; gamesFound: number } | { kind: "error"; message: string }
+  >({ kind: "idle" });
 
   useEffect(() => {
     setCoverUrl(game.cover_url);
@@ -166,6 +175,19 @@ export function GameDetailScreen({
     }
   }
 
+  async function rescanFolder() {
+    setRescanState({ kind: "rescanning" });
+    try {
+      const res = await api.rescanLibraryFolder(game.folder_id);
+      setRescanState({ kind: "done", gamesFound: res.games_found });
+    } catch (err) {
+      setRescanState({
+        kind: "error",
+        message: err instanceof ApiError ? err.message : "Não foi possível revarrer esta pasta.",
+      });
+    }
+  }
+
   useEffect(() => {
     api
       .getSessions()
@@ -225,10 +247,29 @@ export function GameDetailScreen({
         {/* M6: nenhum link, nenhuma sugestão de onde obter o arquivo (regra
             6 do CLAUDE.md) — só revela o que já está no disco do usuário. */}
         <div className="flex flex-col gap-1">
-          <Button variant="secondary" onClick={openGameFolder} className="w-fit">
-            Abrir pasta do jogo
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={openGameFolder} className="w-fit">
+              Abrir pasta do jogo
+            </Button>
+            {/* "Revarrer pasta": mesma ação de LibraryScreen, sem precisar
+                voltar até lá. Não bloqueia o resto da tela — erro e
+                resultado ficam colados no botão. */}
+            <Button
+              variant="secondary"
+              disabled={rescanState.kind === "rescanning"}
+              onClick={rescanFolder}
+              className="w-fit"
+            >
+              {rescanState.kind === "rescanning" ? "Revarrendo…" : "Revarrer pasta"}
+            </Button>
+          </div>
           {folderError && <p className="text-xs text-danger">{folderError}</p>}
+          {rescanState.kind === "done" && (
+            <p className="text-xs text-ink">
+              {rescanState.gamesFound} jogo(s) encontrado(s) nesta pasta.
+            </p>
+          )}
+          {rescanState.kind === "error" && <p className="text-xs text-danger">{rescanState.message}</p>}
           <p className="truncate text-xs text-muted" title={game.path}>
             {game.path}
           </p>
