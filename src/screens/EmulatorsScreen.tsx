@@ -417,6 +417,26 @@ function EmulatorCardActions({
         <p className="text-sm text-muted">{source.reason}</p>
       )}
 
+      {/* RetroArch ("kind": "bundled") deveria ser encontrado por Locate()
+          antes de qualquer clique — a cópia vem dentro do instalador do ZeuX
+          (ADR 0012). Mas isso só é verdade para o build oficial cortado com
+          RetroArch empacotado (ZEUX_BUNDLE_RETROARCH=1, hoje só a tag
+          v0.5.0 em release.yml); um `npm run tauri build`/`tauri dev` comum
+          empacota a pasta vazia. Chegar aqui com entry.installed=false
+          significa que este build não tem a cópia — mostrar o botão
+          genérico "Instalar" levava a um beco sem saída (Start() sempre
+          recusa "bundled" com "não há nada para baixar", já que o servidor
+          não sabe a diferença entre "ainda não copiou" e "este build nunca
+          empacotou"). Trata como "manual": manda para o site oficial, de
+          onde também se baixam os cores pelo Online Updater interno do
+          RetroArch (achado real, 2026-08-17). */}
+      {!entry.installed && source?.kind === "bundled" && (
+        <p className="text-sm text-muted">
+          Este build do ZeuX não trouxe o RetroArch empacotado. Baixe pelo site oficial — os cores
+          são baixados de dentro do próprio RetroArch, pelo Online Updater.
+        </p>
+      )}
+
       {/* Emulador personalizado (I1) cujo caminho não foi encontrado —
           continua na lista (nunca some sozinho), com Editar/Excluir
           disponíveis para o usuário corrigir o caminho ou desistir. */}
@@ -482,7 +502,7 @@ function EmulatorCardActions({
               {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
             </Button>
           ))
-        ) : source?.kind === "manual" ? (
+        ) : source?.kind === "manual" || source?.kind === "bundled" ? (
           <Button variant="primary" onClick={() => openUrl(source.homepage)}>
             Abrir site oficial
           </Button>
