@@ -328,6 +328,15 @@ export type HealthStatus = {
   consoles: number;
 };
 
+// GET /system/info (2026-08-17): onde o ZeuX guarda os dados desta
+// instalação, e em que SO — a tela de Configurações usa isso pro botão
+// "Abrir pasta de instalação" e para decidir se mostra o atalho de
+// desinstalação (só existe de verdade no Windows).
+export type SystemInfo = {
+  app_data_dir: string;
+  os: string;
+};
+
 // --- Biblioteca (L5, docs/roadmap.md) ---
 
 export type LibraryFolder = {

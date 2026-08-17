@@ -128,6 +128,37 @@ nem teria subido (`verdict.LoadCatalog` falha em `run()`).
 
 ---
 
+## GET /api/v1/system/info
+
+Devolve onde o ZeuX guarda os dados desta instalação e o sistema operacional
+atual. A tela de Configurações usa isso no botão "Abrir pasta de instalação"
+e para decidir se mostra o atalho de desinstalação nativo (só existe de
+verdade no Windows — ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md)
+para a estrutura de dentro dessa pasta).
+
+```bash
+curl http://127.0.0.1:7777/api/v1/system/info
+```
+
+**200 OK**
+
+```json
+{
+  "app_data_dir": "C:\\Users\\doufl\\AppData\\Roaming\\ZeuX",
+  "os": "windows"
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `app_data_dir` | string | `emulator.AppDataDir()` — pasta raiz onde ficam o banco local, consentimento, emuladores personalizados e `ManagedRoot()` (subpasta `emulators/`). |
+| `os` | string | `runtime.GOOS` (`"windows"`, `"linux"` ou `"darwin"`). |
+
+**500** `app_data_dir_unavailable` — `os.UserConfigDir()` falhou (ambiente sem
+diretório de configuração resolvível).
+
+---
+
 ## GET /api/v1/consent
 
 Consulta o consentimento e devolve o texto exato da política. A interface **deve

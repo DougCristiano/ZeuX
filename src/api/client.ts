@@ -26,6 +26,7 @@ import type {
   ScrapeJob,
   Session,
   SessionsResponse,
+  SystemInfo,
 } from "./types";
 
 // O zeuxd sobe como sidecar do Tauri (item B5) e escuta sempre neste
@@ -103,6 +104,7 @@ function postJSON<T>(path: string, payload: unknown): Promise<T> {
 
 export const api = {
   health: () => request<HealthStatus>("/health"),
+  getSystemInfo: () => request<SystemInfo>("/system/info"),
 
   // Timeout curto: na fase connecting a UI tenta dezenas de vezes; cada
   // tentativa não pode ficar 30 s presa se a porta aceitar TCP sem HTTP.

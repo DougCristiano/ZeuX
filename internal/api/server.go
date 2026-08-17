@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -84,6 +85,7 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/v1/health", s.handleHealth)
+	mux.HandleFunc("GET /api/v1/system/info", s.handleSystemInfo)
 	mux.HandleFunc("GET /api/v1/consent", s.handleGetConsent)
 	mux.HandleFunc("POST /api/v1/consent", s.handlePostConsent)
 	mux.HandleFunc("POST /api/v1/hardware/scan", s.handleScan)
@@ -1405,6 +1407,24 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"status":         "ok",
 		"schema_version": s.catalog.SchemaVersion,
 		"consoles":       len(s.catalog.Consoles),
+	})
+}
+
+// handleSystemInfo devolve onde o ZeuX guarda os dados desta instalação e o
+// sistema operacional atual — a tela de Configurações usa isso pro botão
+// "Abrir pasta de instalação" (achado real, 2026-08-17: %AppData%\ZeuX\ é
+// difícil de chegar sem saber o caminho) e para decidir se mostra o atalho
+// de desinstalação nativo do Windows, que não existe nos outros SOs.
+func (s *Server) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
+	dir, err := emulator.AppDataDir()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "app_data_dir_unavailable",
+			"Não foi possível localizar a pasta de dados do ZeuX.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"app_data_dir": dir,
+		"os":           runtime.GOOS,
 	})
 }
 
