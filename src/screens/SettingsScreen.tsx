@@ -51,6 +51,13 @@ export function SettingsScreen() {
       );
   }, []);
 
+  // O plugin-opener do Tauri só abre caminhos liberados em
+  // src-tauri/capabilities/default.json (opener:allow-open-path). Achado
+  // real, 2026-08-17: a liberação só cobria "$HOME/.config/**", que existe
+  // no Linux mas não no Windows (%AppData%\Roaming) nem no macOS — abrir
+  // esta pasta falhava com "Not allowed to open path" fora do Linux. A
+  // liberação agora usa "$CONFIG/**" (equivalente cross-platform de
+  // os.UserConfigDir() no backend Go).
   async function openInstallFolder() {
     if (systemInfo.kind !== "loaded") return;
     setPathError(null);

@@ -8,7 +8,7 @@
     "opener:default",
     {
       "identifier": "opener:allow-open-path",
-      "allow": [{ "path": "$HOME/.config/**" }]
+      "allow": [{ "path": "$CONFIG/**" }]
     },
     {
       "identifier": "opener:allow-reveal-item-in-dir",
