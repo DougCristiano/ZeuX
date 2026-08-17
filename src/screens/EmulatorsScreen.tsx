@@ -414,7 +414,25 @@ function EmulatorCardActions({
           falhar com o motivo em texto puro, abre o site oficial direto no
           navegador (2026-08-04, a pedido do Douglas). */}
       {!entry.installed && source?.kind === "manual" && (
-        <p className="text-sm text-muted">{source.reason}</p>
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted">{source.reason}</p>
+          {/* O site oficial abre pelo botão abaixo, mas o download em si
+              precisa ir pra algum lugar que o ZeuX ache sozinho depois
+              (findBinary, internal/emulator/discovery.go) — o Program
+              Files funciona (é o primeiro lugar verificado fora da pasta
+              gerenciada), mas essa pasta é a garantia: colar/extrair aqui
+              sempre funciona, sem depender de onde o instalador do
+              Dolphin decidir instalar por padrão (achado real,
+              2026-08-17). */}
+          <p className="text-sm text-muted">
+            Extraia (ou instale) o {entry.name} nesta pasta para o ZeuX encontrar sozinho:
+          </p>
+          {entry.managed_dir && (
+            <p className="break-all rounded border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
+              {entry.managed_dir}
+            </p>
+          )}
+        </div>
       )}
 
       {/* RetroArch ("kind": "bundled") deveria ser encontrado por Locate()

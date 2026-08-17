@@ -206,6 +206,24 @@ func TestCustomStoreRoundTrip(t *testing.T) {
 	}
 }
 
+// Trava o bug real do Windows (2026-08-17, "Access is denied" salvando um
+// emulador personalizado): saveLocked escrevia com os.WriteFile e depois
+// reabria o arquivo só para dar fsync — no Windows, FlushFileBuffers recusa
+// um handle reaberto read-only. Este teste garante que Save funciona (não
+// garante o comportamento específico do Windows, que só se reproduz lá) e
+// que a escrita atômica não deixa o .tmp para trás.
+func TestCustomStoreSaveDoesNotLeaveTemporaryFile(t *testing.T) {
+	store := &CustomStore{path: filepath.Join(t.TempDir(), "custom.json")}
+
+	if _, err := store.Upsert(sampleDefinition()); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	if _, err := os.Stat(store.path + ".tmp"); !os.IsNotExist(err) {
+		t.Fatalf("arquivo temporário deveria ter sido renomeado, stat = %v", err)
+	}
+}
+
 // O arquivo é editável à mão, então um JSON quebrado precisa apontar o erro em
 // vez de sumir silenciosamente com as definições.
 func TestCustomStoreReportsInvalidJSON(t *testing.T) {

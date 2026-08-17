@@ -460,6 +460,7 @@ curl http://127.0.0.1:7777/api/v1/emulators
 | `installation` | objeto | **Só presente quando `installed` é `true`.** |
 | `installation.managed` | bool | `true` quando o binário veio da pasta gerenciada pelo ZeuX (`POST /emulators/{id}/install`), organizada por console desde o [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md). |
 | `installation.version` | string | **Nunca preenchido hoje.** Nenhum adapter detecta versão. |
+| `managed_dir` | string | Onde `findBinary` (`internal/emulator/discovery.go`) procura primeiro — o caminho que, se o usuário colar o emulador ali, o ZeuX acha sozinho. Presente sempre que dá pra calcular, mesmo com `installed: false`; **ausente para emulador personalizado** (`custom: true` — esse não tem "a pasta certa", o caminho é o que o próprio usuário escolheu). A tela mostra isso para as fontes `"kind": "manual"` (`GET /emulator-sources`), que não têm 1-click. |
 
 A ordem dos itens é a ordem de registro em `NewRegistry`, personalizados
 primeiro: retroarch, duckstation, pcsx2, dolphin, ppsspp, flycast, rpcs3, cemu,

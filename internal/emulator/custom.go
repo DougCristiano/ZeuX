@@ -238,23 +238,36 @@ func (s *CustomStore) saveLocked(definitions []CustomDefinition) error {
 	}
 
 	temp := s.path + ".tmp"
-	if err := os.WriteFile(temp, data, 0o644); err != nil {
+
+	// Escreve e sincroniza no MESMO handle, aberto para escrita — bug real
+	// achado no Windows (2026-08-17, "Access is denied" no Sync): a versão
+	// anterior gravava com os.WriteFile (que abre, escreve e fecha
+	// sozinho) e depois reabria o arquivo só para chamar Sync(). No Linux
+	// isso funciona (fsync não exige permissão de escrita), mas no Windows
+	// FlushFileBuffers recusa um handle aberto read-only com
+	// ERROR_ACCESS_DENIED — o reabrir com os.Open() é sempre read-only.
+	// Mantendo o handle de escrita aberto até depois do Sync, o mesmo
+	// código passa a funcionar nos dois SOs.
+	file, err := os.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
 		return fmt.Errorf("gravando emuladores personalizados: %w", err)
 	}
-
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		os.Remove(temp)
+		return fmt.Errorf("gravando emuladores personalizados: %w", err)
+	}
 	// fsync garante que o arquivo está no disco antes do rename — resiste a
 	// queda de energia no meio da operação.
-	file, err := os.Open(temp)
-	if err != nil {
-		os.Remove(temp)
-		return fmt.Errorf("reabrindo para fsync: %w", err)
-	}
 	if err := file.Sync(); err != nil {
 		file.Close()
 		os.Remove(temp)
 		return fmt.Errorf("sincronizando ao disco: %w", err)
 	}
-	file.Close()
+	if err := file.Close(); err != nil {
+		os.Remove(temp)
+		return fmt.Errorf("fechando arquivo temporário: %w", err)
+	}
 
 	if err := os.Rename(temp, s.path); err != nil {
 		os.Remove(temp)
