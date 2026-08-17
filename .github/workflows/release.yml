@@ -107,6 +107,23 @@ jobs:
         with:
           tag_name: ${{ steps.resolve.outputs.tag }}
 
+  # Sem auto-updater (2026-08-17: decisão explícita do Douglas de adiar —
+  # exigiria gerar e guardar uma chave de assinatura e publicar um manifesto
+  # de atualização a cada release, escopo de infraestrutura que ainda não
+  # foi aberto). Até lá, "atualizar" é baixar o instalador de novo e rodar
+  # por cima — o que só atualiza no lugar (sem duplicar a instalação nem
+  # perder configuração) porque `identifier`/`productName` em
+  # tauri.conf.json nunca mudam entre versões: o NSIS os usa para registrar
+  # a instalação em HKCU\...\Uninstall, e detecta/reaproveita esse registro
+  # ao rodar um instalador mais novo. `nsis.installMode: "currentUser"`
+  # (tauri.conf.json) fixa esse comportamento (era o padrão implícito;
+  # deixado explícito para não depender de um valor-padrão que pode mudar
+  # numa versão futura do Tauri) — instala sempre no mesmo lugar fixo
+  # (`%LocalAppData%\Programs\zeux`), sem pedir administrador. Isso só
+  # funciona se quem instalar aceitar o caminho padrão do assistente: quem
+  # navegar manualmente para uma pasta diferente a cada instalador (ex.:
+  # "Área de Trabalho\Nova pasta") cria uma instalação paralela, não
+  # atualiza a existente.
   build-windows:
     needs: create-release
     runs-on: windows-latest
