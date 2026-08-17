@@ -125,6 +125,17 @@ type Status struct {
 	// declarar a capacidade real, não descobrir por tentativa).
 	Configurable bool `json:"configurable"`
 	Bindable     bool `json:"bindable"`
+
+	// ManagedDir é onde findBinary procura primeiro (discovery.go) — o lugar
+	// que, se o usuário colar o emulador ali, o ZeuX acha sozinho na próxima
+	// abertura da tela. Preenchida sempre que dá pra calcular (mesmo com o
+	// emulador ainda não instalado, e mesmo achado por outro caminho — ex.:
+	// Program Files), exceto para emulador personalizado (Custom): esse não
+	// tem "a pasta certa", o caminho é o que o próprio usuário escolheu.
+	// Existe para a fonte "manual" (hoje só o Dolphin, sem 1-click possível)
+	// mostrar exatamente onde extrair o download, em vez de deixar o
+	// usuário adivinhar (achado real, 2026-08-17).
+	ManagedDir string `json:"managed_dir,omitempty"`
 }
 
 // Survey verifica quais emuladores estão instalados na máquina.
@@ -138,6 +149,12 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 	statuses := make([]Status, 0, len(adapters))
 
 	ctx = withDiscoveryIndex(ctx, buildDirIndex())
+
+	// Calculado uma vez fora do laço — ManagedDir de cada adapter é só um
+	// Join a partir da mesma raiz. root vem "" se ManagedRoot() falhar (ex.:
+	// os.UserConfigDir() indisponível); nesse caso ManagedDir fica ausente
+	// para todo mundo, sem travar o Survey inteiro por isso.
+	root, _ := ManagedRoot()
 
 	for _, adapter := range adapters {
 		consoles := append([]string{}, adapter.Consoles()...)
@@ -153,6 +170,10 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 			Custom:       isCustom,
 			Configurable: configurable,
 			Bindable:     bindable,
+		}
+
+		if root != "" && !isCustom {
+			status.ManagedDir = ManagedEmulatorDir(root, adapter.ID(), consoles)
 		}
 
 		if install, ok := adapter.Locate(ctx); ok {

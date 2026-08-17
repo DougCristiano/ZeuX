@@ -166,6 +166,13 @@ export type EmulatorEntry = {
   configurable: boolean;
   /** H3/H4 — diz se GET/POST .../bindings existe de verdade. */
   bindable: boolean;
+  /**
+   * Onde findBinary procura primeiro (internal/emulator/discovery.go) — o
+   * lugar que, se o usuário colar o emulador ali, o ZeuX acha sozinho.
+   * Ausente para emulador personalizado (custom: true), que não tem "a
+   * pasta certa" — o caminho é o que o próprio usuário escolheu.
+   */
+  managed_dir?: string;
 };
 
 // --- Configuração persistida do emulador (H1/H2, docs/roadmap.md) ---
