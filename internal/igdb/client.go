@@ -151,6 +151,19 @@ func (c *Client) authenticate(ctx context.Context) error {
 	if response.StatusCode == http.StatusBadRequest || response.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("o Twitch recusou o client_id/client_secret informado — confira a credencial nas Configurações")
 	}
+	// 403 num grant client_credentials normalmente não é credencial errada
+	// (isso já caiu no ramo acima, 400/401) — é o client_id do app suspenso
+	// pelo Twitch. Achado real (2026-08-18): a credencial de teste embutida
+	// (defaultCredentials, credentials.go) é distribuída no binário e
+	// compartilhada por quem não conecta a própria conta — exatamente o
+	// padrão que a detecção de fraude do Twitch costuma suspender (mesmo
+	// client_secret usado de várias máquinas ao mesmo tempo). A mensagem diz
+	// isso, em vez de repetir só o código HTTP.
+	if response.StatusCode == http.StatusForbidden {
+		return fmt.Errorf(
+			"o Twitch recusou com 403 (proibido) — geralmente significa que o aplicativo dessa credencial foi suspenso no painel do Twitch, não senha errada. Se você está usando a credencial de teste padrão do ZeuX, conecte sua própria conta em Configurações; se é uma conta pessoal, confira o status do app em dev.twitch.tv/console",
+		)
+	}
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("o Twitch respondeu %s ao autenticar", response.Status)
 	}

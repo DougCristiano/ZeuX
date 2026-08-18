@@ -4088,6 +4088,44 @@ explicitamente acima; O1, O5 e O7 têm o cálculo de CSS escrito por extenso.
 
 ---
 
+## Achado — credencial de teste do IGDB pode estar suspensa (2026-08-18)
+
+**Não é item de sprint, é um alerta operacional.** O Douglas reportou, ao
+vivo: `"o Twitch respondeu 403 Forbidden ao autenticar"` ao tentar buscar
+capa. Investigado em `internal/igdb/client.go` — a mensagem estava correta,
+só genérica demais (corrigida nesta sessão, ver abaixo).
+
+**O que o `403` provavelmente significa, e por que é sério:** num grant
+`client_credentials` do OAuth do Twitch, `403` normalmente não é "senha
+errada" (isso é `401`, tratado à parte) — é o **app (`client_id`) suspenso**
+pelo painel do Twitch. A credencial de teste embutida
+(`defaultCredentials`, `internal/igdb/credentials.go`, decisão de
+2026-08-17) é distribuída dentro do binário do ZeuX e compartilhada por todo
+mundo que não conecta a própria conta — exatamente o padrão que a detecção
+de fraude do Twitch costuma suspender (mesmo `client_secret` sendo usado de
+várias máquinas ao mesmo tempo). O comentário que registrou essa decisão já
+avisava desse risco por escrito; parece ter se concretizado.
+
+**O que foi corrigido nesta sessão:** a mensagem de erro para `403`
+(`client.go:151-163`) agora diz que é provavelmente suspensão de app, não
+credencial errada, e sugere conectar conta pessoal ou checar
+`dev.twitch.tv/console` — em vez de só repetir "o Twitch respondeu 403
+Forbidden ao autenticar".
+
+**O que NÃO foi corrigido, porque exige acesso que esta sessão não tem:**
+- Confirmar se o app está mesmo suspenso — só o painel do Twitch do Douglas
+  mostra isso.
+- Se estiver suspenso, a busca de capa **para de funcionar para todo
+  testador que não conectar a própria conta** até o Douglas rotacionar a
+  chave (gerar um `client_id`/`client_secret` novo no painel) ou pedir pra
+  cada testador conectar a própria conta em Configurações.
+
+**Decisão do Douglas:** o que fazer com a credencial embutida — rotacionar,
+trocar a estratégia (nunca embutir, pedir conta pessoal de todo mundo) ou
+aceitar o risco de novo com uma chave nova.
+
+---
+
 ## Sprint E — Perfil e camada social (**v2.0 — pós-v1.0**)
 
 > **Adiada para a v2.0 por decisão do Douglas, 2026-08-04.** Nada nesta sprint
