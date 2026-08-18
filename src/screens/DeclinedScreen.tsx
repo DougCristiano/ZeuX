@@ -1,4 +1,4 @@
-import { Button } from "../components/ui";
+import { Button, OnboardingGlow } from "../components/ui";
 
 /**
  * Tela mostrada depois de "Agora não" na tela 01. Regra de produto (item B8):
@@ -18,8 +18,12 @@ export function DeclinedScreen({
   onViewEmulators: () => void;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-paper px-6">
-      <div className="flex max-w-md flex-col gap-4">
+    // N3/N8 (docs/roadmap.md, Sprint N): max-w-3xl é o mesmo teto de leitura
+    // do resto do app (era max-w-md); glow de identidade (N8) — mesmo motivo
+    // do comentário em OnboardingGlow (src/components/ui.tsx).
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6">
+      <OnboardingGlow />
+      <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
         <h1 className="text-2xl font-semibold text-ink">Sem leitura de hardware</h1>
         <p className="text-base text-ink">
           Você optou por não autorizar a leitura deste computador. Sem essa leitura, o ZeuX não tem como

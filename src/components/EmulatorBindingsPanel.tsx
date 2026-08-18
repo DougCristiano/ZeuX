@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { InputBinding } from "../api/types";
 import { translateKeyForAdapter } from "../lib/keyMapping";
-import { Button } from "./ui";
+import { Button, Callout, InlineError, Toast } from "./ui";
+import { useToast } from "../hooks/useToast";
 
 /**
  * Tela de mapeamento de teclado/controle (H3/H4, docs/roadmap.md) — só
@@ -32,7 +33,23 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
   const [listeningButtonFor, setListeningButtonFor] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ action: string; key: string; withAction: string } | null>(null);
   const [gamepadConnected, setGamepadConnected] = useState(false);
+  // B2 (achado do critico-design, 2026-08-18): `unapplied` (ADR 0006) estava
+  // sendo jogado dentro de `error` — o mesmo `InlineError` vermelho que
+  // erro de verdade usa, transformando uma ressalva ("essa opção não coube")
+  // em "algo quebrou". Separado do `error`, com sua própria caixa âmbar
+  // (mesmo tratamento que `EmulatorConfigPanel` já usa via `Callout`).
+  const [unapplied, setUnapplied] = useState<string[]>([]);
+  // N9 (docs/roadmap.md, Sprint N): antes, gravar um mapeamento não dizia
+  // nada — só o painel recarregava em silêncio.
+  const { toastMessage, showToast } = useToast();
 
+  // `unapplied` NÃO é limpo aqui: `saveBinding` chama `load()` logo depois
+  // de gravar o próprio `unapplied` — como as duas chamadas acontecem no
+  // mesmo tick síncrono, um `setUnapplied([])` aqui dentro apagaria o aviso
+  // antes de qualquer render mostrar ele (achado do critico-design,
+  // 2026-08-18, ao separar `unapplied` de `error`). Quem precisa zerar
+  // `unapplied` de verdade é a troca de `adapterId` — coberto pelo
+  // `useEffect` mais abaixo, que já recria o componente do zero.
   function load() {
     setLoading(true);
     setError(null);
@@ -46,7 +63,11 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [adapterId]);
+  useEffect(() => {
+    setUnapplied([]);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapterId]);
 
   // Detecção de controle conectado — só isso (listar), não captura de
   // botão. A captura de botão (abaixo) só entra quando o usuário clica
@@ -67,10 +88,13 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
 
   async function saveBinding(action: string, patch: Partial<Pick<InputBinding, "key" | "button">>) {
     setError(null);
+    setUnapplied([]);
     try {
       const result = await api.setEmulatorBindings(adapterId, [{ action, ...patch }]);
       if ((result.unapplied ?? []).length > 0) {
-        setError(result.unapplied.join(" "));
+        setUnapplied(result.unapplied);
+      } else {
+        showToast("Mapeamento salvo.");
       }
       load();
     } catch (err) {
@@ -153,7 +177,17 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {toastMessage && <Toast message={toastMessage} />}
+      {error && <InlineError>{error}</InlineError>}
+      {unapplied.length > 0 && (
+        <Callout label="Não aplicado" tone="amber">
+          <ul className="list-disc pl-4">
+            {unapplied.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+        </Callout>
+      )}
 
       {!gamepadConnected && (
         <p className="text-xs text-muted">
@@ -186,37 +220,42 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </div>
       )}
 
-      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-2">
+      {/* O4 (docs/roadmap.md, Sprint O): era `grid grid-cols-[1fr_auto_auto]` —
+          em janela de notebook (1024-1279px) o card fica estreito demais para
+          duas colunas `auto` de botão + a coluna `1fr` do nome da ação, e o
+          grid estourava o card com rolagem horizontal. `flex-wrap` deixa os
+          botões quebrarem para a linha de baixo em vez de forçar largura. */}
+      <div className="flex flex-col gap-2">
         {actions.map((action) => {
           const binding = bindings.find((b) => b.action === action);
           return (
-            <Fragment key={action}>
-              <span className="text-sm text-ink">
+            <div key={action} className="flex flex-wrap items-center justify-between gap-2">
+              <span className="min-w-0 shrink text-sm break-words text-ink">
                 {action}
                 <span className="ml-2 text-xs text-muted">
                   {binding?.key ?? "sem tecla"}
                   {binding?.button ? ` · botão ${binding.button}` : ""}
                 </span>
               </span>
-              <Button
-                variant="secondary"
-                disabled={listeningKeyFor !== null}
-                onClick={() => setListeningKeyFor(action)}
-              >
-                {listeningKeyFor === action ? "Aperte uma tecla…" : "Mapear tecla"}
-              </Button>
-              {gamepadConnected ? (
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
-                  disabled={listeningButtonFor !== null}
-                  onClick={() => setListeningButtonFor(action)}
+                  disabled={listeningKeyFor !== null}
+                  onClick={() => setListeningKeyFor(action)}
                 >
-                  {listeningButtonFor === action ? "Aperte um botão…" : "Mapear controle"}
+                  {listeningKeyFor === action ? "Aperte uma tecla…" : "Mapear tecla"}
                 </Button>
-              ) : (
-                <span />
-              )}
-            </Fragment>
+                {gamepadConnected && (
+                  <Button
+                    variant="secondary"
+                    disabled={listeningButtonFor !== null}
+                    onClick={() => setListeningButtonFor(action)}
+                  >
+                    {listeningButtonFor === action ? "Aperte um botão…" : "Mapear controle"}
+                  </Button>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>

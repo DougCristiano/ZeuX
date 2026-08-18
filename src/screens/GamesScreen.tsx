@@ -2,11 +2,25 @@ import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { EmulatorEntry, LibraryGame, Report, Session } from "../api/types";
-import { Button, Callout, ErrorModal, ProgressBar } from "../components/ui";
+import {
+  Button,
+  Callout,
+  CardSkeleton,
+  ConfirmModal,
+  EmptyState,
+  ErrorModal,
+  InlineError,
+  inputClass,
+  ProgressBar,
+  ScreenContainer,
+  Toast,
+} from "../components/ui";
 import { GameTile } from "../components/GameTile";
 import { useInlineInstall } from "../hooks/useInlineInstall";
+import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { percentOf } from "../lib/format";
+import { consoleAccentColor } from "../lib/consoleColor";
 
 type RowStatus =
   | { kind: "idle" }
@@ -29,9 +43,11 @@ type RowStatus =
  * `evaluateGameLaunchability` (src/lib/gameLaunchability.ts) e
  * `useInlineInstall` (src/hooks/useInlineInstall.ts), compartilhados com
  * `AllGamesScreen`. O que continua exclusivo desta tela (não entrou no
- * componente/hook compartilhado): cabeçalho de parecer/BIOS e confirmação de
- * BIOS vazio — vivem como blocos irmãos do tile, ligados por
- * `installState.pendingGamePath`.
+ * componente/hook compartilhado): o cabeçalho de parecer/BIOS. As
+ * confirmações de hardware fraco/BIOS vazio (N13, docs/roadmap.md,
+ * Sprint N) viraram `ConfirmModal` de tela — antes eram painel inline por
+ * tile, única tela do app ainda fazendo isso depois que a M8 padronizou
+ * `AllGamesScreen` em modal.
  *
  * **Limitação aceita, herdada do M1:** o botão "Jogar" full-width saiu —
  * a checagem de instalado/BIOS antes de lançar agora é o `onPlay` do overlay
@@ -71,6 +87,7 @@ export function GamesScreen({
   // Erro de lançamento vira modal, não texto discreto na linha do jogo —
   // achado em 2026-08-04, um texto inline passava despercebido.
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const { toastMessage, showToast } = useToast();
 
   const verdict = report.verdicts.find((v) => v.console_id === consoleId);
 
@@ -113,6 +130,10 @@ export function GamesScreen({
     try {
       const session = await api.launch({ rom_path: romPath, console_id: consoleId });
       setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "launched", session } }));
+      // B4 (achado do critico-design, 2026-08-18): "Sessão iniciada." era
+      // texto que nunca somia sozinho, preso na célula do jogo — virou
+      // toast, mesma confirmação de sucesso que o resto do app já usa.
+      showToast(`${game.title}: sessão iniciada.`);
       loadGames(); // atualiza playtime_seconds/last_played_at sem recarregar a tela
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Não foi possível abrir o jogo.";
@@ -133,11 +154,16 @@ export function GamesScreen({
   function toggleFavorite(game: LibraryGame) {
     const next = !game.favorite;
     setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: next } : g)) : prev));
+    // B4 (achado do critico-design, 2026-08-18): favoritar confirmava em
+    // AllGamesScreen e ficava mudo aqui — a mesma ação não pode confirmar
+    // numa tela e não confirmar em outra.
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
-    call.catch(() => {
-      setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
-      setError("Não foi possível salvar o favorito. Tente de novo.");
-    });
+    call
+      .then(() => showToast(next ? "Adicionado aos favoritos." : "Removido dos favoritos."))
+      .catch(() => {
+        setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
+        setError("Não foi possível salvar o favorito. Tente de novo.");
+      });
   }
 
   const trimmedSearch = search.trim();
@@ -146,7 +172,9 @@ export function GamesScreen({
     : games;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pt-16 pb-10">
+    // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado — agora usa o
+    // mesmo teto de listagem do resto do app (`ScreenContainer`).
+    <ScreenContainer variant="listing">
       {/*
        * Um só modal de erro por vez, em ordem de prioridade — antes disto,
        * `install.state.kind === "error"` e o `error` genérico apareciam como
@@ -155,6 +183,7 @@ export function GamesScreen({
        * criou o `ErrorModal` em 2026-08-04 para `launchError`, só que os
        * outros dois nunca ganharam o mesmo tratamento.
        */}
+      {toastMessage && <Toast message={toastMessage} />}
       {launchError ? (
         <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={() => setLaunchError(null)} />
       ) : install.state.kind === "error" ? (
@@ -167,11 +196,82 @@ export function GamesScreen({
         error && <ErrorModal title="Não foi possível carregar a tela" message={error} onClose={() => setError(null)} />
       )}
 
-      <div className="mb-4 flex items-center justify-between">
+      {/* N13 (docs/roadmap.md, Sprint N): antes, esta tela mostrava as duas
+          confirmações abaixo como painel inline por tile — a mesma decisão
+          que `AllGamesScreen` já resolvia em `ConfirmModal` (M8). Regra
+          única: instalar/lançar mesmo assim toca disco/rede ou ignora um
+          aviso de compatibilidade — vira modal em toda tela, não só na que
+          precisou de virtualização. */}
+      {install.state.kind === "confirm-hardware" &&
+        (() => {
+          const confirmState = install.state;
+          return (
+            <ConfirmModal
+              title="Hardware abaixo do recomendado"
+              message={confirmState.message}
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => install.startInstall(confirmState.adapterId, true, confirmState.pendingGamePath)}
+                  >
+                    Instalar mesmo assim
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
+      {install.state.kind === "confirm-bios" &&
+        (() => {
+          const confirmState = install.state;
+          return (
+            <ConfirmModal
+              title="BIOS ausente"
+              message="A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir."
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    Cancelar
+                  </Button>
+                  {adapterEntry?.bios_dir && (
+                    <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
+                      Abrir pasta do BIOS
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      install.setState({ kind: "idle" });
+                      doLaunch(confirmState.pendingGamePath);
+                    }}
+                  >
+                    Jogar mesmo assim
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
+      {/* B9 (achado do critico-design, 2026-08-18): mesma posição que
+          GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
+          (era ao lado do h1, à direita). */}
+      <Button variant="secondary" onClick={onBack} className="mb-4">
+        Voltar à biblioteca
+      </Button>
+      {/* N12 (docs/roadmap.md, Sprint N): mesmo tratamento de borda esquerda
+          que EmulatorCard/ConsoleVerdictCard já usam — antes, esta era uma
+          das duas telas (junto do parecer, já corrigido) sem nenhum sinal da
+          cor de identidade por console, mesmo sendo a tela de UM console só. */}
+      <div className="mb-4 border-l-[3px] py-1 pl-3" style={{ borderColor: consoleAccentColor(consoleId) }}>
         <h1 className="text-2xl font-semibold text-ink">{consoleName}</h1>
-        <Button variant="secondary" onClick={onBack}>
-          Voltar à biblioteca
-        </Button>
       </div>
 
       {/* L9: aviso genérico de dependência externa, nunca nomeando arquivo,
@@ -210,9 +310,24 @@ export function GamesScreen({
         </div>
       )}
 
-      {games && games.length === 0 && (
-        <p className="text-base text-muted">Nenhum jogo achado ainda para este console.</p>
+      {/* N11 (docs/roadmap.md, Sprint N): antes, `games === null` não
+          renderizava nada aqui — a tela ficava em branco entre abrir e a
+          resposta de GET /library/games chegar, a mesma armadilha que o
+          M12 já tinha corrigido em AllGamesScreen. Skeleton na MESMA grade
+          da lista real (linha ~340) — senão o conteúdo pula de coluna ao
+          carregar. */}
+      {games === null && (
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Carregando jogos…</span>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
+            {Array.from({ length: 10 }, (_, i) => (
+              <CardSkeleton key={i} className="aspect-[3/4] h-auto" />
+            ))}
+          </div>
+        </div>
       )}
+
+      {games && games.length === 0 && <EmptyState message="Nenhum jogo achado ainda para este console." />}
 
       {games && games.length > 0 && (
         <>
@@ -227,7 +342,7 @@ export function GamesScreen({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar jogos…"
-            className="mb-4 w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className={`mb-4 ${inputClass} max-w-xs`}
           />
         </>
       )}
@@ -236,8 +351,13 @@ export function GamesScreen({
         <p className="text-base text-muted">Nenhum jogo encontrado para "{trimmedSearch}".</p>
       )}
 
+      {/* B5 (achado do critico-design, 2026-08-18): a Sprint O escalonou a
+          grade de AllGamesScreen para telas grandes/4K (O5) mas não tocou
+          esta tela — mesma GameTile, densidade travada em lg:grid-cols-5,
+          capas desproporcionalmente grandes em monitor grande. Mesmos dois
+          tiers extras copiados aqui e no skeleton acima. */}
       {visibleGames && visibleGames.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
           {visibleGames.map((game) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =
@@ -264,58 +384,6 @@ export function GamesScreen({
                   }
                 />
 
-                {isPendingInstall && install.state.kind === "confirm-hardware" && (
-                  (() => {
-                    // Captura local: dentro do onClick (outro closure), o
-                    // TS não mantém o estreitamento de `install.state.kind`
-                    // — sem isto, `adapterId` não existiria no tipo.
-                    const confirmState = install.state;
-                    return (
-                      <div className="rounded border border-dashed border-line-strong p-2">
-                        <p className="text-sm text-ink">{confirmState.message}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Button
-                            variant="primary"
-                            onClick={() => install.startInstall(confirmState.adapterId, true, game.path)}
-                          >
-                            Instalar mesmo assim
-                          </Button>
-                          <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })()
-                )}
-
-                {isPendingInstall && install.state.kind === "confirm-bios" && (
-                  <div className="rounded border border-dashed border-line-strong p-2">
-                    <p className="text-sm text-ink">
-                      A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {adapterEntry?.bios_dir && (
-                        <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
-                          Abrir pasta do BIOS
-                        </Button>
-                      )}
-                      <Button
-                        variant="primary"
-                        onClick={() => {
-                          install.setState({ kind: "idle" });
-                          doLaunch(game.path);
-                        }}
-                      >
-                        Jogar mesmo assim
-                      </Button>
-                      <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
                 {isPendingInstall && install.state.kind === "installing" && (
                   <div>
                     <p className="text-sm text-muted">
@@ -327,25 +395,26 @@ export function GamesScreen({
                   </div>
                 )}
 
-                {status.kind === "launched" && (
-                  <div className="text-sm text-ink">
-                    <p>Sessão iniciada.</p>
-                    {status.session.unapplied && status.session.unapplied.length > 0 && (
-                      <ul className="mt-1 list-disc pl-4 text-muted">
-                        {status.session.unapplied.map((note, i) => (
-                          <li key={i}>{note}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                {/* B2 (achado do critico-design, 2026-08-18): a lista de
+                    `unapplied` (ADR 0006) era um `<ul>` cinza solto — terceira
+                    aparência diferente do mesmo aviso no app (a outra era
+                    `Callout tone="amber"` em EmulatorConfigPanel). */}
+                {status.kind === "launched" && status.session.unapplied && status.session.unapplied.length > 0 && (
+                  <Callout label="Não aplicado" tone="amber">
+                    <ul className="list-disc pl-4">
+                      {status.session.unapplied.map((note, i) => (
+                        <li key={i}>{note}</li>
+                      ))}
+                    </ul>
+                  </Callout>
                 )}
 
-                {status.kind === "error" && <p className="text-sm text-danger">{status.message}</p>}
+                {status.kind === "error" && <InlineError>{status.message}</InlineError>}
               </div>
             );
           })}
         </div>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

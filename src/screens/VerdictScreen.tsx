@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, HardwareInfo, Report } from "../api/types";
-import { Callout, Card, ConsoleVerdictCard, FOCUS_RING, LEVEL_LABEL, Pagination, PartialNotice } from "../components/ui";
+import {
+  Callout,
+  Card,
+  CardSkeleton,
+  ConsoleVerdictCard,
+  FOCUS_RING,
+  InlineError,
+  inputClass,
+  LEVEL_LABEL,
+  Pagination,
+  PartialNotice,
+  ScreenContainer,
+} from "../components/ui";
 
 const LEVEL_ORDER: ConsoleVerdict["level"][] = ["otimo", "bom", "limitado", "improvavel"];
 const PAGE_SIZE = 9;
@@ -32,16 +44,24 @@ function SpecsPanel() {
   if (error) {
     return (
       <Card filled>
-        <p className="text-sm text-danger">{error}</p>
+        <InlineError>{error}</InlineError>
       </Card>
     );
   }
 
   if (!hardware) {
+    // B10 (achado do critico-design, 2026-08-18): era um único "Lendo
+    // hardware…" — o painel tem forma fixa e conhecida (4 cards: Sistema,
+    // Processador, Memória, Placa de vídeo), então o skeleton na mesma
+    // forma evita o conteúdo saltar quando os dados chegam.
     return (
-      <Card filled>
-        <p className="text-sm text-muted">Lendo hardware…</p>
-      </Card>
+      <div role="status" aria-live="polite" className="flex flex-col gap-4">
+        <span className="sr-only">Lendo hardware…</span>
+        <CardSkeleton className="h-32" />
+        <CardSkeleton className="h-44" />
+        <CardSkeleton className="h-24" />
+        <CardSkeleton className="h-36" />
+      </div>
     );
   }
 
@@ -177,9 +197,20 @@ export function VerdictScreen({ report }: { report: Report }) {
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-10">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[320px_1fr]">
-        <aside className="flex flex-col gap-4 lg:max-w-[320px]">
+    // N3 (docs/roadmap.md, Sprint N): era `max-w-7xl` + `py-10` própria (a
+    // única tela do app com esse espaçamento de topo diferente) — agora usa
+    // o mesmo teto/espaçamento de listagem do resto do app
+    // (`ScreenContainer`, que já herda o teto escalonado que o O5 validou).
+    <ScreenContainer variant="listing">
+      {/* O6 (docs/roadmap.md, Sprint O): era `320px` fixo — largura fixa numa
+          coluna dentro da área que divide espaço com a sidebar, proibida pela
+          regra de "Layout responsivo" do CLAUDE.md. `minmax(260px, 340px)`
+          continua com teto (não estica sem limite num monitor grande, o que
+          ia deixar o texto de spec — nomes de CPU/GPU — perdido num espaço
+          vazio), mas encolhe de verdade em janela pequena; o `max-w` do
+          `<aside>` some porque a coluna do grid já é o teto, era redundante. */}
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(260px,340px)_1fr]">
+        <aside className="flex flex-col gap-4">
           <h1 className="text-2xl font-semibold text-ink">Especificações</h1>
           <SpecsPanel />
         </aside>
@@ -210,7 +241,7 @@ export function VerdictScreen({ report }: { report: Report }) {
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Buscar console…"
-              className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className={`${inputClass} max-w-xs`}
             />
             <div className="flex flex-wrap gap-1.5">
               <button
@@ -242,11 +273,15 @@ export function VerdictScreen({ report }: { report: Report }) {
           )}
 
           {/* 2xl, não xl (CLAUDE.md, regra de breakpoint): esta grade divide
-              espaço com a coluna lateral de 320px acima, então tem menos
+              espaço com a coluna lateral de até 340px acima, então tem menos
               largura disponível que uma grade de tela cheia — xl (1280,
               quase o tamanho padrão da janela) já era o valor frágil que
-              causou o bug de 2026-08-04 em outro lugar; aqui seria pior. */}
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+              causou o bug de 2026-08-04 em outro lugar; aqui seria pior.
+              min-[2400px] (O5, Sprint O) acompanha o teto do container acima:
+              sem essa quarta coluna, os cards só ficariam maiores num monitor
+              grande, sem usar a largura extra pra mostrar mais consoles de
+              uma vez. */}
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3 min-[2400px]:grid-cols-4">
             {pageItems.map((verdict) => (
               <ConsoleVerdictCard key={verdict.console_id} verdict={verdict} />
             ))}
@@ -255,6 +290,6 @@ export function VerdictScreen({ report }: { report: Report }) {
           <Pagination page={page} totalPages={totalPages} onChange={setPage} />
         </div>
       </div>
-    </div>
+    </ScreenContainer>
   );
 }

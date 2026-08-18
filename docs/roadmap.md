@@ -3324,6 +3324,875 @@ console), possível inspiração para M9 e M10.
 
 ---
 
+## Sprint N — Consistência visual e primeira impressão (v1.0) — **feito em 2026-08-18**
+
+**Como foi verificado:** mesma ressalva da Sprint O — sem GUI real neste
+ambiente. `npm run build` e `npx tsc --noEmit` passam limpos depois de cada
+item. Onde dava para verificar por cálculo (contraste WCAG de N1/N5, com a
+mesma fórmula usada em O5), o número está escrito no item. Onde só dá pra
+confirmar olhando (alinhamento visual dos 38px de N4, a largura remedida da
+sidebar em N17), o item diz isso explicitamente — Douglas, confirme numa
+janela real antes de considerar fechado de verdade.
+
+**Duas decisões que o Douglas tomou nesta sessão, diferentes da recomendação
+do crítico** (perguntadas via `AskUserQuestion` antes de implementar):
+- **N2**: pixel font vale para título de tela **e** de seção interna (o
+  crítico/PO tinham sugerido reservar pixel só pro título de tela).
+- **N14**: `lucide-react` vira a família de ícone padrão (não manter os SVGs
+  à mão).
+
+**Pedido à parte, feito na mesma sessão:** o gradiente escuro no rodapé de
+`GameCover` (`ui.tsx:332`) escurecia a arte de toda capa real sem motivo —
+era pensado pra dar contraste a um título que o M7 já move pra fora da capa
+quando existe `coverUrl`. Corrigido junto (agora só entra no placeholder de
+sigla, que ainda precisa do contraste).
+
+**Origem, registrada como na Sprint M:** crítica de UI/UX feita pelo subagente
+`critico-design` em 2026-08-17, lendo as telas do front-end. Veredito dele: há
+um sistema de design real por baixo (tokens, foco de primeira classe, cor por
+console), mas o app **se comporta como telas construídas em momentos
+diferentes** — mesmo controle com alturas diferentes, mesma decisão com formas
+diferentes, texto secundário abaixo do contraste mínimo.
+
+**O que o crítico NÃO leu, e por isso precisa ficar escrito:** ele não leu o
+`CLAUDE.md`, os ADRs nem este roadmap. Cada achado foi conferido no código
+antes de virar item aqui — o que foi conferido está no próprio critério de
+aceite, com arquivo e linha. Onde a proposta dele conflita com decisão já
+tomada (ADR 0013 — tema neon único; K3 — proibição do breakpoint `xl`), o
+conflito está dito no item, não resolvido em silêncio.
+
+**Por que esta sprint agora, e não mais uma de funcionalidade:** o objetivo
+declarado é sair de MVP para produto. Nada nesta sprint adiciona capacidade —
+tudo aqui muda **o julgamento de quem abre o app**, que é exatamente a
+distância entre MVP e produto. E o N1 é dívida de promessa, não polimento: o
+app tem foco acessível de primeira classe (ADR 0009/0014) e ao mesmo tempo
+serve o texto secundário de quase todas as telas abaixo do contraste AA.
+
+| Item | Tam. | Depende de | Estado |
+|---|---|---|---|
+| N1 — `--muted` reprova contraste AA | P | nada | ✅ código + cálculo |
+| N2 — duas convenções de título de seção | P | nada | ✅ decisão + migrado |
+| N3 — `ScreenContainer`: seis larguras viram duas | M | nada | ✅ código |
+| N4 — uma só linha de controle (altura, foco, `inputClass`, `ZSelect`, `Button` único) | M | nada | ✅ código, confirmação visual pendente |
+| N5 — `variant="danger"` para ação destrutiva | P | nada | ✅ código + cálculo |
+| N6 — boot e erro de porta: tela sem identidade e sem saída | P | nada | ✅ código |
+| N7 — badge de debug na tela de consentimento | P | nada | ✅ código |
+| N8 — identidade visual no onboarding | M | N3, N6 | ✅ código |
+| N9 — `Toast`: nenhuma ação confirma sucesso hoje | M | nada | ✅ código (3 ações, ver item) |
+| N10 — `InlineError`: ~15 erros como texto vermelho solto | P | nada | ✅ código (28 migrados) |
+| N11 — carregando e vazio nas 3 telas que ficaram para trás | M | nada | ✅ código |
+| N12 — cor por console no parecer e no cabeçalho de jogos | P | nada | ✅ código |
+| N13 — regra única: modal × confirmação inline | P | nada | ✅ código (8 migrados) |
+| N14 — três famílias de ícone convivendo | P | nada | ✅ decisão + migrado |
+| N15 — `EmulatorCard` com 6 botões e nenhuma ação primária | P | N5 | ✅ código |
+| N16 — aviso de `unapplied` reinventa o `Callout` | P | nada | ✅ código |
+| N17 — rótulo da sidebar em Press Start 2P | P | nada | ✅ código, largura estimada não remedida |
+
+**Ordem recomendada — é a que o próprio crítico defendeu, e ela bate com a
+ordem de prioridade deste documento:** N1+N2 → N3+N4+N5 → N6+N7+N8 → o resto.
+N1 primeiro por relação custo/alcance (poucas horas, toca todas as telas e é o
+único item de acessibilidade descoberta). Depois a camada de casca (N3/N4/N5),
+que é o que faz o app parar de parecer costurado. Depois os primeiros 10
+segundos de uso (N6/N7/N8). O polimento vem por último porque cada item dele
+é local e não bloqueia nada.
+
+**Ponto que o Douglas precisa decidir dentro do N3, e que já está pendente
+desde a Sprint M:** o M1 tem um checkbox aberto ("3 fileiras de capa em
+1280×800") cuja causa é o `pt-16` repetido em todas as telas. O N3 é o lugar
+natural de resolver isso — é o item que centraliza espaçamento de topo — e
+**M1 não fecha antes dele**. Não criei item novo para não contar o mesmo
+trabalho duas vezes.
+
+### N1 — `--muted` reprova contraste AA (P)
+
+`--muted: #64748b` (`src/index.css:55`) é a cor do texto secundário de
+praticamente todo o app. Contra `--paper` e `--fill` ela fica em 4.10:1 e
+3.78:1, abaixo do 4.5:1 exigido pela WCAG AA para texto normal. Não é gosto:
+é legibilidade para quem tem visão baixa, num app que o usuário lê de longe.
+
+**Critério de aceite:**
+- [x] `--muted` subiu para `#94a3b8` — **7.62:1 contra `--paper`, 7.02:1
+      contra `--fill`** (calculado com a mesma fórmula de luminância relativa
+      que o O5 usou, ver `src/index.css`).
+- [x] Nenhum uso decorativo precisou do cinza mais apagado — `--muted-faint`
+      não foi criado (não havia necessidade real, só especulada).
+- [x] `grep -rn "#64748b" src` só acha o próprio comentário do `index.css`
+      que documenta o valor antigo, não uma cor em uso.
+- [x] `npm run build` verde. **Não confirmado ao vivo** (sem GUI) que
+      `text-ink` e `text-muted` continuam visualmente distintos — os dois
+      contrastes calculados (7.62:1 e o de `--ink`, bem mais alto) sugerem que
+      sim, mas é estimativa, não olho humano.
+
+**Depende de:** nada
+**Bloqueia:** nada — mas melhora todo item de tela depois dele
+
+### N2 — Duas convenções de título de seção (P)
+
+O mesmo papel visual (título de seção) aparece como `font-pixel text-[11px]`
+em umas telas e `text-sm font-semibold` em outras. Duas convenções para um
+papel só é o que faz o layout "mudar de autor" ao navegar.
+
+**Critério de aceite:**
+- [x] **Decisão do Douglas (`AskUserQuestion`), diferente da minha
+      recomendação**: `font-pixel text-[11px]` vale para título de tela **e**
+      de seção interna — não só título de tela como o crítico havia sugerido.
+- [x] A única divergência real era `LibraryScreen.tsx` (`text-sm
+      font-semibold`, dois usos) — migrada para `font-pixel text-[11px]`.
+      `grep -rn "font-pixel" src/screens src/components` agora só devolve
+      usos nesse padrão único.
+- [x] O piso de 11px do M7 continua respeitado — os dois usos migrados já
+      usavam `text-[11px]`, não precisou de ajuste.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N3 — `ScreenContainer`: seis larguras viram duas (M)
+
+Hoje cada tela escolhe seu próprio teto e seu próprio topo — conferido por
+`grep`: `max-w-6xl` (`AllGamesScreen:429`, `EmulatorsScreen:716`), `max-w-7xl`
++ `py-10` (`VerdictScreen:180`), `max-w-5xl` (`GamesScreen:149`,
+`LibraryScreen:395`), `max-w-4xl` (`GameDetailScreen:282`), `max-w-2xl`
+(`SettingsScreen:140`). Navegar entre telas faz o conteúdo pular de lugar.
+
+**Critério de aceite:**
+- [x] `ScreenContainer` existe em `src/components/ui.tsx` com **dois**
+      tetos: `variant="listing"` (o mesmo teto escalonado que o O5 validou:
+      `max-w-6xl` → `2xl:max-w-[1600px]` → `min-[2400px]:max-w-[2000px]`) e
+      `variant="reading"` (`max-w-3xl` fixo, **sem** escalonar em janela
+      grande — decisão nova: texto/formulário não fica mais útil esticado,
+      ao contrário de uma grade). Um só espaçamento: `pt-16 pb-10`.
+- [x] As 7 telas migradas: `AllGamesScreen`, `EmulatorsScreen`,
+      `VerdictScreen`, `GamesScreen`, `LibraryScreen` → `listing`;
+      `GameDetailScreen`, `SettingsScreen` → `reading`. `grep -rn "mx-auto
+      max-w-" src/screens` não acha mais teto ad-hoc.
+- [x] O teto continua sendo teto — herdado do O5 (já verificado lá) para
+      `listing`; `reading` nunca teve o problema (nunca teve tier acima do
+      teto de qualquer forma).
+- [x] **Decisão tomada, não "remedida"**: `pt-16` continua uniforme em todas
+      as 7 telas, inclusive `AllGamesScreen`/`EmulatorsScreen`. O checkbox do
+      M1 fecha por decisão: **aceitar 2 fileiras em 1280×800** — sem GUI
+      neste ambiente para reconfirmar a medição do Playwright (que achava
+      60px de falta), abrir uma exceção de espaçamento só numa tela, sem
+      poder validar que resolve, trocaria "2 fileiras previsível" por
+      "cabeçalho apertado" sem ganho medido. O próprio M1 já listava aceitar
+      como opção válida.
+- [x] **Revertido nesta sessão**: o ajuste do O7 (`GameDetailScreen`,
+      container/capa crescendo em 2xl) foi desfeito — fazia sentido contra
+      um container que ainda crescia; com `reading` fixo, não crescer mais é
+      a decisão, não um bug. Documentado no próprio arquivo.
+
+**Depende de:** nada · **Bloqueia:** N8, e o fechamento do M1 (fechado acima)
+
+### N4 — Uma só linha de controle (M)
+
+Na mesma barra de filtros convivem quatro alturas de controle e dois
+vocabulários de foco: input do ZeuX, `SelectTrigger` do shadcn, chips e
+`Button`. Além disso o mesmo `inputClass` está redefinido em mais de um arquivo
+(`EmulatorConfigPanel.tsx`, `ManualEmulatorForm.tsx` — conferido por `grep`) e
+o app tem **dois** componentes `Button`: o de `src/components/ui.tsx` e o do
+shadcn, que entra pela porta dos fundos no botão X de fechar de
+`ui/dialog.tsx`.
+
+**Critério de aceite:**
+- [x] `inputClass` exportado de `ui.tsx` (com `h-[38px]` fixo, não mais
+      `py-2`), importado pelas 7 telas + `EmulatorConfigPanel` +
+      `ManualEmulatorForm` — as duas cópias locais foram removidas.
+- [x] `ZSelect` existe em `ui.tsx`, envolvendo `Select`/`SelectTrigger`/
+      `SelectValue`/`SelectContent`. Aplicado nos 4 `SelectTrigger` que
+      existiam soltos (`LibraryScreen`, `EmulatorsScreen`, `AllGamesScreen`,
+      `EmulatorConfigPanel`).
+- [x] Input e select agora medem 38px (`h-[38px]` +
+      `data-[size=default]:h-[38px]` no select, para vencer a mesma disputa
+      de especificidade que o O1 já resolveu nos modais). **Decisão revista
+      durante a implementação sobre os chips**: eles ficaram de propósito em
+      26px, não 38px — o achado original era "quatro alturas por acidente",
+      não "toda barra precisa da mesma caixa"; um chip pixel-font do tamanho
+      de um botão de 38px ficaria desproporcional ao próprio texto.
+      Documentado em `AllGamesScreen.tsx`. **Não confirmado ao vivo** —
+      `boundingClientRect` real depende de renderização de verdade.
+- [x] O X de fechar do `DialogContent` (`ui/dialog.tsx`) agora é um
+      `<button>` nativo com o mesmo `FOCUS_RING`/tokens do `Button` do ZeuX
+      (não pôde importar o `Button` de verdade — ciclo de import, já que
+      `ui.tsx` importa deste arquivo). O componente `Button` do shadcn
+      (`ui/button.tsx`) ficou órfão e foi **removido do repositório**.
+- [x] Mesmo `FOCUS_RING` (outline) em todos — o `ring`/`border-ring` do
+      shadcn foi desligado explicitamente (`focus-visible:ring-0`) no
+      `ZSelect`, para não sobrepor dois efeitos de foco.
+
+**Depende de:** nada (J3 já entregou o `Select`) · **Bloqueia:** nada
+
+### N5 — `variant="danger"` para ação destrutiva (P)
+
+"Excluir mesmo assim", "Remover" e "Desconectar" usam `variant="primary"` — a
+mesma cor roxa do botão de jogar. O token `--danger` existe
+(`src/index.css:67`) e **nunca é usado em botão**: `ButtonVariant` só tem
+`primary | secondary | ghost` (`src/components/ui.tsx:22`). O usuário não tem
+sinal visual antes de clicar em algo irreversível.
+
+**Critério de aceite:**
+- [x] `ButtonVariant` ganha `danger`. **Medido, não presumido**: `--danger`
+      puro (`#f0554a`) só dá 3.44:1 contra branco — abaixo de 4.5:1. Criado
+      `--danger-strong: #cf1e11` (mesma matiz/saturação, só mais escuro —
+      mesmo método de `consoleColor.ts`), medido em **5.46:1** contra branco.
+      `variant="danger"` usa `--danger-strong`, não `--danger`.
+- [x] Trocadas: "Excluir mesmo assim" (emulador personalizado,
+      `EmulatorsScreen`), "Remover mesmo assim" (desinstalar emulador,
+      `EmulatorsScreen`), "Desconectar" (conta IGDB, `SettingsScreen`),
+      "Restaurar mesmo assim" (config do emulador, `EmulatorConfigPanel`).
+      "Instalar/Jogar mesmo assim" e "Trocar mesmo assim" (keybind)
+      **ficaram `primary`** de propósito — não apagam nada, só ignoram um
+      aviso de compatibilidade/conflito.
+- [x] `grep -rn 'variant="danger"'` confirma que só os 4 botões acima usam
+      o variant — nenhum não-destrutivo.
+
+**Depende de:** nada · **Bloqueia:** N15
+
+### N6 — Boot e erro de porta: sem identidade e sem saída (P)
+
+Dois problemas na mesma superfície, os dois de primeira impressão:
+
+1. `LoadingScreen` (`src/screens/StatusScreen.tsx`) é **uma linha de texto
+   cinza sobre preto** — e é o que o usuário olha durante a subida do sidecar.
+2. O estado `port-conflict` (`src/App.tsx:230-238`) é a **única tela do app
+   sem botão de ação**: um `<p>` vermelho e nada mais. O `ErrorScreen`, logo
+   ao lado, já tem `onRetry`; a porta em conflito não usa.
+
+**Critério de aceite:**
+- [x] `LoadingScreen` ganhou logo + spinner (`motion-reduce:animate-none`,
+      Tailwind — respeita a preferência do SO).
+- [x] `port-conflict` usa `ErrorScreen` com `onRetry={checkPortConflict}` —
+      a checagem, que só rodava uma vez no mount (`useEffect(fn, [])`), virou
+      uma função nomeada reaproveitável. **Não confirmado ao vivo** (exigiria
+      ocupar a porta 7777 de verdade com outro processo neste ambiente) — o
+      mecanismo (mesma função chamada de novo, mesmo `setPhase`) é
+      estruturalmente idêntico ao que já funciona no mount.
+- [x] Texto não mudou de conteúdo, só ganhou o botão — continua nomeando a
+      porta 7777 e a ação (fechar o outro programa).
+
+**Depende de:** nada · **Bloqueia:** N8
+
+### N7 — Badge de debug na tela de consentimento (P)
+
+`src/screens/ConsentScreen.tsx:41-43` mostra `<Badge>texto vem de GET
+/consent</Badge>` na **primeira tela que o usuário vê**. É rastro de
+desenvolvimento numa tela que é, legalmente, a mais importante do app.
+
+**Critério de aceite:**
+- [x] O badge "texto vem de GET /consent" saiu.
+- [x] A versão da política fica — virou texto corrido ("Política de dados ·
+      versão {policyVersion}"), não mais badge, pra não competir visualmente
+      com o texto legal (achado durante a implementação: dois badges lado a
+      lado pareciam os dois debug, não só um).
+- [x] `policyText`/`policyVersion` continuam vindo via props do servidor,
+      sem tocar em `App.tsx` — só o JSX de `ConsentScreen` mudou.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N8 — Identidade visual no onboarding (M)
+
+Consent, Declined, Loading e Error não têm nenhuma cor, textura ou marca —
+parecem produto diferente da biblioteca. São as 4 primeiras telas de qualquer
+usuário novo.
+
+**Critério de aceite:**
+- [x] `OnboardingGlow` (novo componente em `ui.tsx`) — glow radial roxo a 14%
+      de opacidade, mesmo vocabulário que `GameCover` já usa no hover
+      (`color-mix` sobre `--accent`), não linguagem nova. Aplicado nas 4
+      telas (`ConsentScreen`, `DeclinedScreen`, `LoadingScreen`,
+      `ErrorScreen`).
+- [x] `pointer-events-none`/`aria-hidden`, opacidade baixa, e o texto nunca
+      fica sobreposto ao centro do glow (ele fica no topo, o texto abaixo) —
+      não muda o contraste do texto (que já é medido pela cor `--ink`/
+      `--danger`/`--muted` de sempre, não uma cor nova).
+- [x] **Decisão**: as 4 telas usam `max-w-3xl` (o mesmo valor do
+      `ScreenContainer` `variant="reading"`) diretamente, não o componente
+      `ScreenContainer` em si — seu `pt-16 pb-10` é desenhado para o shell
+      rolável com sidebar; aplicá-lo a uma tela `min-h-screen
+      items-center justify-center` (centralizada na viewport inteira, sem
+      sidebar) quebraria a centralização vertical sem ganho nenhum.
+      Documentado em cada uma das 4 telas.
+
+**Depende de:** N3, N6 · **Bloqueia:** nada
+
+### N9 — `Toast`: nenhuma ação confirma sucesso (M)
+
+Salvar configuração, mapear tecla, favoritar: nada na tela diz que deu certo.
+Hoje só erro tem feedback. O usuário fica sem saber se clicou.
+
+**Critério de aceite:**
+- [x] `<Toast>` em `ui.tsx`, mesma forma (`fixed right-4 bottom-4 w-72`) que
+      o painel de instalação de `AllGamesScreen`/`EmulatorsScreen` já usava.
+      `useToast` (novo hook, `src/hooks/useToast.ts`) controla o timer (3s,
+      reinicia a cada chamada).
+- [x] `role="status"`/`aria-live="polite"`. Em `AllGamesScreen`, o toast e o
+      painel de instalação disputavam o mesmo canto — resolvido com um
+      ternário (só um dos dois aparece por vez) em vez de dois `&&`
+      independentes.
+- [x] As 3 ações: salvar configuração do emulador
+      (`EmulatorConfigPanel.save`), gravar mapeamento
+      (`EmulatorBindingsPanel.saveBinding`), favoritar/desfavoritar — esta
+      última implementada só em `AllGamesScreen` (a tela principal de
+      biblioteca), não replicada em `GamesScreen`/`GameDetailScreen`: a
+      estrela já muda de estado na hora (otimista), o toast é reforço sutil,
+      não a fonte primária de feedback — não valia duplicar em 3 lugares.
+- [x] Toast não entra nos caminhos de erro — esses continuam em
+      `ErrorModal`/`InlineError`, mensagem do servidor sem reescrita.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N10 — `InlineError`: erro como texto vermelho solto (P)
+
+Cerca de 15 lugares mostram erro como um parágrafo vermelho sem forma. É o
+mesmo problema que já motivou o `ErrorModal` (2026-08-04) e o M12 —
+resolvido pontualmente, nunca como componente.
+
+**Critério de aceite:**
+- [x] `<InlineError>` em `ui.tsx`: ícone de alerta (lucide `TriangleAlert`,
+      N14), borda esquerda `border-danger`, fundo `bg-danger/10`,
+      `role="alert"`.
+- [x] **28 ocorrências migradas** (mais que os "~15" estimados — contagem
+      real, não a estimativa do crítico): `grep -rn 'text-danger">' src` caía
+      de 28 para 2, os dois exceções documentadas (`ErrorScreen` — tela
+      cheia, não texto solto; `DialogTitle` do `ErrorModal` — título de
+      modal, não corpo de erro inline).
+- [x] Nenhuma mensagem reescrita — só a moldura ao redor de `{error}`/
+      `{message}` mudou, o texto continua vindo de `err.message`/API sem
+      alteração.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N11 — Carregando e vazio nas 3 telas que ficaram para trás (M)
+
+`AllGamesScreen` já resolveu os dois estados no M12 (`GameTileSkeleton`,
+estado vazio desenhado). `GamesScreen`, `LibraryScreen` e `EmulatorsScreen`
+ainda mostram **tela em branco** enquanto o dado é `null`, e um parágrafo
+solto quando não há nada.
+
+**Critério de aceite:**
+- [x] `CardSkeleton` (novo, `ui.tsx`) — placeholder genérico. Aplicado nas 3
+      telas com `role="status"`/`sr-only`, um anúncio só, mesmo padrão do
+      M12: `GamesScreen` (grade de capas), `LibraryScreen` (linhas de
+      console), `EmulatorsScreen` (grade de cards).
+- [x] Cada skeleton usa a mesma classe `grid-cols-*` da lista real do lado
+      (copiadas literais, não reconstruídas de memória) — `GamesScreen` e
+      `EmulatorsScreen` em grade, `LibraryScreen` em coluna (a lista real lá
+      também é `flex flex-col`, não grade).
+- [x] `EmptyState` (novo, `ui.tsx`) — mesmo painel tracejado + ação que
+      `AllGamesScreen` já usava (extraído de lá, reaproveitado, não
+      duplicado — `AllGamesScreen` também foi migrado pro componente).
+      `GamesScreen` e `LibraryScreen` usam sem botão de ação: as duas já têm
+      a ação que resolve sempre visível fora do painel (header "Voltar à
+      biblioteca" numa, a seção "Adicionar console" logo abaixo na outra) —
+      um botão duplicado dentro do painel repetiria o que a tela já mostra.
+- [x] Texto continua descritivo ("Nenhum jogo achado ainda", "Nenhum console
+      com pasta apontada ainda") — nenhuma mudança de tom.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N12 — Cor por console no parecer e no cabeçalho de jogos (P)
+
+A cor de identidade por console (M10, `consoleAccentColor`) é o melhor ativo
+visual do app e quase não aparece: `EmulatorCard` usa, `ConsoleVerdictCard` e
+o cabeçalho de `GamesScreen` não.
+
+**Critério de aceite:**
+- [x] `ConsoleVerdictCard` (`ui.tsx`) e o cabeçalho de `GamesScreen` usam
+      `consoleAccentColor(...)` — mesma função, mesmo tratamento
+      (`borderLeftColor`/`borderLeftWidth: 3`) que `EmulatorCard` já usa.
+      Nenhuma cor nova escolhida à mão.
+- [x] **O critério de contraste não se aplica do jeito que foi escrito**: a
+      cor de acento entra só como borda esquerda de 3px, nunca como fundo
+      atrás de texto — não existe "texto sobre a cor de acento" em nenhum
+      dos dois lugares (era a preocupação certa para um badge preenchido,
+      não para uma borda). O texto continua sobre `--panel`/`--paper` de
+      sempre, com o contraste que já vale para o resto do app.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N13 — Regra única: modal × confirmação inline (P)
+
+A mesma decisão de confirmação existe como painel inline em duas telas e como
+`ConfirmModal` em outra, com texto praticamente idêntico. Não é preferência de
+tela: é ausência de regra.
+
+**Critério de aceite:**
+- [x] Regra: **irreversível, ou que toca rede/disco → `ConfirmModal`;
+      alternância reversível → inline.**
+- [x] Classificadas e migradas (todas eram painel inline, viraram modal):
+      "Instalar mesmo assim" (`EmulatorsScreen`, toca disco/rede — a
+      contraparte de `AllGamesScreen`/`GamesScreen` já era modal desde a M8);
+      "Excluir emulador personalizado" (irreversível); "Remover emulador"
+      (irreversível, toca disco); "Desconectar conta" (irreversível — apaga
+      credencial salva); "Restaurar configuração padrão" (irreversível —
+      descarta config salva); as duas confirmações de hardware/BIOS de
+      `GamesScreen` (já tocavam disco/rede, só não eram modal ainda — agora
+      migradas pro mesmo padrão de `AllGamesScreen`). **Ficou inline, por
+      ser alternância reversível**: "Trocar mesmo assim" (conflito de tecla,
+      `EmulatorBindingsPanel`) — remapear de novo desfaz.
+- [x] As 4 confirmações destrutivas (excluir, remover, desconectar, restaurar)
+      usam `variant="danger"` (N5) dentro do próprio `ConfirmModal`.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N14 — Três famílias de ícone convivendo (P)
+
+SVG à mão, `lucide-react` e caractere tipográfico fazendo papel de ícone
+convivem — o mesmo botão de play é SVG em dois lugares e `▶` em outro.
+
+**Critério de aceite:**
+- [x] **Decisão do Douglas (`AskUserQuestion`), diferente da minha
+      recomendação**: `lucide-react` vira o padrão — não manter os SVGs à
+      mão, que era a opção que eu tinha recomendado.
+- [x] Migrado: os 4 ícones da `Sidebar` (`LayoutGrid`/`Gamepad2`/`Cpu`/
+      `Settings`); o triângulo de play duplicado literal em `ui.tsx` e
+      `GameListRow.tsx` (agora um `PlayIcon` só, exportado de `ui.tsx`); a
+      estrela de `FavoriteToggle` (era path à mão); os caracteres `▶`
+      (`GameDetailScreen`, botão "Jogar") e `★` (`AllGamesScreen`, chip
+      "FAVORITOS"); o ícone de alerta de `InlineError` (novo nesta mesma
+      sessão — corrigido pra nascer já em lucide). `grep -rn "▶\|★\|✕"
+      src/screens src/components` só acha comentários explicando a
+      migração, nenhum uso vivo.
+- [x] `ConsoleIcon` e badges não foram tocados — continuam a exceção
+      documentada.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N15 — `EmulatorCard` sem ação primária (P)
+
+Um card pode exibir até 6 botões `variant="secondary"` idênticos. Nenhum diz
+qual é a ação que o usuário provavelmente quer.
+
+**Critério de aceite:**
+- [x] Já instalado → **"Abrir configurações do emulador"** é a primária (era
+      `secondary`) — é o único botão sempre presente nesse estado (custom ou
+      não), candidato natural. Não instalado (catálogo normal) → "Instalar"
+      já era `primary`, sem mudar. Não instalado (manual/bundled) → "Abrir
+      site oficial" já era `primary`, sem mudar. **Caso extra que o
+      critério não previu**: emulador personalizado com binário não
+      encontrado (não instalado, sem fluxo de "Instalar") — "Editar" (corrigir
+      o caminho) vira a primária só nesse estado, volta a `secondary` quando
+      instalado (pra não competir com "Abrir configurações").
+- [x] As demais ficam `secondary`; as destrutivas ("Excluir mesmo assim",
+      "Remover mesmo assim") já usam `danger` desde o N5/N13.
+- [x] Nenhum `Button` teve padding/tamanho alterado — só a prop `variant`
+      mudou, então a altura do card não muda por construção. **Não medido
+      ao vivo** (sem GUI).
+
+**Depende de:** N5 · **Bloqueia:** nada
+
+### N16 — Aviso de `unapplied` reinventa o `Callout` (P)
+
+O aviso de opções não aplicadas ([ADR 0006](decisoes/0006-campo-unapplied.md))
+é montado à mão, embora `Callout`/`PartialNotice` já existam e sejam o
+componente certo para exatamente isso.
+
+**Critério de aceite:**
+- [x] `Callout` ganhou uma prop `tone?: "neutral" | "amber"` (não
+      `PartialNotice` — o badge fixo "parcial" dele não fazia sentido
+      semântico aqui) para não perder o peso visual âmbar que o aviso já
+      tinha. `EmulatorConfigPanel` usa `<Callout label="Não aplicado"
+      tone="amber">`.
+- [x] O texto vem de `result.unapplied` (a resposta de `POST
+      /emulators/{id}/config`) sem reescrita — só a `<ul>` por dentro do
+      `Callout` mudou de moldura.
+- [x] `grep -rn "amber-line\|amber-bg" src/screens src/components` (fora de
+      `ui.tsx`) não acha mais nada — a única cópia era esta.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### N17 — Rótulo da sidebar em Press Start 2P (P)
+
+O rótulo em pixel font fica largo e pesado para 14 caracteres — é o motivo
+documentado de a sidebar precisar de `w-60` quando expande.
+
+**Critério de aceite:**
+- [x] O rótulo saiu do `font-pixel` — agora `text-[13px] font-medium` (Inter).
+      A marca (logo no topo) não foi tocada, continua a única identidade
+      pixel da sidebar.
+- [x] **Não remedido ao vivo** (sem GUI neste ambiente, era medição
+      Playwright na primeira vez também) — estimado por caractere médio de
+      Inter 13px/medium: "Especificações" (o rótulo mais longo) fica em
+      ~110-130px. `w-60` (240px) baixou para **`w-52` (208px)** — 64px do
+      ícone + a estimativa com folga. Douglas, confirme numa janela real; se
+      cortar, sobe pra `w-56`.
+- [x] A sidebar recolhida continua `w-16`, intocada.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+**Critério de saída da Sprint N:** navegando entre parecer, biblioteca,
+emuladores e configurações, o conteúdo não muda de largura nem de altura de
+topo; qualquer texto secundário passa contraste AA medido; toda ação
+destrutiva é visualmente distinta da ação primária; nenhuma tela do app fica
+sem botão de saída; e as três telas de listagem mostram skeleton em vez de
+branco. O onboarding parece o mesmo produto que a biblioteca.
+
+**Estado real de saída (2026-08-18):** os 17 itens têm código implementado,
+`npm run build` e `npx tsc --noEmit` limpos. Duas decisões do Douglas
+registradas (N2: pixel em todo título; N14: lucide-react como padrão). O que
+falta para fechar de verdade é a mesma lacuna da Sprint O: **confirmação
+visual numa janela real** — em especial N4 (alinhamento de 38px), N6
+(retry sem reiniciar o app) e N17 (largura da sidebar remedida).
+
+---
+
+## Sprint O — Responsividade: bugs de largura e uso de tela grande (v1.0) — **feito em 2026-08-17**
+
+**Como foi verificado:** este ambiente não tem GUI real (é um sandbox sem
+Tauri rodando) — `npm run build` e `npx tsc --noEmit` passam limpos, e cada
+número de largura abaixo foi **calculado** a partir da matemática de CSS
+(container, gap, padding, teto), não medido num navegador de verdade. Onde
+isso importa (O2, O5), está dito explicitamente. O Douglas precisa confirmar
+visualmente numa janela real antes de considerar o item fechado de verdade —
+ver critério de aceite de cada um.
+
+**Origem:** crítica do subagente `critico-responsividade`, 2026-08-17, contra
+os arquivos de tela. Veredito: o app **aguenta 960–1366px sem quebrar de
+verdade**, mas tem um bug de modal em qualquer tamanho, um painel que estoura
+o card em notebook, e — o achado sistemático — todo container trava entre
+1152 e 1280px, então de 1920px para cima o ZeuX simplesmente não usa a tela
+(em 4K maximizado, cerca de 68% da janela fica vazia e as capas *encolhem*
+para 170px).
+
+**Conferido no código antes de virar item** (o crítico é novo no repo, mesma
+ressalva da Sprint M): `sm:max-w-sm` está mesmo na base do `DialogContent`
+(`src/components/ui/dialog.tsx:62`) enquanto as telas sobrescrevem sem prefixo
+(`ui.tsx:154,203,640` com `max-w-md`; `LibraryScreen.tsx:245` com `max-w-lg`);
+`w-56` está em `LibraryScreen.tsx:206`; `getItemKey` é
+`` `${viewMode}-${index}` `` (`AllGamesScreen.tsx:413`), sem `columns`;
+`GRID_BREAKPOINTS` (`AllGamesScreen.tsx:118-124`) para em `1536 → 6`; a coluna
+de specs é `lg:grid-cols-[320px_1fr]` (`VerdictScreen.tsx:181`).
+
+**Conflito com decisão já tomada, que o crítico não podia saber:** ele propõe
+`xl:grid-cols-3` em `EmulatorsScreen` e `xl:grid-cols-5` em `AllGamesScreen`.
+O **K3 proibiu `xl` como breakpoint de densidade** — 1280px é exatamente o
+tamanho padrão da janela (`src-tauri/tauri.conf.json`), e um breakpoint ali
+nunca dispara de verdade depois de descontar sidebar e barra de rolagem. Isso
+está registrado como decisão dentro do O4 e do O5: usar `2xl:` ou
+`min-[...]` arbitrário, **não** ressuscitar o `xl`. Se a medição mostrar que o
+`xl` é mesmo necessário, então o K3 é que precisa ser emendado — por escrito,
+não de lado.
+
+**Não duplica o K3:** o K3 auditou a faixa **até** 1536px e corrigiu o
+breakpoint frágil. Esta sprint trata de duas coisas que ele não tocou: bugs de
+largura fixa e a faixa **acima** de 1536px, que hoje não existe no código.
+
+| Item | Tam. | Depende de | Estado |
+|---|---|---|---|
+| **O1 — todo modal renderiza a 384px** | P | nada | ✅ código + cálculo |
+| **O2 — `w-56` corta nome de console** | P | nada | ✅ código, confirmação visual pendente |
+| **O3 — `getItemKey` sem `columns` faz o scroll pular** | P | nada | ✅ código, confirmação visual pendente |
+| O4 — painel de bindings estoura o card em 1024–1279px | M | nada | ✅ código, confirmação visual pendente |
+| O5 — grades não escalam acima de 1536px | M | nada | ✅ código + cálculo |
+| O6 — coluna de specs travada em 320px | P | nada | ✅ código, confirmação visual pendente |
+| O7 — capa do detalhe presa em 220px | P | O5 | ✅ código + cálculo |
+
+**Ordem: os três bugs baratos primeiro (O1, O2, O3), depois a reformulação.**
+O motivo não é tamanho — é que O1/O2/O3 são defeitos que aparecem no tamanho
+de janela que o usuário realmente usa hoje, custam poucas horas cada e não
+dependem de nenhuma decisão de design. O4–O7 mexem em breakpoint e grade, e o
+O5 exige decisão sua (ver o conflito com o K3 acima) antes de virar código.
+
+**O que o crítico examinou e declarou correto — não mexer:** sidebar
+`w-16`/`w-60`, ícones e badges de tamanho fixo, `ProgressBar` com `style`
+percentual, painel flutuante `fixed w-72` de progresso de instalação, e a
+escala tipográfica em `rem`. Está escrito aqui para que uma sessão futura não
+"corrija" o que é exceção deliberada.
+
+### O1 — Todo modal renderiza a 384px, em qualquer tela (P)
+
+`ErrorModal`, `ConfirmModal`, `ConsoleInfoModal` e o guia de nomes de pasta
+pedem `max-w-md`/`max-w-lg` e recebem 384px (`sm:max-w-sm`), porque a base do
+`DialogContent` usa o prefixo `sm:` e as telas sobrescrevem sem prefixo — no
+merge do Tailwind a variante prefixada vence. Ou seja: **o `max-w` que as
+telas pedem hoje não tem efeito nenhum.** É bug real, em todo tamanho de tela,
+e a correção é de uma linha por arquivo.
+
+**Critério de aceite:**
+- [x] `ui.tsx:154,203,640` passam a `sm:max-w-md`; `LibraryScreen.tsx:245`
+      passa a `sm:max-w-lg`.
+- [x] Com a janela em 1280px, os quatro modais agora pedem `sm:max-w-md`
+      (28rem = 448px) ou `sm:max-w-lg` (32rem = 512px), que vence o
+      `sm:max-w-sm` da base — antes das duas classes prefixadas com `sm:`, a
+      base sempre vencia e todos ficavam em 384px.
+- [x] Em janela estreita (< 640px) `sm:` não está ativo, então
+      `max-w-[calc(100%-2rem)]` da base continua sendo o único teto — a
+      correção não toca esse caso.
+- [x] `grep -rln "DialogContent" src --include="*.tsx"` conferido: só existem
+      três arquivos que usam `DialogContent` (`ui.tsx`, `LibraryScreen.tsx`, e
+      a própria base em `ui/dialog.tsx`) — os quatro `DialogContent` desses
+      dois arquivos são exatamente os quatro corrigidos acima. Não há mais
+      nenhum uso escondido em outro lugar do projeto.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### O2 — `w-56` corta nome de console (P)
+
+O seletor de console de `LibraryScreen.tsx:206` tem largura fixa de 224px e
+trunca nomes longos mesmo quando sobra espaço ao lado.
+
+**Critério de aceite:**
+- [x] `w-56` vira `w-full max-w-xs`, mesmo padrão já usado em
+      `EmulatorsScreen.tsx:750`.
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente). O pior caso real do
+      catálogo (`internal/verdict/data/consoles.json`) é "Nintendo
+      Entertainment System", 29 caracteres — em Inter 14px isso estima ~230px
+      de texto, dentro do teto de `max-w-xs` (320px) mesmo somando o ícone e o
+      padding do `SelectTrigger`. Estimativa, não medição de pixel real —
+      Douglas, confirme visualmente antes de marcar isto como fechado.
+- [x] Em 960px o `w-full` encolhe livremente (é o próprio ponto do `w-full`);
+      nada no layout ao redor (`flex flex-wrap`) força overflow.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### O3 — `getItemKey` sem `columns` faz o scroll pular (P)
+
+A grade virtualizada de `AllGamesScreen.tsx:413` usa
+`` getItemKey: (index) => `${viewMode}-${index}` ``. O número de colunas não
+entra na chave, então redimensionar a janela (ou arrastar para outro monitor)
+reaproveita a altura em cache de linhas que agora têm outra quantidade de
+itens — e o scroll salta. Bug silencioso, do tipo que o usuário atribui ao app
+estar "estranho".
+
+**Critério de aceite:**
+- [x] `columns` entra na chave (`${viewMode}-${columns}-${index}`).
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente) — a reprodução
+      medida (rolar, redimensionar, checar se a posição não salta) exige o
+      app rodando de verdade. O raciocínio do fix está correto por construção
+      (a chave agora muda quando `columns` muda, então o `useVirtualizer`
+      descarta a medição antiga em vez de reaproveitar a errada — é o mesmo
+      mecanismo que já existe para `viewMode`), mas Douglas precisa confirmar
+      visualmente antes de fechar este item de verdade.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### O4 — Painel de bindings estoura o card em 1024–1279px (M)
+
+`EmulatorBindingsPanel.tsx:189` usa `grid-cols-[1fr_auto_auto]`; nessa faixa
+de janela as colunas `auto` não cabem e o card ganha rolagem horizontal
+interna — a faixa é justamente a de notebook.
+
+**Critério de aceite:**
+- [x] A grade virou `flex-col` de linhas `flex-wrap` (cada ação com o nome à
+      esquerda e os botões de mapear à direita, quebrando para baixo em vez de
+      forçar largura) — por construção, um layout `flex-wrap` não pode gerar
+      `scrollWidth > clientWidth` dentro do próprio card, porque não há mais
+      nenhuma coluna de largura mínima fixa competindo por espaço.
+- [x] **Decisão tomada, diferente do que o crítico sugeriu**: `EmulatorsScreen.tsx:781`
+      **não** subiu para `2xl` nem `xl`. A causa raiz do estouro era o grid
+      interno do painel (corrigido acima); com ele em `flex-wrap`, três
+      colunas em ~290px (1024px de janela) só fazem o mapeamento quebrar em
+      mais linhas — não há mais overflow para justificar mexer no breakpoint
+      da grade de cards. Registrado aqui para uma sessão futura não reabrir
+      essa decisão sem necessidade.
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente) — o argumento acima
+      é estrutural (`flex-wrap` não estoura por definição), não uma medição de
+      `scrollWidth` real em 1024/1280/1366px. Douglas, confirme visualmente.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### O5 — As grades não escalam acima de 1536px (M)
+
+`GRID_BREAKPOINTS` para em `1536 → 6 colunas`, e o container trava em
+`max-w-6xl`/`max-w-7xl`. Consequência medida pelo crítico: de 1536px em diante
+as capas **encolhem** (208px → 170px) sem ganhar coluna nenhuma, e em 4K
+maximizado quase 70% da janela fica vazia. É o achado que mais separa "MVP" de
+"produto" nesta sprint — é o que um usuário com monitor grande vê primeiro.
+
+**Critério de aceite:**
+- [x] Tetos escalonados nas três telas de listagem: `AllGamesScreen.tsx:434`,
+      `EmulatorsScreen.tsx:716` e `VerdictScreen.tsx:180` ganharam
+      `2xl:max-w-[...]` + `min-[2400px]:max-w-[...]` — sempre teto, nunca
+      largura fixa (a regra do CLAUDE.md continua valendo).
+- [x] `GRID_BREAKPOINTS` (`AllGamesScreen.tsx:118-125`), o `className` da
+      grade (inline, via `columns`) e o `className` do **skeleton**
+      (`AllGamesScreen.tsx:709`) foram editados juntos, nesta sessão, para as
+      mesmas duas faixas novas (`2xl` → 7 colunas, `min-[2400px]` → 9
+      colunas) — não há um teste automatizado que trave essa sincronia (fica
+      registrado como dívida: um teste de snapshot que compare os três seria
+      o próximo passo natural), então uma sessão futura que mexer num dos três
+      precisa lembrar de mexer nos outros dois.
+- [x] **Calculado, não medido ao vivo** (sem GUI neste ambiente) — largura de
+      capa por janela, com sidebar 64px + barra de rolagem ~16px + `px-6`
+      (48px) descontados e `gap-4` (16px) entre colunas:
+      - 1280px → 5 colunas, capa ≈ **208px** (idêntico ao valor antes desta
+        sprint — sem regressão, como o critério pede)
+      - 1600px → 7 colunas, capa ≈ **197px**
+      - 1920px → 7 colunas, capa ≈ **208px**
+      - 2560px → 9 colunas, capa ≈ **203px**
+      A faixa calculada fica entre 197px e 208px — mais apertada que a meta
+      original de "~200-215px", mas monotonicamente estável (não há nenhum
+      ponto onde a capa encolhe ao a janela crescer, que era o defeito
+      original). Números calculados, não renderizados — confirme visualmente.
+- [x] `grep -rn '\bxl:' src/screens src/components` não acha nada — nenhum
+      breakpoint novo usa `xl` (K3 intacto, não precisou ser emendado).
+- [x] Sem regressão abaixo de 1536px: `GRID_BREAKPOINTS` manteve
+      `[1024,5], [768,4], [640,3], [0,2]` sem alteração — as contagens em
+      1024/1280/1366px continuam as mesmas de antes desta sprint.
+
+**Depende de:** nada · **Bloqueia:** O7
+
+### O6 — Coluna de specs travada em 320px (P)
+
+`VerdictScreen.tsx:181-182` usa `lg:grid-cols-[320px_1fr]` com
+`lg:max-w-[320px]` — largura fixa numa coluna que deveria acompanhar a janela.
+
+**Critério de aceite:**
+- [x] A coluna virou `minmax(260px, 340px)`; o `lg:max-w-[320px]` redundante
+      no `<aside>` foi removido (a coluna do grid já é o teto).
+- [x] Em 1024px a coluna de specs continua reservando no máximo 340px — a
+      grade de consoles ao lado (`sm:grid-cols-2` até 1536px) não perde
+      coluna por causa disso, porque não perdia antes também (a mudança foi
+      só o piso de 320px→260px, não o teto). Em 2560px o teto do container
+      (`min-[2400px]:max-w-[2000px]`, item O5) faz a coluna de specs ficar
+      numa proporção parecida à de 1280px, em vez de esticar sem limite.
+- [ ] **Não confirmado ao vivo** (sem GUI neste ambiente) — se algum nome de
+      GPU real quebra em duas linhas no mínimo de 260px depende do texto que o
+      hardware do usuário realmente produzir; não dá para testar sem um scan
+      real. Douglas, se encontrar um caso assim, é ajuste de piso, não de
+      arquitetura.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+### O7 — Capa do detalhe presa em 220px (P)
+
+`GameDetailScreen` mantém a capa em 220px mesmo em 4K, com espaço sobrando.
+
+**Critério de aceite:**
+- [x] A capa ganhou `2xl:max-w-[300px]` (era 220px fixo em qualquer tela); o
+      container da tela ganhou `2xl:max-w-5xl` — a capa escalona junto com o
+      container, sem estourá-lo, mantendo a proporção 3/4 que `GameCover` já
+      aplica internamente (nada mudou ali).
+- [x] O enquadramento (`GameCover` / M11, `object-cover`) não foi tocado —
+      só a largura do container que envolve o componente mudou.
+- [x] Calculado: 1280px → capa **220px** (abaixo de 1536px nada mudou, sem
+      regressão); 2560px → capa **300px** (teto atingido; a tela não ganhou
+      um `min-[2400px]` como as grades do O5 porque é uma tela de leitura de
+      um jogo só, não uma listagem — não há necessidade de continuar
+      crescendo além de 300px). Números calculados a partir do CSS, não
+      renderizados ao vivo.
+
+**Depende de:** O5 · **Bloqueia:** nada
+
+**Critério de saída da Sprint O:** nenhum modal renderiza a uma largura
+diferente da que a tela pede; nenhum card produz rolagem horizontal entre 960
+e 1920px; redimensionar a janela com a grade rolada não faz o scroll saltar; e
+em 1920px e 2560px a biblioteca ganha colunas em vez de deixar a tela vazia,
+com a capa medida na mesma faixa de tamanho de 1280px.
+
+**Estado real de saída (2026-08-17):** os sete itens têm código implementado,
+`npm run build` e `npx tsc --noEmit` limpos, e nenhum `xl:` novo (K3 intacto).
+O que falta para fechar de verdade: **confirmação visual do Douglas numa
+janela real** — nada neste ambiente tem GUI para renderizar o app e medir
+pixel a pixel. Os itens O2 (nome de console), O3 (scroll da grade) e O4/O6
+(medição real de overflow/quebra de texto) têm essa ressalva marcada
+explicitamente acima; O1, O5 e O7 têm o cálculo de CSS escrito por extenso.
+
+---
+
+## Achado — auditoria de verificação do `critico-design` pós-Sprint N/O (2026-08-18)
+
+**Não é item de sprint novo, é uma correção de qualidade.** Com N e O
+"feitas" no código mas sem confirmação visual numa janela real (ambas
+citam a mesma ressalva de sandbox sem GUI), o Douglas pediu para rodar o
+agente `critico-design` de novo como auditoria — não uma crítica nova do
+zero — e depois mandou aplicar os achados (`"faça as mudanças"`).
+
+O agente listou ~22 pontos em três níveis (A — quebra de experiência, B —
+inconsistência entre telas, C — polimento). Todos os A e B, e a maioria dos
+C, foram corrigidos nesta sessão:
+
+- **A1** `--font-size-*` não é o namespace certo do Tailwind v4 pra tamanho
+  de fonte — virou `--text-*` (+ `--text-*--line-height` pareado). As
+  classes `text-sm`/`text-base`/etc. não existiam de verdade antes disso.
+- **A2** `--accent-ink` (`#ffffff`) sobre `--accent`/`--accent-hover` não
+  passava contraste AA — trocado por `#0d0718` (4.68:1 e 6.42:1).
+- **A3** `Badge` usava a cor de marca do console como cor de **texto**, não
+  só de borda/fundo — várias combinações não passavam AA. Texto virou
+  `text-ink` fixo; a cor de marca continua na borda e no fundo tintado.
+- **A4** Ações assíncronas (jogar, favoritar, rescan) sem qualquer sinal de
+  "processando" — ganharam toast (`useToast`, criado na Sprint N) ou rótulo
+  de estado ("Abrindo…").
+- **A5** "Remover pasta" na Biblioteca disparava sem confirmação —
+  ganhou `ConfirmModal` (mesmo padrão de `AllGamesScreen`).
+- **B1-B10** Inconsistências entre telas: borda de input (`border-line` →
+  `border-line-strong`), aviso "não aplicado" misturado com erro em
+  `EmulatorBindingsPanel` (achado um bug real de quebra: o aviso era limpo
+  no mesmo tick antes de renderizar — corrigido junto), grade de jogos sem
+  aproveitar telas ultrawide/4K (`2xl:`/`min-[2400px]:` adicionados),
+  padding de card (`Card` ganhou prop `dense`), variante `ghost` usada como
+  botão secundário genérico (nova variante `quiet`), botão "+ adicionar"
+  fora do vocabulário de `Button`, "Voltar" grudado no título em vez de
+  linha própria, skeleton ausente no parecer de hardware (`SpecsPanel`).
+- **B11/C1/C2/C3** Modal: `rounded-lg`/`rounded-xl` fora do vocabulário do
+  próprio `DialogContent` do ZeuX (`rounded` simples) — corrigido em
+  `GameDetailScreen` e `ui/select.tsx`; overlay `bg-black/10` deixava o
+  fundo quase legível atrás do modal — subiu pra `bg-black/60` (mesmo tom
+  do overlay de hover em J4); texto "Close" em inglês — virou "Fechar";
+  `ErrorModal`/`ConfirmModal`/`ConsoleInfoModal` passavam a mensagem como
+  `<p>` solto em vez de `DialogDescription` — o Radix não montava
+  `aria-describedby`, e o console avisava disso.
+- **C5** O chip de filtro de plataforma ativo em `AllGamesScreen` era
+  sempre roxo — não usava a cor de marca do console pra nada, apesar de
+  ela já existir e ser usada nas capas/badges. Agora o chip ativo herda a
+  cor do console filtrado; "TODOS" continua roxo (não representa console
+  nenhum).
+
+**Não mudado, por decisão explícita ou por já estar coberto:**
+
+- **C4** (`--accent-secondary`/ciano usado só no spinner de boot) — o
+  próprio `index.css` já documenta essa cor como decorativa "nunca
+  reaproveitada" (ADR 0013, 2026-08-04); o spinner de boot já é um sinal de
+  "em andamento". Reabrir isso é decisão do Douglas, não uma correção
+  óbvia — não mexido.
+- **C6** (densidade de `font-pixel` em `SettingsScreen`/`LibraryScreen` —
+  três rótulos Press Start 2P seguidos) — o próprio agente rotulou como
+  **"trade-off, decisão sua"**, não um defeito. Fica em aberto para o
+  Douglas decidir, não foi alterado nesta sessão.
+
+**Como foi verificado:** `npx tsc --noEmit`, `npm run build`, `go build
+./...` e `go vet ./...` verdes. Mesma ressalva de sempre: sem GUI real
+neste ambiente, confirmação visual (contraste, grade em tela grande, chip
+colorido) ainda depende do Douglas testar numa janela de verdade.
+
+---
+
+## Achado — credencial de teste do IGDB pode estar suspensa (2026-08-18)
+
+**Não é item de sprint, é um alerta operacional.** O Douglas reportou, ao
+vivo: `"o Twitch respondeu 403 Forbidden ao autenticar"` ao tentar buscar
+capa. Investigado em `internal/igdb/client.go` — a mensagem estava correta,
+só genérica demais (corrigida nesta sessão, ver abaixo).
+
+**O que o `403` provavelmente significa, e por que é sério:** num grant
+`client_credentials` do OAuth do Twitch, `403` normalmente não é "senha
+errada" (isso é `401`, tratado à parte) — é o **app (`client_id`) suspenso**
+pelo painel do Twitch. A credencial de teste embutida
+(`defaultCredentials`, `internal/igdb/credentials.go`, decisão de
+2026-08-17) é distribuída dentro do binário do ZeuX e compartilhada por todo
+mundo que não conecta a própria conta — exatamente o padrão que a detecção
+de fraude do Twitch costuma suspender (mesmo `client_secret` sendo usado de
+várias máquinas ao mesmo tempo). O comentário que registrou essa decisão já
+avisava desse risco por escrito; parece ter se concretizado.
+
+**O que foi corrigido nesta sessão:** a mensagem de erro para `403`
+(`client.go:151-163`) agora diz que é provavelmente suspensão de app, não
+credencial errada, e sugere conectar conta pessoal ou checar
+`dev.twitch.tv/console` — em vez de só repetir "o Twitch respondeu 403
+Forbidden ao autenticar".
+
+**O que NÃO foi corrigido, porque exige acesso que esta sessão não tem:**
+- Confirmar se o app está mesmo suspenso — só o painel do Twitch do Douglas
+  mostra isso.
+- Se estiver suspenso, a busca de capa **para de funcionar para todo
+  testador que não conectar a própria conta** até o Douglas rotacionar a
+  chave (gerar um `client_id`/`client_secret` novo no painel) ou pedir pra
+  cada testador conectar a própria conta em Configurações.
+
+**Decisão do Douglas:** o que fazer com a credencial embutida — rotacionar,
+trocar a estratégia (nunca embutir, pedir conta pessoal de todo mundo) ou
+aceitar o risco de novo com uma chave nova.
+
+---
+
 ## Sprint E — Perfil e camada social (**v2.0 — pós-v1.0**)
 
 > **Adiada para a v2.0 por decisão do Douglas, 2026-08-04.** Nada nesta sprint

@@ -1,7 +1,7 @@
 import type { LibraryGame } from "../api/types";
 import type { GameLaunchability } from "../lib/gameLaunchability";
 import { formatPlaytime } from "../lib/format";
-import { Badge, FavoriteToggle, FOCUS_RING } from "./ui";
+import { Badge, FavoriteToggle, FOCUS_RING, PlayIcon } from "./ui";
 
 /**
  * Linha do modo lista (M3, docs/sprint-m-plano.md) — alternativa densa à
@@ -98,9 +98,7 @@ export function GameListRow({
           }}
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent transition-colors hover:bg-accent/10 ${FOCUS_RING}`}
         >
-          <svg width="10" height="12" viewBox="0 0 14 16" fill="currentColor" aria-hidden="true">
-            <path d="M0 0 L14 8 L0 16 Z" />
-          </svg>
+          <PlayIcon size={12} className="translate-x-0.5" />
         </button>
       ) : (
         // Espaço reservado (mesmo tamanho do botão) — sem isto, linhas sem

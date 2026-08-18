@@ -2,9 +2,22 @@ import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { BulkMatchedFolder, LibraryFolder, LibraryGame, Report } from "../api/types";
-import { Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ErrorModal } from "../components/ui";
+import {
+  Button,
+  Callout,
+  Card,
+  CardSkeleton,
+  ConfirmModal,
+  ConsoleIcon,
+  ConsoleInfoModal,
+  EmptyState,
+  ErrorModal,
+  InlineError,
+  ScreenContainer,
+  ZSelect,
+} from "../components/ui";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { SelectItem } from "../components/ui/select";
 
 type ConsoleInfo = { console_id: string; name: string; short_name: string };
 
@@ -56,7 +69,7 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
         </Button>
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <InlineError>{error}</InlineError>}
 
       {result && (
         <div className="flex flex-col gap-2">
@@ -110,8 +123,40 @@ function ConfiguredConsoleRow({
   onOpenGames: () => void;
   onSelectConsole: () => void;
 }) {
+  // A5 (achado do critico-design, 2026-08-18): "Remover" apagava a pasta
+  // apontada sem confirmação nenhuma, com o mesmo peso visual de
+  // "Revarrer" (que é reversível/barato) — a única ação destrutiva do app
+  // que tinha escapado da regra do N13. `folderId`, não booleano: mais de
+  // uma pasta pode existir por console (comentário do componente, acima).
+  const [confirmingRemove, setConfirmingRemove] = useState<number | null>(null);
+  const confirmingFolder = folders.find((f) => f.id === confirmingRemove);
+
   return (
-    <div className="flex flex-col gap-1.5 rounded border border-line bg-fill p-3">
+    <Card filled dense className="flex flex-col gap-1.5">
+      {confirmingFolder && (
+        <ConfirmModal
+          title="Remover pasta da biblioteca?"
+          message={`"${confirmingFolder.path}" sai da lista do ZeuX. Os arquivos continuam no disco — nada é apagado, só o apontamento.`}
+          onClose={() => setConfirmingRemove(null)}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setConfirmingRemove(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                autoFocus
+                onClick={() => {
+                  onRemove(confirmingFolder.id);
+                  setConfirmingRemove(null);
+                }}
+              >
+                Remover mesmo assim
+              </Button>
+            </>
+          }
+        />
+      )}
       <div className="flex items-center gap-3">
         <ConsoleIcon consoleId={consoleInfo.console_id} label={consoleInfo.short_name} onClick={onSelectConsole} />
         <div className="min-w-0 flex-1">
@@ -133,17 +178,17 @@ function ConfiguredConsoleRow({
               {folder.path}
             </span>
             <span className="flex shrink-0 gap-2">
-              <Button type="button" variant="ghost" disabled={busy} onClick={() => onRescan(folder.id)}>
+              <Button type="button" variant="quiet" disabled={busy} onClick={() => onRescan(folder.id)}>
                 Revarrer
               </Button>
-              <Button type="button" variant="ghost" disabled={busy} onClick={() => onRemove(folder.id)}>
+              <Button type="button" variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
                 Remover
               </Button>
             </span>
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }
 
@@ -202,23 +247,21 @@ function AddConsoleSection({
     <Card filled className="flex flex-col gap-3">
       <p className="font-semibold text-ink">Adicionar console</p>
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={consoleId} onValueChange={setConsoleId}>
-          <SelectTrigger aria-label="Escolher console" className="w-56">
-            <SelectValue placeholder="Escolher console" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableConsoles.map((c) => (
-              <SelectItem key={c.console_id} value={c.console_id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* O2 (docs/roadmap.md, Sprint O): largura fixa cortava nomes longos de
+            console ("Nintendo Entertainment System") mesmo sobrando espaço ao lado —
+            `max-w-xs` (via ZSelect, N4) encolhe e tem teto ao mesmo tempo. */}
+        <ZSelect ariaLabel="Escolher console" value={consoleId} onValueChange={setConsoleId} placeholder="Escolher console" className="max-w-xs">
+          {availableConsoles.map((c) => (
+            <SelectItem key={c.console_id} value={c.console_id}>
+              {c.name}
+            </SelectItem>
+          ))}
+        </ZSelect>
         <Button type="button" variant="primary" disabled={busy || !consoleId} onClick={handlePick}>
           {busy ? "Apontando…" : "Escolher pasta"}
         </Button>
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <InlineError>{error}</InlineError>}
     </Card>
   );
 }
@@ -242,7 +285,10 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto rounded border border-line bg-fill p-5 ring-0">
+      {/* O1 (docs/roadmap.md, Sprint O): precisa do prefixo "sm:" para vencer o
+          "sm:max-w-sm" da base do DialogContent — sem ele o modal renderiza em
+          384px, cortando a lista de 33 consoles em vez de usar a largura pedida. */}
+      <DialogContent className="max-h-[85vh] sm:max-w-lg overflow-y-auto rounded border border-line bg-fill p-5 ring-0">
         <DialogTitle className="mb-1 text-lg font-semibold text-ink">Nomes de pasta aceitos</DialogTitle>
         <p className="mb-4 text-sm text-muted">
           Em "Selecionar pasta para todos os jogos", cada subpasta é reconhecida pelo nome — copie um dos valores
@@ -392,21 +438,25 @@ export function LibraryScreen({
   const availableConsoles = allConsoles.filter((c) => !configuredIds.includes(c.console_id));
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pt-16 pb-10">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Biblioteca</h1>
-        {/* Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
-            (all-games), não pro Parecer/Especificações — ficou desatualizado
-            desde a reestruturação da sidebar (Sprint 1). */}
-        <Button variant="secondary" onClick={onBack}>
-          Voltar
-        </Button>
-      </div>
+    // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado.
+    <ScreenContainer variant="listing">
+      {/* B9 (achado do critico-design, 2026-08-18): "Voltar" ficava à
+          direita do h1 aqui/Emuladores/Jogos, e sozinho à esquerda acima do
+          título em GameDetailScreen — duas convenções para o mesmo botão.
+          Padronizado na posição de GameDetailScreen: mais legível numa app
+          com sidebar (o olho lê "voltar" antes do título da tela nova).
+          Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
+          (all-games), não pro Parecer/Especificações — ficou desatualizado
+          desde a reestruturação da sidebar (Sprint 1). */}
+      <Button variant="secondary" onClick={onBack} className="mb-4">
+        Voltar
+      </Button>
+      <h1 className="mb-4 text-2xl font-semibold text-ink">Biblioteca</h1>
 
       <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
 
       <div className="mb-4 -mt-2 flex justify-end">
-        <Button type="button" variant="ghost" onClick={() => setShowNameGuide(true)}>
+        <Button type="button" variant="quiet" onClick={() => setShowNameGuide(true)}>
           Ver nomes de pasta aceitos
         </Button>
       </div>
@@ -419,12 +469,35 @@ export function LibraryScreen({
           própria seção. */}
       {error && <ErrorModal title="Não foi possível listar as pastas" message={error} onClose={() => setError(null)} />}
 
+      {/* N11 (docs/roadmap.md, Sprint N): antes, `folders === null` não
+          renderizava nada — a tela ficava em branco entre abrir e a resposta
+          de GET /library/folders chegar. Skeleton na forma de linha (o
+          `ConfiguredConsoleRow` real, abaixo, também é uma linha, não um
+          card de grade). */}
+      {folders === null && (
+        <div role="status" aria-live="polite" className="flex flex-col gap-2">
+          <span className="sr-only">Carregando pastas…</span>
+          {Array.from({ length: 3 }, (_, i) => (
+            <CardSkeleton key={i} className="h-16" />
+          ))}
+        </div>
+      )}
+
       {folders && (
         <div className="flex flex-col gap-6">
+          {/* N2 (docs/roadmap.md, Sprint N): era `text-sm font-semibold` — a
+              única tela com essa segunda convenção de título de seção.
+              Decisão do Douglas: `font-pixel text-[11px]` (o mesmo do resto
+              do app) vale para título de tela E de seção interna, sem
+              distinção. */}
           <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">Consoles configurados</h2>
+            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Consoles configurados</h2>
             {configuredConsoles.length === 0 ? (
-              <p className="text-sm text-muted">Nenhum console com pasta apontada ainda.</p>
+              // N11 (docs/roadmap.md, Sprint N): sem botão de ação aqui — a
+              // seção "Adicionar console" (a ação que resolve este vazio) já
+              // fica sempre visível logo abaixo, um botão duplicado só
+              // repetiria o que a tela já mostra.
+              <EmptyState message="Nenhum console com pasta apontada ainda." />
             ) : (
               <div className="flex flex-col gap-2">
                 {configuredConsoles.map((consoleInfo) => (
@@ -445,7 +518,7 @@ export function LibraryScreen({
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">Adicionar console</h2>
+            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar console</h2>
             <AddConsoleSection availableConsoles={availableConsoles} onAdded={() => setReloadKey((k) => k + 1)} />
           </div>
         </div>
@@ -458,6 +531,6 @@ export function LibraryScreen({
           onClose={() => setModalConsoleId(null)}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

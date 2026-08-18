@@ -1,10 +1,25 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { Star } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
-import { Button, ConfirmModal, ErrorModal, FOCUS_RING, Pagination, ProgressBar } from "../components/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import {
+  Button,
+  ConfirmModal,
+  EmptyState,
+  ErrorModal,
+  FOCUS_RING,
+  inputClass,
+  Pagination,
+  ProgressBar,
+  ScreenContainer,
+  InlineError,
+  Toast,
+  ZSelect,
+} from "../components/ui";
+import { SelectItem } from "../components/ui/select";
+import { useToast } from "../hooks/useToast";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
@@ -109,14 +124,22 @@ export function persistAllGamesView(patch: Partial<AllGamesViewState>) {
 }
 
 // M3 (virtualização): quantas colunas a grade tem, replicando os
-// breakpoints do próprio className abaixo (`grid-cols-2 sm: md: lg: 2xl:`).
+// breakpoints do próprio className abaixo (`grid-cols-2 sm: md: lg: 2xl:
+// min-[2400px]:`).
 // Precisa ser calculado em JS porque a virtualização substitui o
 // `display: grid` que faria isso sozinho — cada "linha" virtualizada tem
 // que saber quantos jogos ela carrega. Mede a LARGURA DA JANELA, não a do
 // container: os breakpoints do Tailwind são media query sobre viewport,
 // não sobre elemento (CLAUDE.md, "layout responsivo").
+// O5 (docs/roadmap.md, Sprint O): as duas faixas acima de 1536px são novas —
+// antes a densidade parava em 6 colunas para sempre a partir daí, e como o
+// container também tinha teto fixo (ver o comentário no JSX abaixo), a capa
+// só encolhia (208px em 1280px de janela -> 170px em 1536px+) sem nunca
+// ganhar coluna nenhuma. Nada abaixo de 1536 muda — é o que o critério de
+// aceite do O5 exige (sem regressão em 1024/1280/1366px).
 const GRID_BREAKPOINTS: readonly [minWidth: number, columns: number][] = [
-  [1536, 6], // 2xl
+  [2400, 9], // janela ~4K
+  [1536, 7], // 2xl
   [1024, 5], // lg
   [768, 4], // md
   [640, 3], // sm
@@ -215,9 +238,9 @@ export function AllGamesScreen({
   const [debouncedSearch, setDebouncedSearch] = useState(search.trim());
   const [error, setError] = useState<string | null>(null);
   const { statusFor, launch, launchError, clearLaunchError, retryLaunch } = useLaunchGame();
+  const { toastMessage, showToast } = useToast();
   const igdbConfigured = useIGDBStatus();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
-  const [scrapeSummary, setScrapeSummary] = useState<string | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const columns = useGridColumns();
   // M8: carregado uma vez só para a tela inteira — diferente de GamesScreen
@@ -295,11 +318,17 @@ export function AllGamesScreen({
   function toggleFavorite(game: LibraryGame) {
     const next = !game.favorite;
     setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: next } : g)) : prev));
+    // N9 (docs/roadmap.md, Sprint N): a estrela já muda na hora (otimista,
+    // acima) — o toast aqui é sutil de propósito, só reforça pra quem não
+    // olhou o ícone no instante do clique. Só no sucesso: um "desfeito"
+    // duplicado em cima do próprio `setError` do catch abaixo seria ruído.
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
-    call.catch(() => {
-      setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
-      setError("Não foi possível salvar o favorito. Tente de novo.");
-    });
+    call
+      .then(() => showToast(next ? "Adicionado aos favoritos." : "Removido dos favoritos."))
+      .catch(() => {
+        setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
+        setError("Não foi possível salvar o favorito. Tente de novo.");
+      });
   }
 
   // Busca de capas em lote (G1, docs/roadmap.md) — poll com setTimeout
@@ -313,7 +342,10 @@ export function AllGamesScreen({
         if (job.phase === "concluido") {
           const found = job.results.filter((r) => r.status === "found").length;
           const notFound = job.results.length - found;
-          setScrapeSummary(
+          // B4 (achado do critico-design, 2026-08-18): o resumo da busca em
+          // lote ficava como `<p>` que nunca sumia sozinho — persistia até a
+          // próxima busca. Virou toast, mesma confirmação de sucesso.
+          showToast(
             notFound > 0
               ? `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}, ${notFound} não encontrada${notFound === 1 ? "" : "s"}.`
               : `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}.`,
@@ -337,7 +369,6 @@ export function AllGamesScreen({
 
   function startScrapeCovers() {
     setScrapeError(null);
-    setScrapeSummary(null);
     api
       .scrapeCovers()
       .then((job) => {
@@ -373,9 +404,17 @@ export function AllGamesScreen({
   const install = useInlineInstall({
     onEmulatorInstalled: (adapterId) =>
       setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
+    // A4 (achado do critico-design, 2026-08-18): clicar em ▶ não dava
+    // nenhum retorno até a janela do emulador subir — no Windows, com o
+    // antivírus varrendo o binário, isso pode não ser instantâneo. O toast
+    // não espera a resposta do lançamento (que já tem seu próprio tratamento
+    // de erro via `launchError`/`ErrorModal`) — é só o "recebi seu clique".
     onLaunch: (romPath) => {
       const game = games?.find((g) => g.path === romPath);
-      if (game) launch(game);
+      if (game) {
+        showToast(`Abrindo ${game.title}…`);
+        launch(game);
+      }
     },
   });
 
@@ -410,7 +449,12 @@ export function AllGamesScreen({
     overscan: viewMode === "grade" ? 2 : 6,
     // Cola o offset do scroll ao trocar de página/ordenação/modo — sem isto
     // o virtualizer tentaria reaproveitar posições da lista anterior.
-    getItemKey: (index) => `${viewMode}-${index}`,
+    // O3 (docs/roadmap.md, Sprint O): `columns` também entra na chave —
+    // redimensionar a janela muda quantos jogos cabem por linha, então a
+    // altura medida de uma linha em cache (calculada para o `columns`
+    // antigo) ficava errada para o novo, e o scroll saltava (mais visível
+    // ao arrastar a janela para um monitor de tamanho diferente).
+    getItemKey: (index) => `${viewMode}-${columns}-${index}`,
   });
 
   // M8: mesma cadeia de decisão de GamesScreen — só varia o que cada tela
@@ -426,7 +470,11 @@ export function AllGamesScreen({
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 pt-16 pb-10">
+    // O5 fixou o teto escalonado (nada muda abaixo de 1536px de janela; acima,
+    // cresce até 2000px — motivo completo no comentário de `ScreenContainer`,
+    // src/components/ui.tsx); N3 (Sprint N) moveu esse teto para lá, um único
+    // lugar em vez de repetido em 5 telas.
+    <ScreenContainer variant="listing">
       {/*
        * Um só modal por vez — antes disto, `error` (falha ao listar/
        * favoritar) aparecia como parágrafo vermelho solto no meio da tela
@@ -525,7 +573,7 @@ export function AllGamesScreen({
        * Fixo na tela, não no tile: ver comentário no topo do arquivo sobre
        * por que um indicador por tile não sobrevive à virtualização.
        */}
-      {install.state.kind === "installing" && (
+      {install.state.kind === "installing" ? (
         <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
           <p className="text-sm text-ink">
             Instalando {install.state.job.name}… {install.state.job.phase}
@@ -534,6 +582,13 @@ export function AllGamesScreen({
             <ProgressBar percent={percentOf(install.state.job)} />
           </div>
         </div>
+      ) : (
+        // N9 (docs/roadmap.md, Sprint N): mesmo canto que o painel de
+        // instalação acima — por isso o `ternário`, não dois `&&`
+        // independentes: os dois competiriam pelo mesmo `fixed right-4
+        // bottom-4`, um por cima do outro, se ambos ficassem verdadeiros ao
+        // mesmo tempo (favoritar durante uma instalação em andamento).
+        toastMessage && <Toast message={toastMessage} />
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -579,19 +634,28 @@ export function AllGamesScreen({
         </div>
       </div>
 
-      {scrapeSummary && <p className="mb-3 text-sm text-ink">{scrapeSummary}</p>}
       {scrapeError && (
-        <p className="mb-3 text-sm text-danger">
+        <InlineError className="mb-3">
           {scrapeError}{" "}
           <button type="button" onClick={startScrapeCovers} className="underline">
             Tentar de novo
           </button>
-        </p>
+        </InlineError>
       )}
 
       {/* M3: uma barra só, com busca, ordenação, alternância grade/lista,
           favoritos e chips de plataforma — nada solto fora dela (critério
-          do item). */}
+          do item).
+          N4 (docs/roadmap.md, Sprint N): input e select medem 38px agora
+          (inputClass/ZSelect); os chips de tag (grade/lista, favoritos,
+          plataforma — abaixo) ficam de propósito nos 26px que já tinham.
+          Decisão revista durante a implementação: o achado do crítico era
+          "quatro alturas diferentes por acidente", não "toda barra precisa
+          da mesma caixa" — um chip de tag pixel-font do tamanho de um botão
+          de 38px ficaria desproporcional ao próprio texto que carrega.
+          `items-center` nesta linha já alinha os dois tamanhos pelo centro
+          vertical, o mesmo padrão que Steam/GitHub usam em barra mista de
+          input + tag. */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <label htmlFor="all-games-search" className="sr-only">
           Buscar jogos
@@ -604,21 +668,21 @@ export function AllGamesScreen({
           value={search}
           onChange={(e) => onViewChange({ search: e.target.value })}
           placeholder="Buscar jogos…"
-          className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className={`${inputClass} max-w-xs`}
         />
 
-        <Select value={sort} onValueChange={(v) => onViewChange({ sort: v as SortValue })}>
-          <SelectTrigger aria-label="Ordenar por" className="w-fit">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SORT_VALUES.map((value) => (
-              <SelectItem key={value} value={value}>
-                {SORT_LABELS[value]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ZSelect
+          ariaLabel="Ordenar por"
+          value={sort}
+          onValueChange={(v) => onViewChange({ sort: v as SortValue })}
+          className="w-fit"
+        >
+          {SORT_VALUES.map((value) => (
+            <SelectItem key={value} value={value}>
+              {SORT_LABELS[value]}
+            </SelectItem>
+          ))}
+        </ZSelect>
 
         <div className="flex gap-1 rounded-sm border border-line-strong p-0.5" role="group" aria-label="Modo de exibição">
           {(["grade", "lista"] as const).map((mode) => (
@@ -640,11 +704,14 @@ export function AllGamesScreen({
           type="button"
           onClick={() => onViewChange({ favoriteOnly: !favoriteOnly })}
           aria-pressed={favoriteOnly}
-          className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+          className={`flex items-center gap-1 rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
             favoriteOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
           }`}
         >
-          ★ FAVORITOS
+          {/* N14 (docs/roadmap.md, Sprint N): era o caractere "★" — lucide
+              agora é a família de ícone padrão do app. */}
+          <Star size={11} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden="true" />
+          FAVORITOS
         </button>
         {platformOptions.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
@@ -662,8 +729,15 @@ export function AllGamesScreen({
                 key={id}
                 type="button"
                 onClick={() => onViewChange({ platformFilter: id, page: 1 })}
+                // C5: o chip ativo usava sempre roxo/`border-accent`, igual
+                // pra qualquer console — a cor de marca (já usada nas capas
+                // e no badge de plataforma) não cumpria papel nenhum de
+                // navegação aqui. Filtrando um console, o chip ativo herda
+                // a cor dele; "TODOS" continua roxo (não representa um
+                // console específico).
+                style={platformFilter === id ? { borderColor: consoleAccentColor(id), color: consoleAccentColor(id) } : undefined}
                 className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
-                  platformFilter === id ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
+                  platformFilter === id ? "" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
                 {label.toUpperCase()}
@@ -685,7 +759,7 @@ export function AllGamesScreen({
       {games === null && (
         <div role="status" aria-live="polite">
           <span className="sr-only">Carregando jogos…</span>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
             {Array.from({ length: PAGE_SIZE }, (_, i) => (
               <GameTileSkeleton key={i} />
             ))}
@@ -704,12 +778,14 @@ export function AllGamesScreen({
           const trulyEmpty = !debouncedSearch && !platformFilter && !favoriteOnly;
           if (trulyEmpty) {
             return (
-              <div className="flex flex-col items-center gap-3 rounded border border-dashed border-line-strong px-6 py-16 text-center">
-                <p className="text-base text-muted">Nenhum jogo na biblioteca ainda.</p>
-                <Button variant="primary" onClick={onOpenLibrary}>
-                  Escolher pasta com meus jogos
-                </Button>
-              </div>
+              <EmptyState
+                message="Nenhum jogo na biblioteca ainda."
+                action={
+                  <Button variant="primary" onClick={onOpenLibrary}>
+                    Escolher pasta com meus jogos
+                  </Button>
+                }
+              />
             );
           }
           return (
@@ -803,6 +879,6 @@ export function AllGamesScreen({
           <Pagination page={page} totalPages={totalPages} onChange={(next) => onViewChange({ page: next })} />
         </>
       )}
-    </div>
+    </ScreenContainer>
   );
 }

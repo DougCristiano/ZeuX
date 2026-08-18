@@ -2,8 +2,19 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
+
+// N4 (docs/roadmap.md, Sprint N): o X de fechar usava o `Button` do shadcn
+// (src/components/ui/button.tsx) — o único lugar do app onde ele era
+// renderizado, um segundo sistema de foco/borda/raio convivendo com o
+// `Button` do ZeuX (src/components/ui.tsx) sem que nenhuma tela percebesse.
+// Não dá para importar o `Button` do ZeuX aqui: `ui.tsx` já importa deste
+// arquivo (`Dialog`, `DialogContent`, `DialogTitle`) — importar de volta
+// criaria um ciclo. Em vez disso, um `<button>` nativo com o mesmo
+// `FOCUS_RING` (outline, não ring) e os mesmos tokens de cor — duplicado de
+// propósito, não reimportado.
+const CLOSE_BUTTON_FOCUS_RING =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
 
 function Dialog({
   ...props
@@ -37,7 +48,10 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        // Mesmo escurecimento usado em J4 (ui.tsx) pra overlay de hover —
+        // bg-black/10 deixava o conteúdo por trás do modal quase legível,
+        // o que não separa o modal do resto da tela.
+        "fixed inset-0 isolate z-50 bg-black/60 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -67,15 +81,13 @@ function DialogContent({
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-2 right-2"
-              size="icon-sm"
+            <button
+              type="button"
+              className={`absolute top-2 right-2 flex size-7 items-center justify-center rounded border border-transparent text-muted transition-colors hover:border-line-strong hover:bg-fill hover:text-ink ${CLOSE_BUTTON_FOCUS_RING}`}
             >
-              <XIcon
-              />
-              <span className="sr-only">Close</span>
-            </Button>
+              <XIcon className="size-4" />
+              <span className="sr-only">Fechar</span>
+            </button>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -113,7 +125,12 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <button
+            type="button"
+            className={`rounded border border-line-strong bg-transparent px-4 py-2 text-sm text-ink transition-colors hover:bg-fill ${CLOSE_BUTTON_FOCUS_RING}`}
+          >
+            Fechar
+          </button>
         </DialogPrimitive.Close>
       )}
     </div>
