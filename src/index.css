@@ -69,7 +69,15 @@
   --fill-strong: #131d35;
   --accent: #9d4eff;
   --accent-hover: #b174ff;
-  --accent-ink: #ffffff;
+  /* Achado do critico-design em 2026-08-18: branco sobre --accent mede
+     4.23:1 (abaixo do 4.5:1 da WCAG AA para texto normal) e cai para 3.08:1
+     no hover — o botão primário, o mais clicado do app, reprovava
+     silenciosamente enquanto N1/N5 mediam outros tokens. #0d0718 (quase
+     preto, com um toque do próprio roxo) mede 4.68:1 contra --accent e
+     6.42:1 contra --accent-hover — os dois passam, com folga maior no
+     hover. Mantém a identidade "roxo neon vivo" (ADR 0013) em vez de trocar
+     o próprio roxo por um tom mais escuro, que era a outra opção. */
+  --accent-ink: #0d0718;
   --accent-secondary: #00e5ff;
   --amber: #ff6b1a;
   --amber-bg: #241a0f;
@@ -150,13 +158,33 @@
   /*
    * Escala tipográfica única (item B7): tudo na interface usa um destes seis
    * degraus, para não acumular tamanho de fonte ad-hoc tela por tela.
+   *
+   * Achado do critico-design em 2026-08-18: estas seis variáveis nunca
+   * estiveram em vigor. No Tailwind v4 (o projeto está em 4.3.3, sem
+   * tailwind.config), as classes `text-xs`/`text-sm`/`text-base`/`text-lg`/
+   * `text-xl`/`text-2xl` são geradas a partir do namespace `--text-*` dentro
+   * de `@theme` — `--font-*` é reservado para família de fonte
+   * (`--font-sans`/`--font-pixel`, acima), não tamanho. Com o prefixo
+   * errado, toda tela do app usava a escala padrão do Tailwind (14/16/18/
+   * 20/24px) em vez destes seis degraus (12/13/15/17/22/28px) — a hierarquia
+   * h1↔corpo era mais fraca do que o desenho pretendia, silenciosamente,
+   * desde que a escala foi escrita. Corrigido para o namespace certo, com
+   * `--text-*--line-height` emparelhado (mesma convenção do Tailwind v4)
+   * para não perder a entrelinha generosa que o app já tinha com os
+   * defaults antigos.
    */
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.8125rem;
-  --font-size-base: 0.9375rem;
-  --font-size-lg: 1.0625rem;
-  --font-size-xl: 1.375rem;
-  --font-size-2xl: 1.75rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.125rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.375rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
 }
 
 body {

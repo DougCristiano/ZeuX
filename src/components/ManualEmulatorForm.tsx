@@ -100,7 +100,11 @@ export function ManualEmulatorForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded border border-line-strong bg-fill p-4">
+    // B6 (achado do critico-design, 2026-08-18): `border-line-strong` era
+    // divergente do token que `Card` usa (`border-line`) — `<form>` não pode
+    // virar `<Card>` de verdade (precisa da semântica nativa de submit),
+    // então alinhado à mão aos mesmos tokens que o componente usa.
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded border border-line bg-fill p-4">
       <label className="flex flex-col gap-1 text-sm text-ink">
         Nome
         <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />

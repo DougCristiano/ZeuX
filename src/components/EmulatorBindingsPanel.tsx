@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { InputBinding } from "../api/types";
 import { translateKeyForAdapter } from "../lib/keyMapping";
-import { Button, InlineError, Toast } from "./ui";
+import { Button, Callout, InlineError, Toast } from "./ui";
 import { useToast } from "../hooks/useToast";
 
 /**
@@ -33,10 +33,23 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
   const [listeningButtonFor, setListeningButtonFor] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ action: string; key: string; withAction: string } | null>(null);
   const [gamepadConnected, setGamepadConnected] = useState(false);
+  // B2 (achado do critico-design, 2026-08-18): `unapplied` (ADR 0006) estava
+  // sendo jogado dentro de `error` — o mesmo `InlineError` vermelho que
+  // erro de verdade usa, transformando uma ressalva ("essa opção não coube")
+  // em "algo quebrou". Separado do `error`, com sua própria caixa âmbar
+  // (mesmo tratamento que `EmulatorConfigPanel` já usa via `Callout`).
+  const [unapplied, setUnapplied] = useState<string[]>([]);
   // N9 (docs/roadmap.md, Sprint N): antes, gravar um mapeamento não dizia
   // nada — só o painel recarregava em silêncio.
   const { toastMessage, showToast } = useToast();
 
+  // `unapplied` NÃO é limpo aqui: `saveBinding` chama `load()` logo depois
+  // de gravar o próprio `unapplied` — como as duas chamadas acontecem no
+  // mesmo tick síncrono, um `setUnapplied([])` aqui dentro apagaria o aviso
+  // antes de qualquer render mostrar ele (achado do critico-design,
+  // 2026-08-18, ao separar `unapplied` de `error`). Quem precisa zerar
+  // `unapplied` de verdade é a troca de `adapterId` — coberto pelo
+  // `useEffect` mais abaixo, que já recria o componente do zero.
   function load() {
     setLoading(true);
     setError(null);
@@ -50,7 +63,11 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [adapterId]);
+  useEffect(() => {
+    setUnapplied([]);
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapterId]);
 
   // Detecção de controle conectado — só isso (listar), não captura de
   // botão. A captura de botão (abaixo) só entra quando o usuário clica
@@ -71,10 +88,11 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
 
   async function saveBinding(action: string, patch: Partial<Pick<InputBinding, "key" | "button">>) {
     setError(null);
+    setUnapplied([]);
     try {
       const result = await api.setEmulatorBindings(adapterId, [{ action, ...patch }]);
       if ((result.unapplied ?? []).length > 0) {
-        setError(result.unapplied.join(" "));
+        setUnapplied(result.unapplied);
       } else {
         showToast("Mapeamento salvo.");
       }
@@ -161,6 +179,15 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     <div className="flex flex-col gap-3">
       {toastMessage && <Toast message={toastMessage} />}
       {error && <InlineError>{error}</InlineError>}
+      {unapplied.length > 0 && (
+        <Callout label="Não aplicado" tone="amber">
+          <ul className="list-disc pl-4">
+            {unapplied.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+        </Callout>
+      )}
 
       {!gamepadConnected && (
         <p className="text-xs text-muted">

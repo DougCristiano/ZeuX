@@ -625,7 +625,7 @@ function EmulatorCard({
 
       {entry.adapter_id === "retroarch" && (
         <div>
-          <Button type="button" variant="ghost" onClick={() => setShowCores((v) => !v)}>
+          <Button type="button" variant="quiet" onClick={() => setShowCores((v) => !v)}>
             {showCores ? "Ocultar cores" : "Ver cores"}
           </Button>
           {showCores && (
@@ -766,14 +766,15 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
     // N3 (docs/roadmap.md, Sprint N): teto centralizado em `ScreenContainer`
     // (src/components/ui.tsx) — mesmo teto escalonado que o O5 validou.
     <ScreenContainer variant="listing">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Emuladores</h1>
-        {onBack && (
-          <Button variant="secondary" onClick={onBack}>
-            Voltar
-          </Button>
-        )}
-      </div>
+      {/* B9 (achado do critico-design, 2026-08-18): mesma posição que
+          GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
+          (era ao lado do h1, à direita). */}
+      {onBack && (
+        <Button variant="secondary" onClick={onBack} className="mb-4">
+          Voltar
+        </Button>
+      )}
+      <h1 className="mb-4 text-2xl font-semibold text-ink">Emuladores</h1>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {emulators && emulators.length > PAGE_SIZE && (
@@ -875,13 +876,15 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
       <div className="mt-6">
         <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar emulador</p>
         {formMode === "closed" ? (
-          <button
-            type="button"
-            onClick={() => setFormMode("new")}
-            className="w-full rounded border border-dashed border-line-strong px-4 py-3 text-center font-pixel text-[11px] text-muted transition-colors hover:border-ink hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
+          // B8 (achado do critico-design, 2026-08-18): reescrevia as quatro
+          // classes do FOCUS_RING à mão em vez de usar o componente — único
+          // lugar do app que fazia isso. `Button variant="ghost"` já é
+          // exatamente esse bloco tracejado de slot vazio/"adicione algo
+          // aqui" (B7); texto em `text-base` normal, não `font-pixel` — é
+          // rótulo de ação, não título de seção nem chip.
+          <Button type="button" variant="ghost" onClick={() => setFormMode("new")} className="w-full text-center">
             + Adicionar emulador manualmente
-          </button>
+          </Button>
         ) : (
           <ManualEmulatorForm
             existing={formMode === "new" ? undefined : formMode}

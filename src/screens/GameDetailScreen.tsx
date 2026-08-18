@@ -13,9 +13,11 @@ import {
   InlineError,
   PlayIcon,
   ScreenContainer,
+  Toast,
 } from "../components/ui";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
+import { useToast } from "../hooks/useToast";
 import { consoleAccentColor } from "../lib/consoleColor";
 
 function formatPlaytime(seconds: number): string {
@@ -82,6 +84,7 @@ export function GameDetailScreen({
   const [sessionCount, setSessionCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { statusFor, launch, launchError, clearLaunchError } = useLaunchGame();
+  const { toastMessage, showToast } = useToast();
   const igdbConfigured = useIGDBStatus();
   // Estado próprio, não `game.cover_url` direto: o prop `game` vem de um
   // snapshot guardado no App.tsx no momento do clique e não muda sozinho
@@ -111,15 +114,19 @@ export function GameDetailScreen({
     setFavorite(game.favorite);
   }, [game.id, game.cover_url, game.favorite]);
 
+  // B4 (achado do critico-design, 2026-08-18): favoritar confirmava em
+  // AllGamesScreen e ficava mudo aqui e em GamesScreen.
   function toggleFavorite() {
     const next = !favorite;
     setFavorite(next);
     setFavoriteError(null);
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
-    call.catch(() => {
-      setFavorite(!next);
-      setFavoriteError("Não foi possível salvar o favorito. Tente de novo.");
-    });
+    call
+      .then(() => showToast(next ? "Adicionado aos favoritos." : "Removido dos favoritos."))
+      .catch(() => {
+        setFavorite(!next);
+        setFavoriteError("Não foi possível salvar o favorito. Tente de novo.");
+      });
   }
 
   function pollCoverJob(jobId: string) {
@@ -191,6 +198,9 @@ export function GameDetailScreen({
     try {
       const res = await api.rescanLibraryFolder(game.folder_id);
       setRescanState({ kind: "done", gamesFound: res.games_found });
+      // B4 (achado do critico-design, 2026-08-18): o resultado ficava como
+      // `<p>` que nunca somia sozinho, preso embaixo do botão.
+      showToast(`${res.games_found} jogo(s) encontrado(s) nesta pasta.`);
     } catch (err) {
       setRescanState({
         kind: "error",
@@ -251,8 +261,17 @@ export function GameDetailScreen({
           onClick={() => launch(game)}
           className="flex w-fit items-center gap-2 px-8 py-3 text-lg"
         >
-          {/* N14 (docs/roadmap.md, Sprint N): era o caractere "▶". */}
-          {status.kind === "error" ? "Tentar de novo" : (
+          {/* N14 (docs/roadmap.md, Sprint N): era o caractere "▶".
+              A4 (achado do critico-design, 2026-08-18): o botão só
+              desabilitava durante "launching", sem trocar o rótulo — o
+              clique mais importante do produto ficava sem retorno até a
+              janela do emulador subir. Mesma técnica de "Salvando…" em
+              EmulatorConfigPanel. */}
+          {status.kind === "error" ? (
+            "Tentar de novo"
+          ) : status.kind === "launching" ? (
+            "Abrindo…"
+          ) : (
             <>
               <PlayIcon size={16} />
               Jogar
@@ -284,11 +303,6 @@ export function GameDetailScreen({
             </Button>
           </div>
           {folderError && <InlineError>{folderError}</InlineError>}
-          {rescanState.kind === "done" && (
-            <p className="text-xs text-ink">
-              {rescanState.gamesFound} jogo(s) encontrado(s) nesta pasta.
-            </p>
-          )}
           {rescanState.kind === "error" && <InlineError>{rescanState.message}</InlineError>}
           <p className="truncate text-xs text-muted" title={game.path}>
             {game.path}
@@ -307,6 +321,7 @@ export function GameDetailScreen({
           `coverError`/`folderError` continuam inline, de propósito: aparecem
           colados no botão que falhou (favoritar, buscar capa, abrir pasta),
           não soltos pela tela. */}
+      {toastMessage && <Toast message={toastMessage} />}
       {launchError ? (
         <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={clearLaunchError} />
       ) : (
@@ -321,7 +336,7 @@ export function GameDetailScreen({
           capa real. Sem capa, o topo fica exatamente como estava (nada de
           padding/fundo novo por cima do placeholder de sigla). */}
       {heroCoverUrl ? (
-        <div className="relative overflow-hidden rounded-lg">
+        <div className="relative overflow-hidden rounded">
           <img
             src={heroCoverUrl}
             alt=""

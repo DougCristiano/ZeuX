@@ -4088,6 +4088,73 @@ explicitamente acima; O1, O5 e O7 têm o cálculo de CSS escrito por extenso.
 
 ---
 
+## Achado — auditoria de verificação do `critico-design` pós-Sprint N/O (2026-08-18)
+
+**Não é item de sprint novo, é uma correção de qualidade.** Com N e O
+"feitas" no código mas sem confirmação visual numa janela real (ambas
+citam a mesma ressalva de sandbox sem GUI), o Douglas pediu para rodar o
+agente `critico-design` de novo como auditoria — não uma crítica nova do
+zero — e depois mandou aplicar os achados (`"faça as mudanças"`).
+
+O agente listou ~22 pontos em três níveis (A — quebra de experiência, B —
+inconsistência entre telas, C — polimento). Todos os A e B, e a maioria dos
+C, foram corrigidos nesta sessão:
+
+- **A1** `--font-size-*` não é o namespace certo do Tailwind v4 pra tamanho
+  de fonte — virou `--text-*` (+ `--text-*--line-height` pareado). As
+  classes `text-sm`/`text-base`/etc. não existiam de verdade antes disso.
+- **A2** `--accent-ink` (`#ffffff`) sobre `--accent`/`--accent-hover` não
+  passava contraste AA — trocado por `#0d0718` (4.68:1 e 6.42:1).
+- **A3** `Badge` usava a cor de marca do console como cor de **texto**, não
+  só de borda/fundo — várias combinações não passavam AA. Texto virou
+  `text-ink` fixo; a cor de marca continua na borda e no fundo tintado.
+- **A4** Ações assíncronas (jogar, favoritar, rescan) sem qualquer sinal de
+  "processando" — ganharam toast (`useToast`, criado na Sprint N) ou rótulo
+  de estado ("Abrindo…").
+- **A5** "Remover pasta" na Biblioteca disparava sem confirmação —
+  ganhou `ConfirmModal` (mesmo padrão de `AllGamesScreen`).
+- **B1-B10** Inconsistências entre telas: borda de input (`border-line` →
+  `border-line-strong`), aviso "não aplicado" misturado com erro em
+  `EmulatorBindingsPanel` (achado um bug real de quebra: o aviso era limpo
+  no mesmo tick antes de renderizar — corrigido junto), grade de jogos sem
+  aproveitar telas ultrawide/4K (`2xl:`/`min-[2400px]:` adicionados),
+  padding de card (`Card` ganhou prop `dense`), variante `ghost` usada como
+  botão secundário genérico (nova variante `quiet`), botão "+ adicionar"
+  fora do vocabulário de `Button`, "Voltar" grudado no título em vez de
+  linha própria, skeleton ausente no parecer de hardware (`SpecsPanel`).
+- **B11/C1/C2/C3** Modal: `rounded-lg`/`rounded-xl` fora do vocabulário do
+  próprio `DialogContent` do ZeuX (`rounded` simples) — corrigido em
+  `GameDetailScreen` e `ui/select.tsx`; overlay `bg-black/10` deixava o
+  fundo quase legível atrás do modal — subiu pra `bg-black/60` (mesmo tom
+  do overlay de hover em J4); texto "Close" em inglês — virou "Fechar";
+  `ErrorModal`/`ConfirmModal`/`ConsoleInfoModal` passavam a mensagem como
+  `<p>` solto em vez de `DialogDescription` — o Radix não montava
+  `aria-describedby`, e o console avisava disso.
+- **C5** O chip de filtro de plataforma ativo em `AllGamesScreen` era
+  sempre roxo — não usava a cor de marca do console pra nada, apesar de
+  ela já existir e ser usada nas capas/badges. Agora o chip ativo herda a
+  cor do console filtrado; "TODOS" continua roxo (não representa console
+  nenhum).
+
+**Não mudado, por decisão explícita ou por já estar coberto:**
+
+- **C4** (`--accent-secondary`/ciano usado só no spinner de boot) — o
+  próprio `index.css` já documenta essa cor como decorativa "nunca
+  reaproveitada" (ADR 0013, 2026-08-04); o spinner de boot já é um sinal de
+  "em andamento". Reabrir isso é decisão do Douglas, não uma correção
+  óbvia — não mexido.
+- **C6** (densidade de `font-pixel` em `SettingsScreen`/`LibraryScreen` —
+  três rótulos Press Start 2P seguidos) — o próprio agente rotulou como
+  **"trade-off, decisão sua"**, não um defeito. Fica em aberto para o
+  Douglas decidir, não foi alterado nesta sessão.
+
+**Como foi verificado:** `npx tsc --noEmit`, `npm run build`, `go build
+./...` e `go vet ./...` verdes. Mesma ressalva de sempre: sem GUI real
+neste ambiente, confirmação visual (contraste, grade em tela grande, chip
+colorido) ainda depende do Douglas testar numa janela de verdade.
+
+---
+
 ## Achado — credencial de teste do IGDB pode estar suspensa (2026-08-18)
 
 **Não é item de sprint, é um alerta operacional.** O Douglas reportou, ao

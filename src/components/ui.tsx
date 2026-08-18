@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import { Play, Star, TriangleAlert } from "lucide-react";
 import type { ConsoleVerdict } from "../api/types";
 import { consoleAccentColor } from "../lib/consoleColor";
-import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "./ui/select";
 
 /**
@@ -42,8 +42,14 @@ export const FOCUS_RING =
  * e o `SelectTrigger` do shadcn (abaixo) tinha 32px — três alturas
  * diferentes na mesma barra de filtros.
  */
+// B1 (achado do critico-design, 2026-08-18): `border-line-strong`, não
+// `border-line` — o N4 unificou a altura de input e select (38px) mas
+// deixou a borda divergente (`ZSelect`, abaixo, já usava `border-line-strong`).
+// `border-line` quase desaparece sobre `bg-fill` (as duas cores ficam muito
+// próximas); os dois controles lado a lado na mesma barra tinham a mesma
+// altura e bordas visivelmente diferentes.
 export const inputClass =
-  `h-[38px] w-full rounded border border-line bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
+  `h-[38px] w-full rounded border border-line-strong bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
 
 /**
  * N4 (docs/roadmap.md, Sprint N): wrapper sobre o `Select` do shadcn (J3)
@@ -94,7 +100,7 @@ export function ZSelect({
   );
 }
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "quiet" | "danger";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -103,7 +109,15 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 const buttonVariants: Record<ButtonVariant, string> = {
   primary: "border border-accent bg-accent font-semibold text-accent-ink hover:bg-accent-hover",
   secondary: "border border-line-strong bg-transparent text-ink hover:bg-fill",
+  // `ghost` foi desenhado como bloco tracejado de placeholder (slot vazio,
+  // "adicione algo aqui") — achado do critico-design em 2026-08-18: virou,
+  // na prática, "botão terciário genérico" em lugares que não são slot
+  // nenhum ("Revarrer"/"Remover" de pasta, "Ver cores"), e duas bordas
+  // tracejadas lado a lado numa linha de pasta lêem como área de
+  // arrastar-e-soltar. `quiet` é o terciário de verdade: sem borda, só o
+  // texto ganha peso no hover — ghost continua reservado para placeholder.
   ghost: "border border-dashed border-line-strong bg-transparent text-muted hover:text-ink hover:border-ink",
+  quiet: "border border-transparent bg-transparent text-muted hover:text-ink",
   // N5 (docs/roadmap.md, Sprint N): antes, toda ação destrutiva ("Excluir
   // mesmo assim", "Remover", "Desconectar") usava `primary` — a mesma cor do
   // botão de jogar, sem sinal visual antes de um clique irreversível.
@@ -193,17 +207,27 @@ export function ScreenContainer({
 export function Card({
   children,
   filled = false,
+  // B6 (achado do critico-design, 2026-08-18): `ConfiguredConsoleRow`
+  // (LibraryScreen) montava a mesma caixa à mão (`border border-line
+  // bg-fill p-3`) só por precisar de menos padding que o `p-4` fixo de
+  // `Card` — uma prop, não uma cópia da string inteira do componente.
+  dense = false,
   className = "",
   style,
 }: {
   children: ReactNode;
   filled?: boolean;
+  /** Padding menor (`p-3`), para linha de lista densa em vez de painel. */
+  dense?: boolean;
   className?: string;
   /** Só para casos dinâmicos de verdade (ex.: cor de identidade por console) — nunca um substituto de classe Tailwind fixa. */
   style?: CSSProperties;
 }) {
   return (
-    <div style={style} className={`rounded border border-line p-4 ${filled ? "bg-fill" : "bg-transparent"} ${className}`}>
+    <div
+      style={style}
+      className={`rounded border border-line ${dense ? "p-3" : "p-4"} ${filled ? "bg-fill" : "bg-transparent"} ${className}`}
+    >
       {children}
     </div>
   );
@@ -234,8 +258,17 @@ export function Badge({
   return (
     <span
       title={title}
-      className={`inline-block rounded-sm border px-1.5 py-0.5 font-mono text-xs tracking-wide ${accentColor ? "" : styles}`}
-      style={accentColor ? { borderColor: accentColor, color: accentColor, background: `${accentColor}1a` } : undefined}
+      // Achado do critico-design em 2026-08-18: `color: accentColor` fazia o
+      // badge de plataforma reprovar contraste em ~metade dos 33 consoles do
+      // catálogo (a família Nintendo, PS3, Saturn — cores escolhidas por
+      // matiz de marca, não por legibilidade de texto). A cor de identidade
+      // continua na borda e no fundo tingido (onde já funcionava bem, e é
+      // onde `EmulatorCard`/`ConsoleVerdictCard` também a usam); o texto
+      // usa `text-ink`, que passa contraste contra qualquer fundo do app —
+      // mais barato e menos arriscado que clarear a paleta inteira só para
+      // o caso de texto.
+      className={`inline-block rounded-sm border px-1.5 py-0.5 font-mono text-xs tracking-wide ${accentColor ? "text-ink" : styles}`}
+      style={accentColor ? { borderColor: accentColor, background: `${accentColor}1a` } : undefined}
     >
       {children}
     </span>
@@ -333,7 +366,12 @@ export function ErrorModal({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-danger">{title}</DialogTitle>
-        <p className="text-base text-ink">{message}</p>
+        {/* C3: `<p>` solto não é lido pelo `aria-describedby` que o Radix
+            monta a partir do `Content` — o leitor de tela anunciava só o
+            título. `DialogDescription` resolve isso sem mudar a aparência
+            (o `cn` do componente usa twMerge, então `text-base text-ink`
+            vence de verdade os tokens padrão dele). */}
+        <DialogDescription className="text-base text-ink">{message}</DialogDescription>
         <div className="mt-4 flex justify-end gap-2">
           {onRetry && (
             <Button variant="secondary" onClick={onClose}>
@@ -382,7 +420,9 @@ export function ConfirmModal({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-ink">{title}</DialogTitle>
-        <p className="text-base text-ink">{message}</p>
+        {/* C3: mesmo ajuste do ErrorModal — DialogDescription em vez de
+            `<p>` solto, pra entrar no aria-describedby do Radix. */}
+        <DialogDescription className="text-base text-ink">{message}</DialogDescription>
         <div className="mt-4 flex flex-wrap justify-end gap-2">{actions}</div>
       </DialogContent>
     </Dialog>
@@ -741,7 +781,12 @@ export function InlineError({ children, className = "" }: { children: ReactNode;
  * célula — mesmo padrão do `GameTileSkeleton` (M12).
  */
 export function CardSkeleton({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`h-24 animate-pulse rounded border border-line-strong bg-fill ${className}`} />;
+  // Sem altura padrão: cada chamador já passa a sua (ver os 7 usos atuais).
+  // Um `h-24` fixo aqui dependeria de concatenação de string pra ser
+  // sobrescrito — mesma armadilha do O1 (largura do modal) e do N4 (altura
+  // do ZSelect): a ordem das classes no CSS compilado, não a ordem no JSX,
+  // decide quem vence, e isso não é garantido.
+  return <div aria-hidden="true" className={`animate-pulse rounded border border-line-strong bg-fill ${className}`} />;
 }
 
 /**
@@ -923,7 +968,10 @@ export function ConsoleInfoModal({
 
         {verdict ? (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted">{verdict.headline}</p>
+            {/* C3: headline como DialogDescription — é o resumo que
+                descreve o modal, então é o texto certo pro aria-describedby
+                do Radix (evita o aviso de acessibilidade no console). */}
+            <DialogDescription className="text-sm text-muted">{verdict.headline}</DialogDescription>
 
             {verdict.preset && (
               <p className="text-sm text-muted">

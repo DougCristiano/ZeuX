@@ -241,7 +241,6 @@ export function AllGamesScreen({
   const { toastMessage, showToast } = useToast();
   const igdbConfigured = useIGDBStatus();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
-  const [scrapeSummary, setScrapeSummary] = useState<string | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const columns = useGridColumns();
   // M8: carregado uma vez só para a tela inteira — diferente de GamesScreen
@@ -343,7 +342,10 @@ export function AllGamesScreen({
         if (job.phase === "concluido") {
           const found = job.results.filter((r) => r.status === "found").length;
           const notFound = job.results.length - found;
-          setScrapeSummary(
+          // B4 (achado do critico-design, 2026-08-18): o resumo da busca em
+          // lote ficava como `<p>` que nunca sumia sozinho — persistia até a
+          // próxima busca. Virou toast, mesma confirmação de sucesso.
+          showToast(
             notFound > 0
               ? `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}, ${notFound} não encontrada${notFound === 1 ? "" : "s"}.`
               : `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}.`,
@@ -367,7 +369,6 @@ export function AllGamesScreen({
 
   function startScrapeCovers() {
     setScrapeError(null);
-    setScrapeSummary(null);
     api
       .scrapeCovers()
       .then((job) => {
@@ -403,9 +404,17 @@ export function AllGamesScreen({
   const install = useInlineInstall({
     onEmulatorInstalled: (adapterId) =>
       setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
+    // A4 (achado do critico-design, 2026-08-18): clicar em ▶ não dava
+    // nenhum retorno até a janela do emulador subir — no Windows, com o
+    // antivírus varrendo o binário, isso pode não ser instantâneo. O toast
+    // não espera a resposta do lançamento (que já tem seu próprio tratamento
+    // de erro via `launchError`/`ErrorModal`) — é só o "recebi seu clique".
     onLaunch: (romPath) => {
       const game = games?.find((g) => g.path === romPath);
-      if (game) launch(game);
+      if (game) {
+        showToast(`Abrindo ${game.title}…`);
+        launch(game);
+      }
     },
   });
 
@@ -625,7 +634,6 @@ export function AllGamesScreen({
         </div>
       </div>
 
-      {scrapeSummary && <p className="mb-3 text-sm text-ink">{scrapeSummary}</p>}
       {scrapeError && (
         <InlineError className="mb-3">
           {scrapeError}{" "}
@@ -721,8 +729,15 @@ export function AllGamesScreen({
                 key={id}
                 type="button"
                 onClick={() => onViewChange({ platformFilter: id, page: 1 })}
+                // C5: o chip ativo usava sempre roxo/`border-accent`, igual
+                // pra qualquer console — a cor de marca (já usada nas capas
+                // e no badge de plataforma) não cumpria papel nenhum de
+                // navegação aqui. Filtrando um console, o chip ativo herda
+                // a cor dele; "TODOS" continua roxo (não representa um
+                // console específico).
+                style={platformFilter === id ? { borderColor: consoleAccentColor(id), color: consoleAccentColor(id) } : undefined}
                 className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
-                  platformFilter === id ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
+                  platformFilter === id ? "" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
                 {label.toUpperCase()}

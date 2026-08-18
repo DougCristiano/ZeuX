@@ -4,6 +4,7 @@ import type { ConsoleVerdict, HardwareInfo, Report } from "../api/types";
 import {
   Callout,
   Card,
+  CardSkeleton,
   ConsoleVerdictCard,
   FOCUS_RING,
   InlineError,
@@ -49,10 +50,18 @@ function SpecsPanel() {
   }
 
   if (!hardware) {
+    // B10 (achado do critico-design, 2026-08-18): era um único "Lendo
+    // hardware…" — o painel tem forma fixa e conhecida (4 cards: Sistema,
+    // Processador, Memória, Placa de vídeo), então o skeleton na mesma
+    // forma evita o conteúdo saltar quando os dados chegam.
     return (
-      <Card filled>
-        <p className="text-sm text-muted">Lendo hardware…</p>
-      </Card>
+      <div role="status" aria-live="polite" className="flex flex-col gap-4">
+        <span className="sr-only">Lendo hardware…</span>
+        <CardSkeleton className="h-32" />
+        <CardSkeleton className="h-44" />
+        <CardSkeleton className="h-24" />
+        <CardSkeleton className="h-36" />
+      </div>
     );
   }
 

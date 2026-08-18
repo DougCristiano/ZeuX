@@ -7,6 +7,7 @@ import {
   Callout,
   Card,
   CardSkeleton,
+  ConfirmModal,
   ConsoleIcon,
   ConsoleInfoModal,
   EmptyState,
@@ -122,8 +123,40 @@ function ConfiguredConsoleRow({
   onOpenGames: () => void;
   onSelectConsole: () => void;
 }) {
+  // A5 (achado do critico-design, 2026-08-18): "Remover" apagava a pasta
+  // apontada sem confirmação nenhuma, com o mesmo peso visual de
+  // "Revarrer" (que é reversível/barato) — a única ação destrutiva do app
+  // que tinha escapado da regra do N13. `folderId`, não booleano: mais de
+  // uma pasta pode existir por console (comentário do componente, acima).
+  const [confirmingRemove, setConfirmingRemove] = useState<number | null>(null);
+  const confirmingFolder = folders.find((f) => f.id === confirmingRemove);
+
   return (
-    <div className="flex flex-col gap-1.5 rounded border border-line bg-fill p-3">
+    <Card filled dense className="flex flex-col gap-1.5">
+      {confirmingFolder && (
+        <ConfirmModal
+          title="Remover pasta da biblioteca?"
+          message={`"${confirmingFolder.path}" sai da lista do ZeuX. Os arquivos continuam no disco — nada é apagado, só o apontamento.`}
+          onClose={() => setConfirmingRemove(null)}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setConfirmingRemove(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                autoFocus
+                onClick={() => {
+                  onRemove(confirmingFolder.id);
+                  setConfirmingRemove(null);
+                }}
+              >
+                Remover mesmo assim
+              </Button>
+            </>
+          }
+        />
+      )}
       <div className="flex items-center gap-3">
         <ConsoleIcon consoleId={consoleInfo.console_id} label={consoleInfo.short_name} onClick={onSelectConsole} />
         <div className="min-w-0 flex-1">
@@ -145,17 +178,17 @@ function ConfiguredConsoleRow({
               {folder.path}
             </span>
             <span className="flex shrink-0 gap-2">
-              <Button type="button" variant="ghost" disabled={busy} onClick={() => onRescan(folder.id)}>
+              <Button type="button" variant="quiet" disabled={busy} onClick={() => onRescan(folder.id)}>
                 Revarrer
               </Button>
-              <Button type="button" variant="ghost" disabled={busy} onClick={() => onRemove(folder.id)}>
+              <Button type="button" variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
                 Remover
               </Button>
             </span>
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }
 
@@ -407,20 +440,23 @@ export function LibraryScreen({
   return (
     // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado.
     <ScreenContainer variant="listing">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-ink">Biblioteca</h1>
-        {/* Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
-            (all-games), não pro Parecer/Especificações — ficou desatualizado
-            desde a reestruturação da sidebar (Sprint 1). */}
-        <Button variant="secondary" onClick={onBack}>
-          Voltar
-        </Button>
-      </div>
+      {/* B9 (achado do critico-design, 2026-08-18): "Voltar" ficava à
+          direita do h1 aqui/Emuladores/Jogos, e sozinho à esquerda acima do
+          título em GameDetailScreen — duas convenções para o mesmo botão.
+          Padronizado na posição de GameDetailScreen: mais legível numa app
+          com sidebar (o olho lê "voltar" antes do título da tela nova).
+          Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
+          (all-games), não pro Parecer/Especificações — ficou desatualizado
+          desde a reestruturação da sidebar (Sprint 1). */}
+      <Button variant="secondary" onClick={onBack} className="mb-4">
+        Voltar
+      </Button>
+      <h1 className="mb-4 text-2xl font-semibold text-ink">Biblioteca</h1>
 
       <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
 
       <div className="mb-4 -mt-2 flex justify-end">
-        <Button type="button" variant="ghost" onClick={() => setShowNameGuide(true)}>
+        <Button type="button" variant="quiet" onClick={() => setShowNameGuide(true)}>
           Ver nomes de pasta aceitos
         </Button>
       </div>

@@ -48,7 +48,10 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        // Mesmo escurecimento usado em J4 (ui.tsx) pra overlay de hover —
+        // bg-black/10 deixava o conteúdo por trás do modal quase legível,
+        // o que não separa o modal do resto da tela.
+        "fixed inset-0 isolate z-50 bg-black/60 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -83,7 +86,7 @@ function DialogContent({
               className={`absolute top-2 right-2 flex size-7 items-center justify-center rounded border border-transparent text-muted transition-colors hover:border-line-strong hover:bg-fill hover:text-ink ${CLOSE_BUTTON_FOCUS_RING}`}
             >
               <XIcon className="size-4" />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">Fechar</span>
             </button>
           </DialogPrimitive.Close>
         )}
@@ -126,7 +129,7 @@ function DialogFooter({
             type="button"
             className={`rounded border border-line-strong bg-transparent px-4 py-2 text-sm text-ink transition-colors hover:bg-fill ${CLOSE_BUTTON_FOCUS_RING}`}
           >
-            Close
+            Fechar
           </button>
         </DialogPrimitive.Close>
       )}

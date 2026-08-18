@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { SystemInfo } from "../api/types";
-import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer } from "../components/ui";
+import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, Toast } from "../components/ui";
+import { useToast } from "../hooks/useToast";
 
 // `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
 // sem conta pessoal, o ZeuX cai numa credencial de teste embutida (ver
@@ -33,6 +34,7 @@ export function SettingsScreen() {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [saving, setSaving] = useState(false);
+  const { toastMessage, showToast } = useToast();
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [systemInfo, setSystemInfo] = useState<SystemInfoState>({ kind: "loading" });
@@ -108,6 +110,10 @@ export function SettingsScreen() {
 
   useEffect(loadStatus, []);
 
+  // B4 (achado do critico-design, 2026-08-18): conectar/desconectar não
+  // dava nenhum retorno próprio — a tela troca de conteúdo (formulário ↔
+  // "Conta conectada.") por causa do `loadStatus()`, mas isso é sutil o
+  // bastante para passar despercebido; o toast reforça.
   async function handleConnect() {
     setSaving(true);
     setFormError(null);
@@ -116,6 +122,7 @@ export function SettingsScreen() {
       setClientId("");
       setClientSecret("");
       loadStatus();
+      showToast("Conta conectada.");
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Não foi possível conectar a conta.");
     } finally {
@@ -129,6 +136,7 @@ export function SettingsScreen() {
       await api.clearIGDBCredentials();
       setConfirmingDisconnect(false);
       loadStatus();
+      showToast("Conta desconectada.");
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Não foi possível desconectar a conta.");
     } finally {
@@ -138,6 +146,7 @@ export function SettingsScreen() {
 
   return (
     <ScreenContainer variant="reading">
+      {toastMessage && <Toast message={toastMessage} />}
       <h1 className="mb-5 text-2xl font-semibold text-ink">Configurações</h1>
 
       <Card className="mb-6">
