@@ -2,9 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { BulkMatchedFolder, LibraryFolder, LibraryGame, Report } from "../api/types";
-import { Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ErrorModal } from "../components/ui";
+import {
+  Button,
+  Callout,
+  Card,
+  CardSkeleton,
+  ConsoleIcon,
+  ConsoleInfoModal,
+  EmptyState,
+  ErrorModal,
+  InlineError,
+  ScreenContainer,
+  ZSelect,
+} from "../components/ui";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { SelectItem } from "../components/ui/select";
 
 type ConsoleInfo = { console_id: string; name: string; short_name: string };
 
@@ -56,7 +68,7 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
         </Button>
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <InlineError>{error}</InlineError>}
 
       {result && (
         <div className="flex flex-col gap-2">
@@ -202,27 +214,21 @@ function AddConsoleSection({
     <Card filled className="flex flex-col gap-3">
       <p className="font-semibold text-ink">Adicionar console</p>
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={consoleId} onValueChange={setConsoleId}>
-          {/* O2 (docs/roadmap.md, Sprint O): largura fixa cortava nomes longos de
-              console ("Nintendo Entertainment System") mesmo sobrando espaço ao lado —
-              mesmo padrão de EmulatorsScreen.tsx (w-full max-w-xs) para encolher e ter
-              teto ao mesmo tempo. */}
-          <SelectTrigger aria-label="Escolher console" className="w-full max-w-xs">
-            <SelectValue placeholder="Escolher console" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableConsoles.map((c) => (
-              <SelectItem key={c.console_id} value={c.console_id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* O2 (docs/roadmap.md, Sprint O): largura fixa cortava nomes longos de
+            console ("Nintendo Entertainment System") mesmo sobrando espaço ao lado —
+            `max-w-xs` (via ZSelect, N4) encolhe e tem teto ao mesmo tempo. */}
+        <ZSelect ariaLabel="Escolher console" value={consoleId} onValueChange={setConsoleId} placeholder="Escolher console" className="max-w-xs">
+          {availableConsoles.map((c) => (
+            <SelectItem key={c.console_id} value={c.console_id}>
+              {c.name}
+            </SelectItem>
+          ))}
+        </ZSelect>
         <Button type="button" variant="primary" disabled={busy || !consoleId} onClick={handlePick}>
           {busy ? "Apontando…" : "Escolher pasta"}
         </Button>
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <InlineError>{error}</InlineError>}
     </Card>
   );
 }
@@ -399,7 +405,8 @@ export function LibraryScreen({
   const availableConsoles = allConsoles.filter((c) => !configuredIds.includes(c.console_id));
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pt-16 pb-10">
+    // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado.
+    <ScreenContainer variant="listing">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">Biblioteca</h1>
         {/* Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
@@ -426,12 +433,35 @@ export function LibraryScreen({
           própria seção. */}
       {error && <ErrorModal title="Não foi possível listar as pastas" message={error} onClose={() => setError(null)} />}
 
+      {/* N11 (docs/roadmap.md, Sprint N): antes, `folders === null` não
+          renderizava nada — a tela ficava em branco entre abrir e a resposta
+          de GET /library/folders chegar. Skeleton na forma de linha (o
+          `ConfiguredConsoleRow` real, abaixo, também é uma linha, não um
+          card de grade). */}
+      {folders === null && (
+        <div role="status" aria-live="polite" className="flex flex-col gap-2">
+          <span className="sr-only">Carregando pastas…</span>
+          {Array.from({ length: 3 }, (_, i) => (
+            <CardSkeleton key={i} className="h-16" />
+          ))}
+        </div>
+      )}
+
       {folders && (
         <div className="flex flex-col gap-6">
+          {/* N2 (docs/roadmap.md, Sprint N): era `text-sm font-semibold` — a
+              única tela com essa segunda convenção de título de seção.
+              Decisão do Douglas: `font-pixel text-[11px]` (o mesmo do resto
+              do app) vale para título de tela E de seção interna, sem
+              distinção. */}
           <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">Consoles configurados</h2>
+            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Consoles configurados</h2>
             {configuredConsoles.length === 0 ? (
-              <p className="text-sm text-muted">Nenhum console com pasta apontada ainda.</p>
+              // N11 (docs/roadmap.md, Sprint N): sem botão de ação aqui — a
+              // seção "Adicionar console" (a ação que resolve este vazio) já
+              // fica sempre visível logo abaixo, um botão duplicado só
+              // repetiria o que a tela já mostra.
+              <EmptyState message="Nenhum console com pasta apontada ainda." />
             ) : (
               <div className="flex flex-col gap-2">
                 {configuredConsoles.map((consoleInfo) => (
@@ -452,7 +482,7 @@ export function LibraryScreen({
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">Adicionar console</h2>
+            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar console</h2>
             <AddConsoleSection availableConsoles={availableConsoles} onAdded={() => setReloadKey((k) => k + 1)} />
           </div>
         </div>
@@ -465,6 +495,6 @@ export function LibraryScreen({
           onClose={() => setModalConsoleId(null)}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

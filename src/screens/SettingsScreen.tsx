@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { SystemInfo } from "../api/types";
-import { Button, Card } from "../components/ui";
+import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer } from "../components/ui";
 
 // `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
 // sem conta pessoal, o ZeuX cai numa credencial de teste embutida (ver
@@ -137,7 +137,7 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 pt-16 pb-10">
+    <ScreenContainer variant="reading">
       <h1 className="mb-5 text-2xl font-semibold text-ink">Configurações</h1>
 
       <Card className="mb-6">
@@ -148,14 +148,14 @@ export function SettingsScreen() {
         </p>
 
         {systemInfo.kind === "loading" && <p className="text-sm text-muted">Localizando a pasta…</p>}
-        {systemInfo.kind === "error" && <p className="text-sm text-danger">{systemInfo.message}</p>}
+        {systemInfo.kind === "error" && <InlineError>{systemInfo.message}</InlineError>}
 
         {systemInfo.kind === "loaded" && (
           <div className="flex flex-col gap-3">
             <p className="break-all rounded border border-line bg-fill px-3 py-2 font-mono text-xs text-ink">
               {systemInfo.info.app_data_dir}
             </p>
-            {pathError && <p className="text-sm text-danger">{pathError}</p>}
+            {pathError && <InlineError>{pathError}</InlineError>}
             <Button variant="secondary" onClick={openInstallFolder} className="w-fit">
               Abrir pasta de instalação
             </Button>
@@ -174,7 +174,7 @@ export function SettingsScreen() {
               instalados, saves e biblioteca continuam no disco, para o caso de reinstalar depois); apague-a
               manualmente se quiser também limpar esses dados.
             </p>
-            {uninstallError && <p className="text-sm text-danger">{uninstallError}</p>}
+            {uninstallError && <InlineError>{uninstallError}</InlineError>}
             <Button variant="secondary" onClick={openWindowsUninstall} className="w-fit">
               Abrir desinstalação do Windows
             </Button>
@@ -209,7 +209,7 @@ export function SettingsScreen() {
 
         {state.kind === "error" && (
           <div>
-            <p className="mb-2 text-sm text-danger">{state.message}</p>
+            <InlineError className="mb-2">{state.message}</InlineError>
             <Button variant="secondary" onClick={loadStatus}>
               Tentar de novo
             </Button>
@@ -219,20 +219,25 @@ export function SettingsScreen() {
         {state.kind === "loaded" && state.personal && (
           <div>
             <p className="mb-3 text-sm text-ink">Conta conectada.</p>
-            {formError && <p className="mb-3 text-sm text-danger">{formError}</p>}
+            {formError && <InlineError className="mb-3">{formError}</InlineError>}
             {confirmingDisconnect ? (
-              <div className="flex flex-wrap gap-2">
-                <p className="w-full text-sm text-ink">
-                  Desconectar a conta? O ZeuX volta a usar a credencial de teste compartilhada (abaixo) até você
-                  conectar de novo.
-                </p>
-                <Button variant="primary" disabled={saving} onClick={handleDisconnect}>
-                  Desconectar
-                </Button>
-                <Button variant="secondary" disabled={saving} onClick={() => setConfirmingDisconnect(false)}>
-                  Cancelar
-                </Button>
-              </div>
+              // N13 (docs/roadmap.md, Sprint N): irreversível (apaga a
+              // credencial pessoal salva) — era painel inline, virou modal.
+              <ConfirmModal
+                title="Desconectar conta?"
+                message="O ZeuX volta a usar a credencial de teste compartilhada (abaixo) até você conectar de novo."
+                onClose={() => setConfirmingDisconnect(false)}
+                actions={
+                  <>
+                    <Button variant="secondary" disabled={saving} onClick={() => setConfirmingDisconnect(false)}>
+                      Cancelar
+                    </Button>
+                    <Button variant="danger" disabled={saving} onClick={handleDisconnect}>
+                      Desconectar
+                    </Button>
+                  </>
+                }
+              />
             ) : (
               <Button variant="secondary" onClick={() => setConfirmingDisconnect(true)}>
                 Desconectar conta
@@ -255,7 +260,7 @@ export function SettingsScreen() {
               Ela é compartilhada com quem também não conectou a própria conta; conecte a sua para não depender
               dessa cota.
             </p>
-            {formError && <p className="text-sm text-danger">{formError}</p>}
+            {formError && <InlineError>{formError}</InlineError>}
             <label className="flex flex-col gap-1 text-sm text-ink">
               ID do cliente
               <input
@@ -263,7 +268,7 @@ export function SettingsScreen() {
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
                 autoComplete="off"
-                className="rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className={inputClass}
               />
             </label>
             <label className="flex flex-col gap-1 text-sm text-ink">
@@ -273,7 +278,7 @@ export function SettingsScreen() {
                 value={clientSecret}
                 onChange={(e) => setClientSecret(e.target.value)}
                 autoComplete="off"
-                className="rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className={inputClass}
               />
             </label>
             <Button
@@ -287,6 +292,6 @@ export function SettingsScreen() {
           </div>
         )}
       </Card>
-    </div>
+    </ScreenContainer>
   );
 }

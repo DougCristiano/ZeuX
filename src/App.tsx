@@ -115,11 +115,17 @@ function App() {
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver
   // src-tauri/src/lib.rs para o porquê.
-  useEffect(() => {
+  // N6 (docs/roadmap.md, Sprint N): extraída de dentro do `useEffect` para
+  // função nomeada — antes só rodava uma vez, no mount (deps `[]`), e a tela
+  // de "porta em conflito" não tinha nenhum botão de ação, a única tela do
+  // app sem saída (fechar e reabrir era o único caminho). Agora
+  // `checkPortConflict` também é o `onRetry` do `ErrorScreen`.
+  function checkPortConflict() {
     invoke<boolean>("zeuxd_port_conflict")
       .then((conflict) => setPhase(conflict ? "port-conflict" : "connecting"))
       .catch(() => setPhase("connecting"));
-  }, []);
+  }
+  useEffect(checkPortConflict, []);
 
   // 2. Com a porta liberada, busca o consentimento. O sidecar é iniciado em
   // paralelo com a janela (B5) e pode levar um instante a mais para aceitar
@@ -228,13 +234,16 @@ function App() {
       break;
 
     case "port-conflict":
+      // N6 (docs/roadmap.md, Sprint N): era um <p> sem nenhum botão — a
+      // única tela do app sem saída, fechar e reabrir era o único jeito de
+      // tentar de novo. `onRetry` reconsulta a porta sem reiniciar o app;
+      // se o outro processo já tiver liberado a 7777, a tela avança sozinha
+      // (checkPortConflict troca a phase para "connecting").
       screen = (
-        <main className="flex min-h-screen items-center justify-center bg-paper px-6">
-          <p className="max-w-sm text-base text-danger">
-            A porta 7777 já está sendo usada por outro programa, não pelo ZeuX. Feche o que estiver usando
-            essa porta e abra o ZeuX de novo.
-          </p>
-        </main>
+        <ErrorScreen
+          message="A porta 7777 já está sendo usada por outro programa, não pelo ZeuX. Feche o que estiver usando essa porta e tente de novo."
+          onRetry={checkPortConflict}
+        />
       );
       break;
 

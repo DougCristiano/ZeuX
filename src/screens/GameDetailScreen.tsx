@@ -2,7 +2,18 @@ import { useEffect, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, ApiError, coverImageURL } from "../api";
 import type { LibraryGame, Report } from "../api/types";
-import { Badge, Button, Card, ConsoleVerdictCard, ErrorModal, FavoriteToggle, GameCover } from "../components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ConsoleVerdictCard,
+  ErrorModal,
+  FavoriteToggle,
+  GameCover,
+  InlineError,
+  PlayIcon,
+  ScreenContainer,
+} from "../components/ui";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -204,19 +215,21 @@ export function GameDetailScreen({
 
   const heroContent = (
     <>
-      {/* O7 (docs/roadmap.md, Sprint O): a capa era 220px fixo mesmo em 4K,
-          perdida no meio do espaço sobrando — escalona junto com o container
-          acima, mantendo a proporção 3/4 que GameCover já aplica. */}
-      <div className="relative w-full max-w-[220px] 2xl:max-w-[300px]">
+      {/* O7 media esta capa contra um container que ainda crescia em janela
+          grande — o N3 (docs/roadmap.md, Sprint N) tornou `reading` um teto
+          fixo (`ScreenContainer`, motivo no comentário de lá: tela de
+          leitura não fica mais útil esticada em 4K), então a capa também
+          volta a ser fixa — não há mais "espaço sobrando" para acompanhar. */}
+      <div className="relative w-full max-w-[220px]">
         <GameCover label={shortName} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
         <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
-        {favoriteError && <p className="mt-1 text-xs text-danger">{favoriteError}</p>}
+        {favoriteError && <InlineError className="mt-1">{favoriteError}</InlineError>}
         {igdbConfigured && (
           <div className="mt-2">
             <Button variant="secondary" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full text-xs">
               {scrapingCover ? "Buscando…" : coverUrl ? "Buscar capa de novo" : "Buscar capa"}
             </Button>
-            {coverError && <p className="mt-1 text-xs text-danger">{coverError}</p>}
+            {coverError && <InlineError className="mt-1">{coverError}</InlineError>}
           </div>
         )}
       </div>
@@ -236,15 +249,19 @@ export function GameDetailScreen({
           autoFocus
           disabled={game.missing || status.kind === "launching"}
           onClick={() => launch(game)}
-          className="w-fit px-8 py-3 text-lg"
+          className="flex w-fit items-center gap-2 px-8 py-3 text-lg"
         >
-          {status.kind === "error" ? "Tentar de novo" : "▶ Jogar"}
+          {/* N14 (docs/roadmap.md, Sprint N): era o caractere "▶". */}
+          {status.kind === "error" ? "Tentar de novo" : (
+            <>
+              <PlayIcon size={16} />
+              Jogar
+            </>
+          )}
         </Button>
 
         {game.missing && (
-          <p className="text-sm text-danger">
-            O arquivo deste jogo não foi encontrado na última varredura da pasta.
-          </p>
+          <InlineError>O arquivo deste jogo não foi encontrado na última varredura da pasta.</InlineError>
         )}
 
         {/* M6: nenhum link, nenhuma sugestão de onde obter o arquivo (regra
@@ -266,13 +283,13 @@ export function GameDetailScreen({
               {rescanState.kind === "rescanning" ? "Revarrendo…" : "Revarrer pasta"}
             </Button>
           </div>
-          {folderError && <p className="text-xs text-danger">{folderError}</p>}
+          {folderError && <InlineError>{folderError}</InlineError>}
           {rescanState.kind === "done" && (
             <p className="text-xs text-ink">
               {rescanState.gamesFound} jogo(s) encontrado(s) nesta pasta.
             </p>
           )}
-          {rescanState.kind === "error" && <p className="text-xs text-danger">{rescanState.message}</p>}
+          {rescanState.kind === "error" && <InlineError>{rescanState.message}</InlineError>}
           <p className="truncate text-xs text-muted" title={game.path}>
             {game.path}
           </p>
@@ -282,10 +299,7 @@ export function GameDetailScreen({
   );
 
   return (
-    // O7 (docs/roadmap.md, Sprint O): teto escalonado a partir de 1536px,
-    // acompanhando o O5 — sem isso a tela de detalhe fica com a mesma largura
-    // de leitura em qualquer monitor, capa incluída (abaixo).
-    <div className="mx-auto max-w-4xl px-6 pt-16 pb-10 2xl:max-w-5xl">
+    <ScreenContainer variant="reading">
       {/* A contagem de sessões falhar não impede o resto da tela de
           funcionar — mas o texto vermelho solto dentro do card de
           estatísticas era fácil de perder (mesmo achado do Douglas em
@@ -347,6 +361,6 @@ export function GameDetailScreen({
           </div>
         </div>
       </Card>
-    </div>
+    </ScreenContainer>
   );
 }

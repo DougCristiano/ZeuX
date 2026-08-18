@@ -2,10 +2,7 @@ import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { CustomDefinition } from "../api/types";
-import { Button } from "./ui";
-
-const inputClass =
-  "w-full rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+import { Button, InlineError, inputClass } from "./ui";
 
 // slugify vira o nome digitado num id estável (mesmo alfabeto de
 // console_id/adapter_id do catálogo: minúsculo, hífen). Só usado para uma
@@ -157,7 +154,7 @@ export function ManualEmulatorForm({
         <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
       </label>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <InlineError>{error}</InlineError>}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" disabled={saving}>

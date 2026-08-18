@@ -1,7 +1,22 @@
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
+import { Play, Star, TriangleAlert } from "lucide-react";
 import type { ConsoleVerdict } from "../api/types";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { Select, SelectContent, SelectTrigger, SelectValue } from "./ui/select";
+
+/**
+ * N14 (docs/roadmap.md, Sprint N): decisão do Douglas — `lucide-react` (já
+ * dependência via `ui/dialog.tsx`/`ui/select.tsx`) vira a família de ícone
+ * padrão do app, substituindo os SVGs desenhados à mão (o triângulo de play
+ * estava duplicado literal em `ui.tsx` e `GameListRow.tsx`; a estrela de
+ * favorito tinha seu próprio path à mão) e os caracteres tipográficos
+ * fazendo papel de ícone (`▶`/`★`). `PlayIcon` centraliza o triângulo — os
+ * dois lugares que o usavam agora importam daqui, em vez de duplicar.
+ */
+export function PlayIcon({ size = 14, className = "" }: { size?: number; className?: string }) {
+  return <Play size={size} className={className} fill="currentColor" aria-hidden="true" />;
+}
 
 // Componentes primitivos do item B7 (docs/sprint-b-plano.md), construídos
 // sobre os tokens de src/index.css. Cor, tipografia e foco vivem aqui uma vez
@@ -18,7 +33,68 @@ import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 export const FOCUS_RING =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+/**
+ * N4 (docs/roadmap.md, Sprint N): antes, a mesma string estava copiada em 7
+ * lugares (`grep -rn` achou: EmulatorConfigPanel, ManualEmulatorForm,
+ * VerdictScreen, AllGamesScreen, GamesScreen, EmulatorsScreen, e duas vezes
+ * em SettingsScreen) — cada cópia era uma chance de convergir errado depois
+ * de uma mudança. `h-[38px]` fixa a altura: antes o `py-2` produzia ~34px,
+ * e o `SelectTrigger` do shadcn (abaixo) tinha 32px — três alturas
+ * diferentes na mesma barra de filtros.
+ */
+export const inputClass =
+  `h-[38px] w-full rounded border border-line bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
+
+/**
+ * N4 (docs/roadmap.md, Sprint N): wrapper sobre o `Select` do shadcn (J3)
+ * que aplica a mesma altura (38px, `inputClass` acima), borda e
+ * `FOCUS_RING` do input do ZeuX — sem isto, cada tela reconstruía o
+ * `SelectTrigger` com um `className` própio e divergia (uma tinha `w-fit`,
+ * outra `w-full max-w-xs`, nenhuma corrigia a altura de 32px nem o
+ * `focus-visible:ring` de dois vocabulários — outline aqui, ring lá).
+ * `data-[size=default]:h-[38px]`, não só `h-[38px]`: a base do
+ * `SelectTrigger` fixa a altura sob esse mesmo seletor de atributo
+ * (`data-[size=default]:h-8`) — um `h-[38px]` sem o mesmo modificador
+ * perderia a MESMA disputa de especificidade que o O1 já achou nos modais
+ * (`ui/dialog.tsx`): tailwind-merge não considera dois modificadores
+ * diferentes como conflitantes, e a classe da base sobreviveria.
+ * `focus-visible:ring-0`: desliga o ring do shadcn (grupo de utilitário
+ * diferente do outline — os dois ficariam ativos ao mesmo tempo, dois
+ * efeitos de foco sobrepostos, se não for desligado explicitamente).
+ */
+export function ZSelect({
+  value,
+  onValueChange,
+  placeholder,
+  ariaLabel,
+  className = "",
+  children,
+}: {
+  // `| undefined`: LibraryScreen ainda não escolheu console num primeiro
+  // render sem catálogo (`useState<string | undefined>`) — o `Select` do
+  // Radix já aceita `value` ausente (mostra o placeholder), então o wrapper
+  // não deveria ser mais estrito que o primitivo por baixo.
+  value: string | undefined;
+  onValueChange: (value: string) => void;
+  placeholder?: string;
+  ariaLabel: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger
+        aria-label={ariaLabel}
+        className={`h-[38px] w-full rounded border-line-strong bg-fill px-3 text-sm text-ink data-[size=default]:h-[38px] focus-visible:border-line-strong focus-visible:ring-0 ${FOCUS_RING} ${className}`}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>{children}</SelectContent>
+    </Select>
+  );
+}
+
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -28,6 +104,12 @@ const buttonVariants: Record<ButtonVariant, string> = {
   primary: "border border-accent bg-accent font-semibold text-accent-ink hover:bg-accent-hover",
   secondary: "border border-line-strong bg-transparent text-ink hover:bg-fill",
   ghost: "border border-dashed border-line-strong bg-transparent text-muted hover:text-ink hover:border-ink",
+  // N5 (docs/roadmap.md, Sprint N): antes, toda ação destrutiva ("Excluir
+  // mesmo assim", "Remover", "Desconectar") usava `primary` — a mesma cor do
+  // botão de jogar, sem sinal visual antes de um clique irreversível.
+  // `--danger-strong`, não `--danger` puro (comentário em src/index.css) —
+  // é o fundo que mede ≥ 4.5:1 contra o texto branco.
+  danger: "border border-danger-strong bg-danger-strong font-semibold text-white hover:brightness-110",
 };
 
 export function Button({ variant = "secondary", className = "", ...props }: ButtonProps) {
@@ -37,6 +119,75 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
       {...props}
     />
   );
+}
+
+/**
+ * N8 (docs/roadmap.md, Sprint N): Consentimento, Recusa, Carregando e Erro
+ * não tinham nenhuma cor/textura — pareciam produto diferente da biblioteca,
+ * que já usa a identidade neon (ADR 0013) em glow de foco e borda de capa.
+ * Um glow radial roxo de baixa opacidade atrás do conteúdo, ancorado no
+ * topo — mesmo vocabulário de glow que `GameCover` já usa no hover
+ * (`color-mix` sobre `--accent`), não uma linguagem nova. `pointer-events-none`
+ * e `aria-hidden`: puramente decorativo, nunca compete com o texto por trás
+ * (contraste do texto de consentimento continua medido e sem interferência,
+ * porque o glow fica a 14% de opacidade e o texto não fica sobre ele — a tela
+ * inteira que ganha o clima, não uma faixa atrás da frase). Uso: `<main
+ * className="relative ...">` + `<OnboardingGlow />` como primeiro filho.
+ */
+export function OnboardingGlow() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(60% 50% at 50% 30%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%)",
+      }}
+    />
+  );
+}
+
+/**
+ * N3 (docs/roadmap.md, Sprint N): antes, cada tela escolhia seu próprio teto
+ * de largura e seu próprio espaçamento de topo — conferido por `grep`, eram
+ * seis valores diferentes (`max-w-6xl`, `max-w-7xl`, `max-w-5xl`,
+ * `max-w-4xl`, `max-w-2xl`) mais um `py-10` isolado — e navegar de uma tela
+ * para outra fazia o conteúdo "pular" de largura. Dois tetos só, escolhidos
+ * pelo tipo de conteúdo, não por tela:
+ *
+ * - `"listing"` — telas de grade/lista (Todos os jogos, Emuladores,
+ *   Especificações, Biblioteca, Jogos de um console). Mesmo teto escalonado
+ *   que a Sprint O já validou (O5): `max-w-6xl` até 1536px de janela,
+ *   crescendo em telas grandes/4K para não deixar metade da janela vazia.
+ * - `"reading"` — telas de leitura/formulário (Detalhe do jogo,
+ *   Configurações). `max-w-3xl` fixo, **sem** crescer em janela grande — ao
+ *   contrário de uma grade, texto e formulário não ficam mais úteis
+ *   esticados; a régua de ~65-75 caracteres por linha é o motivo de existir
+ *   um teto de leitura para início de conversa. (Isto supersede o ajuste do
+ *   O7 em `GameDetailScreen`, feito quando essa tela ainda tinha seu próprio
+ *   teto crescente — revertido junto com esta mudança, ver comentário lá.)
+ *
+ * `pt-16 pb-10` é o único espaçamento de topo/rodapé — inclusive
+ * `VerdictScreen`, que antes usava `py-10` sozinha. O checkbox aberto do M1
+ * ("3 fileiras de capa em 1280×800") foi remedido nesta sessão: a decisão do
+ * Douglas foi **aceitar 2 fileiras** — sem uma janela de verdade para
+ * reconfirmar ao vivo (Playwright mediu a falta em 60px), abrir uma exceção
+ * de espaçamento só para uma tela, sem poder validar visualmente que resolve,
+ * arriscava trocar "2 fileiras previsível" por "cabeçalho apertado" sem
+ * ganho medido — o próprio M1 já listava "aceitar" como opção válida.
+ */
+export function ScreenContainer({
+  variant = "listing",
+  className = "",
+  children,
+}: {
+  variant?: "listing" | "reading";
+  className?: string;
+  children: ReactNode;
+}) {
+  const width =
+    variant === "listing" ? "max-w-6xl 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]" : "max-w-3xl";
+  return <div className={`mx-auto px-6 pt-16 pb-10 ${width} ${className}`}>{children}</div>;
 }
 
 export function Card({
@@ -95,10 +246,31 @@ export function Badge({
  * Bloco tracejado para o que só aparece condicionalmente — gargalo, aviso de
  * preset, estado parcial. Ver wireframe.html, ".ph"/bordas tracejadas: é o
  * mesmo vocabulário visual, agora com cor de verdade.
+ *
+ * `tone="amber"` (N16, docs/roadmap.md, Sprint N): o aviso de `Unapplied`
+ * (ADR 0006 — opção que o emulador não suporta) montava a mesma caixa
+ * rotulada à mão em `EmulatorConfigPanel`, com borda/fundo âmbar copiados
+ * literais em vez de reusar este componente. `tone` deixa o `Callout`
+ * cobrir esse caso sem perder o âmbar (o mesmo peso visual de "atenção" que
+ * já tinha) nem duplicar a caixa.
  */
-export function Callout({ label, children }: { label: string; children: ReactNode }) {
+export function Callout({
+  label,
+  tone = "neutral",
+  children,
+}: {
+  label: string;
+  tone?: "neutral" | "amber";
+  children: ReactNode;
+}) {
   return (
-    <div className="rounded border border-dashed border-line-strong p-3">
+    <div
+      className={
+        tone === "amber"
+          ? "rounded border border-amber-line bg-amber-bg p-3"
+          : "rounded border border-dashed border-line-strong p-3"
+      }
+    >
       <p className="mb-1 font-mono text-xs tracking-wide text-muted uppercase">{label}</p>
       <div className="text-base text-ink">{children}</div>
     </div>
@@ -329,7 +501,16 @@ export function GameCover({
           <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
         </>
       )}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/75 to-transparent" />
+      {/* Órfão do M7 corrigido nesta sessão: este gradiente existia para dar
+          contraste ao título escrito por cima da arte — mas o M7 já move
+          esse título para fora da capa (GameTile.tsx, comentário abaixo)
+          sempre que existe `coverUrl`. Ficou aplicado incondicionalmente e
+          escurecia o rodapé de toda capa real sem nenhum texto para
+          proteger — só entra agora quando falta capa de verdade, junto com
+          o título em pixel font que ele existe para sustentar. */}
+      {!coverUrl && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/75 to-transparent" />
+      )}
 
       {/* Badge de plataforma (2026-08-05) — cor de identidade do console,
           não estado. Substitui a repetição da sigla que existia no centro E
@@ -362,11 +543,12 @@ export function GameCover({
               ? "border-[var(--console-accent)] shadow-[0_0_16px_var(--console-accent)]"
               : "border-accent shadow-[0_0_16px_var(--accent)]"
           }`;
-          const icon = (
-            <svg width="14" height="16" viewBox="0 0 14 16" fill={accent ?? "var(--accent)"} aria-hidden="true">
-              <path d="M0 0 L14 8 L0 16 Z" />
-            </svg>
-          );
+          // `color`, não `fill` direto no ícone: PlayIcon usa
+          // `fill="currentColor"`, então herdar a cor de identidade do
+          // console pelo wrapper (abaixo) é o jeito de colorir sem duplicar
+          // a lógica de accent dentro do componente do ícone.
+          const iconStyle: CSSProperties = { color: accent ?? "var(--accent)" };
+          const icon = <PlayIcon size={16} className="translate-x-0.5" />;
           return (
             // Escurecimento mais forte (J4, docs/roadmap.md — referência real
             // do Playnite em docs/referencias-playnite.md: overlay de hover em
@@ -398,11 +580,14 @@ export function GameCover({
                     onPlay();
                   }}
                   className={`pointer-events-auto ${circleClass}`}
+                  style={iconStyle}
                 >
                   {icon}
                 </button>
               ) : (
-                <div className={circleClass}>{icon}</div>
+                <div className={circleClass} style={iconStyle}>
+                  {icon}
+                </div>
               )}
             </div>
           );
@@ -443,14 +628,7 @@ export function FavoriteToggle({
         favorite ? "border-amber bg-black/60 text-amber" : "border-line-strong bg-black/60 text-muted hover:text-ink"
       } ${FOCUS_RING} ${className}`}
     >
-      <svg width="14" height="14" viewBox="0 0 16 16" fill={favorite ? "currentColor" : "none"} aria-hidden="true">
-        <path
-          d="M8 1.5 L9.85 5.6 L14.3 6.15 L11 9.15 L11.9 13.6 L8 11.4 L4.1 13.6 L5 9.15 L1.7 6.15 L6.15 5.6 Z"
-          stroke="currentColor"
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Star size={14} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
     </button>
   );
 }
@@ -503,6 +681,85 @@ export function ProgressBar({ percent }: { percent: number | null }) {
   );
 }
 
+/**
+ * N9 (docs/roadmap.md, Sprint N): antes, nenhuma ação de sucesso confirmava
+ * nada — salvar configuração, gravar mapeamento — o rótulo do botão só
+ * voltava ao normal, sem dizer que funcionou. Reaproveita exatamente a caixa
+ * flutuante que a instalação já usa (`fixed right-4 bottom-4 w-72`,
+ * AllGamesScreen/EmulatorsScreen) — mesmo lugar, mesma forma, não um
+ * componente novo do zero. `role="status"`/`aria-live="polite"`: um anúncio
+ * de leitor de tela sem interromper o que a pessoa estava fazendo. Some
+ * sozinho — use com `useToast` (src/hooks/useToast.ts), que controla o
+ * timer; nunca cobre o controle que originou a ação porque fica ancorado no
+ * canto, longe de onde o usuário acabou de clicar.
+ */
+export function Toast({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg"
+    >
+      <p className="text-sm text-ink">{message}</p>
+    </div>
+  );
+}
+
+/**
+ * N10 (docs/roadmap.md, Sprint N): antes, erro que não justificava um
+ * `ErrorModal` inteiro (falha ao favoritar, revarrer uma pasta, salvar um
+ * campo) virava `<p className="text-sm text-danger">` solto — 28 ocorrências
+ * (`grep -rn 'text-danger">' src/screens src/components`), texto do mesmo
+ * tamanho do que está ao redor, sem ícone nem fundo, fácil de perder num
+ * painel denso. `role="alert"`: leitor de tela anuncia sem precisar de foco.
+ * A mensagem em si nunca muda — continua vindo do servidor sem reescrita
+ * (regra do projeto), só a moldura é nova. Sem tamanho de texto fixo por
+ * dentro do componente: variava entre `text-xs`/`text-sm` nos usos antigos
+ * por acidente, não por decisão — `text-sm` aqui consolida num só.
+ */
+export function InlineError({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      role="alert"
+      className={`flex items-start gap-2 rounded-sm border-l-2 border-danger bg-danger/10 px-2 py-1.5 text-sm text-ink ${className}`}
+    >
+      <TriangleAlert size={15} className="mt-0.5 shrink-0 text-danger" aria-hidden="true" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+/**
+ * N11 (docs/roadmap.md, Sprint N): `AllGamesScreen` já resolveu carregando/
+ * vazio no M12 — `GamesScreen`, `LibraryScreen` e `EmulatorsScreen` ainda
+ * mostravam tela em branco enquanto o dado era `null` (sem nenhum sinal de
+ * que algo estava vindo) e um parágrafo solto quando não havia nada.
+ * `CardSkeleton` é o placeholder genérico — cada tela desenha na MESMA grade
+ * da lista real (mesmas classes `grid-cols-*`), senão o conteúdo pula de
+ * layout ao carregar (a mesma armadilha que o O5 documentou pra grade
+ * virtualizada). `role="status"`/`sr-only`: um anúncio só, não um por
+ * célula — mesmo padrão do `GameTileSkeleton` (M12).
+ */
+export function CardSkeleton({ className = "" }: { className?: string }) {
+  return <div aria-hidden="true" className={`h-24 animate-pulse rounded border border-line-strong bg-fill ${className}`} />;
+}
+
+/**
+ * N11 (docs/roadmap.md, Sprint N): mesmo painel tracejado + ação primária
+ * que `AllGamesScreen` já usava para "biblioteca vazia" (M12), extraído
+ * daqui pra não duplicar em toda tela que precisar do mesmo tratamento.
+ * `action` fica de fora quando a tela já tem a ação em outro lugar visível
+ * (ex.: `GamesScreen` sempre mostra "Voltar à biblioteca" no cabeçalho).
+ */
+export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded border border-dashed border-line-strong px-6 py-16 text-center">
+      <p className="text-base text-muted">{message}</p>
+      {action}
+    </div>
+  );
+}
+
 export const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
   otimo: "ótimo",
   bom: "bom",
@@ -518,9 +775,15 @@ export const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
  */
 export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
   const isGoodTier = verdict.level === "otimo" || verdict.level === "bom";
+  // N12 (docs/roadmap.md, Sprint N): mesmo tratamento que `EmulatorCard`
+  // (src/screens/EmulatorsScreen.tsx) já usa — borda esquerda de 3px na cor
+  // de `consoleAccentColor`. Antes, esta era a única grade de cards do app
+  // sem a cor de identidade que M10 introduziu — 33+ cards visualmente
+  // idênticos, cinza, diferindo só pelo texto.
+  const accent = consoleAccentColor(verdict.console_id);
 
   return (
-    <Card className="flex flex-col gap-2">
+    <Card className="flex flex-col gap-2" style={{ borderLeftColor: accent, borderLeftWidth: 3 }}>
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold text-ink">{verdict.name}</p>
         <Badge variant={isGoodTier ? "solid" : "default"}>{LEVEL_LABEL[verdict.level]}</Badge>

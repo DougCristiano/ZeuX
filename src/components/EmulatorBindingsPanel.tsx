@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { InputBinding } from "../api/types";
 import { translateKeyForAdapter } from "../lib/keyMapping";
-import { Button } from "./ui";
+import { Button, InlineError, Toast } from "./ui";
+import { useToast } from "../hooks/useToast";
 
 /**
  * Tela de mapeamento de teclado/controle (H3/H4, docs/roadmap.md) — só
@@ -32,6 +33,9 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
   const [listeningButtonFor, setListeningButtonFor] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ action: string; key: string; withAction: string } | null>(null);
   const [gamepadConnected, setGamepadConnected] = useState(false);
+  // N9 (docs/roadmap.md, Sprint N): antes, gravar um mapeamento não dizia
+  // nada — só o painel recarregava em silêncio.
+  const { toastMessage, showToast } = useToast();
 
   function load() {
     setLoading(true);
@@ -71,6 +75,8 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       const result = await api.setEmulatorBindings(adapterId, [{ action, ...patch }]);
       if ((result.unapplied ?? []).length > 0) {
         setError(result.unapplied.join(" "));
+      } else {
+        showToast("Mapeamento salvo.");
       }
       load();
     } catch (err) {
@@ -153,7 +159,8 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {toastMessage && <Toast message={toastMessage} />}
+      {error && <InlineError>{error}</InlineError>}
 
       {!gamepadConnected && (
         <p className="text-xs text-muted">

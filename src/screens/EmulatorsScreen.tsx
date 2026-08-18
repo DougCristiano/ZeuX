@@ -10,8 +10,25 @@ import type {
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
-import { Badge, Button, Callout, Card, ConsoleIcon, ConsoleInfoModal, ConsoleMoreBadge, ErrorModal, Pagination, ProgressBar } from "../components/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  ConfirmModal,
+  ConsoleIcon,
+  ConsoleInfoModal,
+  ConsoleMoreBadge,
+  CardSkeleton,
+  ErrorModal,
+  InlineError,
+  inputClass,
+  Pagination,
+  ProgressBar,
+  ScreenContainer,
+  ZSelect,
+} from "../components/ui";
+import { SelectItem } from "../components/ui/select";
 import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
@@ -68,7 +85,7 @@ function RetroArchCoresList() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os cores."));
   }, []);
 
-  if (error) return <p className="text-sm text-danger">{error}</p>;
+  if (error) return <InlineError>{error}</InlineError>;
   if (!cores) return <p className="text-sm text-muted">Carregando cores…</p>;
 
   const missing = cores.filter((c) => !c.installed);
@@ -244,7 +261,7 @@ function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
       <Button type="button" variant="secondary" onClick={openBiosFolder}>
         Abrir pasta do BIOS
       </Button>
-      {biosError && <p className="text-sm text-danger">{biosError}</p>}
+      {biosError && <InlineError>{biosError}</InlineError>}
     </div>
   );
 }
@@ -375,20 +392,26 @@ function EmulatorCardActions({
 
   return (
     <>
+      {/* N13 (docs/roadmap.md, Sprint N): era painel inline tracejado — toca
+          disco/rede (baixa e instala o emulador), então vira `ConfirmModal`,
+          mesma regra já aplicada em AllGamesScreen/GamesScreen. "Cancelar"
+          só volta ao estado normal, o card não some nem desabilita. */}
       {state.kind === "confirm-hardware" && (
-        // Regra: recusar não some com o card nem desabilita o botão de
-        // instalar — "Cancelar" só volta ao estado normal.
-        <div className="rounded border border-dashed border-line-strong p-3">
-          <p className="text-sm text-ink">{state.message}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Button variant="primary" autoFocus onClick={() => install(true)}>
-              Instalar mesmo assim
-            </Button>
-            <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-              Cancelar
-            </Button>
-          </div>
-        </div>
+        <ConfirmModal
+          title="Hardware abaixo do recomendado"
+          message={state.message}
+          onClose={() => setState({ kind: "idle" })}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+                Cancelar
+              </Button>
+              <Button variant="primary" autoFocus onClick={() => install(true)}>
+                Instalar mesmo assim
+              </Button>
+            </>
+          }
+        />
       )}
 
       {(state.kind === "installing" || state.kind === "done") && (
@@ -405,8 +428,8 @@ function EmulatorCardActions({
         </div>
       )}
 
-      {state.kind === "error" && <p className="text-sm text-danger">{state.message}</p>}
-      {state.kind === "remove-error" && <p className="text-sm text-danger">{state.message}</p>}
+      {state.kind === "error" && <InlineError>{state.message}</InlineError>}
+      {state.kind === "remove-error" && <InlineError>{state.message}</InlineError>}
 
       {/* Fontes "manual" (hoje só o Dolphin) não distribuem por releases do
           GitHub — não há como o ZeuX resolver a versão mais recente por API
@@ -459,11 +482,11 @@ function EmulatorCardActions({
           continua na lista (nunca some sozinho), com Editar/Excluir
           disponíveis para o usuário corrigir o caminho ou desistir. */}
       {customDef && !entry.installed && (
-        <p className="text-sm text-danger">O executável não foi encontrado em "{customDef.binary_path}".</p>
+        <InlineError>O executável não foi encontrado em "{customDef.binary_path}".</InlineError>
       )}
 
-      {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
-      {openError && <p className="text-sm text-danger">{openError}</p>}
+      {deleteError && <InlineError>{deleteError}</InlineError>}
+      {openError && <InlineError>{openError}</InlineError>}
 
       <div className="flex flex-wrap items-center gap-2">
         {entry.installed && (
@@ -472,7 +495,11 @@ function EmulatorCardActions({
           // escape hatch mesmo para os adapters que já têm
           // EmulatorConfigPanel/EmulatorBindingsPanel: informar, não
           // bloquear, o ZeuX nunca vira o único caminho.
-          <Button variant="secondary" disabled={opening} onClick={openStandalone} title="Abre o emulador sem nenhum jogo, para configurar dentro dele.">
+          // N15 (docs/roadmap.md, Sprint N): é a única ação primária do card
+          // quando instalado — antes, todos os até 6 botões do card eram
+          // `secondary`, nenhum se destacava. É o único botão sempre presente
+          // (custom ou não) nesse estado, o candidato natural.
+          <Button variant="primary" disabled={opening} onClick={openStandalone} title="Abre o emulador sem nenhum jogo, para configurar dentro dele.">
             {opening ? "Abrindo…" : "Abrir configurações do emulador"}
           </Button>
         )}
@@ -482,18 +509,32 @@ function EmulatorCardActions({
           // genérico (não tem fonte de download) — Editar/Excluir são as
           // únicas ações, disponíveis mesmo se o binário sumiu do caminho.
           <>
-            <Button variant="secondary" onClick={() => onEditCustom(customDef)}>
+            {/* N15 (docs/roadmap.md, Sprint N): primária só quando este
+                emulador personalizado NÃO está instalado — "Abrir
+                configurações do emulador" acima já é a primária do card
+                quando está (um card nunca tem duas). Sem instalação, "Editar"
+                (corrigir o caminho) é a ação óbvia seguinte. */}
+            <Button variant={entry.installed ? "secondary" : "primary"} onClick={() => onEditCustom(customDef)}>
               Editar
             </Button>
             {confirmingDelete ? (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="primary" autoFocus disabled={deleting} onClick={deleteCustom}>
-                  Excluir mesmo assim
-                </Button>
-                <Button variant="secondary" onClick={() => setConfirmingDelete(false)}>
-                  Cancelar
-                </Button>
-              </div>
+              // N13 (docs/roadmap.md, Sprint N): irreversível (apaga o
+              // cadastro personalizado) — era painel inline, virou modal.
+              <ConfirmModal
+                title="Excluir emulador personalizado?"
+                message={`"${customDef.name}" será removido da lista. O binário no disco não é apagado — só o cadastro no ZeuX.`}
+                onClose={() => setConfirmingDelete(false)}
+                actions={
+                  <>
+                    <Button variant="secondary" onClick={() => setConfirmingDelete(false)}>
+                      Cancelar
+                    </Button>
+                    <Button variant="danger" autoFocus disabled={deleting} onClick={deleteCustom}>
+                      Excluir mesmo assim
+                    </Button>
+                  </>
+                }
+              />
             ) : (
               <Button variant="secondary" disabled={deleting} onClick={() => setConfirmingDelete(true)}>
                 Excluir
@@ -503,14 +544,23 @@ function EmulatorCardActions({
         ) : entry.installed ? (
           canRemove &&
           (state.kind === "confirm-remove" ? (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="primary" autoFocus onClick={remove}>
-                Remover mesmo assim
-              </Button>
-              <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                Cancelar
-              </Button>
-            </div>
+            // N13 (docs/roadmap.md, Sprint N): irreversível (desinstala,
+            // toca disco) — era painel inline, virou modal.
+            <ConfirmModal
+              title="Remover emulador?"
+              message={`${entry.name} será desinstalado da pasta gerenciada pelo ZeuX.`}
+              onClose={() => setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+                    Cancelar
+                  </Button>
+                  <Button variant="danger" autoFocus onClick={remove}>
+                    Remover mesmo assim
+                  </Button>
+                </>
+              }
+            />
           ) : (
             <Button
               variant="secondary"
@@ -713,10 +763,9 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   }
 
   return (
-    // O5 (docs/roadmap.md, Sprint O): mesmo teto escalonado de AllGamesScreen —
-    // nada muda abaixo de 1536px, evita o container travar em 1152px de
-    // conteúdo útil em janela grande/4K.
-    <div className="mx-auto max-w-6xl px-6 pt-16 pb-10 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]">
+    // N3 (docs/roadmap.md, Sprint N): teto centralizado em `ScreenContainer`
+    // (src/components/ui.tsx) — mesmo teto escalonado que o O5 validou.
+    <ScreenContainer variant="listing">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-ink">Emuladores</h1>
         {onBack && (
@@ -740,28 +789,25 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Buscar emulador ou console…"
-              className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className={`${inputClass} max-w-xs`}
             />
           </>
         )}
 
         {consoleOptions.length > 0 && (
-          <Select
+          <ZSelect
+            ariaLabel="Filtrar por console"
             value={consoleFilter || ALL_CONSOLES}
             onValueChange={(v) => handleConsoleFilter(v === ALL_CONSOLES ? "" : v)}
+            className="max-w-xs"
           >
-            <SelectTrigger aria-label="Filtrar por console" className="w-full max-w-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_CONSOLES}>Todos os consoles</SelectItem>
-              {consoleOptions.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <SelectItem value={ALL_CONSOLES}>Todos os consoles</SelectItem>
+            {consoleOptions.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </ZSelect>
         )}
       </div>
 
@@ -774,6 +820,21 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           falhou, ao lado do botão que a disparou — diferente do erro que
           motivou a troca, que ficava longe da célula que o causou. */}
       {error && <ErrorModal title="Não foi possível listar os emuladores" message={error} onClose={() => setError(null)} />}
+
+      {/* N11 (docs/roadmap.md, Sprint N): antes, `emulators === null` só
+          deixava o cabeçalho visível, nada de grade nem sinal de
+          carregamento. Skeleton na mesma grade dos cards reais (linha
+          abaixo). */}
+      {emulators === null && (
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Carregando emuladores…</span>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
+            {Array.from({ length: PAGE_SIZE }, (_, i) => (
+              <CardSkeleton key={i} className="h-40" />
+            ))}
+          </div>
+        </div>
+      )}
 
       {emulators && filtered.length === 0 && (
         <p className="text-base text-muted">Nenhum emulador encontrado para "{search}".</p>
@@ -842,6 +903,6 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           onClose={() => setModalConsoleId(null)}
         />
       )}
-    </div>
+    </ScreenContainer>
   );
 }

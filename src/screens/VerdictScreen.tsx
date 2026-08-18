@@ -1,7 +1,18 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, HardwareInfo, Report } from "../api/types";
-import { Callout, Card, ConsoleVerdictCard, FOCUS_RING, LEVEL_LABEL, Pagination, PartialNotice } from "../components/ui";
+import {
+  Callout,
+  Card,
+  ConsoleVerdictCard,
+  FOCUS_RING,
+  InlineError,
+  inputClass,
+  LEVEL_LABEL,
+  Pagination,
+  PartialNotice,
+  ScreenContainer,
+} from "../components/ui";
 
 const LEVEL_ORDER: ConsoleVerdict["level"][] = ["otimo", "bom", "limitado", "improvavel"];
 const PAGE_SIZE = 9;
@@ -32,7 +43,7 @@ function SpecsPanel() {
   if (error) {
     return (
       <Card filled>
-        <p className="text-sm text-danger">{error}</p>
+        <InlineError>{error}</InlineError>
       </Card>
     );
   }
@@ -177,9 +188,11 @@ export function VerdictScreen({ report }: { report: Report }) {
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    // O5 (docs/roadmap.md, Sprint O): mesmo teto escalonado das outras telas
-    // de listagem — nada muda abaixo de 1536px.
-    <div className="mx-auto max-w-7xl px-6 py-10 2xl:max-w-[1720px] min-[2400px]:max-w-[2000px]">
+    // N3 (docs/roadmap.md, Sprint N): era `max-w-7xl` + `py-10` própria (a
+    // única tela do app com esse espaçamento de topo diferente) — agora usa
+    // o mesmo teto/espaçamento de listagem do resto do app
+    // (`ScreenContainer`, que já herda o teto escalonado que o O5 validou).
+    <ScreenContainer variant="listing">
       {/* O6 (docs/roadmap.md, Sprint O): era `320px` fixo — largura fixa numa
           coluna dentro da área que divide espaço com a sidebar, proibida pela
           regra de "Layout responsivo" do CLAUDE.md. `minmax(260px, 340px)`
@@ -219,7 +232,7 @@ export function VerdictScreen({ report }: { report: Report }) {
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Buscar console…"
-              className="w-full max-w-xs rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className={`${inputClass} max-w-xs`}
             />
             <div className="flex flex-wrap gap-1.5">
               <button
@@ -268,6 +281,6 @@ export function VerdictScreen({ report }: { report: Report }) {
           <Pagination page={page} totalPages={totalPages} onChange={setPage} />
         </div>
       </div>
-    </div>
+    </ScreenContainer>
   );
 }

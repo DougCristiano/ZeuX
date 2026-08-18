@@ -52,7 +52,17 @@
   --paper: #080c17;
   --panel: #0f1629;
   --ink: #e2e8f0;
-  --muted: #64748b;
+  /* N1 (docs/roadmap.md, Sprint N): era #64748b — 4.10:1 contra --paper e
+     3.78:1 contra --fill, abaixo do 4.5:1 que a WCAG AA exige para texto
+     normal. É o texto secundário de quase toda tela do app (rótulo, tempo
+     jogado, caminho de pasta), então valia a pena medir em vez de confiar no
+     olho. #94a3b8 (slate-400) passa nos dois fundos: 7.62:1 contra --paper,
+     7.02:1 contra --fill (medido nesta sessão, fórmula de luminância
+     relativa da WCAG — a mesma que o comentário abaixo já usa para
+     roxo/ciano/âmbar). Nenhum uso decorativo do projeto precisou do cinza
+     mais apagado depois da subida — se precisar no futuro, crie
+     `--muted-faint: #64748b` e não reuse `--muted` para isso. */
+  --muted: #94a3b8;
   --line: #1e2d4f;
   --line-strong: #2c3f66;
   --fill: #0f1629;
@@ -65,6 +75,16 @@
   --amber-bg: #241a0f;
   --amber-line: #4a3320;
   --danger: #f0554a;
+  /* N5 (docs/roadmap.md, Sprint N): --danger sozinho não serve de fundo de
+     botão sólido com texto branco — 3.44:1 contra #fff, abaixo do 4.5:1 da
+     WCAG AA (o token foi calibrado para texto/borda sobre fundo escuro,
+     onde já passa: 4.62:1 contra --paper). --danger-strong é a mesma matiz
+     e saturação, só mais escuro (mesmo método do restante da paleta —
+     "variar tom/brilho, nunca matiz", ver src/lib/consoleColor.ts), medido
+     em 5.46:1 contra branco — é o fundo que Button variant="danger" usa.
+     Nunca use `text-danger` sobre `bg-danger-strong` (mesma matiz, contraste
+     baixo entre si) nem o contrário. */
+  --danger-strong: #cf1e11;
 
   /*
    * J1 (docs/roadmap.md): variáveis que o shadcn/Radix espera, mapeadas para
@@ -114,6 +134,7 @@
   --color-amber-bg: var(--amber-bg);
   --color-amber-line: var(--amber-line);
   --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
 
   --font-sans: "Inter", system-ui, sans-serif;
   /*

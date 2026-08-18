@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { Renderer } from "../api/types";
-import { Button } from "./ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-
-const inputClass =
-  "w-full rounded border border-line bg-fill px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+import { Button, Callout, ConfirmModal, InlineError, inputClass, Toast, ZSelect } from "./ui";
+import { SelectItem } from "./ui/select";
+import { useToast } from "../hooks/useToast";
 
 const RENDERER_LABEL: Record<Renderer, string> = {
   "": "Padrão do emulador",
@@ -43,6 +41,9 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
   const [unapplied, setUnapplied] = useState<string[]>([]);
   const [confirmingRestore, setConfirmingRestore] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  // N9 (docs/roadmap.md, Sprint N): antes, salvar só fazia o botão voltar ao
+  // normal — nada dizia que funcionou.
+  const { toastMessage, showToast } = useToast();
 
   function load() {
     setLoading(true);
@@ -72,6 +73,7 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
       });
       setUnapplied(result.unapplied ?? []);
       load();
+      showToast("Configuração salva.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível salvar a configuração.");
     } finally {
@@ -97,7 +99,8 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
 
   return (
     <div className="flex flex-col gap-3">
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {toastMessage && <Toast message={toastMessage} />}
+      {error && <InlineError>{error}</InlineError>}
 
       <label className="flex items-center gap-2 text-sm text-ink">
         <input
@@ -124,29 +127,30 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
 
       <label className="flex flex-col gap-1 text-sm text-ink">
         Backend gráfico
-        <Select
+        <ZSelect
+          ariaLabel="Backend gráfico"
           value={renderer || DEFAULT_RENDERER}
           onValueChange={(v) => setRenderer((v === DEFAULT_RENDERER ? "" : v) as Renderer)}
         >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.keys(RENDERER_LABEL) as Renderer[]).map((r) => (
-              <SelectItem key={r || DEFAULT_RENDERER} value={r || DEFAULT_RENDERER}>
-                {RENDERER_LABEL[r]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {(Object.keys(RENDERER_LABEL) as Renderer[]).map((r) => (
+            <SelectItem key={r || DEFAULT_RENDERER} value={r || DEFAULT_RENDERER}>
+              {RENDERER_LABEL[r]}
+            </SelectItem>
+          ))}
+        </ZSelect>
       </label>
 
+      {/* N16 (docs/roadmap.md, Sprint N): era uma `<ul>` montada à mão com
+          borda/fundo âmbar copiados — `Callout` (tone="amber") já é
+          exatamente esse componente, reaproveitado em vez de duplicado. */}
       {unapplied.length > 0 && (
-        <ul className="list-disc rounded border border-dashed border-amber-line bg-amber-bg pl-6 py-2 pr-2 text-sm text-ink">
-          {unapplied.map((msg, i) => (
-            <li key={i}>{msg}</li>
-          ))}
-        </ul>
+        <Callout label="Não aplicado" tone="amber">
+          <ul className="list-disc pl-4">
+            {unapplied.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+        </Callout>
       )}
 
       <div className="flex flex-wrap gap-2">
@@ -154,14 +158,23 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
           {saving ? "Salvando…" : "Salvar"}
         </Button>
         {confirmingRestore ? (
-          <>
-            <Button variant="primary" autoFocus disabled={restoring} onClick={restore}>
-              Restaurar mesmo assim
-            </Button>
-            <Button variant="secondary" onClick={() => setConfirmingRestore(false)}>
-              Cancelar
-            </Button>
-          </>
+          // N13 (docs/roadmap.md, Sprint N): irreversível (descarta a
+          // configuração personalizada salva) — era painel inline, virou modal.
+          <ConfirmModal
+            title="Restaurar configuração padrão?"
+            message={`As opções personalizadas de ${adapterName} salvas aqui serão descartadas.`}
+            onClose={() => setConfirmingRestore(false)}
+            actions={
+              <>
+                <Button variant="secondary" onClick={() => setConfirmingRestore(false)}>
+                  Cancelar
+                </Button>
+                <Button variant="danger" autoFocus disabled={restoring} onClick={restore}>
+                  Restaurar mesmo assim
+                </Button>
+              </>
+            }
+          />
         ) : (
           <Button variant="secondary" onClick={() => setConfirmingRestore(true)}>
             Restaurar padrão

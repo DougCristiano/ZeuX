@@ -1,34 +1,23 @@
 import type { ReactNode } from "react";
+import { Cpu, Gamepad2, LayoutGrid, Settings } from "lucide-react";
 import logoZeux from "../assets/logo-zeux.png";
 import { FOCUS_RING } from "./ui";
 
 export type NavID = "library" | "emulators" | "verdict" | "settings";
 
+// N14 (docs/roadmap.md, Sprint N): os 4 ícones eram SVG desenhado à mão —
+// decisão do Douglas: lucide-react (já dependência via ui/dialog.tsx e
+// ui/select.tsx) vira a família padrão do app.
 const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
   {
     id: "library",
     label: "Biblioteca",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <rect x="1" y="1" width="6" height="6" fill="currentColor" />
-        <rect x="11" y="1" width="6" height="6" fill="currentColor" />
-        <rect x="1" y="11" width="6" height="6" fill="currentColor" />
-        <rect x="11" y="11" width="6" height="6" fill="currentColor" />
-      </svg>
-    ),
+    icon: <LayoutGrid size={18} aria-hidden="true" />,
   },
   {
     id: "emulators",
     label: "Emuladores",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <rect x="2" y="4" width="14" height="10" rx="1" stroke="currentColor" strokeWidth="2" />
-        <rect x="5" y="8" width="2" height="2" fill="currentColor" />
-        <rect x="11" y="8" width="2" height="2" fill="currentColor" />
-        <rect x="8" y="6" width="2" height="2" fill="currentColor" />
-        <rect x="8" y="10" width="2" height="2" fill="currentColor" />
-      </svg>
-    ),
+    icon: <Gamepad2 size={18} aria-hidden="true" />,
   },
   {
     id: "verdict",
@@ -39,12 +28,7 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
     // nesta tela). A sidebar agora expande no hover/foco e mostra o `label`
     // completo em vez de qualquer sigla.
     label: "Especificações",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <rect x="3" y="1" width="12" height="16" rx="1" stroke="currentColor" strokeWidth="2" />
-        <path d="M6 9 L8 11 L12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
+    icon: <Cpu size={18} aria-hidden="true" />,
   },
   {
     id: "settings",
@@ -53,17 +37,7 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
     // Douglas nesta sessão para dar lugar a "conectar conta do IGDB", sem
     // uma tela nem um modal específicos para isso antes.
     label: "Configurações",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
-        <path
-          d="M9 1.5 L9 3.2 M9 14.8 L9 16.5 M16.5 9 L14.8 9 M3.2 9 L1.5 9 M14.3 3.7 L13.1 4.9 M4.9 13.1 L3.7 14.3 M14.3 14.3 L13.1 13.1 M4.9 4.9 L3.7 3.7"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
+    icon: <Settings size={18} aria-hidden="true" />,
   },
 ];
 
@@ -107,11 +81,15 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
     // e `relative` existem só para ancorar e disparar o painel absoluto abaixo.
     <aside className="group relative h-screen w-16 shrink-0">
       <div
-        // `w-60`, não `w-48`: medido ao vivo (Playwright) — "Especificações"
-        // (o rótulo mais longo) precisa de ~158px, e o slot do ícone já
-        // consome 64px; `w-48` (192px) cortava as duas palavras mais longas
-        // no meio.
-        className={`absolute inset-y-0 left-0 z-20 flex w-16 flex-col items-center overflow-hidden border-r border-line bg-panel py-5 transition-[width] duration-150 ease-in-out group-hover:w-60 group-hover:shadow-xl group-focus-within:w-60 group-focus-within:shadow-xl`}
+        // N17 (docs/roadmap.md, Sprint N): `w-60` media o rótulo em Press
+        // Start 2P (pixel font, larga e pesada para 14 caracteres — motivo
+        // documentado de a sidebar precisar de tanta largura pra caber
+        // "Especificações"). O rótulo saiu do `font-pixel` (abaixo) — em
+        // Inter 13px/medium, a mesma palavra estimada em ~110-130px (não
+        // remedido ao vivo, sem GUI neste ambiente — Douglas, confirme e
+        // ajuste `w-52`/`w-56` se cortar). `w-52` (208px) = 64px do ícone +
+        // ~130px de folga pro texto mais longo, teto ainda menor que antes.
+        className={`absolute inset-y-0 left-0 z-20 flex w-16 flex-col items-center overflow-hidden border-r border-line bg-panel py-5 transition-[width] duration-150 ease-in-out group-hover:w-52 group-hover:shadow-xl group-focus-within:w-52 group-focus-within:shadow-xl`}
       >
         <div className="mb-7 shrink-0" aria-hidden="true">
           <img src={logoZeux} alt="" width={36} height={36} className="object-contain" />
@@ -141,8 +119,13 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
                     suavemente (mesmo padrão de duração de `GameCover`), e
                     `width: auto` não anima em CSS — a técnica de "chutar" um
                     teto de largura maior que qualquer rótulo real é o jeito
-                    padrão de contornar isso. */}
-                <span className="max-w-0 overflow-hidden font-pixel text-[11px] whitespace-nowrap tracking-wide opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[176px] group-hover:opacity-100 group-focus-within:max-w-[176px] group-focus-within:opacity-100">
+                    padrão de contornar isso.
+                    N17 (docs/roadmap.md, Sprint N): saiu do `font-pixel` —
+                    pixel font é tempero de marca (logo, badge, contador),
+                    não rótulo de navegação; em 14 caracteres ficava largo e
+                    pesado, e era o motivo da sidebar precisar de tanta
+                    largura (ver comentário no painel acima). */}
+                <span className="max-w-0 overflow-hidden text-[13px] font-medium whitespace-nowrap tracking-wide opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[144px] group-hover:opacity-100 group-focus-within:max-w-[144px] group-focus-within:opacity-100">
                   {item.label}
                 </span>
               </button>
