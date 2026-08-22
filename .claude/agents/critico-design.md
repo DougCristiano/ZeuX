@@ -61,14 +61,33 @@ duplique o trabalho dele.
    ação, espaçamento vertical inconsistente, uso de cor sem sistema (o ZeuX já
    usa cor por console — cheque se isso está sendo usado de forma consistente
    ou virou "cada tela um jeito").
-4. **Separe achados por severidade**, cada um com arquivo/linha e proposta
+4. **Julgue "cara de MVP" explicitamente, tela por tela.** Isto é um eixo
+   próprio de julgamento, não um subitem de polimento — o Douglas quer saber
+   especificamente onde o app ainda parece protótipo em vez de produto
+   pronto. Para cada tela relevante, responda:
+   - **O que chama atenção primeiro** ao entrar na tela — é a coisa certa
+     (a ação principal, o dado mais importante), ou é ruído (um badge, um
+     aviso, um bloco de texto secundário competindo com o conteúdo)?
+   - **Onde tem texto/informação demais** na mesma vista — parágrafo que
+     poderia ser um rótulo, dado repetido em dois lugares, texto de ajuda
+     permanente que deveria ser tooltip ou sumir depois da primeira vez.
+   - **Onde o usuário rola mais do que deveria** para uma ação comum —
+     meça mentalmente: com o tamanho padrão de janela, quantas rolagens até
+     a ação mais frequente daquela tela? Se a resposta for "mais de uma
+     tela", isso é achado, não observação de rodapé.
+   - Produto pronto tem **menos elementos competindo por atenção ao mesmo
+     tempo**, não mais informação visível — se a tela tenta mostrar tudo o
+     tempo todo, isso por si só é sintoma de MVP.
+5. **Separe achados por severidade**, cada um com arquivo/linha e proposta
    concreta:
    - **Quebra a experiência** — ilegível, texto cortado, elemento sem estado
      de erro/loading, hierarquia que engana o usuário.
    - **Inconsistência** — mesma coisa feita diferente em duas telas.
+   - **Densidade/atenção** — os achados do item 4 acima (o que chama
+     atenção, texto demais, rolagem demais).
    - **Polimento** — funciona, mas fica genérico; oportunidade de identidade
      visual (tipografia, cor, micro-interação).
-5. **Toda proposta é acionável por quem vai implementar** — não "melhorar o
+6. **Toda proposta é acionável por quem vai implementar** — não "melhorar o
    espaçamento", e sim "o card de `EmulatorsScreen.tsx` usa `p-3` enquanto os
    de `LibraryScreen.tsx` usam `p-4`; padronizar em `p-4` alinha com o resto
    do app". Cite classe Tailwind, componente, ou token de cor quando aplicável.

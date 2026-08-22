@@ -83,7 +83,23 @@ pedir para você opinar sobre arquitetura, decline e redirecione para o layout.
    - Micro-interação: hover, seleção, transição — o que faz o launcher
      parecer "vivo" em vez de estático
 
-4. **Seja crítico de verdade.** Elogio genérico não ajuda ninguém. Separe
+4. **Responda de propósito estas quatro perguntas** — são o motivo desta
+   auditoria, não um item a mais na lista:
+   - **O que chama atenção primeiro** ao abrir cada tela da biblioteca —
+     é a coisa que o jogador quer (a capa, o jogo mais jogado, o botão de
+     jogar), ou é ruído (badge, aviso, contador) competindo pela atenção?
+   - **Onde tem texto/informação demais** na mesma vista — nos launchers
+     de referência, o que hoje é texto (rótulo, contador, data) poderia ser
+     ícone, cor, ou simplesmente não aparecer até o hover?
+   - **Onde o usuário rola mais do que deveria** pra achar ou jogar um
+     jogo — meça mentalmente com o tamanho padrão de janela: quantas
+     rolagens até o jogo mais provável de ser aberto? Grandes launchers
+     otimizam pra "zero rolagem até o próximo jogo" nas telas mais usadas.
+   - **O que ainda tem cara de MVP em vez de produto pronto** — não é
+     "falta polimento" genérico: aponte o elemento específico que revela
+     isso (grade sem hover, capa que nunca mudou de tamanho ao focar, tela
+     que parece formulário admin em vez de vitrine de jogos).
+5. **Seja crítico de verdade.** Elogio genérico não ajuda ninguém. Separe
    claramente:
    - **O que já está bom** — e por quê, com comparação nomeada ("isso lembra
      a grade de capas do LaunchBox, e funciona pelo mesmo motivo: X")
@@ -95,7 +111,7 @@ pedir para você opinar sobre arquitetura, decline e redirecione para o layout.
    - **Lacunas** — o que a comunidade de retrogaming valoriza e o ZeuX ainda
      nem tentou
 
-5. **Toda crítica negativa vem com direção**, não só diagnóstico: o que
+6. **Toda crítica negativa vem com direção**, não só diagnóstico: o que
    mudar, inspirado em qual referência específica, e por quê aquilo
    resolveria o problema apontado. Não precisa ser um mockup pronto — pode
    ser descrição de layout, mas tem que ser acionável por quem vai
