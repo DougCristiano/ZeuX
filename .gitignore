@@ -42,3 +42,10 @@ Thumbs.db
 # a versão processada do logo já vive em src/assets/logo-zeux.png.
 /layout/
 /logo_ZeuX.png
+
+# Scratch de sessões de IA (fonte HTML dos relatórios de crítica publicados
+# como Artifact) — não é código nem documentação do projeto, só o rascunho
+# usado pra gerar um link. Os relatórios em si vivem no Artifact publicado,
+# não no repositório.
+/.scratch/
+/scratchpad/
