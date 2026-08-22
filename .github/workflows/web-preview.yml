@@ -19,6 +19,25 @@ name: Preview web (GitHub Pages)
 #      normalmente. `ZEUX_DEV_ORIGIN` já existe pra isso desde o `tauri dev`
 #      (internal/api/server.go); aqui é só mais uma origem de desenvolvimento.
 #
+#      Lançar um jogo funciona nesse modo: o botão "Jogar" é só um fetch
+#      (`api.launch`) pro zeuxd, que sobe o processo do emulador via
+#      `exec.Command` (internal/emulator/session.go) — roda no computador
+#      onde o zeuxd está, como janela nativa normal, igual ao app
+#      empacotado. Só ficam de fora as ações que dependem de plugin do
+#      Tauri (sem equivalente em navegador puro): abrir a pasta do
+#      BIOS/instalação no explorador de arquivos e o seletor nativo de
+#      pasta (biblioteca, emulador manual) — nessas, digitar o caminho
+#      funciona onde a tela aceitar path como texto.
+#
+#      OUTRA PESSOA ABRINDO A MESMA URL NÃO CONSEGUE JOGAR NA SUA MÁQUINA:
+#      o front sempre chama "http://127.0.0.1:7777" — o loopback do
+#      navegador de QUEM ABRIU a página, nunca o seu computador. Sem um
+#      zeuxd rodando na própria máquina dessa pessoa (e sem ela liberar a
+#      origem do Pages no CORS dela, o mesmo passo do item 2), a página
+#      só mostra os estados de erro do item 1. Não há como essa página,
+#      sozinha, dar a alguém acesso ao seu zeuxd, seus jogos ou seus
+#      emuladores.
+#
 # Gatilho: só a branch `web-preview` (mais workflow_dispatch para republicar
 # sem precisar de um commit vazio) — de propósito separado do `release.yml`,
 # que cobre o app empacotado de verdade. Path filter (`paths:`) evita rodar
