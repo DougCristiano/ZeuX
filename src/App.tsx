@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
+import { isDemoMode } from "./api/demoMode";
 import type { LibraryGame } from "./api/types";
 import {
   AllGamesScreen,
@@ -384,11 +385,29 @@ function App() {
         <main ref={mainRef} className="flex-1 overflow-y-auto">
           {screen}
         </main>
+        {isDemoMode() && <DemoBanner />}
       </div>
     );
   }
 
-  return screen;
+  return (
+    <>
+      {screen}
+      {isDemoMode() && <DemoBanner />}
+    </>
+  );
+}
+
+// Preview web (branch `web-preview`, GitHub Pages): tudo que a tela mostra
+// nesse modo é fictício (hardware, biblioteca, sessão) — a faixa existe
+// pra ninguém confundir isso com uma leitura real da própria máquina.
+// `fixed`, não some ao rolar; z-50 pra ficar acima de qualquer modal.
+function DemoBanner() {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-50 bg-amber-bg py-1 text-center font-pixel text-[10px] text-amber">
+      MODO DEMONSTRAÇÃO — hardware, biblioteca e sessões são fictícios
+    </div>
+  );
 }
 
 const SIDEBAR_PHASES: Phase[] = [

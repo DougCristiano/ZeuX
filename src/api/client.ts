@@ -28,6 +28,9 @@ import type {
   SessionsResponse,
   SystemInfo,
 } from "./types";
+import { isDemoMode } from "./demoMode";
+import { demoRequest } from "./demoMock";
+import { ApiError } from "./apiError";
 
 // O zeuxd sobe como sidecar do Tauri (item B5) e escuta sempre neste
 // endereço fixo — descoberta dinâmica de porta é backlog sem sprint.
@@ -43,21 +46,7 @@ export function coverImageURL(coverUrl: string | undefined): string | undefined 
   return coverUrl ? `${API_ORIGIN}${coverUrl}` : undefined;
 }
 
-/**
- * Erro de API com o `code` estável do servidor. `message` já vem em
- * português, pronta para ser exibida ao usuário exatamente como veio — regra
- * de produto: a UI nunca reescreve a mensagem do servidor. `code` é só para a
- * UI ramificar (ex.: mostrar um botão diferente para `hardware_insufficient`).
- */
-export class ApiError extends Error {
-  readonly code: string;
-
-  constructor(code: string, message: string) {
-    super(message);
-    this.name = "ApiError";
-    this.code = code;
-  }
-}
+export { ApiError } from "./apiError";
 
 function isErrorBody(value: unknown): value is ErrorBody {
   return (
@@ -70,6 +59,14 @@ function isErrorBody(value: unknown): value is ErrorBody {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Modo demo (branch `web-preview`, ver src/api/demoMode.ts): nenhum fetch
+  // real acontece, tudo vem de demoMock.ts. Verificado antes de qualquer
+  // outra coisa nesta função — o resto dela (timeout, parse de erro) só
+  // faz sentido para o zeuxd de verdade.
+  if (isDemoMode()) {
+    return demoRequest<T>(path, init);
+  }
+
   // Sem timeout próprio, um fetch pendurado (TCP aceito sem resposta HTTP)
   // deixava a UI em "lendo o consentimento…" até o WebView desistir sozinho —
   // StatusScreen promete que o loading não gira para sempre; isso só vale se

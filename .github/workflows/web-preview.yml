@@ -38,6 +38,21 @@ name: Preview web (GitHub Pages)
 #      sozinha, dar a alguém acesso ao seu zeuxd, seus jogos ou seus
 #      emuladores.
 #
+#   3. Modo demo — pra deixar QUALQUER PESSOA clicar pelas telas sem
+#      instalar nada, sem tunelar CORS e sem depender do seu zeuxd estar de
+#      pé: abra a URL do Pages com "?demo=1" no final. src/api/demoMode.ts
+#      e src/api/demoMock.ts substituem toda chamada de API por dados
+#      fictícios em memória (persistidos só em localStorage do próprio
+#      navegador de quem visita) — biblioteca, parecer de hardware,
+#      instalação e sessão de mentira, tudo fabricado no próprio front, sem
+#      round-trip nenhum pra rede. Por isso resolve o problema que o item 2
+#      não resolve: não depende do computador de ninguém estar ligado com
+#      o zeuxd rodando. Em compensação, "Jogar" aqui não abre emulador
+#      nenhum de verdade — só finge uma sessão, exatamente pra não
+#      confundir alguém achando que clicou e o jogo abriu numa janela em
+#      algum lugar. Uma faixa fixa no topo da tela ("MODO DEMONSTRAÇÃO")
+#      deixa isso visível o tempo todo. "?demo=0" desativa de novo.
+#
 # Gatilho: só a branch `web-preview` (mais workflow_dispatch para republicar
 # sem precisar de um commit vazio) — de propósito separado do `release.yml`,
 # que cobre o app empacotado de verdade. Path filter (`paths:`) evita rodar
