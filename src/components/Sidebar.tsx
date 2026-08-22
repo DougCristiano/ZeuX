@@ -91,8 +91,11 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
         // ~130px de folga pro texto mais longo, teto ainda menor que antes.
         className={`absolute inset-y-0 left-0 z-20 flex w-16 flex-col items-center overflow-hidden border-r border-line bg-panel py-5 transition-[width] duration-150 ease-in-out group-hover:w-52 group-hover:shadow-xl group-focus-within:w-52 group-focus-within:shadow-xl`}
       >
+        {/* 48px num rail de 64px (w-16): a logo é a única identidade pixel
+            fora dos rótulos (N17) — 36px deixava margem demais nos dois
+            lados e lia como pequena demais pra ser o topo da marca. */}
         <div className="mb-7 shrink-0" aria-hidden="true">
-          <img src={logoZeux} alt="" width={36} height={36} className="object-contain" />
+          <img src={logoZeux} alt="" width={48} height={48} className="object-contain" />
         </div>
 
         <nav className="flex w-full flex-1 flex-col" aria-label="Navegação principal">
