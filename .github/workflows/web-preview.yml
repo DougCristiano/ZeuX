@@ -1,0 +1,94 @@
+name: Preview web (GitHub Pages)
+
+# Publica só o front-end (React/Vite) no GitHub Pages, para testar mudanças
+# de tela/design num navegador de verdade em segundos — sem esperar um
+# build do Tauri (Rust) nem instalar nada. Não é o app completo: o zeuxd
+# (backend Go) não roda no Pages, que só serve arquivos estáticos.
+#
+# Duas formas de usar a página publicada:
+#   1. Só visual — abrir a URL do Pages sem nada rodando localmente. Toda
+#      tela aparece, mas qualquer chamada de API cai no estado de erro
+#      ("zeuxd não respondeu"). Serve para validar layout, cor, contraste,
+#      responsividade — o que motivou este workflow.
+#   2. Com dado real — rodar `zeuxd` na própria máquina liberando a origem
+#      do Pages no CORS:
+#        ZEUX_DEV_ORIGIN=https://<usuário>.github.io mise exec -- go run ./cmd/zeuxd
+#      e abrir a URL do Pages nesse mesmo navegador. O front chama
+#      "http://127.0.0.1:7777" (src/api/client.ts) — isso resolve para a
+#      própria máquina de quem abriu a página, então o zeuxd local responde
+#      normalmente. `ZEUX_DEV_ORIGIN` já existe pra isso desde o `tauri dev`
+#      (internal/api/server.go); aqui é só mais uma origem de desenvolvimento.
+#
+# Gatilho: só a branch `web-preview` (mais workflow_dispatch para republicar
+# sem precisar de um commit vazio) — de propósito separado do `release.yml`,
+# que cobre o app empacotado de verdade. Path filter (`paths:`) evita rodar
+# em commits que só tocam Go/docs, que não mudam o que o Pages serve.
+on:
+  push:
+    branches:
+      - web-preview
+    paths:
+      - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+      - ".github/workflows/web-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Só um deploy do Pages por vez; um push novo cancela o anterior em vez de
+# empilhar (a versão presa no meio do caminho não importa, só a mais nova).
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.1"
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # tsc sozinho (sem vite build) pra falhar rápido e barato num erro de
+      # tipo, antes de gastar tempo empacotando.
+      - name: Checar tipos
+        run: npx tsc --noEmit
+
+      - name: Build (base = /<repo>/, exigido pelo Pages de projeto)
+        env:
+          ZEUX_GH_PAGES_BASE: /${{ github.event.repository.name }}/
+        run: npx vite build
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Empacotar artifact do Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar no Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
