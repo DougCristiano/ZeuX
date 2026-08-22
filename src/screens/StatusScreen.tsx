@@ -34,7 +34,19 @@ export function LoadingScreen({ message }: { message: string }) {
  * responder, a tela mostra a falha em português e um botão de tentar de
  * novo — nunca fica girando indefinidamente".
  */
-export function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function ErrorScreen({
+  message,
+  onRetry,
+  secondaryAction,
+}: {
+  message: string;
+  onRetry: () => void;
+  // Só usado pelo botão "Iniciar modo demonstração" da build de preview
+  // web (App.tsx, gated por VITE_ZEUX_WEB_PREVIEW) — o app empacotado
+  // nunca passa isto, então nunca aparece pra quem instalou o ZeuX de
+  // verdade.
+  secondaryAction?: { label: string; onClick: () => void };
+}) {
   return (
     // N3/N8 (docs/roadmap.md, Sprint N): max-w-3xl é o teto de leitura do
     // resto do app (era max-w-sm, isolado); glow de identidade (N8).
@@ -42,9 +54,16 @@ export function ErrorScreen({ message, onRetry }: { message: string; onRetry: ()
       <OnboardingGlow />
       <div className="relative z-10 flex w-full max-w-3xl flex-col items-start gap-4">
         <p className="text-base text-danger">{message}</p>
-        <Button variant="primary" autoFocus onClick={onRetry}>
-          Tentar de novo
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" autoFocus onClick={onRetry}>
+            Tentar de novo
+          </Button>
+          {secondaryAction && (
+            <Button variant="secondary" onClick={secondaryAction.onClick}>
+              {secondaryAction.label}
+            </Button>
+          )}
+        </div>
       </div>
     </main>
   );

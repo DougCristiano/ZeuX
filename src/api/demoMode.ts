@@ -36,3 +36,19 @@ export function initDemoModeFromURL(): void {
     // motivo para impedir o resto do app de carregar.
   }
 }
+
+// Botão "Iniciar modo demonstração" (ErrorScreen, só na build do preview
+// web — ver VITE_ZEUX_WEB_PREVIEW em App.tsx): digitar "?demo=1" na mão
+// era o único jeito antes disso. Recarrega a página de propósito — mais
+// simples e mais confiável do que tentar reiniciar o fluxo de
+// consentimento/scan em cima do estado que já falhou.
+export function enableDemoModeAndReload(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DEMO_STORAGE_KEY, "1");
+  } catch {
+    // Sem storage, a flag não sobrevive ao reload — mas o reload ainda
+    // acontece; só não vai persistir numa próxima aba.
+  }
+  window.location.reload();
+}

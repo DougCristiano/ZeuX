@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
-import { isDemoMode } from "./api/demoMode";
+import { enableDemoModeAndReload, isDemoMode } from "./api/demoMode";
 import type { LibraryGame } from "./api/types";
 import {
   AllGamesScreen,
@@ -249,7 +249,21 @@ function App() {
       break;
 
     case "daemon-unreachable":
-      screen = <ErrorScreen message={errorMessage} onRetry={() => setPhase("connecting")} />;
+      screen = (
+        <ErrorScreen
+          message={errorMessage}
+          onRetry={() => setPhase("connecting")}
+          // Só existe na build do preview web (env var setada em
+          // .github/workflows/web-preview.yml) — é exatamente a tela que
+          // aparece quando alguém abre a página publicada sem um zeuxd
+          // local. "?demo=1" na mão funciona também; isto é só o atalho.
+          secondaryAction={
+            import.meta.env.VITE_ZEUX_WEB_PREVIEW === "1"
+              ? { label: "Iniciar modo demonstração", onClick: enableDemoModeAndReload }
+              : undefined
+          }
+        />
+      );
       break;
 
     case "consent":

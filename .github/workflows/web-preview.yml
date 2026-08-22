@@ -106,6 +106,12 @@ jobs:
       - name: Build (base = /<repo>/, exigido pelo Pages de projeto)
         env:
           ZEUX_GH_PAGES_BASE: /${{ github.event.repository.name }}/
+          # Prefixo VITE_ é o que o Vite expõe em import.meta.env pro
+          # bundle do cliente — liga o botão "Iniciar modo demonstração"
+          # em App.tsx (ErrorScreen), só nesta build. O build do Tauri
+          # (`npm run build` local) nunca define isto, então o botão nunca
+          # aparece pra quem instalou o ZeuX de verdade.
+          VITE_ZEUX_WEB_PREVIEW: "1"
         run: npx vite build
 
       - name: Configurar Pages
