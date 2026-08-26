@@ -13,6 +13,15 @@ dizendo o que dizia antes e como foi conferido** — as correções estão marca
 com a data em cada lugar, não apagadas. A tabela "Quantas faltam" foi
 **recontada item a item** nesta data.
 
+**Revisão parcial em 2026-08-26 — não é auditoria completa, e a distinção
+importa:** só foram revisados a Sprint C (RetroArch/cores), a Sprint G
+(G1/G2/G3), a seção "Fora do MVP" e o que a Sprint E dizia sobre
+RetroAchievements, tudo a partir de uma especificação externa trazida pelo
+Douglas ("Retro-Steam Frontend"). O resto do documento **não** foi conferido
+contra o código nesta data — a última verificação de verdade continua sendo a
+de 2026-08-07. A tabela "Quantas faltam" **não** foi recontada: ela agora
+ignora os 4 itens novos da Sprint C (R1–R4), o G6 e os 3 da Sprint P.
+
 ---
 
 ## Corte de versão: o que é v1.0 e o que é v2.0
@@ -999,7 +1008,7 @@ refletindo o estado certo.
 | ~~Extração para `ManagedRoot()`~~ | M | **Feito** — `extract.go` + `manager.go` (`promote`), atômico via diretório de trabalho + `rename` |
 | ~~Instalar/atualizar/remover apenas o que é `managed`~~ | M | **Feito** — `Uninstall` só apaga dentro de `ManagedRoot()`; atualização preserva dados de instalação portátil |
 | ~~Estrutura de diretórios por console (não achatada por adapter)~~ | M | **Feito 2026-08-02** — ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md); só a parte de emuladores, a de jogos depende da Sprint D |
-| ~~**Instalação de cores do RetroArch**~~ | M | **Resolvido — via empacotamento, não via instalação em tempo real.** Ver [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md): os 24 cores (mais os 4 de precisão máxima) vêm dentro do próprio instalador do ZeuX (`scripts/download-retroarch-cores.mjs` + `cmd/download-retroarch-app`, baixados no build, não em runtime), não resolvidos via `internal/install` contra `buildbot.libretro.com` como esta linha presumia originalmente. **Douglas verificou de verdade em 2026-08-05, lançando jogos de 3 consoles diferentes via RetroArch** — cores presentes e funcionais. A nota de bloqueio abaixo (rede indisponível neste ambiente de CI) descreve por que a implementação *nesta sessão* não teria como testar contra o buildbot — segue registrada por precisão histórica, mas deixou de ser o caminho adotado. |
+| ~~**Instalação de cores do RetroArch**~~ | M | **Reaberto em 2026-08-26 — ver [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) e os itens R1–R4 abaixo.** O empacotamento descrito nesta célula foi construído, verificado e **funciona**; o que mudou foi a decisão de produto do Douglas (instalador pequeno, core baixado sob demanda). O texto original segue abaixo, sem edição, porque o modelo novo assume de volta custos que ele descreve. — *Texto de 2026-08-05:* **Resolvido — via empacotamento, não via instalação em tempo real.** Ver [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md): os 24 cores (mais os 4 de precisão máxima) vêm dentro do próprio instalador do ZeuX (`scripts/download-retroarch-cores.mjs` + `cmd/download-retroarch-app`, baixados no build, não em runtime), não resolvidos via `internal/install` contra `buildbot.libretro.com` como esta linha presumia originalmente. **Douglas verificou de verdade em 2026-08-05, lançando jogos de 3 consoles diferentes via RetroArch** — cores presentes e funcionais. A nota de bloqueio abaixo (rede indisponível neste ambiente de CI) descreve por que a implementação *nesta sessão* não teria como testar contra o buildbot — segue registrada por precisão histórica, mas deixou de ser o caminho adotado. |
 | ~~**Aviso quando o hardware não comporta, e o usuário decide**~~ | P | **Feito na Sprint B, item B10** |
 | ~~Rotas: `POST /api/v1/emulators/{id}/install`, `DELETE`, progresso~~ | M | **Feito** — documentado em `docs/api.md`, testado de verdade no B10 |
 
@@ -1007,16 +1016,145 @@ refletindo o estado certo.
 automaticamente**. Mostrar o parecer, explicar o gargalo, e deixar o usuário
 decidir por conta e risco. Não bloquear — informar.
 
-### Bloqueio real: instalação de cores do RetroArch
+### Reaberto em 2026-08-26: cores e RetroArch baixados sob demanda (ADR 0015)
 
-**Resolvido por outra via (ver linha da tabela acima, ADR 0012) — seção
-mantida por registro histórico do porquê a rota abaixo foi descartada, não
-como pendência ativa.** Em vez de o `internal/install` resolver e baixar
-cores em tempo real contra o `buildbot.libretro.com` (a ideia original
-descrita abaixo), a decisão foi empacotar os cores dentro do instalador do
-ZeuX — baixados uma vez, no build, não a cada instalação do usuário. O
-Douglas testou o resultado empacotado com jogos reais de 3 consoles em
-2026-08-05 e confirmou funcionando.
+**Decisão do Douglas, 2026-08-26**, a partir de uma especificação externa
+("Retro-Steam Frontend", seção 3): o instalador do ZeuX volta a sair **sem**
+RetroArch e sem cores; o `zeuxd` baixa o que falta na primeira vez que o
+usuário manda abrir um jogo daquele console. Ver
+[ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), que
+substitui o [0012](decisoes/0012-empacotar-retroarch-e-cores.md).
+
+**O que isto custa, escrito antes de alguém descobrir na prática:**
+
+- O primeiro jogo de cada console passa a **exigir rede** — o empacotamento
+  comprava exatamente isso, e é a regressão real desta virada.
+- O ZeuX volta a depender da estrutura do `buildbot.libretro.com`, que já
+  mordeu o projeto duas vezes em 2026-08-04 (URL com `/cores/` a mais → `404`
+  nos 20 cores; API errada da lib de descompactação).
+- **Nada disto é verificável em sessão de IA:** o host segue bloqueado por
+  política de rede neste ambiente (`gateway answered 403 to CONNECT (policy
+  denial)`, confirmado desde 2026-08-02). Todo item abaixo fecha na máquina do
+  Douglas, não aqui.
+- macOS **não** melhora: o buildbot entrega o app do RetroArch como `.dmg`, e
+  baixar sob demanda não muda o formato. No Mac, o RetroArch continua manual.
+
+**Mecanismo de progresso — decidido aqui para não virar discussão depois:**
+job + polling em `GET /api/v1/installs/{id}`, que já existe e já alimenta a
+tela de instalação 1-click. **Sem SSE, sem WebSocket** — `grep -rn
+"text/event-stream" internal/ src/` devolve vazio hoje, e um transporte novo
+para reaproveitar um painel de progresso que já funciona é a solução maior
+para o mesmo problema.
+
+#### R1 — Manifesto de runners: URL e SHA256 fixados por core (M)
+
+Sem hash fixado, o download sob demanda aceita qualquer bytes que o servidor
+devolver. O usuário precisa saber que o core que abriu o jogo dele é o mesmo
+que o Douglas conferiu ao cortar a versão.
+
+**Critério de aceite:**
+- [ ] Existe um manifesto embutido no binário (`//go:embed`, mesmo padrão de
+      `internal/install/data/sources.json`) com, por core e por plataforma:
+      URL, nome do arquivo, tamanho esperado e **SHA256**.
+- [ ] O manifesto cobre os 25 cores que o ADR 0012 listava (`grep -c` no
+      manifesto bate com a lista de `retroArchCores` em
+      `internal/emulator/retroarch.go`) — nenhum core que algum tier do
+      catálogo recomenda fica de fora. Um teste falha se a lista divergir,
+      mesmo espírito de `verdict/catalog_integration_test.go`.
+- [ ] `buildbot.libretro.com` entra em `allowedHosts`
+      (`internal/install/download.go`) — e **só ele**; um teste falha se a
+      lista crescer sem alguém mexer nesse teste.
+- [ ] Existe um comando/script que **gera** o manifesto baixando e medindo os
+      arquivos (reaproveitando `scripts/download-retroarch-cores.mjs` ou
+      `cmd/download-retroarch-app`, que já sabem falar com o buildbot), para
+      que fixar hash não vire trabalho manual a cada versão do ZeuX.
+- [ ] Fica **registrado no manifesto ou num comentário** se o buildbot publica
+      hash oficial por core. Ninguém verificou (host bloqueado aqui); se
+      publicar, o item vira "conferir contra a origem" em vez de "fixar".
+
+**Depende de:** nada · **Bloqueia:** R2, R3, R4
+
+#### R2 — Baixador sob demanda em Go, reusando o job de instalação (M)
+
+O download precisa ser o mesmo mecanismo já provado (atômico, com progresso e
+verificação), não um caminho paralelo com regras próprias.
+
+**Critério de aceite:**
+- [ ] `POST /api/v1/retroarch/cores/{core}/install` devolve `202` com um `id`
+      de job, e `GET /api/v1/installs/{id}` reflete `downloading` → `extracting`
+      → `done`/`failed` com percentual — mesmos estados que a instalação 1-click
+      já usa. Documentado em [`docs/api.md`](api.md) **antes** da tela.
+- [ ] SHA256 divergente do manifesto (R1) **falha o job** com `code` estável e
+      mensagem em português dizendo qual core e que o arquivo recebido não
+      confere. Nada é promovido para `ManagedRoot()`. Verificável por teste com
+      servidor de mentira devolvendo bytes errados — sem rede.
+- [ ] A promoção é atômica (diretório de trabalho + `rename`, como `promote` já
+      faz): um download interrompido no meio não deixa core pela metade que o
+      RetroArch tente carregar.
+- [ ] Baixar um core que já existe é no-op explícito (job já `done`), não um
+      segundo download.
+- [ ] Testes rodam **sem rede**: achou / hash errado / `404` / conexão caindo no
+      meio.
+- [ ] Verificação contra o buildbot real: **pendente do Douglas** — este
+      ambiente não alcança o host. O item só é marcado feito depois disso.
+
+**Depende de:** R1 · **Bloqueia:** R3
+
+#### R3 — "Jogar" baixa o que falta, dizendo o que está fazendo (M)
+
+Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
+"baixando o core X" e poder desistir.
+
+**Critério de aceite:**
+- [ ] Mandar abrir um jogo de console atendido pelo RetroArch, com o core
+      ausente, dispara o job do R2 **antes** do lançamento e abre o jogo sozinho
+      ao terminar — sem o usuário voltar para a tela de Emuladores.
+- [ ] A tela mostra o nome do que está sendo baixado, o percentual e um cancelar
+      que de fato interrompe (o job vai para `failed`/`canceled`, nada fica pela
+      metade em `ManagedRoot()`).
+- [ ] Sem rede, o erro é acionável e **nomeia o que falta** ("o core `sameboy`
+      ainda não está no seu computador e não foi possível baixá-lo agora"),
+      nunca "erro ao lançar".
+- [ ] O caminho já pronto (core presente) **não ganha nenhuma etapa nova** —
+      medível: `POST /games/launch` com core presente não cria job nenhum.
+- [ ] `GET /api/v1/retroarch/cores` continua listando o que está e o que não
+      está instalado, agora com ação de instalar por linha (a rota e a tela já
+      existem desde 2026-08-04).
+
+**Depende de:** R2 · **Bloqueia:** nada
+
+#### R4 — Aposentar o empacotamento (M)
+
+Enquanto os dois modelos coexistirem, o instalador continua com 178 MB e há
+dois caminhos para achar um core — o tipo de ambiguidade que produz bug de
+caminho (já aconteceu duas vezes com `ZEUX_BUNDLED_*`).
+
+**Critério de aceite:**
+- [ ] `npm run tauri build` gera um pacote **sem** cores e sem o app do
+      RetroArch dentro. Verificável: `dpkg-deb -c` no `.deb` não lista nada em
+      `usr/lib/zeux/resources/retroarch/`, e o tamanho cai do patamar de 178 MB
+      (medir e escrever o número novo aqui).
+- [ ] `KindBundled`, `bundled_cores.go`, `bundled_retroarch.go` e as variáveis
+      `ZEUX_BUNDLED_*` (`src-tauri/src/lib.rs`) saem do código, ou fica
+      escrito no roadmap por que algum deles ficou.
+- [ ] `Manager.Uninstall` volta a aceitar remover o RetroArch — a recusa de
+      `KindBundled` existia porque apagar o bundled deixaria o app sem como
+      recuperá-lo, e isso deixa de valer.
+- [ ] `internal/install/data/sources.json`: a entrada do RetroArch deixa de ser
+      `"kind": "bundled"` e o `reason` para de dizer que ele "já vem dentro do
+      instalador" — hoje esse texto passaria a mentir.
+- [ ] Quem já tem uma instalação com cores bundled **não perde nada**: o
+      resolvedor continua encontrando os cores onde eles estiverem, ou o
+      roadmap registra explicitamente que atualizar o ZeuX rebaixa esses cores.
+
+**Depende de:** R3 · **Bloqueia:** nada
+
+---
+
+### Registro histórico: por que este item já foi considerado bloqueado
+
+*(Mantido porque descreve o custo que o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)
+acaba de reassumir — não é pendência ativa.)*
 
 Os cores do RetroArch (libretro) são distribuídos pelo `buildbot.libretro.com`,
 não pelo GitHub Releases — um mecanismo de resolução diferente do que
@@ -1407,6 +1545,7 @@ chegou.
 | ~~Scraper de metadados: IGDB e/ou ScreenScraper~~ | G | Fora do MVP por decisão de 2026-08-02. Busca **metadado**, jamais o jogo. **Decisão reaberta em 2026-08-04** — virou o G1, dentro da v1.0 |
 | ~~Cache local de capas e metadados~~ | M | Só faz sentido com o scraper. **Reaberto junto, 2026-08-04** — virou o G2 |
 | Identificação de jogo por hash (em vez de nome) | M | Pré-requisito de scraper confiável; o MVP usa o nome (L10). **Continua fora** — ver G3, que registra por que |
+| Backend social do ZeuX: contas, reviews, fóruns, sync de tempo jogado entre dispositivos | G | **Registrado em 2026-08-26**, origem: especificação externa trazida pelo Douglas ("Retro-Steam Frontend"). **Não priorizado agora, por decisão dele** — sem critério de aceite de propósito, para não parecer trabalho pronto para começar. É a mesma dependência que já adia as Sprints E e F para a v2.0: identidade de usuário e servidor na nuvem, nenhum dos dois desenhado. Reviews e fóruns são **conteúdo gerado por usuário**, o que traz moderação e política de privacidade novas — escopo maior que a Sprint E já prevê |
 
 **Por que a decisão de 2026-08-02 foi reaberta, e o que ela dizia.** O texto
 original está preservado acima, riscado, de propósito: em 2026-08-02 decidiu-se
@@ -1522,6 +1661,18 @@ modernas, não só retro) pesou mais que a identificação por hash do
 ScreenScraper — G3 (hash) já ficou fora da v1.0 mesmo, então essa vantagem do
 ScreenScraper não estava em jogo.
 
+**Revisado em 2026-08-26, e mantido.** A especificação externa trazida pelo
+Douglas propõe o inverso: ScreenScraper.fr por CRC32/MD5 como fonte
+**primária**, com IGDB/TheGamesDB como fallback por nome sanitizado. Isso é uma
+boa ideia — e não é motivo para mexer no G1, que **está entregue e funcionando
+por nome**. Trocar a fonte primária de um item pronto custa reescrever o cliente,
+o cache (G2) e a conexão de conta, para comprar precisão que ninguém mediu que
+esteja faltando. A proposta foi anexada ao **G3**, onde ela pertence, e o **G6**
+abaixo é o passo barato que decide se ela entra: medir antes de construir. Nota
+relacionada: o achado de 2026-08-18 (credencial de teste do IGDB possivelmente
+suspensa) é sobre **credencial**, não sobre a fonte estar errada — não conta
+como argumento para trocar de fonte.
+
 **Decidido em 2026-08-04: cada usuário conecta a própria conta IGDB.** Evita
 cota compartilhada estourando com o uso real de todo mundo que instalar o
 ZeuX, ao custo de um passo de "conectar conta" — que precisa existir em algum
@@ -1572,9 +1723,42 @@ que construir para descobrir.
 
 **Critério para reavaliar (não é critério de aceite — é gatilho):** se, numa
 biblioteca real do Douglas, mais de ~20% dos jogos ficarem sem capa ou com capa
-errada depois do G1, este item entra na v1.0.
+errada depois do G1, este item entra na v1.0. **O G6 abaixo é quem mede isso** —
+até 2026-08-26 o gatilho existia sem ninguém encarregado de puxá-lo.
 
-**Depende de:** G1 · **Bloqueia:** nada
+**Fonte concreta anexada em 2026-08-26 (origem: especificação externa do
+Douglas):** quando este item entrar, a fonte é o **ScreenScraper.fr**, que
+aceita busca por **CRC32/MD5** do arquivo — é o que torna a identificação por
+hash útil de verdade, já que o IGDB não indexa ROM por hash. O desenho fica:
+ScreenScraper por hash primeiro, IGDB por nome sanitizado como fallback (o que
+já existe hoje, sem reescrita). Duas ressalvas que precisam ser conferidas
+**antes** de estimar, não depois: o ScreenScraper exige conta e impõe cota por
+usuário (mesma conversa do G1, "cada usuário conecta a própria conta"), e a
+regra legal do G1 vale igual — o cliente só sabe falar com endpoints de
+metadado/imagem, e isso é travado por teste.
+
+**Depende de:** G1, G6 · **Bloqueia:** nada
+
+### G6 — Medir a taxa de acerto das capas (P)
+
+O gatilho do G3 fala em "mais de ~20% sem capa ou com capa errada" desde
+2026-08-04 e **ninguém mediu**. Enquanto o número não existir, a decisão de
+promover ou não o G3 é palpite — e o projeto tem cultura de verificar.
+
+**Critério de aceite:**
+- [ ] Sai um número, contra a biblioteca real do Douglas: quantos jogos têm
+      capa, quantos ficaram sem, e quantos vieram com capa de outro jogo (esta
+      última só o Douglas consegue julgar, olhando).
+- [ ] O número é obtido sem tela nova: basta `GET /api/v1/library/games` contando
+      quantos trazem `cover_url`, mais uma passada de olho na grade. Se alguém
+      propuser construir um relatório para isso, o item cresceu além do valor.
+- [ ] O resultado é escrito **aqui no G3**, com a data, e a decisão de promover
+      ou não fica registrada com o número que a motivou.
+- [ ] Se a medição não puder ser feita porque a credencial do IGDB está
+      suspensa (ver achado de 2026-08-18), isso fica escrito no item em vez de
+      um número inventado.
+
+**Depende de:** G1 (entregue) · **Bloqueia:** G3
 
 ### G4 — Favoritar jogo (M)
 
@@ -4193,6 +4377,102 @@ aceitar o risco de novo com uma chave nova.
 
 ---
 
+## Sprint P — RetroAchievements (**pós-v1.0, mas NÃO depende do backend do ZeuX**)
+
+**Criada em 2026-08-26**, origem: especificação externa trazida pelo Douglas
+("Retro-Steam Frontend"). A Sprint E já tinha uma linha "Integração
+RetroAchievements | M" na tabela dela — essa linha vira **ponteiro para cá**,
+porque colocá-la dentro da E dava a entender que ela depende do backend na
+nuvem do ZeuX, e **não depende**: a conta é do usuário, no serviço deles, e o
+ZeuX só lê. Isso muda o custo e a posição no roadmap; deixá-la na E a
+manteria refém de um produto inteiro que não existe.
+
+**Fica pós-v1.0 mesmo assim**, por prioridade: a v1.0 ainda tem itens de
+verificação humana abertos (G5, H3, L3) e a Sprint M inteira. Conquista é valor
+direto ao usuário — quarto lugar na ordem de prioridade deste documento, não
+primeiro.
+
+**Duas coisas precisam ser confirmadas antes de qualquer estimativa virar
+compromisso** (nenhuma foi verificada — este é o tipo de suposição que o D1 já
+mostrou custar caro):
+
+1. **O ZeuX não desbloqueia conquista nenhuma.** Quem faz isso é o emulador
+   (RetroArch e alguns standalone têm suporte próprio a RetroAchievements). O
+   escopo aqui é **exibir**, e possivelmente **configurar as credenciais dentro
+   do emulador** pela tela do ZeuX (Sprint H já sabe escrever config de
+   emulador). Se alguém desenhar isto como "o ZeuX rastreia o jogo e concede a
+   conquista", o item está errado.
+2. **O hash do RetroAchievements não é um MD5 do arquivo.** Eles usam um
+   cálculo próprio por sistema (cabeçalho descartado, trilha de CD específica,
+   etc.). Antes de assumir que o G3 resolve este problema de graça, alguém
+   precisa ler a documentação/implementação de referência deles. Pode ser que
+   sejam dois hashes diferentes convivendo.
+
+### P1 — Conectar a conta do RetroAchievements (M)
+
+Sem credencial não há nada para mostrar. Mesmo princípio do G1: conta **do
+usuário**, nunca uma chave do ZeuX compartilhada por todo mundo — o achado de
+2026-08-18 (credencial de teste do IGDB provavelmente suspensa) é a prova de
+que o caminho contrário cobra.
+
+**Critério de aceite:**
+- [ ] Uma tela em Configurações aceita usuário + chave de API do
+      RetroAchievements, guardada localmente com o mesmo cuidado da credencial
+      do IGDB (nunca no repositório, nunca embutida no binário).
+- [ ] Credencial inválida devolve erro **nomeado e em português**, distinguindo
+      "credencial recusada" de "o serviço não respondeu" — o usuário precisa
+      saber se conserta digitando de novo ou se é só esperar.
+- [ ] **Sem conta conectada, nada na interface muda.** Nenhuma seção vazia,
+      nenhum "conecte sua conta" ocupando espaço na tela de jogo. Mesma regra
+      que o G1 já segue.
+- [ ] Um teste roda sem rede, contra servidor de mentira: conectou / recusou /
+      caiu.
+
+**Depende de:** nada · **Bloqueia:** P2, P3
+
+### P2 — Resolver o jogo pelo hash e trazer as conquistas (M)
+
+**Critério de aceite:**
+- [ ] Dado um jogo da biblioteca, o backend calcula o identificador que o
+      RetroAchievements espera **para aquele console** e consulta a lista de
+      conquistas + o que o usuário já desbloqueou.
+- [ ] Jogo que o serviço não reconhece devolve **desconhecido**, e a tela não
+      mostra nada — nunca as conquistas de um jogo parecido. Mesma regra do
+      parecer parcial e do G1.
+- [ ] O resultado é cacheado localmente (tabela nova, migração em
+      `internal/store/migrations/`), e abrir a mesma tela duas vezes **não faz
+      duas requisições** — medível pelo log do `--debug`, mesmo critério do G2.
+- [ ] A consulta é sob demanda (abrir o jogo), nunca uma varredura silenciosa
+      mandando a biblioteca inteira para um terceiro.
+- [ ] Está escrito no código, com comentário, **qual** algoritmo de hash foi
+      implementado e contra qual documentação ele foi conferido. Se só uma parte
+      dos consoles foi coberta, os demais devolvem desconhecido em vez de
+      chutar.
+- [ ] Testes sem rede: reconhecido / não reconhecido / resposta malformada /
+      serviço fora.
+
+**Depende de:** P1 · **Bloqueia:** P3
+
+### P3 — Badges na tela do jogo (M)
+
+**Critério de aceite:**
+- [ ] `GameDetailScreen` ganha uma seção com as conquistas: ícone, título,
+      descrição e se está desbloqueada, mais um contador (`12/40`).
+- [ ] As imagens de badge vêm de **arquivo local já baixado**, nunca URL de
+      terceiro renderizada direto pelo WebView — mesma regra que o G1 travou
+      para capa, pelo mesmo motivo (offline e uma requisição por render).
+- [ ] Alcançável só com Tab/Enter e pelo controle, sem depender de hover
+      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md),
+      [ADR 0014](decisoes/0014-navegacao-por-controle.md)).
+- [ ] O texto **não julga o jogador**: "12 de 40 conquistas", nunca "você só
+      conseguiu 12". Mesma disciplina do texto sobre hardware.
+- [ ] Sem rede, a seção mostra o que já está em cache; sem cache, ela não
+      aparece — a tela de jogo nunca quebra por causa disto.
+
+**Depende de:** P2 · **Bloqueia:** nada
+
+---
+
 ## Sprint E — Perfil e camada social (**v2.0 — pós-v1.0**)
 
 > **Adiada para a v2.0 por decisão do Douglas, 2026-08-04.** Nada nesta sprint
@@ -4211,7 +4491,7 @@ Objetivo: a promessa social do PRD, agora que há dado para exibir.
 | Perfil público: consoles, tempo de jogo, hardware como comparativo | M | ↑ |
 | Navbar: comunidade, amigos, perfil, conquistas | M | Sprint B |
 | Amigos e feed de atividade | M | ↑ |
-| Integração RetroAchievements | M | ↑ |
+| ~~Integração RetroAchievements~~ | M | **Movida em 2026-08-26 para a Sprint P** — ela não depende do backend na nuvem do ZeuX (a conta é do usuário, no serviço deles), e mantê-la aqui a prendia a uma dependência que ela não tem |
 | Integração Speedrun.com | M | ↑ |
 
 **Consentimento:** o hardware é usado como base de comparação entre jogadores —
@@ -4281,7 +4561,7 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | ~~Suporte a controles: detecção e mapeamento~~ | G | **Promovido em 2026-08-04 para a Sprint H (v1.0)**, itens H3 (joystick) e H4 (teclado). Continua sendo pré-requisito dos perfis de controle compartilháveis (Sprint F, agora v2.0) — a diferença é que agora tem valor próprio na v1.0, sem esperar a nuvem |
 | ~~Emulador dedicado 1-click para os consoles que hoje só têm RetroArch~~ | G | **Substituído em 2026-08-03** pela decisão do [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — em vez de um adapter dedicado por console, empacotar o RetroArch + cores selecionados dentro do próprio instalador do ZeuX. N64 continua com o `rmg` como adapter dedicado (não foi desfeito), mas os outros 23 consoles vão pelo empacotamento, não por pesquisa individual |
-| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 25 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. **Corrigido em 2026-08-07:** esta célula ainda dizia "Falta: confirmar em Windows/macOS e testar a instalação de verdade", o que contradizia os dois `[x]` logo abaixo — Windows e o lançamento real com cores bundled foram confirmados pelo Douglas em 2026-08-05. **O que resta de verdade:** só macOS (o buildbot distribui `.dmg`, sem rota simples em Go puro — decisão registrada no ADR 0012) e trocar o alias móvel `RetroArch.7z` por uma versão datada fixa |
+| ~~**Implementar o ADR 0012**: empacotar RetroArch + cores no instalador~~ **Fechado por substituição em 2026-08-26** — o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) trocou o modelo por download sob demanda; o que sobrava aqui (macOS e trocar o alias `RetroArch.7z` por versão datada) deixou de ser trabalho a fazer neste formato. O trabalho vigente são os itens **R1–R4** da Sprint C. *Texto original abaixo, preservado:* | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 25 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. **Corrigido em 2026-08-07:** esta célula ainda dizia "Falta: confirmar em Windows/macOS e testar a instalação de verdade", o que contradizia os dois `[x]` logo abaixo — Windows e o lançamento real com cores bundled foram confirmados pelo Douglas em 2026-08-05. **O que resta de verdade:** só macOS (o buildbot distribui `.dmg`, sem rota simples em Go puro — decisão registrada no ADR 0012) e trocar o alias móvel `RetroArch.7z` por uma versão datada fixa |
 
 **Download dos cores do RetroArch desbloqueado em 2026-08-04 — dois bugs reais
 achados e corrigidos, verificados pelo Douglas numa máquina com acesso ao
@@ -4660,6 +4940,14 @@ graph LR
     D2["D2 — calibrar limiares<br/>(depende da Sprint F, ou seja: v2.0)"] -.-> F
 ```
 
+**O diagrama acima está desatualizado desde 2026-08-26 e não foi redesenhado**
+— dizer isso é mais honesto que redesenhá-lo às pressas. Duas mudanças que ele
+ainda não mostra: a **Sprint C reabriu** (R1–R4, download de cores sob demanda,
+[ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)) e nasceu a
+**Sprint P** (RetroAchievements), que é pós-v1.0 mas **não** entra no bloco
+`v2` — ela não depende do backend na nuvem, e desenhá-la lá dentro repetiria o
+erro que a linha na Sprint E cometia.
+
 A Sprint A veio primeiro porque era a única que podia invalidar código já
 escrito. **G, H e I não dependiam umas das outras** — eram paralelizáveis, e a
 ordem entre elas foi escolha de prioridade, não de dependência técnica.
@@ -4698,6 +4986,28 @@ acabou de ser feita. Depois dele, a ordem é L1 → L2 → L5 → L6 → L7 (os 
 que é o caminho mais curto até o critério de saída da Sprint D.
 *(D11 foi fechado em 2026-08-04 — parágrafo mantido como registro do raciocínio
 da época, não como recomendação vigente.)*
+
+**Próximo passo recomendado (2026-08-26): o R1 — manifesto de cores com URL e
+SHA256 fixados.**
+
+Recomendo **um**, e não é a Sprint M (que continua sendo o trabalho de v1.0 mais
+volumoso). O motivo é a ordem de prioridade deste documento: o ADR 0015 acabou
+de criar uma **promessa descoberta nova** — a partir da decisão de 2026-08-26, o
+que o `sources.json` diz sobre o RetroArch ("já vem dentro do instalador") e o
+que o produto pretende fazer deixaram de bater. Enquanto R1–R4 não fecharem, o
+app fica com dois modelos coexistindo, que é exatamente a condição que já
+produziu dois bugs de caminho com `ZEUX_BUNDLED_*`.
+
+Dentro deles, o R1 vem primeiro porque **bloqueia os outros três** e é o único
+que dá para começar sem acesso ao buildbot: fixar a estrutura do manifesto,
+o `allowedHosts` e o teste que amarra a lista de cores ao catálogo é trabalho de
+código local. O download real (R2) e o gatilho no "Jogar" (R3) só fecham na sua
+máquina — este ambiente não alcança `buildbot.libretro.com`.
+
+O que eu cortaria, se o tempo apertar: o **R4** (aposentar o empacotamento) pode
+esperar sem prejuízo funcional — ele compra instalador menor, não capacidade
+nova. O que **não** dá para cortar é a verificação de hash do R2: sem ela, o
+download sob demanda é pior que o empacotamento em segurança, não só em UX.
 
 **Próximo passo recomendado (2026-08-07): a Sprint M, começando pelo M2.**
 
