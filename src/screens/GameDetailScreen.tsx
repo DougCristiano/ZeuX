@@ -12,6 +12,7 @@ import {
   GameCover,
   InlineError,
   PlayIcon,
+  ProgressBar,
   ScreenContainer,
   Toast,
 } from "../components/ui";
@@ -19,6 +20,7 @@ import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { percentOf } from "../lib/format";
 
 function formatPlaytime(seconds: number): string {
   if (seconds <= 0) return "nunca jogado";
@@ -83,7 +85,7 @@ export function GameDetailScreen({
 }) {
   const [sessionCount, setSessionCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { statusFor, launch, launchError, clearLaunchError } = useLaunchGame();
+  const { statusFor, launch, cancelCoreDownload, launchError, clearLaunchError } = useLaunchGame();
   const { toastMessage, showToast } = useToast();
   const igdbConfigured = useIGDBStatus();
   // Estado próprio, não `game.cover_url` direto: o prop `game` vem de um
@@ -257,7 +259,7 @@ export function GameDetailScreen({
         <Button
           variant="primary"
           autoFocus
-          disabled={game.missing || status.kind === "launching"}
+          disabled={game.missing || status.kind === "launching" || status.kind === "downloading-core"}
           onClick={() => launch(game)}
           className="flex w-fit items-center gap-2 px-8 py-3 text-lg"
         >
@@ -271,6 +273,12 @@ export function GameDetailScreen({
             "Tentar de novo"
           ) : status.kind === "launching" ? (
             "Abrindo…"
+          ) : status.kind === "downloading-core" ? (
+            // R3 (ADR 0015): mesma razão do "Abrindo…" acima — o clique mais
+            // importante do produto não pode ficar mudo. Aqui a espera é bem
+            // maior (centenas de MB), então o rótulo diz o que está
+            // acontecendo, e o progresso detalhado vem logo abaixo.
+            "Baixando o core…"
           ) : (
             <>
               <PlayIcon size={16} />
@@ -278,6 +286,30 @@ export function GameDetailScreen({
             </>
           )}
         </Button>
+
+        {/* R3 (ADR 0015): o jogo abre sozinho quando o download terminar —
+            até lá, dizer o que falta e deixar desistir. Mesma dupla
+            "texto + ProgressBar" que a instalação de emulador já usa em
+            GamesScreen, para não inventar um segundo vocabulário de espera. */}
+        {status.kind === "downloading-core" && (
+          <div className="w-full max-w-md">
+            <p className="text-sm text-muted">
+              O core {status.job.core_name ?? ""} ainda não estava no seu computador. Baixando…{" "}
+              {status.job.phase}
+              {percentOf(status.job) !== null && ` · ${percentOf(status.job)}%`}
+            </p>
+            <div className="mt-1">
+              <ProgressBar percent={percentOf(status.job)} label={`Baixando o core ${status.job.core_name ?? ""}`} />
+            </div>
+            <Button
+              className="mt-2"
+              variant="secondary"
+              onClick={() => cancelCoreDownload(game.id, status.job)}
+            >
+              Cancelar download
+            </Button>
+          </div>
+        )}
 
         {game.missing && (
           <InlineError>O arquivo deste jogo não foi encontrado na última varredura da pasta.</InlineError>

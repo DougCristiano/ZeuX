@@ -18,13 +18,14 @@ import type {
   InstallJob,
   BulkMatchedFolder,
   LaunchBody,
+  LaunchDownloadingCore,
+  LaunchResult,
   LibraryFolder,
   LibraryGame,
   PreviewResult,
   Report,
   RetroArchCoreStatus,
   ScrapeJob,
-  Session,
   SessionsResponse,
   SystemInfo,
 } from "./types";
@@ -57,6 +58,15 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.code = code;
   }
+}
+
+/**
+ * Distingue as duas formas de `LaunchResult` (ver o tipo em ./types). Fica
+ * aqui, e não no arquivo de tipos, porque `types.ts` é declaradamente só
+ * declaração — nenhuma linha de runtime.
+ */
+export function isDownloadingCore(result: LaunchResult): result is LaunchDownloadingCore {
+  return (result as LaunchDownloadingCore).downloading_core === true;
 }
 
 function isErrorBody(value: unknown): value is ErrorBody {
@@ -166,7 +176,12 @@ export const api = {
     request<{ canceled: string }>(`/installs/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   previewLaunch: (body: LaunchBody) => postJSON<PreviewResult>("/games/preview", body),
-  launch: (body: LaunchBody) => postJSON<Session>("/games/launch", body),
+  // Duas formas de sucesso desde o ADR 0015 (R3): 200 com a Session, ou 202
+  // com o job de download do core que faltava (o jogo abre sozinho quando
+  // terminar). Quem chama PRECISA ramificar com isDownloadingCore() — tratar
+  // as duas como Session foi o bug de 2026-08-27, em que a tela dizia
+  // "sessão iniciada" durante um download de centenas de MB.
+  launch: (body: LaunchBody) => postJSON<LaunchResult>("/games/launch", body),
 
   getSessions: () => request<SessionsResponse>("/sessions"),
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { api, ApiError } from "../api";
-import type { EmulatorEntry, LibraryGame, Report, Session } from "../api/types";
+import { api, ApiError, isDownloadingCore } from "../api";
+import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
 import {
   Button,
   Callout,
@@ -25,6 +25,11 @@ import { consoleAccentColor } from "../lib/consoleColor";
 type RowStatus =
   | { kind: "idle" }
   | { kind: "launching" }
+  // ADR 0015 (R3): o core do RetroArch faltava e está sendo baixado — o jogo
+  // abre sozinho no fim. Estado próprio porque anunciar "sessão iniciada"
+  // aqui era mentira: o download pode levar minutos (o core do MAME passa de
+  // 400 MB) e nada tinha aberto ainda.
+  | { kind: "downloading-core"; job: InstallJob }
   | { kind: "launched"; session: Session }
   | { kind: "error"; message: string };
 
@@ -122,14 +127,65 @@ export function GamesScreen({
     : undefined;
   const canAutoConfigure = Boolean(verdict?.adapter_id && verdict.options);
 
+  async function cancelCoreDownload(gameId: number, job: InstallJob) {
+    try {
+      await api.cancelInstall(job.id);
+      // Não muda o estado aqui: o poll em andamento vê a fase "cancelado" na
+      // próxima resposta e volta a linha para "idle" sozinho.
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Não foi possível cancelar o download.";
+      setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
+      setLaunchError(message);
+    }
+  }
+
+  // Acompanha o download de core disparado pelo próprio /games/launch (R3).
+  // Ao terminar, o servidor já abriu o jogo sozinho (launchWhenCoreReady) —
+  // por isso o sucesso aqui confirma a sessão, sem uma segunda chamada.
+  async function pollCoreDownload(gameId: number, jobId: string, title: string) {
+    try {
+      const job = await api.getInstallJob(jobId);
+      if (job.phase === "concluido") {
+        setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "idle" } }));
+        showToast(`${title}: sessão iniciada.`);
+        loadGames();
+        return;
+      }
+      if (job.phase === "cancelado") {
+        setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "idle" } }));
+        return;
+      }
+      if (job.phase === "falhou") {
+        const message = job.error ?? "O download do core não foi concluído.";
+        setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
+        setLaunchError(message);
+        return;
+      }
+      setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "downloading-core", job } }));
+      setTimeout(() => pollCoreDownload(gameId, jobId, title), 400);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Não foi possível acompanhar o download do core.";
+      setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
+      setLaunchError(message);
+    }
+  }
+
   async function doLaunch(romPath: string) {
     const game = games?.find((g) => g.path === romPath);
     if (!game) return;
 
     setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "launching" } }));
     try {
-      const session = await api.launch({ rom_path: romPath, console_id: consoleId });
-      setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "launched", session } }));
+      const result = await api.launch({ rom_path: romPath, console_id: consoleId });
+      // 202: falta o core do RetroArch e o servidor está baixando agora. O
+      // toast de "sessão iniciada" abaixo não pode disparar — nada abriu
+      // ainda.
+      if (isDownloadingCore(result)) {
+        setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "downloading-core", job: result.install_job } }));
+        pollCoreDownload(game.id, result.install_job.id, game.title);
+        return;
+      }
+      setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "launched", session: result } }));
       // B4 (achado do critico-design, 2026-08-18): "Sessão iniciada." era
       // texto que nunca somia sozinho, preso na célula do jogo — virou
       // toast, mesma confirmação de sucesso que o resto do app já usa.
@@ -365,7 +421,7 @@ export function GamesScreen({
                 install.state.kind === "confirm-hardware" ||
                 install.state.kind === "confirm-bios") &&
               install.state.pendingGamePath === game.path;
-            const canPlay = status.kind !== "launching" && !isPendingInstall;
+            const canPlay = status.kind !== "launching" && status.kind !== "downloading-core" && !isPendingInstall;
             // M8: mesma regra nas duas telas — só varia o que cada uma tem
             // à mão (aqui, adapterEntry já vem carregado desde sempre).
             const launchability = evaluateGameLaunchability(game, verdict, adapterEntry);
@@ -392,6 +448,30 @@ export function GamesScreen({
                     <div className="mt-1">
                       <ProgressBar percent={percentOf(install.state.job)} />
                     </div>
+                  </div>
+                )}
+
+                {/* R3 (ADR 0015): mesma forma visual da instalação de
+                    emulador logo acima — o usuário não precisa aprender dois
+                    jeitos de ver "estou baixando algo antes de abrir seu
+                    jogo". "Cancelar" existe porque o core do MAME passa de
+                    400 MB: desistir precisa ser possível sem fechar o app. */}
+                {status.kind === "downloading-core" && (
+                  <div>
+                    <p className="text-sm text-muted">
+                      Baixando o core {status.job.core_name ?? ""}… {status.job.phase}
+                      {percentOf(status.job) !== null && ` · ${percentOf(status.job)}%`}
+                    </p>
+                    <div className="mt-1">
+                      <ProgressBar percent={percentOf(status.job)} label={`Baixando o core ${status.job.core_name ?? ""}`} />
+                    </div>
+                    <Button
+                      className="mt-2"
+                      variant="secondary"
+                      onClick={() => cancelCoreDownload(game.id, status.job)}
+                    >
+                      Cancelar download
+                    </Button>
                   </div>
                 )}
 

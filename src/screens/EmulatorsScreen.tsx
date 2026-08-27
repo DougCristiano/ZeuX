@@ -33,6 +33,7 @@ import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { percentOf } from "../lib/format";
 
 const PAGE_SIZE = 6;
 // Quantos ícones de console cabem no card sem esticar a altura entre
@@ -65,11 +66,6 @@ type RowState =
   | { kind: "removing" }
   | { kind: "remove-error"; message: string };
 
-function percentOf(job: InstallJob): number | null {
-  if (job.total_bytes <= 0) return null;
-  return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
-}
-
 // Estado de download de UM core (ADR 0015, R2/R3) — por nome, não um único
 // estado pra tela inteira, porque baixar "sameboy" não pode travar o botão
 // de "mesen" numa lista de 25.
@@ -85,11 +81,18 @@ type CoreInstallState =
 // jogo e receber "core não encontrado" na cara — só o RetroArch carrega
 // cores plugáveis, então isto só aparece na linha dele.
 //
-// R3 (2026-08-27): além de listar, cada core faltando ganha um botão
-// "Instalar" que dispara POST /retroarch/cores/{core}/install e acompanha o
-// job por polling — mesmo padrão de pollJob() acima, só que por core em vez
-// de por emulador inteiro. "cancelado" (fase nova do R3) volta ao estado
-// ocioso sem erro: desistir não é falha.
+// R3 (2026-08-27): cada core faltando ganha um botão "Instalar" que dispara
+// POST /retroarch/cores/{core}/install e acompanha o job por polling —
+// mesmo padrão de pollJob() acima, só que por core. "cancelado" (fase nova
+// do R3) volta ao estado ocioso sem erro: desistir não é falha.
+//
+// **A grade continua sendo grade.** A primeira versão desta tela virou uma
+// lista de uma coluna para caber os botões, e 25 cores × ~40 px de botão
+// viravam uma parede de mil pixels dentro do card — o mesmo custo de
+// densidade que o M1 (docs/sprint-m-plano.md) já tinha diagnosticado ao
+// tirar o botão de baixo de cada tile de jogo. Aqui a maior parte da lista é
+// status (badge + nome), e só quem falta ganha ação: o botão é compacto
+// (`px-2 py-1 text-xs`) e o item cresce em altura só enquanto está baixando.
 function RetroArchCoresList() {
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +107,33 @@ function RetroArchCoresList() {
 
   useEffect(() => {
     loadCores();
+    // "Ver cores" é um toggle: fechar desmonta este componente e perde
+    // `installState`. Sem readotar, reabrir durante um download mostrava
+    // "Instalar" para um core que já estava baixando — e clicar de novo
+    // batia em "já existe um download em andamento". GET /installs devolve
+    // os jobs desta execução do daemon; os de core trazem `core_name`.
+    api
+      .getInstalls()
+      .then((res) => {
+        const running: Record<string, CoreInstallState> = {};
+        for (const job of res.installs) {
+          const name = job.core_name;
+          if (!name) continue;
+          if (job.phase === "concluido" || job.phase === "falhou" || job.phase === "cancelado") continue;
+          running[name] = { kind: "installing", job };
+        }
+        if (Object.keys(running).length === 0) return;
+        setInstallState((prev) => ({ ...running, ...prev }));
+        for (const [name, state] of Object.entries(running)) {
+          if (state.kind === "installing") pollCoreJob(name, state.job.id);
+        }
+      })
+      .catch(() => {
+        // Falhar em readotar não impede usar a tela — o pior caso volta a
+        // ser o de antes: o botão aparece e o servidor recusa com a
+        // mensagem certa.
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function setCoreState(name: string, state: CoreInstallState) {
@@ -115,7 +145,7 @@ function RetroArchCoresList() {
       const job = await api.getInstallJob(jobId);
       if (job.phase === "concluido") {
         setCoreState(name, { kind: "idle" });
-        loadCores(); // badge "faltando" → "ok"
+        loadCores(); // o badge "faltando" → "ok" é a confirmação de sucesso
         return;
       }
       if (job.phase === "cancelado") {
@@ -182,41 +212,69 @@ function RetroArchCoresList() {
     <div className="flex flex-col gap-1.5">
       <p className="text-sm text-muted">
         {cores.length - missing.length} de {cores.length} cores instalados
+        {/* Descritivo, nunca "faltam X" com tom de cobrança: o modelo sob
+            demanda (ADR 0015) baixa sozinho ao jogar, então um core ausente
+            não é pendência do usuário — é o comportamento normal. */}
+        {missing.length > 0 && " — os que faltam são baixados sozinhos ao abrir um jogo do console."}
       </p>
-      <ul className="flex flex-col gap-1 text-sm">
+      {/* `lg:` e não `xl:`: o breakpoint mede a janela inteira, e a janela
+          padrão é 1280 px (src-tauri/tauri.conf.json) menos sidebar (64) e
+          barra de rolagem — um `xl:` (1280) nunca dispararia no tamanho
+          padrão. Regra registrada no CLAUDE.md depois de um bug real. */}
+      <ul className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
         {cores.map((core) => {
           const state = installState[core.name] ?? { kind: "idle" };
+          const percent = state.kind === "installing" || state.kind === "canceling" ? percentOf(state.job) : null;
           return (
-            <li key={core.name} className="flex flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <li key={core.name} className="flex flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
                 <span className="truncate text-ink" title={core.path ?? core.filename}>
                   {core.name}
                 </span>
                 {!core.installed && state.kind === "idle" && (
-                  <Button variant="secondary" onClick={() => installCore(core.name)}>
+                  // Compacto de propósito — ver o comentário do componente
+                  // sobre densidade. `shrink-0`: o nome do core trunca antes
+                  // do botão encolher, porque um botão cortado não clica.
+                  <Button
+                    variant="secondary"
+                    className="shrink-0 px-2 py-1 text-xs"
+                    onClick={() => installCore(core.name)}
+                  >
                     Instalar
                   </Button>
                 )}
                 {!core.installed && state.kind === "starting" && (
-                  <span className="text-xs text-muted">Iniciando…</span>
-                )}
-                {!core.installed && (state.kind === "installing" || state.kind === "canceling") && (
-                  <>
-                    <span className="text-xs text-muted">{state.job.phase}</span>
-                    <div className="w-24">
-                      <ProgressBar percent={percentOf(state.job)} />
-                    </div>
-                    <Button
-                      variant="secondary"
-                      disabled={state.kind === "canceling"}
-                      onClick={() => cancelCore(core.name, state.job)}
-                    >
-                      {state.kind === "canceling" ? "Cancelando…" : "Cancelar"}
-                    </Button>
-                  </>
+                  <span className="shrink-0 text-xs text-muted">Iniciando…</span>
                 )}
               </div>
+
+              {/* Fase, percentual e cancelar ocupam a linha de baixo: numa
+                  grade de 3 colunas não cabem ao lado do nome sem espremer
+                  os dois. Só existe enquanto o download acontece. */}
+              {!core.installed && (state.kind === "installing" || state.kind === "canceling") && (
+                <div className="flex items-center gap-1.5">
+                  <ProgressBar
+                    className="flex-1"
+                    percent={percent}
+                    // 25 barras anônimas numa grade não dizem nada a quem usa
+                    // leitor de tela — cada uma precisa se identificar.
+                    label={`Baixando o core ${core.name}`}
+                  />
+                  <span className="shrink-0 text-xs text-muted tabular-nums">
+                    {percent === null ? state.job.phase : `${percent}%`}
+                  </span>
+                  <Button
+                    variant="quiet"
+                    className="shrink-0 px-1.5 py-0.5 text-xs"
+                    disabled={state.kind === "canceling"}
+                    onClick={() => cancelCore(core.name, state.job)}
+                  >
+                    {state.kind === "canceling" ? "Cancelando…" : "Cancelar"}
+                  </Button>
+                </div>
+              )}
+
               {!core.installed && state.kind === "error" && <InlineError>{state.message}</InlineError>}
             </li>
           );

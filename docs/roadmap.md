@@ -1212,6 +1212,47 @@ Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
       `"cancelado"`) em `InstallJob`/`InstallPhase`
       (`src/api/types.ts`) — sem esses campos no tipo, a tela não teria como
       saber qual core um job pertence nem mostrar o cancelamento.
+      **Revisto na segunda passada:** a primeira versão trocou a grade de 3
+      colunas por uma lista de uma coluna para caber os botões — 25 cores ×
+      ~40 px de botão viravam ~1000 px de parede dentro do card, o mesmo
+      custo de densidade que o M1 já tinha diagnosticado ao tirar o botão de
+      baixo de cada tile. A grade voltou (`sm:grid-cols-2 lg:grid-cols-3`),
+      o botão ficou compacto (`px-2 py-1 text-xs`), o percentual virou
+      número além da barra, e `ProgressBar` ganhou `label` (25 barras
+      anônimas não dizem nada a leitor de tela). Também corrigido: fechar
+      "Ver cores" durante um download perdia o estado, e reabrir mostrava
+      "Instalar" para um core que já estava baixando — agora readota os jobs
+      em andamento por `GET /installs` (filtrando por `core_name`).
+
+**Correção de 2026-08-27 (segunda passada, revisão de design).** Os dois
+primeiros checkboxes deste item foram marcados cedo demais: o backend estava
+certo, mas **nenhuma tela sabia ler a resposta nova**. `POST /games/launch`
+passou a devolver `202` com o job em vez de `200` com a `Session`, e
+`api.launch()` continuava tipado como `Promise<Session>` — então:
+
+- `GamesScreen.doLaunch` gravava `{kind: "launched", session}` com um objeto
+  que não era `Session` e **disparava o toast "sessão iniciada"** enquanto o
+  ZeuX ainda baixava o core. O core do MAME passa de 400 MB: o usuário lia
+  "sessão iniciada", nada abria por minutos, e não havia nada na tela dizendo
+  o que estava acontecendo nem como desistir.
+- `useLaunchGame` (AllGamesScreen e GameDetailScreen) marcava `"launched"`
+  pelo mesmo motivo.
+
+Ou seja, o critério "a tela mostra o nome do que está sendo baixado, o
+percentual e um cancelar" estava marcado com base na tela de **Emuladores**
+(lista de cores) — que não é por onde o fluxo do R3 passa. Corrigido:
+
+- `LaunchResult = Session | LaunchDownloadingCore` + `isDownloadingCore()`
+  (`src/api/types.ts`, `src/api/client.ts`): o contrato agora obriga quem
+  chama a ramificar, em vez de deixar as duas formas passarem como uma.
+- Estado `downloading-core` em `useLaunchGame` e em `GamesScreen`, com
+  polling do job, texto nomeando o core, percentual, `ProgressBar` e
+  "Cancelar download". `AllGamesScreen` usa o painel flutuante do canto (a
+  grade é virtualizada — indicador presa ao tile some ao rolar), encadeado no
+  mesmo ternário que o N9 já usava para não competir pelo canto com o painel
+  de instalação. `GameDetailScreen` troca o rótulo do botão principal para
+  "Baixando o core…", mesma técnica do "Abrindo…" que o A4 introduziu.
+- "Jogar" fica bloqueado enquanto o download corre, nas três telas.
 
 **Também ajustado, consequência direta de R4 (não do escopo original de
 R3):** `EmulatorCardActions` escondia o botão "Remover" do RetroArch com um

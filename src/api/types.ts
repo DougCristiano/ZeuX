@@ -289,6 +289,24 @@ export type InstallJob = {
 
 // --- Jogos e sessões ---
 
+/**
+ * Resposta de `POST /games/launch`. Desde o ADR 0015 (R3) ela tem **duas
+ * formas**: o lançamento normal (`Session`, HTTP 200) e o caso em que o core
+ * do RetroArch ainda não está no computador (HTTP 202) — aí o servidor
+ * dispara o download e devolve o job, e o jogo abre sozinho quando terminar.
+ *
+ * Existe como união (e não como campos opcionais no `Session`) porque tratar
+ * as duas como a mesma coisa foi exatamente o bug de 2026-08-27: a tela dizia
+ * "sessão iniciada" enquanto o ZeuX ainda baixava 400 MB de core, e o jogo só
+ * abria minutos depois. Use `isDownloadingCore()` (src/api/client.ts) para ramificar.
+ */
+export type LaunchResult = Session | LaunchDownloadingCore;
+
+export type LaunchDownloadingCore = {
+  downloading_core: true;
+  install_job: InstallJob;
+};
+
 export type LaunchBody = {
   rom_path: string;
   console_id: string;
