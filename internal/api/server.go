@@ -98,6 +98,11 @@ func (s *Server) Routes() http.Handler {
 	// detalhe em toda tela que só quer saber "instalado sim/não" por
 	// emulador.
 	mux.HandleFunc("GET /api/v1/retroarch/cores", s.handleRetroArchCores)
+	// R2 (ADR 0015): download sob demanda de um core individual. Nomes de
+	// core com espaço ("beetle vb", "parallel n64") precisam vir
+	// percent-encoded no path (%20) — o roteador do Go devolve o valor já
+	// decodificado em PathValue.
+	mux.HandleFunc("POST /api/v1/retroarch/cores/{core}/install", s.handleInstallRetroArchCore)
 	// Os emuladores personalizados ficam num prefixo próprio, e não sob
 	// /emulators/, porque "custom" colidiria com o {id} de
 	// /emulators/{id}/install — o roteador do Go recusa registrar padrões em
@@ -233,6 +238,25 @@ func (s *Server) handleRetroArchCores(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"cores": emulator.RetroArchCoreStatus(r.Context()),
 	})
+}
+
+// handleInstallRetroArchCore dispara o download sob demanda de um core do
+// RetroArch (ADR 0015, R2). Devolve 202 com o job sempre — inclusive quando
+// o core já está instalado, caso em que StartCore devolve o job já em
+// PhaseDone sem baixar nada de novo (no-op explícito).
+//
+// Diferente de handleInstall, não há checagem de hardware aqui: o core
+// sozinho não diz nada sobre o console que vai usá-lo, e o consentimento de
+// hardware já foi checado (ou recusado) quando o usuário mandou lançar o
+// jogo que disparou este download (R3).
+func (s *Server) handleInstallRetroArchCore(w http.ResponseWriter, r *http.Request) {
+	job, err := s.installs.StartCore(r.Context(), r.PathValue("core"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "core_install_refused", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, job)
 }
 
 func (s *Server) handleSources(w http.ResponseWriter, r *http.Request) {

@@ -78,8 +78,9 @@ está em português e já pode ser exibida ao usuário como está.
 | POST | `/api/v1/emulators/{id}/install` | Dispara a instalação 1-click |
 | DELETE | `/api/v1/emulators/{id}/install` | Remove uma instalação gerenciada pelo ZeuX |
 | POST | `/api/v1/emulators/{id}/open` | Abre o emulador sozinho, sem ROM (botão "Configurar") |
-| GET | `/api/v1/installs` | Histórico de instalações (jobs) |
-| GET | `/api/v1/installs/{id}` | Acompanha uma instalação em andamento |
+| POST | `/api/v1/retroarch/cores/{core}/install` | Download sob demanda de um core do RetroArch ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), R2) |
+| GET | `/api/v1/installs` | Histórico de instalações (jobs) — cobre instalação de emulador e download de core |
+| GET | `/api/v1/installs/{id}` | Acompanha uma instalação ou download de core em andamento |
 | POST | `/api/v1/games/preview` | Monta a linha de comando sem executar |
 | POST | `/api/v1/games/launch` | Executa o jogo |
 | GET | `/api/v1/sessions` | Histórico de sessões + tempo de jogo |
@@ -730,10 +731,80 @@ curl -X POST http://127.0.0.1:7777/api/v1/emulators/duckstation/open
 
 ---
 
+## POST /api/v1/retroarch/cores/{core}/install
+
+Dispara o download sob demanda de **um core** do RetroArch — o mecanismo que
+substitui o empacotamento fixo no instalador ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), R2).
+Diferente de `/emulators/{id}/install`, a URL e o SHA256 esperado já são
+conhecidos de antemão: vêm do manifesto embutido no binário (R1), não são
+resolvidos contra uma API de release. Por isso o job nunca passa por
+`"resolvendo"` — entra direto em `"baixando"`.
+
+`{core}` é o nome amigável do core, o mesmo usado em `options.core` de
+`/games/launch` e na resposta de `GET /retroarch/cores` (ex.: `mesen`,
+`parallel n64`, `beetle vb`). **Nomes com espaço precisam vir
+percent-encoded** (`%20`) no path — `beetle%20vb`, não `beetle vb` cru.
+
+**Não bloqueia**: devolve o `Job` imediatamente (`202 Accepted`), acompanhado
+por `GET /installs/{id}` como qualquer outra instalação. Baixar um core que
+já está instalado (por qualquer via — bundled, sessão anterior, Online
+Updater do próprio RetroArch) é **no-op explícito**: o job volta em
+`"concluido"` na hora, sem nenhuma requisição de rede.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/retroarch/cores/mesen/install
+```
+
+**202 Accepted**
+
+```json
+{
+  "id": "i7",
+  "adapter_id": "retroarch",
+  "core_name": "mesen",
+  "name": "core mesen do RetroArch",
+  "phase": "baixando",
+  "message": "Baixando o core mesen...",
+  "started_at": "2026-08-27T15:10:00Z",
+  "finished_at": null,
+  "checksum_verified": false
+}
+```
+
+`core_name` só aparece em jobs de core — um job de `/emulators/{id}/install`
+nunca traz este campo. `phase` segue o mesmo vocabulário de sempre
+(`"baixando"` → `"verificando"` → `"extraindo"` → `"finalizando"` →
+`"concluido"`/`"falhou"`), sem `"resolvendo"`.
+
+**Falha de hash não é um erro de requisição — é o job chegando em
+`"falhou"`** com um `code` estável no próprio `Job`:
+
+```json
+{
+  "id": "i7",
+  "phase": "falhou",
+  "code": "core_hash_mismatch",
+  "error": "o core \"mesen\" foi baixado, mas o arquivo recebido não confere com o SHA256 esperado (...) — nada foi instalado",
+  "finished_at": "2026-08-27T15:10:04Z"
+}
+```
+
+Nada é promovido para o diretório de cores do ZeuX quando isso acontece — o
+arquivo baixado fica só no diretório de trabalho temporário, que é apagado.
+
+**Erros da requisição** (não confundir com o job chegando em `"falhou"`):
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `core_install_refused` | Core desconhecido, plataforma sem asset no manifesto, manifesto ainda sem hash medido para esta combinação (`"generated": false` — ver ADR 0015/R1), ou já existe download deste core em andamento. A mensagem original do erro vai em `message`. |
+
+---
+
 ## GET /api/v1/installs
 
 Histórico de todas as instalações desta execução do daemon (em andamento e
-concluídas).
+concluídas) — jobs de emulador (`adapter_id`) e de core do RetroArch
+(`adapter_id: "retroarch"` + `core_name`) na mesma lista.
 
 ```bash
 curl http://127.0.0.1:7777/api/v1/installs
@@ -1434,6 +1505,7 @@ em vez de JSON).
 | `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |
 | `install_refused` | 400 | POST `/emulators/{id}/install` | Fonte desconhecida, fonte manual, ou instalação já em andamento para este emulador. |
 | `uninstall_failed` | 400 | DELETE `/emulators/{id}/install` | Nada gerenciado para remover, ou falha ao apagar os arquivos. |
+| `core_install_refused` | 400 | POST `/retroarch/cores/{core}/install` | Core desconhecido, sem asset para esta plataforma, manifesto ainda sem hash medido (`generated: false`), ou download já em andamento. Não confundir com o `Job` chegando em `phase: "falhou"` com `code: "core_hash_mismatch"` — isso é assíncrono, consultado via `GET /installs/{id}`, não um erro desta chamada. |
 | `open_failed` | 400 | POST `/emulators/{id}/open` | `id` desconhecido, emulador não encontrado no disco, ou falha ao iniciar o processo. |
 | `invalid_id` | 400 | DELETE `/library/folders/{id}`, POST `/library/folders/{id}/scan`, POST/DELETE `/library/games/{id}/favorite` | `{id}` não é numérico. |
 | `path_not_found` | 400 | POST `/library/folders` | O caminho informado não existe ou não é uma pasta. |

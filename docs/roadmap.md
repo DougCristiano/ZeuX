@@ -1093,29 +1093,54 @@ passo (R2), não uma lacuna deste item.
 
 **Depende de:** nada · **Bloqueia:** R2, R3, R4
 
-#### R2 — Baixador sob demanda em Go, reusando o job de instalação (M)
+#### R2 — Baixador sob demanda em Go, reusando o job de instalação (M) — **feito em 2026-08-27, com uma ressalva de rede**
 
 O download precisa ser o mesmo mecanismo já provado (atômico, com progresso e
 verificação), não um caminho paralelo com regras próprias.
 
 **Critério de aceite:**
-- [ ] `POST /api/v1/retroarch/cores/{core}/install` devolve `202` com um `id`
-      de job, e `GET /api/v1/installs/{id}` reflete `downloading` → `extracting`
-      → `done`/`failed` com percentual — mesmos estados que a instalação 1-click
-      já usa. Documentado em [`docs/api.md`](api.md) **antes** da tela.
-- [ ] SHA256 divergente do manifesto (R1) **falha o job** com `code` estável e
-      mensagem em português dizendo qual core e que o arquivo recebido não
-      confere. Nada é promovido para `ManagedRoot()`. Verificável por teste com
-      servidor de mentira devolvendo bytes errados — sem rede.
-- [ ] A promoção é atômica (diretório de trabalho + `rename`, como `promote` já
-      faz): um download interrompido no meio não deixa core pela metade que o
-      RetroArch tente carregar.
-- [ ] Baixar um core que já existe é no-op explícito (job já `done`), não um
-      segundo download.
-- [ ] Testes rodam **sem rede**: achou / hash errado / `404` / conexão caindo no
-      meio.
+- [x] `POST /api/v1/retroarch/cores/{core}/install` devolve `202` com um `id`
+      de job, e `GET /api/v1/installs/{id}` reflete `baixando` → `verificando`
+      → `extraindo` → `finalizando` → `concluido`/`falhou` com percentual —
+      mesmos estados (`Phase`) que a instalação 1-click já usa, mesmo `Job`,
+      mesma rota `GET /installs/{id}`. Documentado em
+      [`docs/api.md`](api.md) antes de qualquer tela consumir a rota.
+      Implementado em `internal/install/retroarch_core_install.go`
+      (`Manager.StartCore`) + `handleInstallRetroArchCore`
+      (`internal/api/server.go`).
+- [x] SHA256 divergente do manifesto (R1) **falha o job** com `code` estável
+      (`"core_hash_mismatch"`) e mensagem em português nomeando o core. Nada é
+      promovido para o diretório gerenciado de cores. Verificado por
+      `TestStartCoreRejectsHashMismatch` — servidor de mentira
+      (`httptest.NewTLSServer`) devolvendo bytes que não batem com o SHA256
+      esperado, sem rede real.
+- [x] A promoção é atômica: o diretório de trabalho fica **dentro do próprio
+      destino** (`os.MkdirTemp(coresDir, ...)`, não `os.TempDir()`) para que o
+      `os.Rename` final nunca cruze sistema de arquivos e nunca deixe um core
+      pela metade — o rename só acontece depois que download, verificação de
+      hash e extração já terminaram com sucesso.
+- [x] Baixar um core que já existe é no-op explícito
+      (`TestStartCoreIsNoOpWhenAlreadyInstalled`): o job volta em `concluido`
+      na hora, sem nenhuma requisição de rede — checado **antes** até de
+      olhar o manifesto, para que um core já presente (bundled, sessão
+      anterior, Online Updater) não dependa do manifesto ter hash medido.
+- [x] Testes rodam sem rede: achou (no-op), hash errado
+      (`TestStartCoreRejectsHashMismatch`), `404`
+      (`TestStartCoreFailsOn404`), conexão caindo no meio
+      (`TestStartCoreFailsOnTruncatedDownload`, via `Content-Length` maior que
+      o corpo enviado), mais o caminho de sucesso
+      (`TestStartCoreInstallsWhenHashMatches`) e a decodificação de nomes de
+      core com espaço no path da API
+      (`TestInstallRetroArchCoreDecodesSpaceInPath`,
+      `internal/api/retroarch_core_install_test.go`).
 - [ ] Verificação contra o buildbot real: **pendente do Douglas** — este
-      ambiente não alcança o host. O item só é marcado feito depois disso.
+      ambiente não alcança o host (mesma restrição do R1). O item segue aberto
+      até alguém rodar o fluxo de ponta a ponta contra `buildbot.libretro.com`
+      de verdade — os testes acima provam a lógica (hash, atomicidade, no-op,
+      falha de rede), não que o buildbot responde do jeito que o código espera.
+
+**Compilação cruzada (linux/darwin/windows) e `go test ./...` completo
+passando em 2026-08-27.**
 
 **Depende de:** R1 · **Bloqueia:** R3
 

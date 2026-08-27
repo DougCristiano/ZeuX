@@ -33,8 +33,20 @@ type Job struct {
 	AdapterID string `json:"adapter_id"`
 	Name      string `json:"name"`
 
+	// CoreName só é preenchido para um job de download de core do RetroArch
+	// (ADR 0015, R2, StartCore) — vazio para instalação de emulador. AdapterID
+	// continua "retroarch" nos dois casos, para que a interface agrupe por
+	// emulador; CoreName é o que distingue qual core está sendo baixado.
+	CoreName string `json:"core_name,omitempty"`
+
 	Phase   Phase  `json:"phase"`
 	Message string `json:"message"`
+
+	// Code é um identificador estável de falha (ex.: "core_hash_mismatch"),
+	// para a interface decidir o que mostrar sem parsear Error. Vazio quando
+	// Phase != PhaseFailed, ou para falhas que ainda não ganharam um code
+	// próprio.
+	Code string `json:"code,omitempty"`
 
 	Version    string `json:"version,omitempty"`
 	AssetName  string `json:"asset_name,omitempty"`
@@ -73,6 +85,17 @@ type Manager struct {
 	jobs     map[string]*Job
 	active   map[string]bool // adapterID -> instalando agora
 	sequence int
+
+	// activeCores dedup a download de cores do RetroArch (ADR 0015, R2) —
+	// mapa próprio, não reaproveita `active`, porque a chave ali é adapterID
+	// ("retroarch") e um único adapter pode ter vários cores baixando ao
+	// mesmo tempo.
+	activeCores map[string]bool
+
+	// retroArchManifest, quando não-nil, substitui o manifesto embutido
+	// (sharedRetroArchManifest) — usado só por teste, no mesmo pacote, para
+	// apontar StartCore a um servidor de mentira sem precisar de rede.
+	retroArchManifest *RetroArchCoreManifest
 }
 
 // NewManager cria o gerenciador de instalações.

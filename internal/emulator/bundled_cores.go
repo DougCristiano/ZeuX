@@ -81,6 +81,23 @@ func ensureBundledCoresAvailable() error {
 	return nil
 }
 
+// RetroArchManagedCoresDir devolve o diretório de cores gerido pelo ZeuX —
+// o mesmo que coreDirs() (retroarch.go) confere primeiro ao procurar um core.
+//
+// Existe para que o download sob demanda (ADR 0015, R2,
+// internal/install.Manager.StartCore) escreva no mesmo lugar que os cores
+// empacotados pelo instalador (ADR 0012) já usam: desde que os dois modelos
+// coexistirem, um core baixado pelo botão "instalar" precisa ser achado
+// exatamente como um core bundled seria, sem um segundo diretório candidato
+// para locateCore verificar.
+func RetroArchManagedCoresDir() (string, error) {
+	dirs := bundledCoreDirsForWrite()
+	if len(dirs) == 0 {
+		return "", fmt.Errorf("não foi possível determinar o diretório de cores do RetroArch neste sistema")
+	}
+	return dirs[0], nil
+}
+
 // bundledCoreDirsForWrite retorna o diretório de escrita para cores bundled
 // (onde serão copiados na primeira execução). Idêntico a bundledCoreDirs(),
 // mas separado para clareza de intenção e para possibilitar testes unitários.
