@@ -70,20 +70,108 @@ function percentOf(job: InstallJob): number | null {
   return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
 }
 
+// Estado de download de UM core (ADR 0015, R2/R3) — por nome, não um único
+// estado pra tela inteira, porque baixar "sameboy" não pode travar o botão
+// de "mesen" numa lista de 25.
+type CoreInstallState =
+  | { kind: "idle" }
+  | { kind: "starting" }
+  | { kind: "installing"; job: InstallJob }
+  | { kind: "canceling"; job: InstallJob }
+  | { kind: "error"; message: string };
+
 // Achado em 2026-08-04: um core podia estar ausente por um bug silencioso
 // (log de aviso, nunca erro) e nada avisava até o usuário tentar lançar um
 // jogo e receber "core não encontrado" na cara — só o RetroArch carrega
 // cores plugáveis, então isto só aparece na linha dele.
+//
+// R3 (2026-08-27): além de listar, cada core faltando ganha um botão
+// "Instalar" que dispara POST /retroarch/cores/{core}/install e acompanha o
+// job por polling — mesmo padrão de pollJob() acima, só que por core em vez
+// de por emulador inteiro. "cancelado" (fase nova do R3) volta ao estado
+// ocioso sem erro: desistir não é falha.
 function RetroArchCoresList() {
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [installState, setInstallState] = useState<Record<string, CoreInstallState>>({});
 
-  useEffect(() => {
+  function loadCores() {
     api
       .getRetroArchCores()
       .then((res) => setCores(res.cores))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os cores."));
+  }
+
+  useEffect(() => {
+    loadCores();
   }, []);
+
+  function setCoreState(name: string, state: CoreInstallState) {
+    setInstallState((prev) => ({ ...prev, [name]: state }));
+  }
+
+  async function pollCoreJob(name: string, jobId: string) {
+    try {
+      const job = await api.getInstallJob(jobId);
+      if (job.phase === "concluido") {
+        setCoreState(name, { kind: "idle" });
+        loadCores(); // badge "faltando" → "ok"
+        return;
+      }
+      if (job.phase === "cancelado") {
+        setCoreState(name, { kind: "idle" });
+        return;
+      }
+      if (job.phase === "falhou") {
+        // job.error já vem do servidor nomeando o core e o que aconteceu
+        // (docs/api.md) — exibido como veio, sem reescrita.
+        setCoreState(name, { kind: "error", message: job.error ?? "O download não foi concluído." });
+        return;
+      }
+      setCoreState(name, { kind: "installing", job });
+      setTimeout(() => pollCoreJob(name, jobId), 400);
+    } catch (err) {
+      setCoreState(name, {
+        kind: "error",
+        message: err instanceof ApiError ? err.message : "Não foi possível acompanhar o download.",
+      });
+    }
+  }
+
+  async function installCore(name: string) {
+    setCoreState(name, { kind: "starting" });
+    try {
+      const job = await api.installRetroArchCore(name);
+      if (job.phase === "concluido") {
+        // No-op: StartCore achou o core já instalado antes de baixar
+        // qualquer coisa (checagem que roda antes do manifesto, R3).
+        setCoreState(name, { kind: "idle" });
+        loadCores();
+        return;
+      }
+      setCoreState(name, { kind: "installing", job });
+      pollCoreJob(name, job.id);
+    } catch (err) {
+      setCoreState(name, {
+        kind: "error",
+        message: err instanceof ApiError ? err.message : "Não foi possível iniciar o download.",
+      });
+    }
+  }
+
+  async function cancelCore(name: string, job: InstallJob) {
+    setCoreState(name, { kind: "canceling", job });
+    try {
+      await api.cancelInstall(job.id);
+      // Não muda o estado aqui: o poll em andamento (pollCoreJob) vai ver
+      // phase "cancelado" na próxima resposta e encerrar sozinho.
+    } catch (err) {
+      setCoreState(name, {
+        kind: "error",
+        message: err instanceof ApiError ? err.message : "Não foi possível cancelar o download.",
+      });
+    }
+  }
 
   if (error) return <InlineError>{error}</InlineError>;
   if (!cores) return <p className="text-sm text-muted">Carregando cores…</p>;
@@ -91,20 +179,48 @@ function RetroArchCoresList() {
   const missing = cores.filter((c) => !c.installed);
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <p className="text-sm text-muted">
         {cores.length - missing.length} de {cores.length} cores instalados
-        {missing.length > 0 && ` — faltam: ${missing.map((c) => c.name).join(", ")}`}
       </p>
-      <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm sm:grid-cols-3">
-        {cores.map((core) => (
-          <li key={core.name} className="flex items-center gap-1.5">
-            <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
-            <span className="truncate text-ink" title={core.path ?? core.filename}>
-              {core.name}
-            </span>
-          </li>
-        ))}
+      <ul className="flex flex-col gap-1 text-sm">
+        {cores.map((core) => {
+          const state = installState[core.name] ?? { kind: "idle" };
+          return (
+            <li key={core.name} className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
+                <span className="truncate text-ink" title={core.path ?? core.filename}>
+                  {core.name}
+                </span>
+                {!core.installed && state.kind === "idle" && (
+                  <Button variant="secondary" onClick={() => installCore(core.name)}>
+                    Instalar
+                  </Button>
+                )}
+                {!core.installed && state.kind === "starting" && (
+                  <span className="text-xs text-muted">Iniciando…</span>
+                )}
+                {!core.installed && (state.kind === "installing" || state.kind === "canceling") && (
+                  <>
+                    <span className="text-xs text-muted">{state.job.phase}</span>
+                    <div className="w-24">
+                      <ProgressBar percent={percentOf(state.job)} />
+                    </div>
+                    <Button
+                      variant="secondary"
+                      disabled={state.kind === "canceling"}
+                      onClick={() => cancelCore(core.name, state.job)}
+                    >
+                      {state.kind === "canceling" ? "Cancelando…" : "Cancelar"}
+                    </Button>
+                  </>
+                )}
+              </div>
+              {!core.installed && state.kind === "error" && <InlineError>{state.message}</InlineError>}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -374,21 +490,21 @@ function EmulatorCardActions({
     } catch (err) {
       setState({
         kind: "remove-error",
-        // err.message já vem do servidor (ex.: "o RetroArch vem empacotado
-        // com o ZeuX e não pode ser removido por aqui") — nunca reescrita
-        // aqui, mesma regra do resto da tela.
+        // err.message já vem do servidor — nunca reescrita aqui, mesma regra
+        // do resto da tela.
         message: err instanceof ApiError ? err.message : "Não foi possível remover este emulador.",
       });
     }
   }
 
-  // O RetroArch nunca oferece remoção nesta tela — ele vem empacotado com o
-  // próprio instalador do ZeuX (ADR 0012), não foi baixado por um clique em
-  // "Instalar", e removê-lo quebraria os 24 consoles que dependem dele sem
-  // uma forma simples de reinstalar. O backend (internal/install/manager.go,
-  // Uninstall) já recusa mesmo que esse botão apareça por engano — esconder
-  // aqui é só para não convidar o clique.
-  const canRemove = entry.installed && entry.installation?.managed && entry.adapter_id !== "retroarch";
+  // Até o ADR 0015 (R4), o RetroArch era um caso especial aqui: vinha
+  // empacotado no instalador do ZeuX (ADR 0012), e removê-lo quebraria os 24
+  // consoles que dependem dele sem forma simples de reinstalar. Isso deixou
+  // de valer — o RetroArch voltou a ser instalação manual, e
+  // internal/install/manager.go (Uninstall) não tem mais esse guard. "Managed"
+  // continua sendo a única condição real: só faz sentido remover o que o
+  // ZeuX colocou na pasta gerenciada.
+  const canRemove = entry.installed && entry.installation?.managed;
 
   return (
     <>
@@ -456,26 +572,6 @@ function EmulatorCardActions({
             </p>
           )}
         </div>
-      )}
-
-      {/* RetroArch ("kind": "bundled") deveria ser encontrado por Locate()
-          antes de qualquer clique — a cópia vem dentro do instalador do ZeuX
-          (ADR 0012). Mas isso só é verdade para o build oficial cortado com
-          RetroArch empacotado (ZEUX_BUNDLE_RETROARCH=1, hoje só a tag
-          v0.5.0 em release.yml); um `npm run tauri build`/`tauri dev` comum
-          empacota a pasta vazia. Chegar aqui com entry.installed=false
-          significa que este build não tem a cópia — mostrar o botão
-          genérico "Instalar" levava a um beco sem saída (Start() sempre
-          recusa "bundled" com "não há nada para baixar", já que o servidor
-          não sabe a diferença entre "ainda não copiou" e "este build nunca
-          empacotou"). Trata como "manual": manda para o site oficial, de
-          onde também se baixam os cores pelo Online Updater interno do
-          RetroArch (achado real, 2026-08-17). */}
-      {!entry.installed && source?.kind === "bundled" && (
-        <p className="text-sm text-muted">
-          Este build do ZeuX não trouxe o RetroArch empacotado. Baixe pelo site oficial — os cores
-          são baixados de dentro do próprio RetroArch, pelo Online Updater.
-        </p>
       )}
 
       {/* Emulador personalizado (I1) cujo caminho não foi encontrado —
@@ -570,7 +666,7 @@ function EmulatorCardActions({
               {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
             </Button>
           ))
-        ) : source?.kind === "manual" || source?.kind === "bundled" ? (
+        ) : source?.kind === "manual" ? (
           <Button variant="primary" onClick={() => openUrl(source.homepage)}>
             Abrir site oficial
           </Button>

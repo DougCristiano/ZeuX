@@ -23,4 +23,4 @@ ADR que a substitua e marque o antigo como *Substituído por 00XX*.
 | [0012](0012-empacotar-retroarch-e-cores.md) | Empacotar RetroArch e cores selecionados no instalador | Substituído por 0015 |
 | [0013](0013-tema-neon-unico.md) | Identidade visual neon única, substituindo os três temas escolhíveis | Aceito |
 | [0014](0014-navegacao-por-controle.md) | Navegação por controle sobre o layout de mesa, sem modo TV | Aceito — emenda parcial do 0009 |
-| [0015](0015-baixar-retroarch-e-cores-sob-demanda.md) | Baixar o RetroArch e os cores sob demanda, com hash fixado | Aceito — substitui 0012 (decisão apenas) |
+| [0015](0015-baixar-retroarch-e-cores-sob-demanda.md) | Baixar o RetroArch e os cores sob demanda, com hash fixado | Aceito — substitui 0012 (implementado, R1–R4; verificação de rede/build pendente) |

@@ -1,7 +1,9 @@
 # 0015 — Baixar o RetroArch e os cores sob demanda, com hash fixado
 
 **Status:** Aceito · substitui [0012](0012-empacotar-retroarch-e-cores.md) ·
-decisão apenas — implementação não começou
+implementação R1–R4 completa em 2026-08-27 ([roadmap](../roadmap.md), Sprint
+C) — resta a verificação de rede/build numa máquina com acesso real ao
+buildbot e ao ambiente Tauri, pendente do Douglas
 
 ## Contexto
 

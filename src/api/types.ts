@@ -256,14 +256,24 @@ export type InstallPhase =
   | "extraindo"
   | "finalizando"
   | "concluido"
-  | "falhou";
+  | "falhou"
+  /** Só existe para download de core do RetroArch (ADR 0015, R3) — via
+   *  `DELETE /installs/{id}`. Diferente de "falhou": é o usuário desistindo,
+   *  não um erro. */
+  | "cancelado";
 
 export type InstallJob = {
   id: string;
   adapter_id: string;
+  /** Só presente num job de download de core do RetroArch (ADR 0015, R2) —
+   *  ausente num job de instalação de emulador. */
+  core_name?: string;
   name: string;
   phase: InstallPhase;
   message: string;
+  /** Identificador estável de falha (ex.: `"core_hash_mismatch"`), quando
+   *  `phase` é `"falhou"`. Vazio para falhas sem code próprio ainda. */
+  code?: string;
   version?: string;
   asset_name?: string;
   downloaded_bytes: number;

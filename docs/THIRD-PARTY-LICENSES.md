@@ -1,6 +1,19 @@
-# Licenças de terceiros — RetroArch e cores libretro empacotados
+# Licenças de terceiros — RetroArch e cores libretro
 
-Este arquivo lista as licenças de todos os componentes de terceiros distribuídos dentro do instalador do ZeuX.
+> **Mecanismo de distribuição mudou em 2026-08-27 (R4, [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)).**
+> Até então, os binários abaixo vinham **dentro do instalador do ZeuX**
+> (ADR 0012) — cópia física, GPL exigindo fonte disponível para o que era
+> redistribuído. Agora o `zeuxd` **baixa cada um sob demanda direto do
+> `buildbot.libretro.com`**, na hora de lançar um jogo: o ZeuX nunca embute
+> nem redistribui o binário, só automatiza o download da origem oficial —
+> análise de conformidade mais próxima de um gerenciador de pacotes do que de
+> um instalador com conteúdo empacotado. A tabela abaixo (projeto/licença/
+> repositório) continua valendo como referência de proveniência; a seção
+> "Conformidade de licença" foi escrita para o modelo antigo e não foi
+> revisada para o novo — não é uma opinião jurídica, e vale conferir antes de
+> tratá-la como válida no modelo atual.
+
+Este arquivo lista as licenças dos componentes de terceiros que o ZeuX baixa e executa — hoje sob demanda, não mais empacotados dentro do instalador.
 
 ## RetroArch
 

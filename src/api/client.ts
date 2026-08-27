@@ -118,6 +118,11 @@ export const api = {
 
   getEmulators: () => request<{ emulators: EmulatorEntry[] }>("/emulators"),
   getRetroArchCores: () => request<{ cores: RetroArchCoreStatus[] }>("/retroarch/cores"),
+  // Download sob demanda de um core (ADR 0015, R2/R3). Nomes com espaço
+  // ("beetle vb", "parallel n64") precisam ir percent-encoded no path —
+  // encodeURIComponent já cuida disso.
+  installRetroArchCore: (core: string) =>
+    request<InstallJob>(`/retroarch/cores/${encodeURIComponent(core)}/install`, { method: "POST" }),
 
   getCustomEmulators: () => request<CustomEmulatorsResponse>("/custom-emulators"),
   upsertCustomEmulator: (def: CustomDefinition) =>
@@ -155,6 +160,10 @@ export const api = {
     postJSON<EmulatorConfigWriteResult>(`/emulators/${encodeURIComponent(id)}/bindings`, { bindings }),
   getInstalls: () => request<{ installs: InstallJob[] }>("/installs"),
   getInstallJob: (id: string) => request<InstallJob>(`/installs/${encodeURIComponent(id)}`),
+  // Só cancela download de core em andamento (R3) — instalação de emulador
+  // devolve cancel_failed, sem suporte a isso.
+  cancelInstall: (id: string) =>
+    request<{ canceled: string }>(`/installs/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   previewLaunch: (body: LaunchBody) => postJSON<PreviewResult>("/games/preview", body),
   launch: (body: LaunchBody) => postJSON<Session>("/games/launch", body),

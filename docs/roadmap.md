@@ -22,6 +22,16 @@ contra o código nesta data — a última verificação de verdade continua send
 de 2026-08-07. A tabela "Quantas faltam" **não** foi recontada: ela agora
 ignora os 4 itens novos da Sprint C (R1–R4), o G6 e os 3 da Sprint P.
 
+**Atualizado em 2026-08-27:** R1, R2 e R3 (Sprint C) foram implementados e
+testados de ponta a ponta nesta sessão — `go build`/`go vet`/`go test ./...`
+verdes, compilação cruzada linux/darwin/windows. R4 também, com uma exceção:
+o `npm run tauri build`/`cargo check` de verificação final não rodou (sem
+cache do Rust nem `node_modules` neste ambiente) — fica **pendente do
+Douglas**, é o único checkbox aberto que sobra na Sprint C inteira. A tabela
+"Quantas faltam" abaixo continua **sem contar** os itens da Sprint C (mesma
+ressalva de 2026-08-26) — ela mede a v1.0/v2.0 originais, não este trabalho
+novo.
+
 ---
 
 ## Corte de versão: o que é v1.0 e o que é v2.0
@@ -151,7 +161,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Dívida honesta | **1** | D2 (estratégia definida; execução depende de Sprint E/F — **não fecha na v1.0**, é dívida declarada) |
 | Sprint A | **0** | fechada; `Installation.Version` feito 2026-08-05, D11 feito 2026-08-04 |
 | Sprint B | **0** | fechada 2026-08-05; B11 verificado em máquina limpa dos 3 SOs pelo Douglas |
-| Sprint C | **0** | fechada; cores do RetroArch resolvidos via [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md), confirmados pelo Douglas em 2026-08-05 |
+| Sprint C | **0** | fechada com o escopo original (cores do RetroArch, confirmado pelo Douglas em 2026-08-05). **O ADR 0012 que resolvia isso foi substituído em 2026-08-26 pelo [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)** — reabriu a sprint com 4 itens novos (R1–R4), implementados em 2026-08-27; contagem aqui continua em 0 porque esta tabela não inclui R1–R4 (ver nota de 2026-08-26/27 no topo do documento) |
 | Sprint D (MVP) | **0** | os 11 itens fechados, critério de saída cumprido |
 | Sprint G (v1.0) | **0** | **Fechada em 2026-08-07** — G5 fechou os dois checkboxes (nenhum console cai num estado vazio; colisão de sigla de 4 letras achada por script e corrigida com `ICON_LABEL_OVERRIDES`). G1/G2/G4 já fechados; G3 fora da v1.0 por decisão |
 | **Sprint H (v1.0)** | **1** | **H3** — 1 checkbox: mapeamento respeitado com controle físico real. Só o Douglas fecha. H1/H2/H4/H5 fechados |
@@ -162,10 +172,10 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | **Sprint M (v1.0)** | **9** | M1–M15. **Atualizado 2026-08-07** (Lote 11, testado ao vivo com Chromium/Playwright): **M15 fechou** (zero checkbox aberto — scanline movida pro placeholder-only, botão "Buscar capas" parou de mudar de largura durante a busca, os dois verificados ao vivo interceptando rede pra não depender de credencial real do IGDB; `PAGE_SIZE`/`defaultLibraryPageSize` já estavam em 30 desde um lote anterior). Com M15, **só M14 continua sem começar** — precisa de controle físico real, fora do alcance de qualquer sessão de IA (mesma limitação de H3/L3). Os outros 8 itens (M1/M2/M3/M4/M6/M7/M10/M11) têm código pronto e a maior parte do critério verificado ao vivo, cada um com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). **6 dos 15 itens fechados sem ressalva nenhuma:** M5, M8, M9, M12, M13, M15. |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
-| Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
+| Sem sprint | **4** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma. **Era 5**: "resto do ADR 0012 (macOS + pinar versão)" saiu em 2026-08-27 — ADR 0012 foi substituído pelo [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) e implementado (R1–R4); a preocupação de macOS/versão fixa não tem mais equivalente pendente aqui (macOS já é coberto pelo manifesto de cores, e o hash fixado substitui "pinar versão" — ver R1) |
 | **Total do MVP e da dívida** | **1** | só o D2 — dívida + A + B + C + D |
 | **Total para fechar a v1.0** | **11** | H3 + L3 + os 9 restantes da Sprint M. **G5 fechou em 2026-08-07** (achado e corrigido: colisão de sigla de 4 letras em `ConsoleIcon`) e saiu desta conta. Recontado em 2026-08-07, Lote 11 — a Sprint M foi de 14 abertos no início do dia a 9 (M5/M8/M9/M12/M13/M15 fecharam sem ressalva). **Esta linha dizia 17** antes desta sessão recontar — desatualizada desde antes da Sprint M ter sido trabalhada. **O D2 não entra**: depende da Sprint F (v2.0) e sai declarado como dívida, não resolvido |
-| **Total geral** | **30** | 11 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 5 (sem sprint). **Esta linha dizia 36** — mesma causa da linha acima |
+| **Total geral** | **29** | 11 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 4 (sem sprint). **Era 30** — "sem sprint" caiu de 5 para 4 em 2026-08-27 (ver linha acima). Ainda não conta os itens novos da Sprint C (R1–R4, fechados) nem G6/Sprint P (abertos) — mesma ressalva de 2026-08-26 |
 | Fora do MVP, registrado | 2 | G3 (identificação por hash) e J5 (`DropdownMenu`) — os dois fora **por decisão escrita**, não por esquecimento |
 
 **Leitura honesta do número:** dos 18 itens da v1.0, **3 são verificação humana
@@ -1144,7 +1154,7 @@ passando em 2026-08-27.**
 
 **Depende de:** R1 · **Bloqueia:** R3
 
-#### R3 — "Jogar" baixa o que falta, dizendo o que está fazendo (M) — **feito no backend em 2026-08-27; a tela fica para quem mexer no front**
+#### R3 — "Jogar" baixa o que falta, dizendo o que está fazendo (M) — **feito em 2026-08-27, backend e tela**
 
 Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
 "baixando o core X" e poder desistir.
@@ -1168,9 +1178,13 @@ Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
       a promoção só acontece depois que tudo deu certo. Testado sem rede
       (`TestCancelJobInterruptsCoreDownload`, `internal/install`) e ponta a
       ponta pela rota (`TestCancelInstallStopsCoreDownload`, `internal/api`).
-      **A tela em si (botão de cancelar, barra de progresso) não foi
-      construída** — isso é trabalho de front-end, fora do escopo desta
-      sessão (só Go).
+      **A tela existe** (`RetroArchCoresList`,
+      `src/screens/EmulatorsScreen.tsx`, dentro de "Ver cores" no card do
+      RetroArch): botão "Instalar" por core faltando, barra de progresso e
+      "Cancelar" durante o download — `tsc --noEmit` não aponta erro novo
+      introduzido por ela (o projeto não tem `node_modules/` neste ambiente,
+      então não roda de verdade no navegador aqui; `npm run build`/rodar o
+      app é o que falta, pendente do Douglas).
 - [x] Sem rede (ou sem hash medido), o erro é acionável e **nomeia o que
       falta**: `"o core \"sameboy\" ainda não está no seu computador e não
       foi possível baixá-lo agora: ..."`, com `code: "launch_failed"` — nunca
@@ -1187,18 +1201,32 @@ Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
       /games/launch` com core presente devolve `200`/`Session` de sempre e
       `GET /installs` continua vazio.
 - [x] `GET /api/v1/retroarch/cores` continua listando o que está e o que não
-      está instalado, com ação de instalar por linha —
-      `POST /retroarch/cores/{core}/install` já existe desde o R2; nada
-      mudou aqui.
+      está instalado, **agora com ação de instalar por linha de verdade**.
+      **Correção sobre o que este item dizia antes:** o texto original do
+      roadmap afirmava que "a tela já existe desde 2026-08-04" — falso,
+      conferido lendo o código: `RetroArchCoresList` só listava badges
+      `ok`/`faltando`, sem nenhum botão. O botão "Instalar" (por core),
+      "Cancelar" (durante o download) e a barra de progresso foram
+      construídos agora, junto com `installRetroArchCore`/`cancelInstall`
+      em `src/api/client.ts` e os campos novos (`core_name`, `code`, fase
+      `"cancelado"`) em `InstallJob`/`InstallPhase`
+      (`src/api/types.ts`) — sem esses campos no tipo, a tela não teria como
+      saber qual core um job pertence nem mostrar o cancelamento.
 
-**O que R3 não cobre, por ser trabalho de UI e não de backend (ADR 0004: Go
-antes de Tauri/React nesta sessão):** a tela mostrando "baixando o core X",
-percentual e o botão de cancelar. O backend expõe tudo que a tela precisa
-(`GET /installs/{id}`, `DELETE /installs/{id}`), mas nenhuma linha de
-`src/` foi tocada. Quem pegar a Sprint B/UI depois encontra a API pronta.
+**Também ajustado, consequência direta de R4 (não do escopo original de
+R3):** `EmulatorCardActions` escondia o botão "Remover" do RetroArch com um
+`entry.adapter_id !== "retroarch"` cravado no componente — guard que só
+fazia sentido enquanto o backend recusava desinstalar um `KindBundled`.
+Como esse guard saiu do `Manager.Uninstall` no R4, o frontend ficaria mais
+restritivo que o backend permite (esconderia uma ação que a API já aceita) —
+corrigido para depender só de `entry.installation?.managed`, mesma regra de
+qualquer outro emulador.
 
-Compilação cruzada (linux/darwin/windows) e `go test ./...` completo passando
-em 2026-08-27.
+Compilação cruzada de Go (linux/darwin/windows) e `go test ./...` completo
+passando em 2026-08-27. Lado front: `tsc --noEmit` não aponta erro novo nos
+arquivos tocados (ruído de `node_modules/` ausente à parte, igual no resto
+do projeto) — não roda de verdade sem o Douglas instalar as dependências e
+abrir o app.
 
 **Depende de:** R2 · **Bloqueia:** nada
 
