@@ -1,0 +1,1007 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-27T02:12:29Z",
+  "hash_source": "Nenhum hash oficial publicado pelo buildbot foi confirmado (host bloqueado no ambiente de desenvolvimento desde 2026-08-02, ver ADR 0015). O SHA256 abaixo é medido pelo próprio ZeuX no momento da geração, não conferido contra uma soma publicada pela origem.",
+  "cores": {
+    "beetle cygne": {
+      "libretro_name": "mednafen_wswan_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mednafen_wswan_libretro.dylib.zip",
+          "filename": "mednafen_wswan_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mednafen_wswan_libretro.dylib.zip",
+          "filename": "mednafen_wswan_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_wswan_libretro.so.zip",
+          "filename": "mednafen_wswan_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_wswan_libretro.so.zip",
+          "filename": "mednafen_wswan_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_wswan_libretro.dll.zip",
+          "filename": "mednafen_wswan_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "beetle ngp": {
+      "libretro_name": "mednafen_ngp_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mednafen_ngp_libretro.dylib.zip",
+          "filename": "mednafen_ngp_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mednafen_ngp_libretro.dylib.zip",
+          "filename": "mednafen_ngp_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_ngp_libretro.so.zip",
+          "filename": "mednafen_ngp_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_ngp_libretro.so.zip",
+          "filename": "mednafen_ngp_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_ngp_libretro.dll.zip",
+          "filename": "mednafen_ngp_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "beetle pce": {
+      "libretro_name": "mednafen_pce_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mednafen_pce_libretro.dylib.zip",
+          "filename": "mednafen_pce_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mednafen_pce_libretro.dylib.zip",
+          "filename": "mednafen_pce_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_pce_libretro.so.zip",
+          "filename": "mednafen_pce_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_pce_libretro.so.zip",
+          "filename": "mednafen_pce_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_pce_libretro.dll.zip",
+          "filename": "mednafen_pce_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "beetle psx hw": {
+      "libretro_name": "mednafen_psx_hw_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mednafen_psx_hw_libretro.dylib.zip",
+          "filename": "mednafen_psx_hw_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mednafen_psx_hw_libretro.dylib.zip",
+          "filename": "mednafen_psx_hw_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_psx_hw_libretro.so.zip",
+          "filename": "mednafen_psx_hw_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_psx_hw_libretro.so.zip",
+          "filename": "mednafen_psx_hw_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_psx_hw_libretro.dll.zip",
+          "filename": "mednafen_psx_hw_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "beetle saturn": {
+      "libretro_name": "mednafen_saturn_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mednafen_saturn_libretro.dylib.zip",
+          "filename": "mednafen_saturn_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mednafen_saturn_libretro.dylib.zip",
+          "filename": "mednafen_saturn_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_saturn_libretro.so.zip",
+          "filename": "mednafen_saturn_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_saturn_libretro.so.zip",
+          "filename": "mednafen_saturn_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_saturn_libretro.dll.zip",
+          "filename": "mednafen_saturn_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "beetle vb": {
+      "libretro_name": "mednafen_vb_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mednafen_vb_libretro.dylib.zip",
+          "filename": "mednafen_vb_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mednafen_vb_libretro.dylib.zip",
+          "filename": "mednafen_vb_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_vb_libretro.so.zip",
+          "filename": "mednafen_vb_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_vb_libretro.so.zip",
+          "filename": "mednafen_vb_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_vb_libretro.dll.zip",
+          "filename": "mednafen_vb_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "bsnes": {
+      "libretro_name": "bsnes_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/bsnes_libretro.dylib.zip",
+          "filename": "bsnes_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/bsnes_libretro.dylib.zip",
+          "filename": "bsnes_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/bsnes_libretro.so.zip",
+          "filename": "bsnes_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/bsnes_libretro.so.zip",
+          "filename": "bsnes_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/bsnes_libretro.dll.zip",
+          "filename": "bsnes_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "fbneo": {
+      "libretro_name": "fbneo_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/fbneo_libretro.dylib.zip",
+          "filename": "fbneo_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/fbneo_libretro.dylib.zip",
+          "filename": "fbneo_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/fbneo_libretro.so.zip",
+          "filename": "fbneo_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/fbneo_libretro.so.zip",
+          "filename": "fbneo_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/fbneo_libretro.dll.zip",
+          "filename": "fbneo_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "flycast": {
+      "libretro_name": "flycast_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/flycast_libretro.dylib.zip",
+          "filename": "flycast_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/flycast_libretro.dylib.zip",
+          "filename": "flycast_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/flycast_libretro.so.zip",
+          "filename": "flycast_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/flycast_libretro.so.zip",
+          "filename": "flycast_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/flycast_libretro.dll.zip",
+          "filename": "flycast_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "gambatte": {
+      "libretro_name": "gambatte_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/gambatte_libretro.dylib.zip",
+          "filename": "gambatte_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/gambatte_libretro.dylib.zip",
+          "filename": "gambatte_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/gambatte_libretro.so.zip",
+          "filename": "gambatte_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/gambatte_libretro.so.zip",
+          "filename": "gambatte_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/gambatte_libretro.dll.zip",
+          "filename": "gambatte_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "genesis plus gx": {
+      "libretro_name": "genesis_plus_gx_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/genesis_plus_gx_libretro.dylib.zip",
+          "filename": "genesis_plus_gx_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/genesis_plus_gx_libretro.dylib.zip",
+          "filename": "genesis_plus_gx_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/genesis_plus_gx_libretro.so.zip",
+          "filename": "genesis_plus_gx_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/genesis_plus_gx_libretro.so.zip",
+          "filename": "genesis_plus_gx_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip",
+          "filename": "genesis_plus_gx_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "mame": {
+      "libretro_name": "mame_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mame_libretro.dylib.zip",
+          "filename": "mame_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mame_libretro.dylib.zip",
+          "filename": "mame_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mame_libretro.so.zip",
+          "filename": "mame_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mame_libretro.so.zip",
+          "filename": "mame_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mame_libretro.dll.zip",
+          "filename": "mame_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "melonds": {
+      "libretro_name": "melonds_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/melonds_libretro.dylib.zip",
+          "filename": "melonds_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/melonds_libretro.dylib.zip",
+          "filename": "melonds_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/melonds_libretro.so.zip",
+          "filename": "melonds_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/melonds_libretro.so.zip",
+          "filename": "melonds_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/melonds_libretro.dll.zip",
+          "filename": "melonds_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "mesen": {
+      "libretro_name": "mesen_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mesen_libretro.dylib.zip",
+          "filename": "mesen_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mesen_libretro.dylib.zip",
+          "filename": "mesen_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mesen_libretro.so.zip",
+          "filename": "mesen_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mesen_libretro.so.zip",
+          "filename": "mesen_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mesen_libretro.dll.zip",
+          "filename": "mesen_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "mgba": {
+      "libretro_name": "mgba_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mgba_libretro.dylib.zip",
+          "filename": "mgba_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mgba_libretro.dylib.zip",
+          "filename": "mgba_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mgba_libretro.so.zip",
+          "filename": "mgba_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mgba_libretro.so.zip",
+          "filename": "mgba_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mgba_libretro.dll.zip",
+          "filename": "mgba_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "mupen64plus-next": {
+      "libretro_name": "mupen64plus_next_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/mupen64plus_next_libretro.dylib.zip",
+          "filename": "mupen64plus_next_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/mupen64plus_next_libretro.dylib.zip",
+          "filename": "mupen64plus_next_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mupen64plus_next_libretro.so.zip",
+          "filename": "mupen64plus_next_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mupen64plus_next_libretro.so.zip",
+          "filename": "mupen64plus_next_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mupen64plus_next_libretro.dll.zip",
+          "filename": "mupen64plus_next_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "opera": {
+      "libretro_name": "opera_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/opera_libretro.dylib.zip",
+          "filename": "opera_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/opera_libretro.dylib.zip",
+          "filename": "opera_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/opera_libretro.so.zip",
+          "filename": "opera_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/opera_libretro.so.zip",
+          "filename": "opera_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/opera_libretro.dll.zip",
+          "filename": "opera_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "parallel n64": {
+      "libretro_name": "parallel_n64_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/parallel_n64_libretro.dylib.zip",
+          "filename": "parallel_n64_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/parallel_n64_libretro.dylib.zip",
+          "filename": "parallel_n64_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/parallel_n64_libretro.so.zip",
+          "filename": "parallel_n64_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/parallel_n64_libretro.so.zip",
+          "filename": "parallel_n64_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/parallel_n64_libretro.dll.zip",
+          "filename": "parallel_n64_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "picodrive": {
+      "libretro_name": "picodrive_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/picodrive_libretro.dylib.zip",
+          "filename": "picodrive_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/picodrive_libretro.dylib.zip",
+          "filename": "picodrive_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/picodrive_libretro.so.zip",
+          "filename": "picodrive_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/picodrive_libretro.so.zip",
+          "filename": "picodrive_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/picodrive_libretro.dll.zip",
+          "filename": "picodrive_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "ppsspp": {
+      "libretro_name": "ppsspp_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/ppsspp_libretro.dylib.zip",
+          "filename": "ppsspp_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/ppsspp_libretro.dylib.zip",
+          "filename": "ppsspp_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/ppsspp_libretro.so.zip",
+          "filename": "ppsspp_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/ppsspp_libretro.so.zip",
+          "filename": "ppsspp_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/ppsspp_libretro.dll.zip",
+          "filename": "ppsspp_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "sameboy": {
+      "libretro_name": "sameboy_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/sameboy_libretro.dylib.zip",
+          "filename": "sameboy_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/sameboy_libretro.dylib.zip",
+          "filename": "sameboy_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/sameboy_libretro.so.zip",
+          "filename": "sameboy_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/sameboy_libretro.so.zip",
+          "filename": "sameboy_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/sameboy_libretro.dll.zip",
+          "filename": "sameboy_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "snes9x": {
+      "libretro_name": "snes9x_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/snes9x_libretro.dylib.zip",
+          "filename": "snes9x_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/snes9x_libretro.dylib.zip",
+          "filename": "snes9x_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/snes9x_libretro.so.zip",
+          "filename": "snes9x_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/snes9x_libretro.so.zip",
+          "filename": "snes9x_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/snes9x_libretro.dll.zip",
+          "filename": "snes9x_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "stella": {
+      "libretro_name": "stella_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/stella_libretro.dylib.zip",
+          "filename": "stella_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/stella_libretro.dylib.zip",
+          "filename": "stella_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/stella_libretro.so.zip",
+          "filename": "stella_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/stella_libretro.so.zip",
+          "filename": "stella_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/stella_libretro.dll.zip",
+          "filename": "stella_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "swanstation": {
+      "libretro_name": "swanstation_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/swanstation_libretro.dylib.zip",
+          "filename": "swanstation_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/swanstation_libretro.dylib.zip",
+          "filename": "swanstation_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/swanstation_libretro.so.zip",
+          "filename": "swanstation_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/swanstation_libretro.so.zip",
+          "filename": "swanstation_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/swanstation_libretro.dll.zip",
+          "filename": "swanstation_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    },
+    "yabause": {
+      "libretro_name": "yabause_libretro",
+      "platforms": {
+        "darwin/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/x86_64/latest/yabause_libretro.dylib.zip",
+          "filename": "yabause_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "darwin/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/osx/arm64/latest/yabause_libretro.dylib.zip",
+          "filename": "yabause_libretro.dylib.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/yabause_libretro.so.zip",
+          "filename": "yabause_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "linux/arm64": {
+          "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/yabause_libretro.so.zip",
+          "filename": "yabause_libretro.so.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        },
+        "windows/amd64": {
+          "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/yabause_libretro.dll.zip",
+          "filename": "yabause_libretro.dll.zip",
+          "size": 0,
+          "sha256": "",
+          "generated": false
+        }
+      }
+    }
+  }
+}

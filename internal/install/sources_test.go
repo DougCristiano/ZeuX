@@ -188,6 +188,31 @@ func TestCheckHostRejectsUntrustedOrigins(t *testing.T) {
 	}
 }
 
+// Trava a lista de hosts permitidos no valor exato esperado (ADR 0015, R1):
+// buildbot.libretro.com é o único host novo que o download sob demanda de
+// cores do RetroArch deveria justificar. Se este teste falhar porque alguém
+// adicionou um host, é sinal de que a lista cresceu sem essa decisão passar
+// por revisão — ajuste o teste deliberadamente, não só para fazê-lo passar.
+func TestAllowedHostsListIsExactlyTheExpectedSet(t *testing.T) {
+	expected := map[string]bool{
+		"api.github.com":                       true,
+		"github.com":                           true,
+		"objects.githubusercontent.com":        true,
+		"release-assets.githubusercontent.com": true,
+		"codeload.github.com":                  true,
+		"buildbot.libretro.com":                true,
+	}
+
+	if len(allowedHosts) != len(expected) {
+		t.Fatalf("allowedHosts tem %d entradas, esperava %d: %v", len(allowedHosts), len(expected), allowedHosts)
+	}
+	for host := range expected {
+		if !allowedHosts[host] {
+			t.Errorf("esperava %q na lista de hosts permitidos", host)
+		}
+	}
+}
+
 func TestJobPercent(t *testing.T) {
 	if got := (Job{Downloaded: 50, Total: 200}).Percent(); got != 25 {
 		t.Errorf("percentual = %d, esperado 25", got)

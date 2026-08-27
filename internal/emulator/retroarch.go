@@ -91,6 +91,22 @@ var defaultCoreByConsole = map[string]string{
 	"neogeo":       "fbneo",
 }
 
+// KnownCores devolve uma cópia de retroArchCores: nome amigável → nome do
+// arquivo sem extensão de plataforma.
+//
+// Existe para que o manifesto de download sob demanda (ADR 0015,
+// internal/install/retroarch_manifest.go) e o gerador que o produz
+// (cmd/generate-retroarch-manifest) leiam a mesma lista que o adapter usa,
+// em vez de manter uma segunda cópia que pode divergir silenciosamente. Cópia
+// porque o chamador não deve conseguir alterar o mapa interno do adapter.
+func KnownCores() map[string]string {
+	cores := make(map[string]string, len(retroArchCores))
+	for name, file := range retroArchCores {
+		cores[name] = file
+	}
+	return cores
+}
+
 type retroArchAdapter struct{}
 
 func newRetroArch() Adapter { return retroArchAdapter{} }

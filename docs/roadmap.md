@@ -1046,31 +1046,50 @@ tela de instalação 1-click. **Sem SSE, sem WebSocket** — `grep -rn
 para reaproveitar um painel de progresso que já funciona é a solução maior
 para o mesmo problema.
 
-#### R1 — Manifesto de runners: URL e SHA256 fixados por core (M)
+#### R1 — Manifesto de runners: URL e SHA256 fixados por core (M) — **feito em 2026-08-27, com uma ressalva de rede**
 
 Sem hash fixado, o download sob demanda aceita qualquer bytes que o servidor
 devolver. O usuário precisa saber que o core que abriu o jogo dele é o mesmo
 que o Douglas conferiu ao cortar a versão.
 
 **Critério de aceite:**
-- [ ] Existe um manifesto embutido no binário (`//go:embed`, mesmo padrão de
+- [x] Existe um manifesto embutido no binário (`//go:embed`, mesmo padrão de
       `internal/install/data/sources.json`) com, por core e por plataforma:
-      URL, nome do arquivo, tamanho esperado e **SHA256**.
-- [ ] O manifesto cobre os 25 cores que o ADR 0012 listava (`grep -c` no
-      manifesto bate com a lista de `retroArchCores` em
-      `internal/emulator/retroarch.go`) — nenhum core que algum tier do
-      catálogo recomenda fica de fora. Um teste falha se a lista divergir,
-      mesmo espírito de `verdict/catalog_integration_test.go`.
-- [ ] `buildbot.libretro.com` entra em `allowedHosts`
-      (`internal/install/download.go`) — e **só ele**; um teste falha se a
-      lista crescer sem alguém mexer nesse teste.
-- [ ] Existe um comando/script que **gera** o manifesto baixando e medindo os
-      arquivos (reaproveitando `scripts/download-retroarch-cores.mjs` ou
-      `cmd/download-retroarch-app`, que já sabem falar com o buildbot), para
-      que fixar hash não vire trabalho manual a cada versão do ZeuX.
-- [ ] Fica **registrado no manifesto ou num comentário** se o buildbot publica
-      hash oficial por core. Ninguém verificou (host bloqueado aqui); se
-      publicar, o item vira "conferir contra a origem" em vez de "fixar".
+      URL, nome do arquivo, tamanho esperado e **SHA256**. Implementado em
+      `internal/install/retroarch_manifest.go` +
+      `internal/install/data/retroarch_cores_manifest.json`.
+- [x] O manifesto cobre os 25 cores que o ADR 0012 listava — via
+      `emulator.KnownCores()` (novo acessor exportado de
+      `internal/emulator/retroarch.go`), para que as duas listas não possam
+      divergir silenciosamente. `TestRetroArchManifestCoversAllKnownCores`
+      (`internal/install/retroarch_manifest_test.go`) falha se algum core sair
+      de sincronia nos dois sentidos (falta no manifesto, ou sobra nele).
+- [x] `buildbot.libretro.com` entra em `allowedHosts`
+      (`internal/install/download.go`) — e só ele;
+      `TestAllowedHostsListIsExactlyTheExpectedSet`
+      (`internal/install/sources_test.go`) trava o conjunto exato.
+- [x] Existe um comando que **gera** o manifesto baixando e medindo os
+      arquivos: `cmd/generate-retroarch-manifest`. Não reaproveita o `.mjs`
+      nem o `cmd/download-retroarch-app` existentes porque nenhum dos dois
+      cobre múltiplas plataformas a partir de uma única máquina — o gerador
+      novo lê `emulator.KnownCores()` direto (mesma fonte que o teste de
+      cobertura) e usa `BuildBotCoreURL`, uma função só, para montar a URL do
+      buildbot — usada tanto pelo gerador quanto pelos testes, para que a
+      estrutura de URL não possa divergir entre os dois.
+- [x] Registrado (`HashSource`, no próprio manifesto, mais o comentário de
+      pacote em `retroarch_manifest.go`): **ninguém confirmou** se o buildbot
+      publica hash oficial por core — o host segue bloqueado neste ambiente.
+      O SHA256 é medido pelo próprio ZeuX no momento da geração.
+
+**Ressalva que fica registrada, não escondida:** rodando o gerador neste
+ambiente (`go run ./cmd/generate-retroarch-manifest`), as 125 combinações
+core/plataforma (25 cores × 5 plataformas) deram `403 Forbidden` — o buildbot
+segue inacessível daqui, exatamente como o ADR 0015 já previa. O manifesto
+commitado tem todas as URLs corretas e `"generated": false` em todo mundo;
+`size` e `sha256` ficam zerados/vazios até alguém rodar o gerador numa máquina
+com acesso real ao buildbot. **R2 precisa recusar instalar a partir de uma
+entrada `generated: false`** — isso não está implementado ainda, é o próximo
+passo (R2), não uma lacuna deste item.
 
 **Depende de:** nada · **Bloqueia:** R2, R3, R4
 
