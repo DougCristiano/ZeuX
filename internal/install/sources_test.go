@@ -29,9 +29,9 @@ func TestLoadCatalog(t *testing.T) {
 			if len(source.Assets) == 0 {
 				t.Errorf("%s: fonte do GitHub sem nenhum padrão de pacote", source.AdapterID)
 			}
-		case KindManual, KindBundled:
+		case KindManual:
 			if source.Reason == "" {
-				t.Errorf("%s: fonte manual/bundled precisa explicar o porquê (não automatizável, ou já vem empacotada)", source.AdapterID)
+				t.Errorf("%s: fonte manual precisa explicar o porquê (não automatizável)", source.AdapterID)
 			}
 		default:
 			t.Errorf("%s: tipo de fonte desconhecido %q", source.AdapterID, source.Kind)
@@ -239,12 +239,10 @@ func TestManualSourceRefusesWithLink(t *testing.T) {
 	}
 }
 
-// RetroArch (kind bundled, ADR 0012) não deve oferecer instalação automática:
-// já vem dentro do instalador. Chegar em Start() mesmo assim (o normal é
-// Locate() já mostrar "instalado" e a interface nem exibir o botão) precisa
-// recusar com uma mensagem que reflete a realidade, não instruções de
-// download que não fazem mais sentido para este emulador.
-func TestBundledSourceRefusesStart(t *testing.T) {
+// RetroArch é KindManual desde o ADR 0015 (R4) — Start() precisa recusar com
+// a mesma mensagem de qualquer outra fonte manual (site oficial), não mais
+// "já vem empacotado" (isso valia enquanto era KindBundled, ADR 0012).
+func TestManualRetroArchRefusesStart(t *testing.T) {
 	catalog, err := LoadCatalog()
 	if err != nil {
 		t.Fatalf("carregando catálogo: %v", err)
@@ -253,9 +251,9 @@ func TestBundledSourceRefusesStart(t *testing.T) {
 	manager := NewManager(catalog, discardLogger())
 
 	if _, err := manager.Start("retroarch"); err == nil {
-		t.Fatal("fonte bundled não deveria iniciar instalação automática")
-	} else if !strings.Contains(err.Error(), "já vem empacotado") {
-		t.Errorf("o erro deveria explicar que o RetroArch já vem empacotado: %v", err)
+		t.Fatal("fonte manual não deveria iniciar instalação automática")
+	} else if !strings.Contains(err.Error(), "instalado manualmente") {
+		t.Errorf("o erro deveria explicar que o RetroArch precisa ser instalado manualmente: %v", err)
 	}
 }
 

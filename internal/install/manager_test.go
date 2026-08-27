@@ -107,21 +107,20 @@ func TestUninstallRemovesFromTheSameFolderPromoteUsed(t *testing.T) {
 	}
 }
 
-// O RetroArch (kind bundled, ADR 0012) nunca pode ser removido por Uninstall:
-// não foi baixado por Start(), vem dentro do próprio instalador, e apagá-lo
-// quebraria os 24 consoles que dependem dele sem uma forma simples de
-// reinstalar. O guard precisa recusar mesmo sem nenhuma instalação promovida
-// no disco — a rota pode ser chamada direto, sem passar pela tela.
-func TestUninstallRefusesBundledSource(t *testing.T) {
+// Desde o ADR 0015 (R4), o RetroArch é KindManual — Uninstall não tem mais
+// um guard próprio para ele. Sem nenhuma instalação gerenciada no disco (o
+// caso normal: o RetroArch é instalado manualmente pelo usuário), a recusa
+// vem do mesmo caminho de qualquer outro emulador nunca instalado pelo ZeuX.
+func TestUninstallRetroArchWithoutManagedInstallSaysNothingToRemove(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	manager := NewManager(mustCatalog(t), discardLogger())
 
 	err := manager.Uninstall("retroarch")
 	if err == nil {
-		t.Fatal("esperava recusa ao tentar remover uma fonte bundled")
+		t.Fatal("esperava recusa: nada gerenciado para remover")
 	}
-	if !strings.Contains(err.Error(), "empacotado com o ZeuX") {
-		t.Errorf("mensagem deveria explicar que é bundled: %v", err)
+	if !strings.Contains(err.Error(), "não instalou este emulador") {
+		t.Errorf("mensagem deveria dizer que o ZeuX não instalou este emulador: %v", err)
 	}
 }

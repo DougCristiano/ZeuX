@@ -8,12 +8,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 )
-
-// bundledCoresInitOnce garante que cores bundled são copiados apenas uma vez
-// por execução do daemon (idempotente na primeira vez).
-var bundledCoresInitOnce sync.Once
 
 // O RetroArch não é um emulador, e sim um front-end que carrega cores. Sem
 // core ele não roda nada, então este adapter carrega uma responsabilidade que
@@ -234,18 +229,7 @@ func coreExtension() string {
 
 // locateCore procura o arquivo do core nos diretórios onde o RetroArch os
 // mantém, que variam conforme a forma de instalação.
-//
-// Na primeira chamada, tenta copiar cores bundled do instalador para
-// ~/.local/share/zeux/retroarch/cores (Linux) ou equivalentes (ADR 0012).
 func locateCore(binaryPath, coreName string) (string, bool) {
-	// Garantir que cores bundled foram copiados (uma vez por daemon)
-	bundledCoresInitOnce.Do(func() {
-		if err := ensureBundledCoresAvailable(); err != nil {
-			// Aviso mas não bloqueia — cores podem vir do Online Updater
-			fmt.Fprintf(os.Stderr, "aviso ao copiar cores bundled: %v\n", err)
-		}
-	})
-
 	file, ok := retroArchCores[coreName]
 	if !ok {
 		return "", false
@@ -335,15 +319,6 @@ type CoreStatus struct {
 // (achado 2026-08-04: um core inteiro podia estar ausente por um bug de
 // caminho, e nada na tela avisava até o lançamento falhar).
 func RetroArchCoreStatus(ctx context.Context) []CoreStatus {
-	// Mesmo gatilho de locateCore: garante que cores bundled foram copiados
-	// antes de reportar o que está instalado, senão a primeira consulta a
-	// esta rota mostraria tudo como ausente até o primeiro lançamento.
-	bundledCoresInitOnce.Do(func() {
-		if err := ensureBundledCoresAvailable(); err != nil {
-			fmt.Fprintf(os.Stderr, "aviso ao copiar cores bundled: %v\n", err)
-		}
-	})
-
 	binaryPath := ""
 	if install, ok := (retroArchAdapter{}).Locate(ctx); ok {
 		binaryPath = install.BinaryPath

@@ -1202,7 +1202,7 @@ em 2026-08-27.
 
 **Depende de:** R2 · **Bloqueia:** nada
 
-#### R4 — Aposentar o empacotamento (M)
+#### R4 — Aposentar o empacotamento (M) — **código feito em 2026-08-27; a verificação de build fica pendente do Douglas**
 
 Enquanto os dois modelos coexistirem, o instalador continua com 178 MB e há
 dois caminhos para achar um core — o tipo de ambiguidade que produz bug de
@@ -1212,19 +1212,57 @@ caminho (já aconteceu duas vezes com `ZEUX_BUNDLED_*`).
 - [ ] `npm run tauri build` gera um pacote **sem** cores e sem o app do
       RetroArch dentro. Verificável: `dpkg-deb -c` no `.deb` não lista nada em
       `usr/lib/zeux/resources/retroarch/`, e o tamanho cai do patamar de 178 MB
-      (medir e escrever o número novo aqui).
-- [ ] `KindBundled`, `bundled_cores.go`, `bundled_retroarch.go` e as variáveis
-      `ZEUX_BUNDLED_*` (`src-tauri/src/lib.rs`) saem do código, ou fica
-      escrito no roadmap por que algum deles ficou.
-- [ ] `Manager.Uninstall` volta a aceitar remover o RetroArch — a recusa de
-      `KindBundled` existia porque apagar o bundled deixaria o app sem como
-      recuperá-lo, e isso deixa de valer.
-- [ ] `internal/install/data/sources.json`: a entrada do RetroArch deixa de ser
-      `"kind": "bundled"` e o `reason` para de dizer que ele "já vem dentro do
-      instalador" — hoje esse texto passaria a mentir.
-- [ ] Quem já tem uma instalação com cores bundled **não perde nada**: o
-      resolvedor continua encontrando os cores onde eles estiverem, ou o
-      roadmap registra explicitamente que atualizar o ZeuX rebaixa esses cores.
+      (medir e escrever o número novo aqui). **Não executado nesta sessão** —
+      rodar o build completo do Tauri exigiria baixar toda a árvore de
+      dependências do Rust (sem cache local, `~/.cargo/registry` vazio) e do
+      npm (`node_modules/` não instalado), o mesmo tipo de peso que o
+      [ADR 0004](decisoes/0004-adiar-rust-e-tauri.md) evita buscar sem
+      necessidade comprovada. `src-tauri/resources/` foi apagado, `resources`
+      saiu de `tauri.conf.json`, e a leitura manual do `src-tauri/src/lib.rs`
+      resultante não indica erro de sintaxe — mas isso não substitui rodar
+      `cargo check`/`npm run tauri build` de verdade. **Só o Douglas pode
+      fechar este item**, numa máquina com o ambiente Tauri já montado.
+- [x] `KindBundled`, `bundled_cores.go`, `bundled_retroarch.go` e as variáveis
+      `ZEUX_BUNDLED_*` (`src-tauri/src/lib.rs`) saíram do código.
+      `bundled_cores.go` virou `internal/emulator/retroarch_cores_dir.go`,
+      mantendo só `RetroArchManagedCoresDir`/`bundledCoreDirsForWrite` — R2/R3
+      dependem delas para saber onde promover um core baixado; o resto do
+      arquivo (a cópia de cores empacotados) foi removido de verdade, não só
+      comentado. `bundled_retroarch.go` saiu inteiro: sem bundling, não há
+      mais nada para copiar para o diretório gerenciado.
+      `cmd/download-retroarch-app` e `scripts/download-retroarch-cores.mjs`
+      também saíram (ficariam mortos: nada mais define
+      `ZEUX_BUNDLE_RETROARCH=1` desde que o `.github/workflows/release.yml`
+      perdeu o input `bundle_retroarch` e a etapa que travava isso à tag
+      v0.5.0).
+- [x] `Manager.Uninstall` volta a aceitar remover o RetroArch — o guard de
+      `KindBundled` saiu; sem instalação gerenciada no disco (o caso comum,
+      já que o RetroArch agora é manual), a rota devolve o mesmo
+      "nada a remover" de qualquer emulador nunca instalado pelo ZeuX
+      (`TestUninstallRetroArchWithoutManagedInstallSaysNothingToRemove`).
+- [x] `internal/install/data/sources.json`: a entrada do RetroArch é
+      `"kind": "manual"`, com `reason` honesto (buildbot sem estrutura
+      estável para automação; cores baixados sob demanda pelo ZeuX). Mesmo
+      texto refletido em `docs/api.md` (`GET /emulator-sources`).
+- [x] Quem já tem cores de uma instalação bundled anterior **não perde
+      nada**: `RetroArchManagedCoresDir()`/`bundledCoreDirsForWrite()` são o
+      mesmo diretório de sempre — nada mudou de lugar, só parou de receber
+      cópia automática do instalador. Um core que já estava lá continua
+      sendo achado por `coreDirs()` exatamente como antes.
+
+**Também retirado, fora da lista original mas parte do mesmo "aposentar":**
+`src-tauri/resources/` (diretório inteiro), a entrada `resources` de
+`tauri.conf.json`, as regras correspondentes do `.gitignore`, e a dependência
+Node `unzipper` (só usada pelo script removido) — **removida do
+`package.json`, mas `package-lock.json` não foi regenerado** (rodar `npm
+install` exigiria a mesma rede/toolchain que o item acima já registra como
+pendente; ninguém tocou `node_modules/` nesta sessão, que nem existe aqui).
+`docs/adr-0012-implementation.md` ganhou um aviso de que descreve um mecanismo
+retirado, sem apagar o conteúdo histórico.
+
+Compilação cruzada de Go (linux/darwin/windows), `go vet` e `go test ./...`
+completo passando em 2026-08-27. O lado Rust/Tauri não foi compilado nesta
+sessão — ver o primeiro item acima.
 
 **Depende de:** R3 · **Bloqueia:** nada
 

@@ -131,18 +131,6 @@ func run(addr string, logger *slog.Logger) error {
 		}
 	}()
 
-	// A cópia do RetroArch empacotado (Windows: exe + ~65 DLLs) pode levar
-	// vários segundos na primeira abertura. Se rodar antes do Listen, a UI
-	// esgota as tentativas de GET /consent e mostra "O zeuxd não respondeu"
-	// mesmo com o daemon ainda vivo (issue #6). Consentimento, health e scan
-	// não dependem desse binário; /emulators pode ver "não instalado" por um
-	// instante na primeira execução — aceitável frente a travar o onboarding.
-	go func() {
-		if err := emulator.EnsureBundledRetroArchAvailable(); err != nil {
-			logger.Warn("não foi possível preparar o RetroArch empacotado", "erro", err)
-		}
-	}()
-
 	select {
 	case err := <-errCh:
 		return err

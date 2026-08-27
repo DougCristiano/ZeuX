@@ -594,10 +594,10 @@ curl http://127.0.0.1:7777/api/v1/emulator-sources
     {
       "adapter_id": "retroarch",
       "name": "RetroArch",
-      "kind": "bundled",
+      "kind": "manual",
       "homepage": "https://www.retroarch.com/?page=platforms",
       "license": "GPL-3.0",
-      "reason": "Já vem dentro do instalador do ZeuX (ADR 0012) — não precisa ser baixado."
+      "reason": "Distribuído pelo buildbot.libretro.com, sem estrutura estável para automação — precisa ser instalado manualmente. Os cores, esses sim, o ZeuX baixa sozinho sob demanda (ADR 0015)."
     },
     {
       "adapter_id": "dolphin",
@@ -615,18 +615,18 @@ curl http://127.0.0.1:7777/api/v1/emulator-sources
 |---|---|---|
 | `adapter_id` | string | Mesmo identificador usado em `/emulators/{id}/install` e `/emulators/{id}/open`. |
 | `name` | string | Nome de exibição. |
-| `kind` | string | Como o pacote é obtido: `"github"` (release resolvida pela API do GitHub), `"bundled"` (já vem dentro do instalador do ZeuX — hoje só o RetroArch, [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md)) ou `"manual"` (`/install` recusa esta fonte — `reason` explica o porquê). Nota: exemplos antigos desta página chegaram a mostrar `"github_release"` — o valor real gravado em `internal/install/sources.go` é `"github"`. |
+| `kind` | string | Como o pacote é obtido: `"github"` (release resolvida pela API do GitHub) ou `"manual"` (`/install` recusa esta fonte — `reason` explica o porquê). Até o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) (R4) existia um terceiro valor, `"bundled"` (RetroArch vinha dentro do instalador, [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md)) — retirado do código; o RetroArch é `"manual"` desde então, e os cores dele têm sua própria rota (`POST /retroarch/cores/{core}/install`, fora deste catálogo). Nota: exemplos antigos desta página chegaram a mostrar `"github_release"` — o valor real gravado em `internal/install/sources.go` é `"github"`. |
 | `repo` | string | `owner/repo` no GitHub. Presente nas fontes `"github"`. |
 | `homepage` | string | Site do projeto ou da release. |
 | `license` | string | Licença declarada pelo projeto, quando conhecida. Nem toda fonte traz este campo. |
-| `reason` | string | **Presente em fontes `"manual"`** (por que a automação não é possível) **e em `"bundled"`** (por que não há botão de instalar). Ausente em `"github"`. |
+| `reason` | string | **Presente em fontes `"manual"`** — por que a automação não é possível. Ausente em `"github"`. |
 
 Esta rota não tem caminho de erro.
 
-Hoje o catálogo (`internal/install/data/sources.json`) tem 12 fontes `"github"`,
-1 `"bundled"` (RetroArch) e 1 `"manual"` (Dolphin) — a única fonte manual, o que
-é o que faz a tela de Emuladores trocar o botão "Instalar" por "Abrir site
-oficial" só para o Dolphin (ver [`docs/adapters.md`](adapters.md)).
+Hoje o catálogo (`internal/install/data/sources.json`) tem 12 fontes `"github"`
+e 2 `"manual"` (RetroArch e Dolphin) — o que faz a tela de Emuladores trocar o
+botão "Instalar" por "Abrir site oficial" para os dois (ver
+[`docs/adapters.md`](adapters.md)).
 
 ---
 
