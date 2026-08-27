@@ -104,7 +104,7 @@ func waitForJob(t *testing.T, m *Manager, id string) Job {
 		if !ok {
 			t.Fatalf("job %s desapareceu", id)
 		}
-		if job.Phase == PhaseDone || job.Phase == PhaseFailed {
+		if job.Phase == PhaseDone || job.Phase == PhaseFailed || job.Phase == PhaseCanceled {
 			return *job
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -321,6 +321,108 @@ func TestStartCoreFailsOnTruncatedDownload(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(coresDir, "testcore.so")); err == nil {
 		t.Error("um download truncado não deveria ter sido promovido")
+	}
+}
+
+// CancelJob interrompe um download em andamento (R3): o job vai para
+// PhaseCanceled, não PhaseFailed, e nada é promovido — o handler do servidor
+// de mentira nunca fecha a conexão sozinho, só o cancelamento do contexto do
+// cliente encerra a leitura.
+func TestCancelJobInterruptsCoreDownload(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	block := make(chan struct{})
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("primeiros bytes, depois trava"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		<-block
+	}))
+	// server.Close() espera o handler em andamento terminar — precisa
+	// destravar o handler (close(block)) ANTES de fechar o servidor, senão
+	// os dois ficam esperando um pelo outro para sempre. Defers rodam em
+	// ordem inversa à declaração, então close(block) é declarado por último
+	// para rodar primeiro.
+	defer server.Close()
+	defer close(block)
+	allowTestServer(t, server)
+
+	manager := NewManager(mustCatalog(t), discardLogger())
+	manager.retroArchManifest = &RetroArchCoreManifest{
+		Cores: map[string]RetroArchCoreEntry{
+			"testcore": {
+				LibretroName: "testcore",
+				Platforms: map[string]RetroArchCoreAsset{
+					currentPlatform(): {URL: server.URL, Filename: "testcore.so.zip", SHA256: "irrelevante", Generated: true},
+				},
+			},
+		},
+	}
+
+	job, err := manager.StartCore(context.Background(), "testcore")
+	if err != nil {
+		t.Fatalf("StartCore: %v", err)
+	}
+
+	// Tempo para o download realmente começar (a goroutine chegar na leitura
+	// bloqueada do handler) antes de cancelar.
+	time.Sleep(50 * time.Millisecond)
+
+	if err := manager.CancelJob(job.ID); err != nil {
+		t.Fatalf("CancelJob: %v", err)
+	}
+
+	finished := waitForJob(t, manager, job.ID)
+	if finished.Phase != PhaseCanceled {
+		t.Fatalf("Phase = %s, esperava %s", finished.Phase, PhaseCanceled)
+	}
+
+	coresDir, err := coresDirForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(coresDir, "testcore.so")); err == nil {
+		t.Error("um download cancelado não deveria ter promovido nada")
+	}
+}
+
+// Um job que já terminou (ou nunca existiu) não pode ser cancelado — a
+// mensagem diz isso, em vez de fingir sucesso.
+func TestCancelJobFailsForFinishedOrUnknownJob(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	manager := NewManager(mustCatalog(t), discardLogger())
+
+	if err := manager.CancelJob("nao-existe"); err == nil {
+		t.Error("esperava erro ao cancelar um job inexistente")
+	}
+
+	manager.retroArchManifest = &RetroArchCoreManifest{
+		Cores: map[string]RetroArchCoreEntry{
+			"mesen": {LibretroName: "mesen_libretro", Platforms: map[string]RetroArchCoreAsset{}},
+		},
+	}
+	coresDir, err := coresDirForTest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(coresDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(coresDir, "mesen_libretro"+coreExtensionForTest()), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	doneJob, err := manager.StartCore(context.Background(), "mesen")
+	if err != nil {
+		t.Fatalf("StartCore: %v", err)
+	}
+	if doneJob.Phase != PhaseDone {
+		t.Fatalf("pré-condição do teste falhou: Phase = %s, esperava %s", doneJob.Phase, PhaseDone)
+	}
+	if err := manager.CancelJob(doneJob.ID); err == nil {
+		t.Error("esperava erro ao cancelar um job já concluído (no-op)")
 	}
 }
 

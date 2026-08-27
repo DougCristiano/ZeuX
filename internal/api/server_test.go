@@ -74,6 +74,22 @@ func newTestServer(t *testing.T, probe hardware.Probe) *api.Server {
 // direto no banco, sem depender de um emulador de verdade rodando.
 func newTestServerWithDB(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB) {
 	t.Helper()
+	server, db, _ := newTestServerFull(t, probe)
+	return server, db
+}
+
+// newTestServerWithInstaller também devolve o *install.Manager — para testes
+// de R3 (ADR 0015) que precisam injetar um manifesto de core sintético
+// (Manager.SetRetroArchManifestForTesting) ou inspecionar jobs diretamente,
+// sem depender de rede nem do manifesto real embutido.
+func newTestServerWithInstaller(t *testing.T, probe hardware.Probe) (*api.Server, *install.Manager) {
+	t.Helper()
+	server, _, installer := newTestServerFull(t, probe)
+	return server, installer
+}
+
+func newTestServerFull(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB, *install.Manager) {
+	t.Helper()
 
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir) // Linux/BSD
@@ -119,7 +135,7 @@ func newTestServerWithDB(t *testing.T, probe hardware.Probe) (*api.Server, *sql.
 	igdbJobs := igdb.NewScrapeManager(libraryStore, igdbCreds, silentLogger())
 
 	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, igdbCreds, igdbJobs, silentLogger())
-	return server, db
+	return server, db, installer
 }
 
 func silentLogger() *slog.Logger {

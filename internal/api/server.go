@@ -131,6 +131,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/emulators/{id}/bindings", s.handleSetEmulatorBindings)
 	mux.HandleFunc("GET /api/v1/installs", s.handleInstalls)
 	mux.HandleFunc("GET /api/v1/installs/{id}", s.handleInstallJob)
+	// R3 (ADR 0015): cancela um download de core em andamento. Só cores
+	// suportam isto hoje — instalação de emulador (Start) devolve
+	// cancel_failed, não um cancelamento silencioso fingido.
+	mux.HandleFunc("DELETE /api/v1/installs/{id}", s.handleCancelInstall)
 	mux.HandleFunc("POST /api/v1/games/launch", s.handleLaunch)
 	mux.HandleFunc("POST /api/v1/games/preview", s.handlePreviewLaunch)
 	mux.HandleFunc("GET /api/v1/sessions", s.handleSessions)
@@ -547,6 +551,19 @@ func (s *Server) handleInstallJob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, job)
 }
 
+// handleCancelInstall interrompe um download de core em andamento (R3). Não
+// apaga o histórico do job — GET /installs/{id} continua achando-o, agora em
+// phase "cancelado".
+func (s *Server) handleCancelInstall(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := s.installs.CancelJob(id); err != nil {
+		s.writeError(w, http.StatusBadRequest, "cancel_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"canceled": id})
+}
+
 // handleListCustom devolve as definições do usuário junto do caminho do
 // arquivo, para quem preferir editá-lo à mão.
 func (s *Server) handleListCustom(w http.ResponseWriter, r *http.Request) {
@@ -691,6 +708,39 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validado aqui, antes de decidir se baixa um core: não faz sentido
+	// baixar dezenas de MB para uma ROM cujo caminho nem existe. Launch()
+	// também valida — mas só chega lá quando não entramos no caminho de
+	// download abaixo.
+	if err := emulator.ValidateROM(input.ROMPath); err != nil {
+		s.writeError(w, http.StatusBadRequest, "launch_failed", err.Error())
+		return
+	}
+
+	// R3 (ADR 0015): um lançamento pelo RetroArch cujo core ainda não está no
+	// computador dispara o download antes de tentar montar o comando — sem
+	// isso, o usuário só saberia que o core falta ao ver o RetroArch recusar
+	// abrir, e precisaria voltar para a tela de Emuladores para resolver.
+	if job, downloadErr, handled := s.downloadMissingRetroArchCoreThenLaunch(input); handled {
+		if downloadErr != nil {
+			// Nomeia o que falta, não "erro ao lançar" genérico — mesmo
+			// `code` de sempre, porque para a interface ainda é "não deu
+			// para lançar", só que a causa é o core, não a ROM ou o emulador.
+			s.writeError(w, http.StatusBadRequest, "launch_failed", downloadErr.Error())
+			return
+		}
+
+		// O lançamento em si acontece sozinho quando o download terminar
+		// (launchWhenCoreReady, em segundo plano) — a resposta aqui é só o
+		// job para a interface acompanhar por GET /installs/{id}, do mesmo
+		// jeito que já acompanha qualquer instalação.
+		writeJSON(w, http.StatusAccepted, map[string]any{
+			"downloading_core": true,
+			"install_job":      job,
+		})
+		return
+	}
+
 	session, err := s.launcher.Launch(r.Context(), input)
 	if err != nil {
 		// Falha de lançamento é quase sempre algo que o usuário pode resolver
@@ -701,6 +751,81 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, session)
+}
+
+// downloadMissingRetroArchCoreThenLaunch decide se este lançamento precisa
+// de um core do RetroArch que ainda não está no computador. `handled=true`
+// significa "não chame Launch() — ou o download já foi disparado (job
+// não-nil, err nil), ou não foi possível disparar (err não-nil)".
+// `handled=false` significa "siga o caminho de sempre" — adapter não é o
+// RetroArch, o core não pôde ser resolvido (Launch() vai devolver o mesmo
+// erro de sempre), ou o core já está instalado.
+func (s *Server) downloadMissingRetroArchCoreThenLaunch(input emulator.LaunchInput) (job *install.Job, err error, handled bool) {
+	ctx := context.Background()
+
+	adapter, _, resolveErr := s.emulators.Resolve(ctx, input.ConsoleID, input.EmulatorID)
+	if resolveErr != nil || adapter.ID() != "retroarch" {
+		return nil, nil, false
+	}
+
+	coreName, resolveErr := emulator.ResolveRetroArchCore(input.ConsoleID, input.Core)
+	if resolveErr != nil {
+		// Sem core resolvido (nenhum padrão para o console, ou core explícito
+		// desconhecido) não é um problema de download — Launch() devolve a
+		// mesma mensagem que sempre devolveu.
+		return nil, nil, false
+	}
+
+	// Checado ANTES de chamar StartCore, não depois: StartCore também detecta
+	// "já instalado" e devolve um job em vez de baixar de novo, mas aquele
+	// job apareceria em GET /installs mesmo sem baixar nada — o critério de
+	// aceite de R3 é explícito que o caminho já pronto não ganha nenhuma
+	// etapa nova, nem um job trivial.
+	for _, status := range emulator.RetroArchCoreStatus(ctx) {
+		if status.Name == coreName && status.Installed {
+			return nil, nil, false
+		}
+	}
+
+	startedJob, startErr := s.installs.StartCore(ctx, coreName)
+	if startErr != nil {
+		return nil, fmt.Errorf(
+			"o core %q ainda não está no seu computador e não foi possível baixá-lo agora: %w",
+			coreName, startErr), true
+	}
+
+	go s.launchWhenCoreReady(startedJob.ID, input)
+
+	return startedJob, nil, true
+}
+
+// launchWhenCoreReady espera o job de download terminar e, se terminou com
+// sucesso, lança o jogo sozinho — sem o usuário precisar voltar a apertar
+// "Jogar". Roda em segundo plano, então usa contexto próprio (mesma regra de
+// session.go: o lançamento precisa sobreviver à resposta HTTP que já foi
+// enviada há muito tempo quando isto termina).
+func (s *Server) launchWhenCoreReady(jobID string, input emulator.LaunchInput) {
+	for {
+		job, ok := s.installs.Job(jobID)
+		if !ok {
+			return
+		}
+
+		switch job.Phase {
+		case install.PhaseDone:
+			if _, err := s.launcher.Launch(context.Background(), input); err != nil {
+				s.logger.Error("lançamento automático depois do download do core falhou",
+					"core", job.CoreName, "erro", err)
+			}
+			return
+		case install.PhaseFailed, install.PhaseCanceled:
+			// Nada a fazer — GET /installs/{id} já conta a história inteira
+			// (Error, Code) para quem estiver observando.
+			return
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // handlePreviewLaunch monta o comando sem executá-lo. Serve para a interface

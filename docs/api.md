@@ -81,6 +81,7 @@ está em português e já pode ser exibida ao usuário como está.
 | POST | `/api/v1/retroarch/cores/{core}/install` | Download sob demanda de um core do RetroArch ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), R2) |
 | GET | `/api/v1/installs` | Histórico de instalações (jobs) — cobre instalação de emulador e download de core |
 | GET | `/api/v1/installs/{id}` | Acompanha uma instalação ou download de core em andamento |
+| DELETE | `/api/v1/installs/{id}` | Cancela um download de core em andamento (R3) |
 | POST | `/api/v1/games/preview` | Monta a linha de comando sem executar |
 | POST | `/api/v1/games/launch` | Executa o jogo |
 | GET | `/api/v1/sessions` | Histórico de sessões + tempo de jogo |
@@ -664,7 +665,7 @@ curl -X POST http://127.0.0.1:7777/api/v1/emulators/duckstation/install
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `phase` | string | `"resolvendo"` → `"baixando"` → `"verificando"` → `"extraindo"` → `"finalizando"` → `"concluido"` ou `"falhou"`. Em português, de propósito — é o que a interface exibe como está. |
+| `phase` | string | `"resolvendo"` → `"baixando"` → `"verificando"` → `"extraindo"` → `"finalizando"` → `"concluido"` ou `"falhou"`. Download de core (R2/R3) nunca passa por `"resolvendo"` — a URL já vem do manifesto. `"cancelado"` (R3) só existe para download de core, via `DELETE /installs/{id}`, e é diferente de `"falhou"`: é o usuário desistindo, não um erro. Em português, de propósito — é o que a interface exibe como está. |
 | `downloaded_bytes` / `total_bytes` | int64 | `total_bytes` pode ser `0` (tamanho desconhecido); ver `Percent()` no código, que devolve `-1` nesse caso em vez de dividir por zero. |
 | `sha256` | string | Sempre registrado quando o download termina, mesmo que o projeto não publique soma oficial — permite comparar entre máquinas depois do fato. |
 | `checksum_verified` | bool | `true` só quando a soma foi conferida contra um valor **publicado pelo projeto**, não apenas calculada localmente. |
@@ -831,6 +832,36 @@ curl http://127.0.0.1:7777/api/v1/installs/i1
 
 ---
 
+## DELETE /api/v1/installs/{id}
+
+Cancela um download de core do RetroArch em andamento ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md),
+R3). **Só download de core suporta isto hoje** — instalação de emulador
+(`POST /emulators/{id}/install`) não tem cancelamento; cancelar aquele job
+devolve `cancel_failed`.
+
+O cancelamento é real: o download em andamento é interrompido, nada é
+promovido para o diretório de cores do ZeuX, e o job muda de fase para
+`"cancelado"` — uma fase própria, diferente de `"falhou"`, porque a interface
+precisa distinguir "o usuário desistiu" de "deu errado". Se o download já
+tinha disparado um lançamento automático (R3, `POST /games/launch`), cancelar
+o core impede esse lançamento — o jogo não abre.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/installs/i9
+```
+
+**200 OK**
+
+```json
+{ "canceled": "i9" }
+```
+
+**400 `cancel_failed`** — o `id` não existe, já terminou (concluído, falhou,
+ou já foi cancelado), ou é um job de instalação de emulador (que não suporta
+cancelamento). A mensagem original do erro vai em `message`.
+
+---
+
 ## POST /api/v1/games/preview
 
 Monta a linha de comando **sem executar nada**. Serve para a interface mostrar
@@ -926,13 +957,64 @@ uma goroutine acompanha até o fim. O processo do jogo é deliberadamente
 desligado do contexto da requisição HTTP — ele precisa sobreviver muito depois
 da resposta.
 
+**Desde o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)
+(R3): um lançamento pelo RetroArch cujo core ainda não está no computador não
+falha mais na hora.** O servidor dispara o download do core
+(`POST /retroarch/cores/{core}/install`, R2) e devolve **`202 Accepted`** em
+vez de `200`, com o `Job` do download — não um `Session`. O jogo é lançado
+**sozinho**, em segundo plano, assim que o download terminar; não existe uma
+segunda chamada que o front precise fazer. A interface acompanha o progresso
+por `GET /installs/{id}`, do jeito de sempre, e descobre que o jogo abriu
+olhando `GET /sessions` (ou só esperando a janela do emulador aparecer). Um
+core já presente **não muda nada** — a resposta continua `200` com o
+`Session`, sem nenhum job criado.
+
 ```bash
 curl -X POST http://127.0.0.1:7777/api/v1/games/launch \
   -H "Content-Type: application/json" \
   -d '{"rom_path":"/roms/jogo.rvz","console_id":"gamecube"}'
 ```
 
-**200 OK** — o corpo é um `emulator.Session`:
+**202 Accepted** — core do RetroArch ausente, download disparado:
+
+```json
+{
+  "downloading_core": true,
+  "install_job": {
+    "id": "i9",
+    "adapter_id": "retroarch",
+    "core_name": "sameboy",
+    "name": "core sameboy do RetroArch",
+    "phase": "baixando",
+    "message": "Baixando o core sameboy...",
+    "started_at": "2026-08-27T15:10:00Z",
+    "finished_at": null,
+    "checksum_verified": false
+  }
+}
+```
+
+Se o download **não puder nem começar** (core desconhecido, manifesto sem
+hash medido, já existe um download deste core em andamento), a resposta é
+`400 launch_failed` como qualquer outra falha de lançamento — a mensagem
+nomeia o core, nunca "erro ao lançar" genérico:
+
+```json
+{
+  "error": {
+    "code": "launch_failed",
+    "message": "o core \"sameboy\" ainda não está no seu computador e não foi possível baixá-lo agora: ..."
+  }
+}
+```
+
+Se o download **começar mas falhar depois** (hash divergente, rede caiu no
+meio), a chamada original já respondeu `202` — a falha só aparece em
+`GET /installs/{id}` (`phase: "falhou"`), não como um segundo erro HTTP. O
+jogo simplesmente não é lançado; nada notifica isso além do job.
+
+**200 OK** — core já presente, lançamento direto (comportamento de sempre); o
+corpo é um `emulator.Session`:
 
 ```json
 {
@@ -973,8 +1055,10 @@ verificação:
 
 1. ROM inexistente, inacessível, ou o caminho aponta para uma pasta.
 2. Emulador desconhecido, que não atende o console, ou não encontrado no disco.
-3. `BuildCommand` recusou (core do RetroArch ausente, console não suportado).
-4. `cmd.Start()` falhou — binário sem permissão de execução, por exemplo.
+3. Core do RetroArch ausente **e o download não pôde nem começar** (ver R3
+   acima — quando o download começa, a resposta é `202`, não `launch_failed`).
+4. `BuildCommand` recusou por outro motivo (console não suportado).
+5. `cmd.Start()` falhou — binário sem permissão de execução, por exemplo.
 
 ---
 
@@ -1506,6 +1590,7 @@ em vez de JSON).
 | `install_refused` | 400 | POST `/emulators/{id}/install` | Fonte desconhecida, fonte manual, ou instalação já em andamento para este emulador. |
 | `uninstall_failed` | 400 | DELETE `/emulators/{id}/install` | Nada gerenciado para remover, ou falha ao apagar os arquivos. |
 | `core_install_refused` | 400 | POST `/retroarch/cores/{core}/install` | Core desconhecido, sem asset para esta plataforma, manifesto ainda sem hash medido (`generated: false`), ou download já em andamento. Não confundir com o `Job` chegando em `phase: "falhou"` com `code: "core_hash_mismatch"` — isso é assíncrono, consultado via `GET /installs/{id}`, não um erro desta chamada. |
+| `cancel_failed` | 400 | DELETE `/installs/{id}` | `id` inexistente, job já terminado, ou é uma instalação de emulador (sem suporte a cancelamento). |
 | `open_failed` | 400 | POST `/emulators/{id}/open` | `id` desconhecido, emulador não encontrado no disco, ou falha ao iniciar o processo. |
 | `invalid_id` | 400 | DELETE `/library/folders/{id}`, POST `/library/folders/{id}/scan`, POST/DELETE `/library/games/{id}/favorite` | `{id}` não é numérico. |
 | `path_not_found` | 400 | POST `/library/folders` | O caminho informado não existe ou não é uma pasta. |

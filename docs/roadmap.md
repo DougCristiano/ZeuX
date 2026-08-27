@@ -1144,26 +1144,61 @@ passando em 2026-08-27.**
 
 **Depende de:** R1 · **Bloqueia:** R3
 
-#### R3 — "Jogar" baixa o que falta, dizendo o que está fazendo (M)
+#### R3 — "Jogar" baixa o que falta, dizendo o que está fazendo (M) — **feito no backend em 2026-08-27; a tela fica para quem mexer no front**
 
 Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
 "baixando o core X" e poder desistir.
 
 **Critério de aceite:**
-- [ ] Mandar abrir um jogo de console atendido pelo RetroArch, com o core
+- [x] Mandar abrir um jogo de console atendido pelo RetroArch, com o core
       ausente, dispara o job do R2 **antes** do lançamento e abre o jogo sozinho
       ao terminar — sem o usuário voltar para a tela de Emuladores.
-- [ ] A tela mostra o nome do que está sendo baixado, o percentual e um cancelar
-      que de fato interrompe (o job vai para `failed`/`canceled`, nada fica pela
-      metade em `ManagedRoot()`).
-- [ ] Sem rede, o erro é acionável e **nomeia o que falta** ("o core `sameboy`
-      ainda não está no seu computador e não foi possível baixá-lo agora"),
-      nunca "erro ao lançar".
-- [ ] O caminho já pronto (core presente) **não ganha nenhuma etapa nova** —
-      medível: `POST /games/launch` com core presente não cria job nenhum.
-- [ ] `GET /api/v1/retroarch/cores` continua listando o que está e o que não
-      está instalado, agora com ação de instalar por linha (a rota e a tela já
-      existem desde 2026-08-04).
+      `POST /games/launch` devolve `202` com o job (não mais `200`/`Session`)
+      quando isso acontece; `launchWhenCoreReady`
+      (`internal/api/server.go`) espera o job em segundo plano e chama
+      `Launcher.Launch` sozinho quando termina. Testado ponta a ponta em
+      `TestLaunchDownloadsMissingCoreThenLaunchesAutomatically`
+      (`internal/api/launch_missing_core_test.go`) — "buildbot" de mentira,
+      "RetroArch" de mentira (script que sai 0), sessão real aparecendo em
+      `GET /sessions` no fim.
+- [x] Um cancelar que de fato interrompe: `DELETE /api/v1/installs/{id}`
+      (`Manager.CancelJob`) cancela o `context.Context` do download — o job
+      vai para uma fase própria, `"cancelado"` (não `"falhou"`, para a
+      interface distinguir desistência de erro), e nada é promovido, porque
+      a promoção só acontece depois que tudo deu certo. Testado sem rede
+      (`TestCancelJobInterruptsCoreDownload`, `internal/install`) e ponta a
+      ponta pela rota (`TestCancelInstallStopsCoreDownload`, `internal/api`).
+      **A tela em si (botão de cancelar, barra de progresso) não foi
+      construída** — isso é trabalho de front-end, fora do escopo desta
+      sessão (só Go).
+- [x] Sem rede (ou sem hash medido), o erro é acionável e **nomeia o que
+      falta**: `"o core \"sameboy\" ainda não está no seu computador e não
+      foi possível baixá-lo agora: ..."`, com `code: "launch_failed"` — nunca
+      um "erro ao lançar" genérico. Testado em
+      `TestLaunchNamesTheMissingCoreWhenDownloadCannotStart`. Uma falha que
+      só aparece **depois** de o download já ter começado (hash divergente,
+      conexão caindo) não vira um segundo erro HTTP — já respondemos `202`;
+      ela só existe em `GET /installs/{id}`, documentado em `docs/api.md`.
+- [x] O caminho já pronto (core presente) **não ganha nenhuma etapa nova** —
+      `downloadMissingRetroArchCoreThenLaunch` checa
+      `emulator.RetroArchCoreStatus` **antes** de chamar `StartCore`, então
+      nenhum job é criado quando o core já está lá. Medido em
+      `TestLaunchDoesNotCreateJobWhenCoreAlreadyInstalled`: `POST
+      /games/launch` com core presente devolve `200`/`Session` de sempre e
+      `GET /installs` continua vazio.
+- [x] `GET /api/v1/retroarch/cores` continua listando o que está e o que não
+      está instalado, com ação de instalar por linha —
+      `POST /retroarch/cores/{core}/install` já existe desde o R2; nada
+      mudou aqui.
+
+**O que R3 não cobre, por ser trabalho de UI e não de backend (ADR 0004: Go
+antes de Tauri/React nesta sessão):** a tela mostrando "baixando o core X",
+percentual e o botão de cancelar. O backend expõe tudo que a tela precisa
+(`GET /installs/{id}`, `DELETE /installs/{id}`), mas nenhuma linha de
+`src/` foi tocada. Quem pegar a Sprint B/UI depois encontra a API pronta.
+
+Compilação cruzada (linux/darwin/windows) e `go test ./...` completo passando
+em 2026-08-27.
 
 **Depende de:** R2 · **Bloqueia:** nada
 

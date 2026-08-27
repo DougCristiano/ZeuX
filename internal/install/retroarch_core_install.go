@@ -114,17 +114,46 @@ func (m *Manager) recordCoreJob(coreName string, phase Phase, message string, as
 // HTTP que disparou (a mesma regra de session.go: o trabalho precisa
 // sobreviver à resposta).
 func (m *Manager) runCore(job *Job, coreName string, asset RetroArchCoreAsset) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	defer cancel()
+	timeout, cancelTimeout := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancelTimeout()
+
+	// Um segundo nível de cancelamento, acionável de fora pela interface
+	// (CancelJob, R3) — sem ele, o único jeito de interromper um download em
+	// andamento seria esperar os 15 minutos do timeout acima.
+	ctx, cancelManual := context.WithCancel(timeout)
+	defer cancelManual()
+
+	m.mu.Lock()
+	if m.cancels == nil {
+		m.cancels = make(map[string]context.CancelFunc)
+	}
+	m.cancels[job.ID] = cancelManual
+	m.mu.Unlock()
 
 	defer func() {
 		m.mu.Lock()
 		delete(m.activeCores, coreName)
+		delete(m.cancels, job.ID)
 		m.mu.Unlock()
 	}()
 
 	if err := m.installCore(ctx, job, coreName, asset); err != nil {
 		finished := time.Now().UTC()
+
+		// Cancelamento explícito (CancelJob) tem sua própria fase — não é uma
+		// falha, é o usuário desistindo. errors.Is cobre tanto o cancelManual
+		// quanto o timeout de 15 minutos (os dois produzem context.Canceled ou
+		// context.DeadlineExceeded na árvore de erro que download()/Extract()
+		// devolvem).
+		if errors.Is(err, context.Canceled) {
+			m.update(job, func(j *Job) {
+				j.Phase = PhaseCanceled
+				j.Message = "Download do core " + coreName + " cancelado."
+				j.FinishedAt = &finished
+			})
+			m.logger.Info("download de core do RetroArch cancelado", "core", coreName)
+			return
+		}
 
 		code := "core_download_failed"
 		var mismatch *coreHashMismatchError
@@ -243,6 +272,16 @@ func (e *coreHashMismatchError) Error() string {
 	return fmt.Sprintf(
 		"o core %q foi baixado, mas o arquivo recebido não confere com o SHA256 esperado (esperado %s, recebido %s) — nada foi instalado",
 		e.core, e.expected, e.got)
+}
+
+// SetRetroArchManifestForTesting substitui o manifesto de cores do RetroArch
+// que StartCore consulta. Existe só para teste — inclusive de fora deste
+// pacote (ex.: internal/api), onde não há como mexer no campo não exportado
+// diretamente — apontando para um manifesto sintético (core inventado,
+// servidor de mentira) sem depender de rede nem do manifesto real embutido.
+// Nunca chamado fora de arquivo `_test.go`.
+func (m *Manager) SetRetroArchManifestForTesting(manifest *RetroArchCoreManifest) {
+	m.retroArchManifest = manifest
 }
 
 // coreManifest devolve o manifesto de cores a usar — o injetado em testes

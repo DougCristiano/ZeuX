@@ -25,6 +25,12 @@ const (
 	PhaseFinishing   Phase = "finalizando"
 	PhaseDone        Phase = "concluido"
 	PhaseFailed      Phase = "falhou"
+
+	// PhaseCanceled é o job interrompido por CancelJob (ADR 0015, R3) — só
+	// existe para o download de core, hoje. Separado de PhaseFailed porque a
+	// interface precisa distinguir "o usuário desistiu" de "deu errado", e o
+	// critério de aceite de R3 pede exatamente essa distinção.
+	PhaseCanceled Phase = "cancelado"
 )
 
 // Job é uma instalação em andamento ou terminada.
@@ -96,6 +102,12 @@ type Manager struct {
 	// (sharedRetroArchManifest) — usado só por teste, no mesmo pacote, para
 	// apontar StartCore a um servidor de mentira sem precisar de rede.
 	retroArchManifest *RetroArchCoreManifest
+
+	// cancels guarda a função de cancelamento de cada job que suporta ser
+	// interrompido (hoje, só download de core — ver runCore). Um job ausente
+	// aqui (instalação de emulador, ou job de core já terminado) não pode ser
+	// cancelado; CancelJob diz isso em vez de fingir sucesso.
+	cancels map[string]context.CancelFunc
 }
 
 // NewManager cria o gerenciador de instalações.
@@ -410,6 +422,30 @@ func (m *Manager) snapshot(id string) *Job {
 
 	copied := *job
 	return &copied
+}
+
+// CancelJob interrompe um download de core em andamento (ADR 0015, R3).
+//
+// A interrupção é real, não cosmética: cancela o context.Context que
+// download()/Extract() usam, então a chamada de rede em andamento aborta e
+// installCore devolve erro antes de chegar no os.Rename que promoveria o
+// core — nada fica pela metade em ManagedRoot() (na verdade, no diretório de
+// cores gerenciado; ver RetroArchManagedCoresDir), porque a promoção só
+// acontece depois que tudo deu certo.
+//
+// Instalação de emulador (Start) não suporta cancelamento ainda — não estava
+// no critério de aceite de R3, e adicionar seria escopo por conta própria.
+func (m *Manager) CancelJob(id string) error {
+	m.mu.Lock()
+	cancel, ok := m.cancels[id]
+	m.mu.Unlock()
+
+	if !ok {
+		return fmt.Errorf("esta instalação não está em andamento ou não pode ser cancelada")
+	}
+
+	cancel()
+	return nil
 }
 
 // Job devolve o andamento de uma instalação.

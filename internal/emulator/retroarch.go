@@ -189,6 +189,19 @@ func (a retroArchAdapter) BuildCommand(install Installation, req Request) (Comma
 	return Command{Argv: argv, Unapplied: unapplied}, nil
 }
 
+// ResolveRetroArchCore devolve o nome do core que um lançamento vai usar,
+// aplicando o mesmo fallback de resolveCoreName (core explícito, senão o
+// padrão do console) sem precisar montar um Request nem tocar o disco.
+//
+// Exportado para o R3 (ADR 0015, docs/decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md):
+// a API precisa saber QUAL core um lançamento vai precisar antes de montar o
+// comando, para decidir se dispara um download primeiro — duplicar essa
+// lógica de fallback na camada de API divergiria de resolveCoreName no
+// primeiro console novo que alguém adicionasse.
+func ResolveRetroArchCore(consoleID, explicitCore string) (string, error) {
+	return retroArchAdapter{}.resolveCoreName(Request{ConsoleID: consoleID, Core: explicitCore})
+}
+
 // resolveCoreName decide qual core usar: o pedido explicitamente, ou o padrão
 // do console.
 func (retroArchAdapter) resolveCoreName(req Request) (string, error) {
