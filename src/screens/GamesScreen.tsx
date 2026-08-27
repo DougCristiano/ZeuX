@@ -140,15 +140,14 @@ export function GamesScreen({
   }
 
   // Acompanha o download de core disparado pelo próprio /games/launch (R3).
-  // Ao terminar, o servidor já abriu o jogo sozinho (launchWhenCoreReady) —
-  // por isso o sucesso aqui confirma a sessão, sem uma segunda chamada.
-  async function pollCoreDownload(gameId: number, jobId: string, title: string) {
+  // Ao terminar, **esta tela** repete o lançamento — o servidor não abre o
+  // jogo sozinho (decisão do Douglas, 2026-08-27). doLaunch cuida do toast e
+  // do loadGames no caminho normal, então aqui é só refazer a chamada.
+  async function pollCoreDownload(gameId: number, jobId: string, romPath: string) {
     try {
       const job = await api.getInstallJob(jobId);
       if (job.phase === "concluido") {
-        setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "idle" } }));
-        showToast(`${title}: sessão iniciada.`);
-        loadGames();
+        await doLaunch(romPath, true);
         return;
       }
       if (job.phase === "cancelado") {
@@ -162,7 +161,7 @@ export function GamesScreen({
         return;
       }
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "downloading-core", job } }));
-      setTimeout(() => pollCoreDownload(gameId, jobId, title), 400);
+      setTimeout(() => pollCoreDownload(gameId, jobId, romPath), 400);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Não foi possível acompanhar o download do core.";
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
@@ -170,7 +169,10 @@ export function GamesScreen({
     }
   }
 
-  async function doLaunch(romPath: string) {
+  // `afterCoreDownload` marca a segunda tentativa, logo depois de um download
+  // de core terminar. Se ela também pedir download, o core não ficou onde a
+  // busca procura — parar ali evita baixar em laço infinito.
+  async function doLaunch(romPath: string, afterCoreDownload = false) {
     const game = games?.find((g) => g.path === romPath);
     if (!game) return;
 
@@ -181,8 +183,15 @@ export function GamesScreen({
       // toast de "sessão iniciada" abaixo não pode disparar — nada abriu
       // ainda.
       if (isDownloadingCore(result)) {
+        if (afterCoreDownload) {
+          const message =
+            "O core foi baixado, mas o ZeuX continua não encontrando ele no computador. Tente abrir o jogo de novo; se persistir, confira a lista de cores na tela de Emuladores.";
+          setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
+          setLaunchError(message);
+          return;
+        }
         setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "downloading-core", job: result.install_job } }));
-        pollCoreDownload(game.id, result.install_job.id, game.title);
+        pollCoreDownload(game.id, result.install_job.id, romPath);
         return;
       }
       setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "launched", session: result } }));

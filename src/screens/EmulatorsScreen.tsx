@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type {
@@ -97,6 +97,14 @@ function RetroArchCoresList() {
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [installState, setInstallState] = useState<Record<string, CoreInstallState>>({});
+  // Fila do "baixar os que faltam": quantos ainda restam e qual está na vez.
+  // `null` quando ninguém pediu a fila — o caminho de um core por clique
+  // continua independente dela.
+  const [bulk, setBulk] = useState<{ remaining: number; total: number; current: string } | null>(null);
+  // Ref, não estado: `runBulk` roda num laço `await` e leria um estado
+  // congelado no fechamento. O clique em "Parar" precisa ser visto pela
+  // iteração seguinte do laço, não pela próxima renderização.
+  const bulkStopped = useRef(false);
 
   function loadCores() {
     api
@@ -168,6 +176,45 @@ function RetroArchCoresList() {
     }
   }
 
+  // Resolve quando o job deste core termina (de qualquer jeito). Existe para
+  // o "baixar os que faltam", que precisa esperar um core antes de começar o
+  // próximo — 25 downloads em paralelo castigariam a rede do usuário e o
+  // buildbot sem nenhum ganho.
+  function waitForCore(name: string, jobId: string): Promise<void> {
+    return new Promise((resolve) => {
+      const tick = async () => {
+        try {
+          const job = await api.getInstallJob(jobId);
+          if (job.phase === "concluido") {
+            setCoreState(name, { kind: "idle" });
+            loadCores();
+            resolve();
+            return;
+          }
+          if (job.phase === "cancelado") {
+            setCoreState(name, { kind: "idle" });
+            resolve();
+            return;
+          }
+          if (job.phase === "falhou") {
+            setCoreState(name, { kind: "error", message: job.error ?? "O download não foi concluído." });
+            resolve();
+            return;
+          }
+          setCoreState(name, { kind: "installing", job });
+          setTimeout(tick, 400);
+        } catch (err) {
+          setCoreState(name, {
+            kind: "error",
+            message: err instanceof ApiError ? err.message : "Não foi possível acompanhar o download.",
+          });
+          resolve();
+        }
+      };
+      tick();
+    });
+  }
+
   async function installCore(name: string) {
     setCoreState(name, { kind: "starting" });
     try {
@@ -187,6 +234,40 @@ function RetroArchCoresList() {
         message: err instanceof ApiError ? err.message : "Não foi possível iniciar o download.",
       });
     }
+  }
+
+  // Baixa os cores que faltam, um de cada vez. Sequencial de propósito: o
+  // servidor aceitaria 25 downloads simultâneos (cada core tem seu próprio
+  // job), mas isso saturaria a rede de quem está usando o app e daria uma
+  // barra de progresso por core que ninguém consegue acompanhar.
+  async function downloadAllMissing(names: string[]) {
+    bulkStopped.current = false;
+    let remaining = names.length;
+    for (const name of names) {
+      if (bulkStopped.current) break;
+      setBulk({ remaining, total: names.length, current: name });
+      setCoreState(name, { kind: "starting" });
+      try {
+        const job = await api.installRetroArchCore(name);
+        if (job.phase !== "concluido") {
+          setCoreState(name, { kind: "installing", job });
+          await waitForCore(name, job.id);
+        } else {
+          setCoreState(name, { kind: "idle" });
+        }
+      } catch (err) {
+        // Um core que falha não derruba a fila — o erro fica na linha dele e
+        // os outros continuam. Interromper tudo por causa de um obrigaria o
+        // usuário a recomeçar do zero.
+        setCoreState(name, {
+          kind: "error",
+          message: err instanceof ApiError ? err.message : "Não foi possível iniciar o download.",
+        });
+      }
+      remaining -= 1;
+    }
+    setBulk(null);
+    loadCores();
   }
 
   async function cancelCore(name: string, job: InstallJob) {
@@ -210,13 +291,53 @@ function RetroArchCoresList() {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <p className="text-sm text-muted">
-        {cores.length - missing.length} de {cores.length} cores instalados
-        {/* Descritivo, nunca "faltam X" com tom de cobrança: o modelo sob
-            demanda (ADR 0015) baixa sozinho ao jogar, então um core ausente
-            não é pendência do usuário — é o comportamento normal. */}
-        {missing.length > 0 && " — os que faltam são baixados sozinhos ao abrir um jogo do console."}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted">
+          {cores.length - missing.length} de {cores.length} cores instalados
+          {/* Descritivo, nunca "faltam X" com tom de cobrança: o modelo sob
+              demanda (ADR 0015) baixa sozinho ao jogar, então um core ausente
+              não é pendência do usuário — é o comportamento normal. */}
+          {missing.length > 0 && " — os que faltam são baixados sozinhos ao abrir um jogo do console."}
+        </p>
+
+        {/* Baixar tudo de uma vez não é o caminho principal (o ADR 0015
+            existe justamente para NÃO empurrar 25 cores em quem vai usar
+            três), mas é o que serve a quem quer deixar a máquina pronta
+            antes de ficar sem rede — viagem, notebook, internet ruim. Por
+            isso é uma ação secundária ao lado do resumo, não um botão
+            primário chamando atenção. Só aparece quando há mais de um
+            faltando: para um só, o botão da linha já resolve. */}
+        {missing.length > 1 && !bulk && (
+          <Button
+            variant="secondary"
+            className="shrink-0 px-2 py-1 text-xs"
+            onClick={() => downloadAllMissing(missing.map((c) => c.name))}
+          >
+            Baixar os {missing.length} que faltam
+          </Button>
+        )}
+
+        {bulk && (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-xs text-muted tabular-nums">
+              Baixando {bulk.total - bulk.remaining + 1} de {bulk.total} · {bulk.current}
+            </span>
+            {/* "Parar" encerra a fila, mas não cancela o core que já está
+                baixando — esse tem o "Cancelar" da própria linha. Separar os
+                dois evita a ambiguidade de um botão só que faz duas coisas
+                diferentes conforme o momento. */}
+            <Button
+              variant="quiet"
+              className="px-1.5 py-0.5 text-xs"
+              onClick={() => {
+                bulkStopped.current = true;
+              }}
+            >
+              Parar depois deste
+            </Button>
+          </div>
+        )}
+      </div>
       {/* `lg:` e não `xl:`: o breakpoint mede a janela inteira, e a janela
           padrão é 1280 px (src-tauri/tauri.conf.json) menos sidebar (64) e
           barra de rolagem — um `xl:` (1280) nunca dispararia no tamanho
@@ -232,10 +353,13 @@ function RetroArchCoresList() {
                 <span className="truncate text-ink" title={core.path ?? core.filename}>
                   {core.name}
                 </span>
-                {!core.installed && state.kind === "idle" && (
+                {!core.installed && state.kind === "idle" && !bulk && (
                   // Compacto de propósito — ver o comentário do componente
                   // sobre densidade. `shrink-0`: o nome do core trunca antes
                   // do botão encolher, porque um botão cortado não clica.
+                  // Some enquanto a fila do "baixar os que faltam" roda: dois
+                  // caminhos para o mesmo core só geram o erro "já existe um
+                  // download em andamento".
                   <Button
                     variant="secondary"
                     className="shrink-0 px-2 py-1 text-xs"

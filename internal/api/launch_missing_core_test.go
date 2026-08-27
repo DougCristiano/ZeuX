@@ -23,9 +23,9 @@ import (
 // gerenciado que Locate() confere primeiro (ver internal/emulator/discovery.go,
 // findBinary) — sem isto, s.emulators.Resolve nunca acha o RetroArch nesta
 // máquina de teste, e o caminho de download nem chega a ser considerado.
-// O conteúdo é um script de verdade (não só bytes com +x): quando o
-// lançamento automático (R3) chega a chamar cmd.Start(), o processo precisa
-// conseguir rodar, ou o teste não teria como observar a sessão gravada.
+// O conteúdo é um script de verdade (não só bytes com +x): o relançamento
+// que a tela faz depois do download chega a cmd.Start(), e o processo
+// precisa conseguir rodar, ou o teste não teria como observar a sessão.
 func fakeManagedRetroArch(t *testing.T) {
 	t.Helper()
 
@@ -69,11 +69,13 @@ func zipWithSingleFile(t *testing.T, entryName string, content []byte) []byte {
 }
 
 // Ponta a ponta do R3: lançar um jogo pelo RetroArch com o core ausente
-// dispara o download (202, com o job), e o jogo é lançado sozinho quando o
-// download termina — sem o usuário voltar para a tela de Emuladores. Sem
-// rede real: o "buildbot" é um httptest.NewTLSServer local, liberado pelos
-// seams de teste do pacote install.
-func TestLaunchDownloadsMissingCoreThenLaunchesAutomatically(t *testing.T) {
+// dispara o download e devolve 202 com o job — e o servidor **não** lança o
+// jogo sozinho ao terminar (decisão do Douglas, 2026-08-27: quem abre o jogo
+// é a tela, repetindo a chamada quando o job chegar a "concluido"). Um
+// servidor que abre um processo de jogo minutos depois surpreende quem já
+// saiu da tela. Sem rede real: o "buildbot" é um httptest.NewTLSServer
+// local, liberado pelos seams de teste do pacote install.
+func TestLaunchStartsCoreDownloadWithoutLaunchingByItself(t *testing.T) {
 	// RetroArchManagedCoresDir (emulator.bundledCoreDirsForWrite) lê $HOME
 	// diretamente, sem passar por XDG_CONFIG_HOME/AppData — sem isto, o
 	// download e o "já instalado" deste teste mexeriam no $HOME de verdade
@@ -161,25 +163,52 @@ func TestLaunchDownloadsMissingCoreThenLaunchesAutomatically(t *testing.T) {
 		t.Errorf("core_name = %v, esperava \"mesen\"", job["core_name"])
 	}
 
-	// O lançamento em si acontece em segundo plano — espera a sessão
-	// aparecer em GET /sessions, prova de que o download terminou e o
-	// launcher rodou o "RetroArch" de mentira sozinho.
+	// O download termina sozinho (o "buildbot" de mentira responde na hora),
+	// mas o jogo NÃO pode abrir por conta do servidor.
+	jobID := job["id"].(string)
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		sessionsRec := doJSON(t, handler, http.MethodGet, "/api/v1/sessions", nil)
-		sessionsBody := decodeBody(t, sessionsRec)
-		sessions, _ := sessionsBody["sessions"].([]any)
-		if len(sessions) == 1 {
-			session := sessions[0].(map[string]any)
-			if session["rom_path"] != romPath {
-				t.Fatalf("sessão gravada para a ROM errada: %v", session)
-			}
-			return
+		got, ok := installer.Job(jobID)
+		if !ok {
+			t.Fatal("job desapareceu")
+		}
+		if got.Phase == install.PhaseDone {
+			break
+		}
+		if got.Phase == install.PhaseFailed || got.Phase == install.PhaseCanceled {
+			t.Fatalf("download não concluiu: %+v", got)
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("nenhuma sessão apareceu depois do download automático — corpo mais recente: %s", sessionsRec.Body.String())
+			t.Fatalf("download não terminou dentro do prazo: %+v", got)
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Margem generosa: se existisse um lançamento em segundo plano, ele teria
+	// tempo de sobra para acontecer aqui.
+	time.Sleep(300 * time.Millisecond)
+
+	sessionsRec := doJSON(t, handler, http.MethodGet, "/api/v1/sessions", nil)
+	sessionsBody := decodeBody(t, sessionsRec)
+	if sessions, _ := sessionsBody["sessions"].([]any); len(sessions) != 0 {
+		t.Errorf("o servidor não deveria lançar o jogo sozinho — quem abre é a tela: %v", sessions)
+	}
+
+	// E a segunda chamada de lançamento (o que a tela faz quando o job
+	// termina) agora acha o core no lugar e abre o jogo de verdade.
+	rec2 := doJSON(t, handler, http.MethodPost, "/api/v1/games/launch", body)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("relançamento status = %d, esperava 200 — corpo: %s", rec2.Code, rec2.Body.String())
+	}
+
+	sessionsRec = doJSON(t, handler, http.MethodGet, "/api/v1/sessions", nil)
+	sessionsBody = decodeBody(t, sessionsRec)
+	sessions, _ := sessionsBody["sessions"].([]any)
+	if len(sessions) != 1 {
+		t.Fatalf("esperava exatamente 1 sessão depois do relançamento, veio %d: %v", len(sessions), sessions)
+	}
+	if sessions[0].(map[string]any)["rom_path"] != romPath {
+		t.Errorf("sessão gravada para a ROM errada: %v", sessions[0])
 	}
 }
 

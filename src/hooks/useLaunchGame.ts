@@ -40,14 +40,17 @@ export function useLaunchGame() {
     setStatusByGameId((prev) => ({ ...prev, [gameId]: status }));
   }
 
-  // Acompanha o download do core disparado pelo próprio /games/launch. Quando
-  // termina, o servidor já abriu o jogo (launchWhenCoreReady, R3) — daí ir
-  // direto para "launched" sem uma segunda chamada de lançamento.
-  async function pollCoreDownload(gameId: number, jobId: string) {
+  // Acompanha o download do core disparado pelo próprio /games/launch. Ao
+  // terminar, **esta tela** repete o lançamento — o servidor não abre o jogo
+  // sozinho (decisão do Douglas, 2026-08-27): abrir um processo de jogo
+  // minutos depois surpreenderia quem já tinha saído da tela. A segunda
+  // chamada acha o core no lugar e cai no caminho normal de lançamento.
+  async function pollCoreDownload(game: LibraryGame, jobId: string) {
+    const gameId = game.id;
     try {
       const job = await api.getInstallJob(jobId);
       if (job.phase === "concluido") {
-        setStatus(gameId, { kind: "launched" });
+        await launch(game, true);
         return;
       }
       if (job.phase === "cancelado") {
@@ -62,7 +65,7 @@ export function useLaunchGame() {
         return;
       }
       setStatus(gameId, { kind: "downloading-core", job });
-      setTimeout(() => pollCoreDownload(gameId, jobId), 400);
+      setTimeout(() => pollCoreDownload(game, jobId), 400);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Não foi possível acompanhar o download do core.";
       setStatus(gameId, { kind: "error", message });
@@ -70,7 +73,13 @@ export function useLaunchGame() {
     }
   }
 
-  async function launch(game: LibraryGame) {
+  /**
+   * `afterCoreDownload` marca a segunda tentativa, feita logo depois de um
+   * download de core terminar. Se ela também pedir download, alguma coisa
+   * está errada (o core não ficou onde a busca procura) — parar ali evita
+   * baixar em laço infinito, gastando banda até alguém perceber.
+   */
+  async function launch(game: LibraryGame, afterCoreDownload = false) {
     setLastGame(game);
     setStatus(game.id, { kind: "launching" });
     try {
@@ -78,8 +87,15 @@ export function useLaunchGame() {
       // 202: o core do RetroArch faltava e está sendo baixado agora. Dizer
       // "jogo aberto" aqui seria mentira — o jogo só abre no fim do download.
       if (isDownloadingCore(result)) {
+        if (afterCoreDownload) {
+          const message =
+            "O core foi baixado, mas o ZeuX continua não encontrando ele no computador. Tente abrir o jogo de novo; se persistir, confira a lista de cores na tela de Emuladores.";
+          setStatus(game.id, { kind: "error", message });
+          setLaunchError(message);
+          return;
+        }
         setStatus(game.id, { kind: "downloading-core", job: result.install_job });
-        pollCoreDownload(game.id, result.install_job.id);
+        pollCoreDownload(game, result.install_job.id);
         return;
       }
       setStatus(game.id, { kind: "launched" });

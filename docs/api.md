@@ -961,12 +961,25 @@ da resposta.
 (R3): um lançamento pelo RetroArch cujo core ainda não está no computador não
 falha mais na hora.** O servidor dispara o download do core
 (`POST /retroarch/cores/{core}/install`, R2) e devolve **`202 Accepted`** em
-vez de `200`, com o `Job` do download — não um `Session`. O jogo é lançado
-**sozinho**, em segundo plano, assim que o download terminar; não existe uma
-segunda chamada que o front precise fazer. A interface acompanha o progresso
-por `GET /installs/{id}`, do jeito de sempre, e descobre que o jogo abriu
-olhando `GET /sessions` (ou só esperando a janela do emulador aparecer). Um
-core já presente **não muda nada** — a resposta continua `200` com o
+vez de `200`, com o `Job` do download — não um `Session`.
+
+**Quem abre o jogo é o cliente, não o servidor** (decisão do Douglas,
+2026-08-27). O fluxo esperado do front é:
+
+1. `POST /games/launch` → `202` com `install_job`.
+2. Acompanhar `GET /installs/{id}` até `phase: "concluido"` (mostrando o
+   progresso, e oferecendo `DELETE /installs/{id}` para desistir).
+3. **Repetir o mesmo `POST /games/launch`** — agora o core está no lugar e a
+   resposta é o `200` normal com a `Session`.
+
+Uma versão anterior desta rota lançava o jogo sozinho em segundo plano ao fim
+do download. Foi retirado: abrir um processo de jogo minutos depois
+surpreende quem já desistiu e saiu da tela, e o cliente ficava sem como
+impedir. Se a segunda chamada **também** devolver `202`, algo está errado (o
+core não ficou onde a busca procura) — o cliente deve parar aí em vez de
+repetir, ou entra num laço de downloads.
+
+Um core já presente **não muda nada** — a resposta continua `200` com o
 `Session`, sem nenhum job criado.
 
 ```bash
@@ -1011,7 +1024,8 @@ nomeia o core, nunca "erro ao lançar" genérico:
 Se o download **começar mas falhar depois** (hash divergente, rede caiu no
 meio), a chamada original já respondeu `202` — a falha só aparece em
 `GET /installs/{id}` (`phase: "falhou"`), não como um segundo erro HTTP. O
-jogo simplesmente não é lançado; nada notifica isso além do job.
+cliente que estiver acompanhando o job é quem mostra isso; o jogo
+simplesmente não chega a ser lançado, porque a segunda chamada nunca é feita.
 
 **200 OK** — core já presente, lançamento direto (comportamento de sempre); o
 corpo é um `emulator.Session`:

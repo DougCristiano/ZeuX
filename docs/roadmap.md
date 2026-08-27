@@ -1164,13 +1164,21 @@ Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
       ausente, dispara o job do R2 **antes** do lançamento e abre o jogo sozinho
       ao terminar — sem o usuário voltar para a tela de Emuladores.
       `POST /games/launch` devolve `202` com o job (não mais `200`/`Session`)
-      quando isso acontece; `launchWhenCoreReady`
-      (`internal/api/server.go`) espera o job em segundo plano e chama
-      `Launcher.Launch` sozinho quando termina. Testado ponta a ponta em
-      `TestLaunchDownloadsMissingCoreThenLaunchesAutomatically`
-      (`internal/api/launch_missing_core_test.go`) — "buildbot" de mentira,
-      "RetroArch" de mentira (script que sai 0), sessão real aparecendo em
-      `GET /sessions` no fim.
+      quando isso acontece.
+      **Quem relança é a tela, não o servidor** (decisão do Douglas,
+      2026-08-27, revendo a primeira versão): o front acompanha o job e
+      repete `POST /games/launch` quando ele conclui. A primeira versão tinha
+      um `launchWhenCoreReady` que abria o jogo em segundo plano pelo lado do
+      servidor — retirado, porque abrir um processo de jogo minutos depois
+      surpreende quem já desistiu e saiu da tela, e o cliente não tinha como
+      impedir. O projeto já tinha o padrão certo em `useInlineInstall` (o
+      front espera o job e chama `onLaunch`). Trava contra laço: se a segunda
+      chamada também pedir download, a tela para e explica, em vez de baixar
+      em círculo. Testado em
+      `TestLaunchStartsCoreDownloadWithoutLaunchingByItself`
+      (`internal/api/launch_missing_core_test.go`), que prova as duas metades
+      — nenhuma sessão aparece por conta do servidor, e o relançamento abre o
+      jogo de verdade.
 - [x] Um cancelar que de fato interrompe: `DELETE /api/v1/installs/{id}`
       (`Manager.CancelJob`) cancela o `context.Context` do download — o job
       vai para uma fase própria, `"cancelado"` (não `"falhou"`, para a
@@ -1201,7 +1209,16 @@ Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
       /games/launch` com core presente devolve `200`/`Session` de sempre e
       `GET /installs` continua vazio.
 - [x] `GET /api/v1/retroarch/cores` continua listando o que está e o que não
-      está instalado, **agora com ação de instalar por linha de verdade**.
+      está instalado, **agora com ação de instalar por linha de verdade**,
+      mais um "Baixar os N que faltam" (a pedido do Douglas, 2026-08-27) para
+      quem quer deixar a máquina pronta antes de ficar sem rede. A fila é
+      **sequencial** — o servidor aceitaria 25 downloads simultâneos, um job
+      por core, mas isso saturaria a rede de quem está usando o app e daria
+      25 barras que ninguém acompanha — e tem "Parar depois deste". Um core
+      que falha não derruba a fila. Continua sendo ação secundária, ao lado
+      do resumo: o caminho principal é o download sozinho ao jogar, e o
+      ADR 0015 existe justamente para não empurrar 25 cores em quem vai usar
+      três.
       **Correção sobre o que este item dizia antes:** o texto original do
       roadmap afirmava que "a tela já existe desde 2026-08-04" — falso,
       conferido lendo o código: `RetroArchCoresList` só listava badges
