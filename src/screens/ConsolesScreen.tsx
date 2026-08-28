@@ -67,7 +67,7 @@ function ConsoleCard({
   entry: ConsoleEntry;
   readiness: ConsoleReadiness;
   verdict?: ConsoleVerdict;
-  onOpen?: () => void;
+  onOpen: () => void;
 }) {
   const accent = consoleAccentColor(entry.console_id);
   const style: CSSProperties = { borderLeftColor: accent, borderLeftWidth: 3 };
@@ -130,11 +130,9 @@ function ConsoleCard({
         ) : (
           <span />
         )}
-        {onOpen && (
-          <Button variant="secondary" onClick={onOpen}>
-            Ver jogos
-          </Button>
-        )}
+        <Button variant="secondary" onClick={onOpen}>
+          Ver console
+        </Button>
       </div>
     </Card>
   );
@@ -167,12 +165,7 @@ export function ConsolesScreen({
   onOpenEmulators,
 }: {
   report?: Report;
-  /**
-   * Ausente quando não há parecer carregado ainda (tela alcançável antes do
-   * consentimento/scan): sem ele não há destino de console pra abrir, e o
-   * botão some em vez de existir sem fazer nada.
-   */
-  onOpenConsole?: (consoleId: string, name: string, shortName: string) => void;
+  onOpenConsole: (consoleId: string, name: string, shortName: string) => void;
   onOpenEmulators: () => void;
 }) {
   const [consoles, setConsoles] = useState<ConsoleEntry[] | null>(null);
@@ -333,9 +326,7 @@ export function ConsolesScreen({
             entry={entry}
             readiness={readiness}
             verdict={verdictById.get(entry.console_id)}
-            onOpen={
-              onOpenConsole ? () => onOpenConsole(entry.console_id, entry.name, entry.short_name) : undefined
-            }
+            onOpen={() => onOpenConsole(entry.console_id, entry.name, entry.short_name)}
           />
         ))}
       </div>

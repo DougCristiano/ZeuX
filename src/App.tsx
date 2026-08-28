@@ -11,6 +11,7 @@ import {
   type AllGamesViewState,
 } from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
+import { ConsoleDetailScreen } from "./screens/ConsoleDetailScreen";
 import { ConsolesScreen } from "./screens/ConsolesScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
@@ -43,6 +44,7 @@ type Phase =
   | "all-games"
   | "verdict"
   | "consoles"
+  | "console-detail"
   | "emulators"
   | "library"
   | "games"
@@ -70,7 +72,7 @@ function App() {
   // De onde "games" foi aberto, para o botão "Voltar" de GamesScreen saber
   // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
   // a tela por console (LibraryScreen) continua existindo.
-  const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library">("all-games");
+  const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library" | "console-detail">("all-games");
   // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04). M5
   // (docs/sprint-m-plano.md, 2026-08-07): até aqui só vinha de
   // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
@@ -335,16 +337,29 @@ function App() {
             setCameFromDeclined(false);
             setPhase("emulators");
           }}
-          // Fatia 1 (2026-08-28): "Ver console" leva aos jogos daquele
-          // console, que é a página de console que já existe. A Fatia 2
-          // insere o detalhe (opções de emulador, core, BIOS, pasta) na
-          // frente dela. Ausente sem `report` — `GamesScreen` exige o
-          // parecer para o preset, e esta tela é alcançável antes do scan.
-          onOpenConsole={
+          // P2: "Ver console" abre o detalhe, não os jogos. Sempre presente
+          // — diferente de `GamesScreen`, o detalhe não exige parecer (só
+          // esconde o bloco "Nesta máquina" quando não há).
+          onOpenConsole={(id, name, shortName) => {
+            setSelectedConsole({ id, name, shortName });
+            setPhase("console-detail");
+          }}
+        />
+      );
+      break;
+
+    case "console-detail":
+      screen = (
+        <ConsoleDetailScreen
+          consoleId={selectedConsole!.id}
+          report={report ?? undefined}
+          onBack={() => setPhase("consoles")}
+          // "Ver jogos" só existe com parecer carregado: `GamesScreen` tira
+          // dele o preset que manda pro lançamento.
+          onOpenGames={
             report
-              ? (id, name, shortName) => {
-                  setSelectedConsole({ id, name, shortName });
-                  setGamesOrigin("library");
+              ? () => {
+                  setGamesOrigin("console-detail");
                   setPhase("games");
                 }
               : undefined
@@ -416,7 +431,7 @@ function App() {
         ? "verdict"
         : // "emulators" acende "Consoles": é sub-visão dela desde 2026-08-28,
           // não um destino de sidebar próprio.
-          phase === "consoles" || phase === "emulators"
+          phase === "consoles" || phase === "console-detail" || phase === "emulators"
           ? "consoles"
           : phase === "settings"
             ? "settings"
@@ -438,6 +453,7 @@ const SIDEBAR_PHASES: Phase[] = [
   "all-games",
   "verdict",
   "consoles",
+  "console-detail",
   "emulators",
   "library",
   "games",

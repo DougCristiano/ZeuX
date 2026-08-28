@@ -125,20 +125,48 @@ linhas nos cards de título longo (NES, PC Engine) e esticava a altura do
 card, deixando a grade irregular. `shrink-0 whitespace-nowrap` no selo —
 local, não no `Badge`, que precisa poder quebrar em outros usos.
 
-### P2 — detalhe do console — **aberto**
+### P2 — detalhe do console — **feito em 2026-08-28**
 
-O que a Fatia 1 deixou para trás, e que "Ver jogos" hoje contorna indo direto
-para `GamesScreen`:
+- [x] `ConsoleDetailScreen`: um card por forma de rodar o console (as 2 opções
+      do PS1, a única do Game Boy), cada uma com instalar/remover, "abrir
+      configurações do emulador", o estado do core e o caminho de instalação
+      manual quando a fonte é `manual`. A pasta de jogos (apontar, varrer de
+      novo, remover, contagem) e a de BIOS na coluna lateral, com o parecer
+      reusando `ConsoleVerdictCard` — nunca uma segunda formatação do mesmo
+      dado.
+- [x] A prontidão do topo reusa `evaluateConsoleReadiness`, a mesma da lista:
+      as duas telas não têm como discordar sobre o que falta.
+- [x] **Refatoração que veio junto, para não duplicar máquina de estado:**
+      `useCoreInstall` e `useEmulatorInstall` extraídos de dentro de
+      `EmulatorsScreen` (`RetroArchCoresList` e `EmulatorCardActions`) e
+      adotados pelas duas telas. `EmulatorsScreen` caiu de 1210 para 1011
+      linhas, com comportamento idêntico — o polling, o "cancelado não é
+      falha" e a readoção de jobs em andamento são detalhes que uma segunda
+      implementação por instinto erraria em silêncio.
 
-- [ ] Tela de detalhe por console: as opções de emulador com instalar/remover
-      no lugar, o core com "baixar" quando falta, a pasta de BIOS quando o
-      ZeuX sabe onde ela fica, e a pasta de jogos.
-- [ ] Decidir o que fazer nos 9 consoles cujo emulador é `manual`
-      (RetroArch, Dolphin): hoje a prontidão diz "instalar emulador" e o
-      caminho de instalação só existe na tela de emuladores.
-- [ ] Rever a capability `opener:allow-open-path` (`$CONFIG/**`) se o detalhe
-      passar a apontar pasta de BIOS fora de `%AppData%` — hoje nenhuma
-      aponta, então a restrição não incomoda.
+**Achado ao ver as duas telas juntas (2026-08-28), não corrigido de
+propósito:** no Game Boy, o detalhe mostra o core `gambatte` e o parecer
+mostra "RetroArch (core SameBoy)". Os dois estão certos e são coisas
+diferentes — `ConsoleVerdict.core` é o core do **patamar** do catálogo,
+`defaultCoreByConsole` é o que o lançamento realmente usa. E é o segundo que
+vale: `GamesScreen.doLaunch` manda só `rom_path`/`console_id`, então
+`resolveCoreName` cai no padrão e o `sameboy` do parecer **nunca é
+aplicado**. O detalhe mostra o core certo (o que roda); quem promete errado
+é o parecer. Fechar essa lacuna significa mudar o que o lançamento envia —
+decisão de produto, fora do escopo desta sprint.
+
+### P3 — o que a Sprint P deixou aberto
+
+- [ ] O parecer promete um core que o lançamento não usa (achado acima).
+      Decidir entre mandar `core` no lançamento ou parar de anunciar o core
+      do patamar no texto do parecer.
+- [ ] Os 2 emuladores de fonte `manual` (RetroArch, Dolphin) não têm 1-click:
+      a prontidão diz "instalar emulador" e o detalhe só sabe mostrar o site
+      oficial e a pasta de destino. Vale para os 21 consoles que dependem do
+      RetroArch.
+- [ ] Rever a capability `opener:allow-open-path` (`$CONFIG/**`) se algum dia
+      uma pasta de BIOS fora de `%AppData%` for apontada — hoje nenhuma é,
+      então a restrição não incomoda.
 
 ---
 

@@ -6,7 +6,6 @@ import type {
   CustomDefinition,
   EmulatorEntry,
   EmulatorSource,
-  InstallJob,
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
@@ -32,6 +31,8 @@ import { SelectItem } from "../components/ui/select";
 import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { useCoreInstall } from "../hooks/useCoreInstall";
+import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { percentOf } from "../lib/format";
 
@@ -47,34 +48,6 @@ const MAX_CONSOLE_ICONS = 6;
 // nativo. Convertido de volta para "" ao sair do componente (J3,
 // docs/roadmap.md), então `consoleFilter` continua "" pro resto da tela.
 const ALL_CONSOLES = "__all__";
-
-// Item B10 (docs/sprint-b-plano.md): instalar com ressalva de hardware. O
-// servidor já faz a parte que importa — hardwareBlocks recusa com 409 e
-// override_hint, /installs/{id} acompanha o progresso — esta tela só não pode
-// estragar isso.
-type RowState =
-  | { kind: "idle" }
-  | { kind: "starting" }
-  // message vem de ApiError.message (docs/api.md, code hardware_insufficient)
-  // — nunca uma frase escrita aqui. Ver ConsoleVerdict/handleInstall em
-  // internal/api/server.go, hardwareBlocks.
-  | { kind: "confirm-hardware"; message: string }
-  | { kind: "installing"; job: InstallJob }
-  | { kind: "done"; job: InstallJob }
-  | { kind: "error"; message: string }
-  | { kind: "confirm-remove" }
-  | { kind: "removing" }
-  | { kind: "remove-error"; message: string };
-
-// Estado de download de UM core (ADR 0015, R2/R3) — por nome, não um único
-// estado pra tela inteira, porque baixar "sameboy" não pode travar o botão
-// de "mesen" numa lista de 25.
-type CoreInstallState =
-  | { kind: "idle" }
-  | { kind: "starting" }
-  | { kind: "installing"; job: InstallJob }
-  | { kind: "canceling"; job: InstallJob }
-  | { kind: "error"; message: string };
 
 // Achado em 2026-08-04: um core podia estar ausente por um bug silencioso
 // (log de aviso, nunca erro) e nada avisava até o usuário tentar lançar um
@@ -111,14 +84,13 @@ type CoreInstallState =
 function RetroArchCoresList() {
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [installState, setInstallState] = useState<Record<string, CoreInstallState>>({});
   // Fila do "baixar os que faltam": quantos ainda restam e qual está na vez.
   // `null` quando ninguém pediu a fila — o caminho de um core por clique
   // continua independente dela.
   const [bulk, setBulk] = useState<{ remaining: number; total: number; current: string } | null>(null);
-  // Ref, não estado: `runBulk` roda num laço `await` e leria um estado
-  // congelado no fechamento. O clique em "Parar" precisa ser visto pela
-  // iteração seguinte do laço, não pela próxima renderização.
+  // Ref, não estado: `downloadAllMissing` roda num laço `await` e leria um
+  // estado congelado no fechamento. O clique em "Parar" precisa ser visto
+  // pela iteração seguinte do laço, não pela próxima renderização.
   const bulkStopped = useRef(false);
 
   function loadCores() {
@@ -128,128 +100,24 @@ function RetroArchCoresList() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os cores."));
   }
 
+  // P2 (docs/roadmap.md, Sprint P): o polling, o "cancelado não é falha" e a
+  // readoção de jobs em andamento saíram daqui para `useCoreInstall`, para o
+  // detalhe do console poder baixar um core sozinho sem uma segunda cópia
+  // dessa máquina. Comportamento idêntico ao de antes — só mudou de casa.
+  // O badge "faltando" → "ok" continua sendo a confirmação de sucesso, agora
+  // via `onCoreReady`.
+  const { stateFor, setCoreState, installCore, cancelCore, waitForCore, adoptRunningJobs } = useCoreInstall({
+    onCoreReady: loadCores,
+  });
+
   useEffect(() => {
     loadCores();
-    // "Ver cores" é um toggle: fechar desmonta este componente e perde
-    // `installState`. Sem readotar, reabrir durante um download mostrava
-    // "Instalar" para um core que já estava baixando — e clicar de novo
-    // batia em "já existe um download em andamento". GET /installs devolve
-    // os jobs desta execução do daemon; os de core trazem `core_name`.
-    api
-      .getInstalls()
-      .then((res) => {
-        const running: Record<string, CoreInstallState> = {};
-        for (const job of res.installs) {
-          const name = job.core_name;
-          if (!name) continue;
-          if (job.phase === "concluido" || job.phase === "falhou" || job.phase === "cancelado") continue;
-          running[name] = { kind: "installing", job };
-        }
-        if (Object.keys(running).length === 0) return;
-        setInstallState((prev) => ({ ...running, ...prev }));
-        for (const [name, state] of Object.entries(running)) {
-          if (state.kind === "installing") pollCoreJob(name, state.job.id);
-        }
-      })
-      .catch(() => {
-        // Falhar em readotar não impede usar a tela — o pior caso volta a
-        // ser o de antes: o botão aparece e o servidor recusa com a
-        // mensagem certa.
-      });
+    // "Ver cores" é um toggle: fechar desmonta este componente e perde o
+    // estado de download. Readotar o que já está em andamento evita mostrar
+    // "Instalar" para um core que o daemon já está baixando.
+    adoptRunningJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  function setCoreState(name: string, state: CoreInstallState) {
-    setInstallState((prev) => ({ ...prev, [name]: state }));
-  }
-
-  async function pollCoreJob(name: string, jobId: string) {
-    try {
-      const job = await api.getInstallJob(jobId);
-      if (job.phase === "concluido") {
-        setCoreState(name, { kind: "idle" });
-        loadCores(); // o badge "faltando" → "ok" é a confirmação de sucesso
-        return;
-      }
-      if (job.phase === "cancelado") {
-        setCoreState(name, { kind: "idle" });
-        return;
-      }
-      if (job.phase === "falhou") {
-        // job.error já vem do servidor nomeando o core e o que aconteceu
-        // (docs/api.md) — exibido como veio, sem reescrita.
-        setCoreState(name, { kind: "error", message: job.error ?? "O download não foi concluído." });
-        return;
-      }
-      setCoreState(name, { kind: "installing", job });
-      setTimeout(() => pollCoreJob(name, jobId), 400);
-    } catch (err) {
-      setCoreState(name, {
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível acompanhar o download.",
-      });
-    }
-  }
-
-  // Resolve quando o job deste core termina (de qualquer jeito). Existe para
-  // o "baixar os que faltam", que precisa esperar um core antes de começar o
-  // próximo — 25 downloads em paralelo castigariam a rede do usuário e o
-  // buildbot sem nenhum ganho.
-  function waitForCore(name: string, jobId: string): Promise<void> {
-    return new Promise((resolve) => {
-      const tick = async () => {
-        try {
-          const job = await api.getInstallJob(jobId);
-          if (job.phase === "concluido") {
-            setCoreState(name, { kind: "idle" });
-            loadCores();
-            resolve();
-            return;
-          }
-          if (job.phase === "cancelado") {
-            setCoreState(name, { kind: "idle" });
-            resolve();
-            return;
-          }
-          if (job.phase === "falhou") {
-            setCoreState(name, { kind: "error", message: job.error ?? "O download não foi concluído." });
-            resolve();
-            return;
-          }
-          setCoreState(name, { kind: "installing", job });
-          setTimeout(tick, 400);
-        } catch (err) {
-          setCoreState(name, {
-            kind: "error",
-            message: err instanceof ApiError ? err.message : "Não foi possível acompanhar o download.",
-          });
-          resolve();
-        }
-      };
-      tick();
-    });
-  }
-
-  async function installCore(name: string) {
-    setCoreState(name, { kind: "starting" });
-    try {
-      const job = await api.installRetroArchCore(name);
-      if (job.phase === "concluido") {
-        // No-op: StartCore achou o core já instalado antes de baixar
-        // qualquer coisa (checagem que roda antes do manifesto, R3).
-        setCoreState(name, { kind: "idle" });
-        loadCores();
-        return;
-      }
-      setCoreState(name, { kind: "installing", job });
-      pollCoreJob(name, job.id);
-    } catch (err) {
-      setCoreState(name, {
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível iniciar o download.",
-      });
-    }
-  }
 
   // Baixa os cores que faltam, um de cada vez. Sequencial de propósito: o
   // servidor aceitaria 25 downloads simultâneos (cada core tem seu próprio
@@ -285,19 +153,6 @@ function RetroArchCoresList() {
     loadCores();
   }
 
-  async function cancelCore(name: string, job: InstallJob) {
-    setCoreState(name, { kind: "canceling", job });
-    try {
-      await api.cancelInstall(job.id);
-      // Não muda o estado aqui: o poll em andamento (pollCoreJob) vai ver
-      // phase "cancelado" na próxima resposta e encerrar sozinho.
-    } catch (err) {
-      setCoreState(name, {
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível cancelar o download.",
-      });
-    }
-  }
 
   if (error) return <InlineError>{error}</InlineError>;
   if (!cores) return <p className="text-sm text-muted">Carregando cores…</p>;
@@ -359,7 +214,7 @@ function RetroArchCoresList() {
           prometeria um espaço que este card nunca tem. */}
       <ul className="max-h-64 overflow-y-auto pr-1 text-sm">
         {cores.map((core) => {
-          const state = installState[core.name] ?? { kind: "idle" };
+          const state = stateFor(core.name);
           const percent = state.kind === "installing" || state.kind === "canceling" ? percentOf(state.job) : null;
           return (
             <li key={core.name} className="flex flex-col gap-0.5 py-0.5">
@@ -605,7 +460,10 @@ function EmulatorCardActions({
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
-  const [state, setState] = useState<RowState>({ kind: "idle" });
+  // P2 (docs/roadmap.md, Sprint P): a máquina de instalar/remover saiu daqui
+  // para `useEmulatorInstall`, compartilhada com o detalhe do console.
+  // Comportamento idêntico — só mudou de casa.
+  const { state, setState, install, remove } = useEmulatorInstall({ adapterId: entry.adapter_id, onChanged });
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -640,63 +498,6 @@ function EmulatorCardActions({
       setOpenError(err instanceof ApiError ? err.message : "Não foi possível abrir o emulador.");
     } finally {
       setOpening(false);
-    }
-  }
-
-  async function pollJob(jobId: string) {
-    try {
-      const job = await api.getInstallJob(jobId);
-      if (job.phase === "concluido") {
-        setState({ kind: "done", job });
-        onChanged();
-        return;
-      }
-      if (job.phase === "falhou") {
-        // job.error é a mensagem original do servidor (docs/api.md) — exibida
-        // como veio, igual ao erro de rota.
-        setState({ kind: "error", message: job.error ?? "A instalação falhou." });
-        return;
-      }
-      setState({ kind: "installing", job });
-      setTimeout(() => pollJob(jobId), 400);
-    } catch (err) {
-      setState({
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível acompanhar a instalação.",
-      });
-    }
-  }
-
-  async function install(force: boolean) {
-    setState({ kind: "starting" });
-    try {
-      const job = await api.installEmulator(entry.adapter_id, force);
-      setState({ kind: "installing", job });
-      pollJob(job.id);
-    } catch (err) {
-      if (err instanceof ApiError && err.code === "hardware_insufficient") {
-        setState({ kind: "confirm-hardware", message: err.message });
-        return;
-      }
-      setState({
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível iniciar a instalação.",
-      });
-    }
-  }
-
-  async function remove() {
-    setState({ kind: "removing" });
-    try {
-      await api.uninstallEmulator(entry.adapter_id);
-      onChanged();
-    } catch (err) {
-      setState({
-        kind: "remove-error",
-        // err.message já vem do servidor — nunca reescrita aqui, mesma regra
-        // do resto da tela.
-        message: err instanceof ApiError ? err.message : "Não foi possível remover este emulador.",
-      });
     }
   }
 
