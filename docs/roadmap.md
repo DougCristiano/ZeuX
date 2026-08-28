@@ -1310,16 +1310,35 @@ Confirmado ao vivo que o bug do "sessão iniciada" está mesmo corrigido:
 com `/games/launch` respondendo 202, a tela mostra "Baixando o core mesen… ·
 37%" com barra e "Cancelar download", e **não** dispara o toast de sessão.
 
-**Achado pré-existente, não corrigido aqui (fica registrado):** o botão
-"Jogar" do tile da biblioteca (`GameTile`) mora dentro de um
-`<div role="button">`, e a árvore de acessibilidade colapsa o controle
-interno — `page.accessibility.snapshot()` não encontra o botão, e
-`getByRole("button", { name: "Jogar …" })` também não. O M1 registrou a
-troca de `<button>` por `role="button"` para evitar botão-dentro-de-botão, e
-deixou a tela de detalhe como o caminho alcançável por teclado; o efeito
-sobre leitor de tela na grade não estava escrito. Mexer no `GameTile` é a
-tela mais importante do app e tem decisão registrada — fica para o Douglas
-decidir, não para esta sessão.
+**Alarme falso registrado e desmentido no mesmo dia (2026-08-28), porque a
+conclusão errada é pior que nenhuma:** esta seção chegou a afirmar que o
+botão "Jogar" do tile (`GameTile`) não existia na árvore de acessibilidade
+por morar dentro de um `<div role="button">`. **Está errado.** A medição
+que gerou a afirmação tirou `page.accessibility.snapshot()` com o tile em
+repouso — e nesse estado o overlay está `display: none`
+(`hidden group-hover:flex group-focus-visible:flex`, `GameCover` em
+`src/components/ui.tsx`), então nenhum elemento oculto apareceria mesmo.
+Medido de novo, nos três estados:
+
+| estado do tile | `display` do overlay | botão na árvore a11y |
+|---|---|---|
+| em repouso | `none` | não (correto: está oculto) |
+| com o mouse por cima | `flex` | **sim** |
+| com foco de teclado no wrapper | `flex` | **sim** |
+
+Ou seja, o desenho do M1 se sustenta: `group-focus-visible:flex` faz o
+overlay aparecer quando o wrapper recebe foco, e o botão fica exposto. O
+`tabIndex={-1}` continua sendo escolha deliberada e documentada (um alvo
+por tile na navegação por Tab/D-pad; quem navega por teclado abre o detalhe
+e joga de lá) — não uma omissão.
+
+**O que sobra, e é opcional:** um `<button>` dentro de um `role="button"`
+segue sendo aninhamento de controle interativo, que o ARIA desaconselha
+mesmo funcionando no Chromium. Se algum dia incomodar, a correção é barata
+e não muda um pixel: mover o overlay para irmão do wrapper, posicionado
+absoluto sobre a capa — exatamente o que `FavoriteToggle` já faz no mesmo
+componente. Não há defeito observável hoje que justifique mexer na tela
+mais importante do app.
 
 **Também ajustado, consequência direta de R4 (não do escopo original de
 R3):** `EmulatorCardActions` escondia o botão "Remover" do RetroArch com um
