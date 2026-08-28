@@ -64,15 +64,16 @@ type RetroArchCoreManifest struct {
 }
 
 // RetroArchManifestPlatforms são as combinações goos/goarch que o manifesto
-// cobre — as mesmas que scripts/download-retroarch-cores.mjs sabe resolver no
-// buildbot, mais linux/arm64 (buildbot chama de "aarch64").
+// cobre. O vocabulário do buildbot para cada uma está em buildBotPlatform,
+// abaixo — ele chama linux/arm64 de "aarch64" e darwin de "osx".
 func RetroArchManifestPlatforms() []string {
 	return []string{"linux/amd64", "linux/arm64", "windows/amd64", "darwin/amd64", "darwin/arm64"}
 }
 
 // buildBotPlatform e buildBotExt traduzem goos/goarch para o vocabulário do
 // buildbot (internal/emulator/retroarch.go já faz o mesmo tipo de tradução
-// para runtime.GOOS ao decidir a extensão do core instalado).
+// para runtime.GOOS ao decidir a extensão do core instalado). Os nomes vêm
+// do que o buildbot publica de verdade, verificado em 2026-08-04.
 func buildBotPlatform(goos, goarch string) (string, error) {
 	switch goos {
 	case "linux":
@@ -123,9 +124,17 @@ func BuildBotCoreURL(goos, goarch, libretroName string) (rawURL string, filename
 		return "", "", err
 	}
 	filename = libretroName + ext
-	// "latest" é caminho literal do buildbot, não um valor a resolver — ver o
-	// comentário do pacote acima e scripts/download-retroarch-cores.mjs, que
-	// documenta a estrutura real confirmada em 2026-08-04.
+	// Formato real, confirmado pelo Douglas em 2026-08-04 numa máquina com
+	// acesso ao host:
+	//
+	//	https://buildbot.libretro.com/nightly/linux/x86_64/latest/mesen_libretro.so.zip
+	//
+	// "nightly" e "latest" são segmentos literais do caminho, não valores a
+	// resolver — "latest" fica no FIM, antes do arquivo. A estrutura que
+	// parecia óbvia (".../latest/<plataforma>/cores/<arquivo>") devolvia 404
+	// em todo core. Isto estava documentado em
+	// scripts/download-retroarch-cores.mjs, apagado no R4 junto com o
+	// empacotamento; ficou registrado aqui para não se perder com ele.
 	rawURL = fmt.Sprintf("https://buildbot.libretro.com/nightly/%s/latest/%s.zip", platform, filename)
 	return rawURL, filename + ".zip", nil
 }

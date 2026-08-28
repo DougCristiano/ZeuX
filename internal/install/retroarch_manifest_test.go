@@ -80,7 +80,7 @@ func TestRetroArchManifestEntriesAreWellFormed(t *testing.T) {
 
 // BuildBotCoreURL é a única função que deveria montar essa URL — trava o
 // formato para que uma mudança futura na estrutura do buildbot (já aconteceu
-// uma vez, ver scripts/download-retroarch-cores.mjs) precise editar aqui e
+// uma vez, ver o comentário de BuildBotCoreURL) precise editar aqui e
 // só aqui, tanto para o gerador quanto para o manifesto embutido.
 func TestBuildBotCoreURLMatchesKnownFormat(t *testing.T) {
 	url, filename, err := BuildBotCoreURL("linux", "amd64", "mesen_libretro")

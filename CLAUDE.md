@@ -85,9 +85,13 @@ internal/consent/    consentimento persistido e versionado
 internal/hardware/   detecção de CPU/RAM (gopsutil) e GPU (um arquivo por SO)
 internal/verdict/    catálogo embutido + motor de parecer
 internal/emulator/   adapters, descoberta de binários, launcher
-internal/install/    gerenciador de instalação de emuladores
-internal/library/    catálogo de ROMs do usuário (não plugado — L5)
-internal/store/      persistência de preferências (SQLite)
+internal/install/    instalação de emuladores + download de cores do RetroArch
+internal/library/    catálogo de ROMs do usuário (pastas, jogos, favoritos)
+internal/igdb/       scraper de capas (G1) — credencial do próprio usuário
+internal/store/      persistência local (SQLite, ADR 0011): migrações e conexão
+cmd/generate-retroarch-manifest/
+                     mede URL/tamanho/SHA256 dos cores e escreve o manifesto
+                     embutido (ADR 0015, R1). Roda à mão, nunca no build.
 docs/                esta documentação
 ```
 
@@ -272,10 +276,15 @@ descontinuados após ação judicial. Ver
   ROMs entre máquinas. Se a tarefa parecer pedir isso, pare e pergunte.
 - ❌ **Não adicione o Nintendo Switch ao catálogo**, nem adapters para Yuzu ou
   Ryujinx.
-- ❌ **Não introduza banco de dados, ORM ou camada de persistência** sem que a
-  decisão seja explicitamente reaberta. Ver
-  [ADR 0002](docs/decisoes/0002-adiar-banco-de-dados.md). Isso inclui "só um
-  SQLite rapidinho para salvar as sessões".
+- ❌ **Não introduza ORM nem uma segunda camada de persistência.** O SQLite
+  local já é a persistência oficial desde o
+  [ADR 0011](docs/decisoes/0011-sqlite-local-para-biblioteca.md) (que
+  substituiu o 0002, o qual adiava qualquer banco) — `internal/store` abre a
+  conexão e aplica migrações `.sql` embutidas, e é por ali que passa dado
+  novo que precise sobreviver a um reinício. O que continua fora sem reabrir
+  a decisão: ORM, um segundo banco, ou um serviço remoto de dados. Note que
+  `consent.json` e `custom_emulators.json` **ficam fora do banco de
+  propósito** — o motivo está no próprio ADR 0011.
 - ❌ **Não escreva texto que julgue o hardware do usuário.**
 - ❌ **Não invente flags de linha de comando** que a documentação do emulador não
   descreve. Uma flag inexistente faz o emulador recusar a abrir. Se a opção não
@@ -308,11 +317,19 @@ Coisas que já custaram tempo e vale saber de antemão:
   Ver roadmap D6 se precisar de profundidade maior.
 - **`Options.Extra` é anexado depois do caminho da ROM**, o que no PCSX2 o coloca
   depois do separador `--`.
-- **`Installation.Version` nunca é preenchido.** Nenhum adapter detecta versão.
+- **`Installation.Version` só vem de instalação gerenciada.** Quem instalou
+  pelo ZeuX tem a tag do release gravada em `.zeux-version`
+  (`VersionMarkerName`, lido por `readVersionMarker`); para o emulador que o
+  usuário já tinha por conta própria o campo fica ausente — o ZeuX não
+  executa o binário para perguntar a versão a ele.
 - **`mise.toml` usa versões fixas:** `go = "1.26.5"`, `node = "24.18.1"`
   (não latest/lts). Ver comentário no arquivo sobre por quê.
-- **O `README.md` está desatualizado**: diz que não há lançamento de emulador,
-  e não lista as rotas de `/emulators`, `/games/*` e `/sessions`.
+- **Um core do RetroArch não baixa enquanto o manifesto não for gerado.**
+  `internal/install/data/retroarch_cores_manifest.json` vai no repositório com
+  `"generated": false` em tudo (URLs certas, hash não medido), e `StartCore`
+  recusa instalar a partir de entrada não medida — de propósito. Rodar
+  `go run ./cmd/generate-retroarch-manifest` numa máquina com acesso a
+  `buildbot.libretro.com` é o que destrava. Ver ADR 0015, R1.
 
 ---
 

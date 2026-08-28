@@ -65,6 +65,7 @@ está em português e já pode ser exibida ao usuário como está.
 | Método | Rota | Função |
 |---|---|---|
 | GET | `/api/v1/health` | Daemon no ar + versão do catálogo |
+| GET | `/api/v1/system/info` | Sistema operacional e versão do ZeuX |
 | GET | `/api/v1/consent` | Estado do consentimento + texto da política |
 | POST | `/api/v1/consent` | Registra ou revoga o consentimento |
 | POST | `/api/v1/hardware/scan` | Executa o scan (exige consentimento) |
@@ -78,6 +79,12 @@ está em português e já pode ser exibida ao usuário como está.
 | POST | `/api/v1/emulators/{id}/install` | Dispara a instalação 1-click |
 | DELETE | `/api/v1/emulators/{id}/install` | Remove uma instalação gerenciada pelo ZeuX |
 | POST | `/api/v1/emulators/{id}/open` | Abre o emulador sozinho, sem ROM (botão "Configurar") |
+| GET | `/api/v1/emulators/{id}/config` | Lê a configuração persistida do emulador (H1) |
+| POST | `/api/v1/emulators/{id}/config` | Grava a configuração persistida (H1) |
+| DELETE | `/api/v1/emulators/{id}/config` | Restaura a configuração anterior ao ZeuX (H2) |
+| GET | `/api/v1/emulators/{id}/bindings` | Lê o mapeamento de teclado/controle (H3) |
+| POST | `/api/v1/emulators/{id}/bindings` | Grava o mapeamento (H4) |
+| GET | `/api/v1/retroarch/cores` | Lista todo core conhecido e se está instalado |
 | POST | `/api/v1/retroarch/cores/{core}/install` | Download sob demanda de um core do RetroArch ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), R2) |
 | GET | `/api/v1/installs` | Histórico de instalações (jobs) — cobre instalação de emulador e download de core |
 | GET | `/api/v1/installs/{id}` | Acompanha uma instalação ou download de core em andamento |
@@ -86,6 +93,7 @@ está em português e já pode ser exibida ao usuário como está.
 | POST | `/api/v1/games/launch` | Executa o jogo |
 | GET | `/api/v1/sessions` | Histórico de sessões + tempo de jogo |
 | POST | `/api/v1/library/folders` | Aponta uma pasta a um console e varre na hora |
+| POST | `/api/v1/library/folders/bulk` | Aponta uma pasta-mãe e casa cada subpasta a um console |
 | GET | `/api/v1/library/folders` | Lista as pastas apontadas |
 | DELETE | `/api/v1/library/folders/{id}` | Remove a referência à pasta (não apaga arquivo) |
 | POST | `/api/v1/library/folders/{id}/scan` | Revarre uma pasta já apontada |
@@ -801,6 +809,186 @@ arquivo baixado fica só no diretório de trabalho temporário, que é apagado.
 
 ---
 
+## GET /api/v1/emulators/{id}/config
+
+Lê a configuração que o emulador tem **hoje no arquivo dele** — não uma cópia
+guardada pelo ZeuX. H1 (`docs/roadmap.md`).
+
+**Só existe para adapters que satisfazem `emulator.ConfigurableAdapter`** —
+hoje PCSX2 e RetroArch. Use `configurable` de `GET /emulators` para saber se
+a rota vale para um `id` antes de chamá-la.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/emulators/retroarch/config
+```
+
+**200 OK**
+
+```json
+{ "fullscreen": true, "internal_scale": 2, "renderer": "vulkan" }
+```
+
+Os três campos são **omitidos quando o ZeuX não conseguiu ler o valor real**
+do arquivo do emulador — nunca um chute nem um `false` de enfeite. Um
+emulador recém-instalado, sem arquivo de configuração ainda, devolve `{}`.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` | Nenhum emulador com este `id`. |
+| 400 | `not_configurable` | O emulador existe, mas o ZeuX não sabe ler/escrever a configuração dele. |
+| 400 | `not_installed` | O emulador não foi encontrado no disco — o caminho do arquivo depende de onde ele está instalado. |
+| 500 | `config_read_failed` | O arquivo existe mas não pôde ser lido/interpretado. |
+
+---
+
+## POST /api/v1/emulators/{id}/config
+
+Grava a configuração no arquivo do próprio emulador.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/emulators/retroarch/config \
+  -H "Content-Type: application/json" \
+  -d '{"fullscreen":true,"internal_scale":2,"renderer":"vulkan"}'
+```
+
+**200 OK**
+
+```json
+{ "unapplied": [] }
+```
+
+`unapplied` segue a mesma ideia do [ADR 0006](decisoes/0006-campo-unapplied.md)
+que `Command.unapplied` usa: o que o ZeuX **não** conseguiu aplicar, em
+frases prontas para exibir. Vem sempre como array — `[]` quando tudo coube,
+nunca `null` (o front itera direto, e um `null` derrubava a tela; achado em
+2026-08-05).
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` · 400 `not_configurable` / `not_installed` | Iguais aos do `GET` acima. |
+| 400 | `invalid_body` | Corpo fora do formato `{"fullscreen": bool, "internal_scale": int, "renderer": string}`. |
+| 500 | `config_write_failed` | Não foi possível gravar o arquivo. |
+
+---
+
+## DELETE /api/v1/emulators/{id}/config
+
+Restaura a configuração que existia **antes de o ZeuX escrever** nela (H2) —
+o escape hatch de "mexi e me arrependi". O ZeuX guarda o arquivo original ao
+gravar pela primeira vez; sem esse backup, não há o que restaurar.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/emulators/retroarch/config
+```
+
+**200 OK** — `{ "restored": true }`
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` · 400 `not_configurable` / `not_installed` | Iguais aos do `GET` acima. |
+| 400 | `config_restore_failed` | Não há backup para restaurar, ou a restauração falhou. Mensagem original no `message`. |
+
+---
+
+## GET /api/v1/emulators/{id}/bindings
+
+Lê o mapeamento de teclado/controle do emulador (H3).
+
+**Só existe para adapters que satisfazem `emulator.KeyBindableAdapter`** —
+ver `bindable` em `GET /emulators`.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/emulators/retroarch/bindings
+```
+
+**200 OK**
+
+```json
+{
+  "actions": ["up", "down", "left", "right", "a", "b", "x", "y", "select", "start", "l", "r", "l2", "r2", "l3", "r3"],
+  "bindings": [{ "action": "up", "key": "up" }, { "action": "a" }]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `actions` | array de string | Vocabulário do **próprio emulador** — "Cross" no PCSX2 não é necessariamente o mesmo botão físico que "b" no RetroArch. |
+| `bindings` | array | Uma entrada por ação. `key`/`button` ausentes = ação sem nada vinculado. |
+
+**Sem arquivo de mapeamento, a resposta não é vazia:** vem a lista de ações
+conhecidas, cada uma sem vínculo — "não existe arquivo ainda" não é o mesmo
+que "este emulador não tem ações", e a tela sempre precisa ter o que mostrar.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` | Nenhum emulador com este `id`. |
+| 400 | `not_bindable` | O emulador existe, mas o ZeuX não sabe ler o mapeamento dele. |
+| 400 | `not_installed` | O emulador não foi encontrado no disco. |
+| 500 | `bindings_read_failed` | O arquivo existe mas não pôde ser lido. |
+
+---
+
+## POST /api/v1/emulators/{id}/bindings
+
+Grava o mapeamento (H4). Mesma forma de resposta do `POST .../config`.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/emulators/retroarch/bindings \
+  -H "Content-Type: application/json" \
+  -d '{"bindings":[{"action":"a","key":"z"}]}'
+```
+
+**200 OK** — `{ "unapplied": [] }`, sempre array.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` · 400 `not_bindable` / `not_installed` | Iguais aos do `GET` acima. |
+| 400 | `invalid_body` | Corpo fora de `{"bindings": [{"action": "...", "key": "..."}]}`. |
+| 500 | `bindings_write_failed` | Não foi possível gravar. |
+
+---
+
+## GET /api/v1/retroarch/cores
+
+Lista **todo core que o ZeuX conhece** — não só os instalados — com o estado
+de cada um. Rota própria, e não um campo dentro de `/emulators`, porque cores
+só existem para o RetroArch: nenhum outro adapter carrega bibliotecas
+plugáveis, e 25 cores dentro da resposta de `/emulators` infiltrariam esse
+detalhe em toda tela que só quer saber "instalado sim/não" por emulador.
+
+Existe porque um core podia estar ausente sem nada avisar até o usuário
+tentar abrir um jogo e receber "core não encontrado" (achado em 2026-08-04).
+
+```bash
+curl http://127.0.0.1:7777/api/v1/retroarch/cores
+```
+
+**200 OK**
+
+```json
+{
+  "cores": [
+    { "name": "beetle cygne", "filename": "mednafen_wswan_libretro.so", "installed": false },
+    { "name": "mesen", "filename": "mesen_libretro.so", "installed": true, "path": "/home/voce/.local/share/zeux/retroarch/cores/mesen_libretro.so" }
+  ]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `name` | string | Nome amigável — o mesmo usado em `options.core` de `/games/launch` e no path de `POST /retroarch/cores/{core}/install`. Vários têm espaço (`beetle vb`, `parallel n64`). |
+| `filename` | string | Nome do arquivo com a extensão desta plataforma (`.so`/`.dll`/`.dylib`). |
+| `installed` | bool | Achado em algum dos diretórios que o adapter procura — inclui o que o Online Updater do próprio RetroArch baixou, não só o que o ZeuX instalou. |
+| `path` | string | Só presente quando `installed` é `true`. |
+
+Ordenada por `name`, de forma estável — a ordem interna do adapter vem de um
+mapa e não é determinística.
+
+Esta rota não tem caminho de erro: sem RetroArch instalado, ela responde
+`200` com todos os cores em `installed: false`.
+
+---
+
 ## GET /api/v1/installs
 
 Histórico de todas as instalações desta execução do daemon (em andamento e
@@ -1193,6 +1381,55 @@ esta resposta.
 | `path_not_found` | 400 | O caminho não existe ou não é uma pasta. Mensagem nomeia o caminho. |
 | `library_write_failed` | 500 | Erro de I/O gravando no banco local. |
 | `library_scan_failed` | 500 | Erro de I/O varrendo a pasta ou gravando os jogos achados. |
+
+---
+
+## POST /api/v1/library/folders/bulk
+
+Aponta **uma pasta-mãe** e deixa o ZeuX casar cada subpasta a um console pelo
+nome dela — o caminho de quem já organiza as ROMs em `roms/nes`, `roms/PS1`,
+`roms/snes`.
+
+Rota própria, e não um corpo opcional diferente em `POST /library/folders`:
+"console_id + path" (uma pasta, um console) e "path" sozinho (varre as
+subpastas) são operações distintas o bastante para merecer contrato próprio,
+em vez de um `if console_id == ""` escondido no meio.
+
+O casamento é por **nome normalizado**, e cada console entra no índice pelo
+`id`, pelo nome e pela sigla — `ps1`, `PS1` e `PlayStation` acham o mesmo
+console. Subpasta que não casa com nada não vira erro: sai em `unmatched`,
+para a tela poder dizer o que ficou de fora.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/library/folders/bulk \
+  -H "Content-Type: application/json" \
+  -d '{"path":"/home/voce/roms"}'
+```
+
+**200 OK**
+
+```json
+{
+  "matched": [
+    { "console_id": "ps1", "name": "PlayStation 1", "path": "/home/voce/roms/PS1", "games_found": 0 },
+    { "console_id": "nes", "name": "Nintendo Entertainment System", "path": "/home/voce/roms/nes", "games_found": 1 }
+  ],
+  "unmatched": ["pasta-qualquer"]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `matched` | array | Uma entrada por subpasta reconhecida, já apontada e varrida. `games_found` é o que a varredura achou **naquela** pasta — `0` é resultado normal (pasta vazia, ou só com extensão que aquele console não reconhece). |
+| `unmatched` | array de string | Nome das subpastas que não casaram com console nenhum. Nunca `null` — array vazio quando todas casaram. |
+
+Arquivos soltos na pasta-mãe são ignorados: só subpastas entram na conta.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `invalid_body` | Corpo fora de `{"path": "..."}`. |
+| 400 | `missing_fields` | `path` vazio. |
+| 400 | `path_not_found` | A pasta não existe ou não pôde ser lida. |
 
 ---
 

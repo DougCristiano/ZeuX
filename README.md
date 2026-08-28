@@ -8,17 +8,23 @@ honesta, o que aquele computador alcança em cada console.
 
 O daemon local em Go detecta o hardware, emite o parecer por console e lança
 jogos nos emuladores instalados, aplicando automaticamente o preset adequado à
-máquina. São 33 consoles no catálogo e 13 emuladores conhecidos, além dos que o
+máquina. São 33 consoles no catálogo e 14 emuladores conhecidos, além dos que o
 usuário cadastrar manualmente.
 
 A instalação 1-click baixa os emuladores das fontes oficiais, verifica a
-integridade e instala em `%APPDATA%\ZeuX\emulators`. Ainda não há interface
-gráfica, scraper de metadados nem banco de dados.
+integridade e instala em `%APPDATA%\ZeuX\emulators`. Os cores do RetroArch
+são baixados **sob demanda**, na hora de abrir um jogo, com SHA256 conferido
+contra um manifesto embutido ([ADR 0015](docs/decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)).
 
-⚠️ **As linhas de comando ainda não foram validadas com jogos reais.** Só o
-DuckStation foi conferido contra o binário de verdade; os demais foram escritos
-a partir da documentação de cada projeto. Os testes cobrem a tradução de opções
-em argumentos, não a aceitação deles pelos emuladores. Ver
+Existe interface gráfica (Tauri + React, 10 telas), busca de capas pelo IGDB
+com a conta do próprio usuário, e SQLite local para biblioteca, sessões e
+tempo de jogo ([ADR 0011](docs/decisoes/0011-sqlite-local-para-biblioteca.md)).
+
+⚠️ **A maioria das linhas de comando ainda não foi validada com jogos reais.**
+Foram abertos até a tela de título: PS1 (DuckStation), PS2 (PCSX2), N64 (RMG) e
+três consoles pelo RetroArch. Os demais adapters foram escritos a partir da
+documentação de cada projeto — os testes cobrem a tradução de opções em
+argumentos, não a aceitação delas pelo emulador. Ver
 [docs/roadmap.md](docs/roadmap.md).
 
 Para conferir se algum projeto mudou o nome dos pacotes publicados:

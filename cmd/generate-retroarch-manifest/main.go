@@ -5,11 +5,11 @@
 // recusar um arquivo que não bate.
 //
 // Não roda em CI nem no build normal: precisa de acesso de rede a
-// buildbot.libretro.com, que está bloqueado neste ambiente de
-// desenvolvimento desde 2026-08-02 (mesma restrição que já bloqueava
-// scripts/download-retroarch-cores.mjs). Uso esperado: o Douglas roda isto
-// numa máquina com acesso real ao buildbot, sempre que decidir cortar uma
-// nova versão do manifesto — nunca automaticamente.
+// buildbot.libretro.com, bloqueado neste ambiente de desenvolvimento desde
+// 2026-08-02 — o mesmo bloqueio que já impedia o empacotamento do ADR 0012.
+// Uso esperado: o Douglas roda isto numa máquina com acesso real ao
+// buildbot, sempre que decidir cortar uma nova versão do manifesto — nunca
+// automaticamente.
 //
 // Um core que falhar (rede indisponível, 404, timeout) não derruba o
 // programa: fica registrado no manifesto com "generated": false, size 0 e
@@ -139,8 +139,7 @@ func downloadAndHash(client *http.Client, url string) (int64, string, error) {
 
 // defaultManifestPath acha internal/install/data/retroarch_cores_manifest.json
 // a partir da localização deste arquivo-fonte, para que o comando funcione
-// não importa de onde `go run` seja invocado — mesma técnica que
-// scripts/download-retroarch-cores.mjs usa com import.meta.url.
+// não importa de onde `go run` seja invocado.
 func defaultManifestPath() string {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

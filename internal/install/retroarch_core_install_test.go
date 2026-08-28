@@ -47,8 +47,8 @@ func coreExtensionForTest() string {
 }
 
 // zipWithSingleFile monta um .zip com uma única entrada — mesmo formato que o
-// buildbot publica para um core (scripts/download-retroarch-cores.mjs
-// documenta isso).
+// buildbot publica para um core (ver BuildBotCoreURL, retroarch_manifest.go,
+// que registra o formato real verificado no host).
 func zipWithSingleFile(t *testing.T, entryName string, content []byte) []byte {
 	t.Helper()
 

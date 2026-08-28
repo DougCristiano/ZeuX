@@ -131,15 +131,29 @@ func (c *Client) authenticate(ctx context.Context) error {
 		"client_secret": {c.creds.ClientSecret},
 		"grant_type":    {"client_credentials"},
 	}
-	reqURL := twitchTokenURL + "?" + values.Encode()
-	if err := checkHost(reqURL); err != nil {
+	if err := checkHost(twitchTokenURL); err != nil {
 		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
+	// As credenciais vão no CORPO, não na query string. Achado ao ler o log
+	// do daemon em 2026-08-28: com elas na URL, qualquer falha de rede vira
+	// um *url.Error do Go que carrega a URL inteira na mensagem — e a
+	// mensagem ia para o log:
+	//
+	//	msg="busca de capas falhou" erro="autenticando com o IGDB: Post
+	//	\"https://id.twitch.tv/oauth2/token?client_id=…&client_secret=…\": …"
+	//
+	// Com a credencial do próprio usuário (o caminho recomendado, ver
+	// credentials.go), esse log expõe o segredo DELE — e um log é
+	// exatamente o que alguém cola num chamado pedindo ajuda. Corpo
+	// form-encoded é o que o OAuth 2 (RFC 6749, §2.3.1) espera de qualquer
+	// jeito, e mantém o segredo fora de URL, de log de proxy e de histórico
+	// de servidor.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, twitchTokenURL, strings.NewReader(values.Encode()))
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "ZeuX")
 
 	response, err := httpClient.Do(req)

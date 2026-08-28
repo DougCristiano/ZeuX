@@ -2,6 +2,7 @@ package igdb
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -202,5 +203,43 @@ func TestDownloadCoverOversizeRejected(t *testing.T) {
 
 	if _, err := os.Stat(dest); !os.IsNotExist(err) {
 		t.Fatal("DownloadCover: nenhum arquivo deveria ter sido deixado para trás após rejeição")
+	}
+}
+
+// Trava a regra achada em 2026-08-28 lendo o log de um daemon real: o
+// client_secret NUNCA pode ir na URL. Com ele na query string, qualquer
+// falha de rede vira um *url.Error do Go que carrega a URL inteira na
+// mensagem, e essa mensagem acaba no log do daemon — expondo o segredo do
+// próprio usuário para quem quer que veja o log (inclusive quem cola um log
+// num chamado pedindo ajuda). O lugar dele é o corpo form-encoded, que é o
+// que o OAuth 2 espera (RFC 6749, §2.3.1).
+func TestAuthenticateNaoColocaSegredoNaURL(t *testing.T) {
+	var urlVista, corpoVisto, contentType string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		urlVista = r.URL.String()
+		contentType = r.Header.Get("Content-Type")
+		body, _ := io.ReadAll(r.Body)
+		corpoVisto = string(body)
+		tokenHandler(w, r)
+	})
+	fakeIGDBServer(t, mux)
+
+	client := NewClient(testCredentials())
+	if err := client.authenticate(context.Background()); err != nil {
+		t.Fatalf("authenticate: %v", err)
+	}
+
+	if strings.Contains(urlVista, "segredo-de-teste") {
+		t.Errorf("o client_secret vazou na URL: %s", urlVista)
+	}
+	if strings.Contains(urlVista, "client_id") {
+		t.Errorf("credencial na query string: %s", urlVista)
+	}
+	if !strings.Contains(corpoVisto, "client_secret=segredo-de-teste") {
+		t.Errorf("o client_secret deveria ir no corpo, veio: %q", corpoVisto)
+	}
+	if contentType != "application/x-www-form-urlencoded" {
+		t.Errorf("Content-Type = %q, esperava application/x-www-form-urlencoded", contentType)
 	}
 }

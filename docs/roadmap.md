@@ -34,6 +34,44 @@ novo.
 
 ---
 
+## Auditoria de veracidade dos documentos (2026-08-28)
+
+Varredura de **todos** os `.md` do repositório contra o código e contra o app
+rodando (Chromium/Playwright, `zeuxd` real). O que estava errado foi
+corrigido no próprio documento; registrado aqui o que a varredura achou,
+porque a maior parte era afirmação que envelheceu sem ninguém notar:
+
+| Documento | O que estava errado |
+|---|---|
+| `README.md` | Dizia **"ainda não há interface gráfica, scraper de metadados nem banco de dados"** — os três existem (Tauri + React com 10 telas, IGDB, SQLite). Dizia 13 emuladores (são 14) e que só o DuckStation tinha sido validado com jogo real (também PS2/PCSX2, N64/RMG e três consoles pelo RetroArch). |
+| `CLAUDE.md` | Faltavam `internal/igdb` e `cmd/generate-retroarch-manifest` na estrutura; `internal/library` ainda marcado "(não plugado — L5)"; a proibição "não introduza banco de dados" apontava para o **ADR 0002, que foi substituído pelo 0011** — lida ao pé da letra, proibia mexer no SQLite que já é a persistência oficial. Duas "armadilhas conhecidas" tinham deixado de ser verdade (`Installation.Version` nunca preenchido; README desatualizado). |
+| `docs/api.md` | Anunciava documentar "todas as rotas HTTP" com **6 rotas ausentes** (`/emulators/{id}/config` nos três métodos, `/emulators/{id}/bindings` nos dois, `/library/folders/bulk`) e 3 fora do índice (`/system/info`, `/covers/{caminho}`, `/retroarch/cores`). Escritas conferindo a resposta real do daemon; índice agora bate com as 42 rotas do roteador. |
+| `docs/adapters.md` | A tabela de cores listava **10 de 25**, e a de `defaultCoreByConsole` **7 de 24**, ambas sem dizer que eram amostra. A nota "`gambatte` está mapeado mas nenhum console o usa — não há entrada de Game Boy/GBC" era **falsa**: `gb` e `gbc` usam `gambatte` como padrão. Faltava o diretório gerenciado do ZeuX na ordem de busca de cores, e o texto ainda mandava o usuário ao Online Updater em vez do download sob demanda (R3). Seção regenerada a partir do código. |
+| `docs/arquitetura.md` | `internal/igdb` fora da tabela de pacotes; `internal/install` descrito sem o download de cores. |
+| `docs/wireframe.md` | "Sem scraper no MVP" (o G1 existe), "as tabelas da biblioteca ainda não" (existem, migrações `0002`–`0005`), painel de detalhe "em aberto" (virou `GameDetailScreen`). O item de BIOS foi mantido — continua verdade que não há catálogo de nome/hash — mas agora diz o que já existe (`requires_external_file`, `BiosDir`). |
+| `docs/decisoes/0011` | O Status dizia "pastas/jogos/BIOS da biblioteca ainda não têm tabela nem código". Pastas e jogos têm; só o BIOS continua fora do banco. |
+| `docs/THIRD-PARTY-LICENSES.md` | Escrito para o modelo empacotado (ADR 0012); ganhou aviso de que a distribuição mudou e que a seção de conformidade não foi revisada para o modelo novo. |
+| Comentários de código | Seis apontavam para `scripts/download-retroarch-cores.mjs`, **apagado no R4** — e um deles era a única fonte que documentava a estrutura real de URL do buildbot (confirmada em 2026-08-04). O conhecimento foi realojado em `BuildBotCoreURL` antes que se perdesse com o arquivo. |
+
+**Achado de segurança, fora do escopo de documentação:** o log do daemon
+imprimia o `client_secret` do IGDB. As credenciais iam na query string, e
+qualquer falha de rede vira um `*url.Error` que carrega a URL inteira na
+mensagem — que ia para o log. Com a credencial do próprio usuário (o caminho
+recomendado), o segredo **dele** apareceria num log colado num pedido de
+ajuda. Corrigido movendo para o corpo form-encoded, que é o que o OAuth 2
+espera (RFC 6749, §2.3.1), travado por
+`TestAuthenticateNaoColocaSegredoNaURL`. A credencial de teste embutida em
+`internal/igdb/credentials.go` **não** é um achado: é decisão consciente do
+Douglas (2026-08-17), com o trade-off documentado no próprio arquivo.
+
+**O que foi verificado na tela, não só no código:** as 4 telas de navegação
+abrem sem erro de console; a sidebar mede os 64 px que o `CLAUDE.md` afirma;
+a área útil em janela de 1280 é de 1216 px, confirmando a regra de nunca usar
+`xl:` esperando que dispare no tamanho padrão; nenhuma tela produz rolagem
+horizontal.
+
+---
+
 ## Corte de versão: o que é v1.0 e o que é v2.0
 
 **Decisão do Douglas, 2026-08-04.** Até aqui o roadmap tinha sprints em ordem

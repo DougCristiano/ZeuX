@@ -249,8 +249,8 @@ func (m *Manager) installCore(ctx context.Context, job *Job, coreName string, as
 		return err
 	}
 
-	// O buildbot zipa só o binário do core, sem diretórios (mesma observação
-	// de scripts/download-retroarch-cores.mjs) — o nome esperado depois de
+	// O buildbot zipa só o binário do core, sem diretórios (formato registrado
+	// em BuildBotCoreURL, retroarch_manifest.go) — o nome esperado depois de
 	// extrair é o nome do .zip sem a extensão .zip.
 	binaryName := strings.TrimSuffix(asset.Filename, ".zip")
 	extractedPath := filepath.Join(workDir, binaryName)
