@@ -117,6 +117,14 @@ func (retroArchAdapter) Consoles() []string {
 	return consoles
 }
 
+// DefaultCore satisfaz CoreAdapter — a mesma tabela que resolveCoreName já
+// consulta no lançamento, agora legível de fora para a tela de consoles
+// poder dizer "o RetroArch está instalado, mas o core Gambatte não está".
+func (retroArchAdapter) DefaultCore(consoleID string) (string, bool) {
+	core, ok := defaultCoreByConsole[consoleID]
+	return core, ok
+}
+
 func (a retroArchAdapter) Locate(ctx context.Context) (Installation, bool) {
 	names := binaryNames("retroarch", []string{"retroarch.exe"}, "RetroArch")
 

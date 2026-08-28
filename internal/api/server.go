@@ -91,6 +91,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/hardware/scan", s.handleScan)
 	mux.HandleFunc("GET /api/v1/hardware", s.handleGetHardware)
 	mux.HandleFunc("GET /api/v1/consoles/verdicts", s.handleVerdicts)
+	// Catálogo de consoles + como rodar cada um. Rota irmã da de cima, e
+	// não um campo dentro dela, porque esta **não** exige consentimento:
+	// /consoles/verdicts precisa do scan de hardware, esta só lê o catálogo
+	// embutido e a lista de adapters. Ver handleConsoles.
+	mux.HandleFunc("GET /api/v1/consoles", s.handleConsoles)
 	mux.HandleFunc("GET /api/v1/emulators", s.handleEmulators)
 	// Rota própria em vez de embutir em /emulators: cores só existem para o
 	// RetroArch (nenhum outro adapter carrega bibliotecas plugáveis), e
@@ -224,6 +229,58 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// consoleEntry é uma entrada de GET /api/v1/consoles: o console do catálogo
+// mais as formas conhecidas de rodá-lo.
+//
+// Repete de propósito só o que identifica o console (id/nome/ano) — nada de
+// estado de instalação, que GET /emulators já devolve por adapter e a tela
+// cruza por adapter_id. Duplicar "instalado sim/não" aqui criaria duas
+// respostas capazes de discordar entre si sobre o mesmo disco.
+type consoleEntry struct {
+	ConsoleID string `json:"console_id"`
+	Name      string `json:"name"`
+	ShortName string `json:"short_name"`
+	Year      int    `json:"year"`
+
+	// RequiresExternalFile repete ConsoleVerdict.RequiresExternalFile (L3) —
+	// aqui porque esta rota não exige consentimento e o parecer exige: sem
+	// isto, a tela de consoles não teria como avisar sobre BIOS antes do
+	// scan.
+	RequiresExternalFile bool `json:"requires_external_file,omitempty"`
+
+	// Emulators pode vir vazia: um console do catálogo sem nenhum adapter que
+	// o atenda é um estado real e honesto ("o ZeuX ainda não sabe rodar
+	// isto"), não um erro a esconder.
+	Emulators []emulator.ConsoleOption `json:"emulators"`
+}
+
+// handleConsoles lista o catálogo de consoles com as formas de rodar cada um.
+//
+// **Não exige consentimento**, diferente de /consoles/verdicts: o que sai
+// daqui é catálogo embutido no binário e a lista de adapters — nada é lido
+// da máquina do usuário, então não há o que consentir. É o que deixa a tela
+// de consoles funcionar também para quem recusou o scan (mesma regra do
+// docs/sprint-b-plano.md, B8: "recusar não pode ser beco sem saída").
+//
+// A ordem é a do catálogo (cronológica, o mais antigo primeiro), não a do
+// parecer — esta rota não conhece hardware, então não teria como ordenar por
+// patamar sem inventar um.
+func (s *Server) handleConsoles(w http.ResponseWriter, _ *http.Request) {
+	consoles := make([]consoleEntry, 0, len(s.catalog.Consoles))
+	for _, console := range s.catalog.Consoles {
+		consoles = append(consoles, consoleEntry{
+			ConsoleID:            console.ID,
+			Name:                 console.Name,
+			ShortName:            console.ShortName,
+			Year:                 console.Year,
+			RequiresExternalFile: console.RequiresExternalFile,
+			Emulators:            s.emulators.OptionsForConsole(console.ID),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"consoles": consoles})
 }
 
 func (s *Server) handleEmulators(w http.ResponseWriter, r *http.Request) {

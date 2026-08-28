@@ -11,6 +11,7 @@ import {
   type AllGamesViewState,
 } from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
+import { ConsolesScreen } from "./screens/ConsolesScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
@@ -41,6 +42,7 @@ type Phase =
   // daqui.
   | "all-games"
   | "verdict"
+  | "consoles"
   | "emulators"
   | "library"
   | "games"
@@ -218,9 +220,9 @@ function App() {
   function navigateSidebar(id: NavID) {
     if (id === "library") setPhase("all-games");
     if (id === "verdict") setPhase("verdict");
-    if (id === "emulators") {
+    if (id === "consoles") {
       setCameFromDeclined(false);
-      setPhase("emulators");
+      setPhase("consoles");
     }
     if (id === "settings") setPhase("settings");
   }
@@ -325,9 +327,42 @@ function App() {
       screen = <VerdictScreen report={report!} />;
       break;
 
+    case "consoles":
+      screen = (
+        <ConsolesScreen
+          report={report ?? undefined}
+          onOpenEmulators={() => {
+            setCameFromDeclined(false);
+            setPhase("emulators");
+          }}
+          // Fatia 1 (2026-08-28): "Ver console" leva aos jogos daquele
+          // console, que é a página de console que já existe. A Fatia 2
+          // insere o detalhe (opções de emulador, core, BIOS, pasta) na
+          // frente dela. Ausente sem `report` — `GamesScreen` exige o
+          // parecer para o preset, e esta tela é alcançável antes do scan.
+          onOpenConsole={
+            report
+              ? (id, name, shortName) => {
+                  setSelectedConsole({ id, name, shortName });
+                  setGamesOrigin("library");
+                  setPhase("games");
+                }
+              : undefined
+          }
+        />
+      );
+      break;
+
     case "emulators":
       screen = (
-        <EmulatorsScreen report={report ?? undefined} onBack={cameFromDeclined ? () => setPhase("declined") : undefined} />
+        <EmulatorsScreen
+          report={report ?? undefined}
+          // Sem consentimento, volta pra DeclinedScreen (nunca beco sem
+          // saída, B8). Com consentimento, esta tela virou sub-visão de
+          // Consoles em 2026-08-28 — a sidebar leva pra "Consoles", mas o
+          // caminho de volta explícito é o que confirma a hierarquia.
+          onBack={cameFromDeclined ? () => setPhase("declined") : () => setPhase("consoles")}
+        />
       );
       break;
 
@@ -377,7 +412,15 @@ function App() {
   // cheia, sem sidebar — ver EmulatorsScreen.onBack.
   if (report && SIDEBAR_PHASES.includes(phase)) {
     const active: NavID =
-      phase === "verdict" ? "verdict" : phase === "emulators" ? "emulators" : phase === "settings" ? "settings" : "library";
+      phase === "verdict"
+        ? "verdict"
+        : // "emulators" acende "Consoles": é sub-visão dela desde 2026-08-28,
+          // não um destino de sidebar próprio.
+          phase === "consoles" || phase === "emulators"
+          ? "consoles"
+          : phase === "settings"
+            ? "settings"
+            : "library";
     return (
       <div className="flex h-screen">
         <Sidebar active={active} onNav={navigateSidebar} />
@@ -394,6 +437,7 @@ function App() {
 const SIDEBAR_PHASES: Phase[] = [
   "all-games",
   "verdict",
+  "consoles",
   "emulators",
   "library",
   "games",

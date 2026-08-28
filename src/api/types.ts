@@ -146,6 +146,44 @@ export type Installation = {
   managed: boolean;
 };
 
+/**
+ * Uma forma de rodar um console, vinda de `GET /api/v1/consoles`. A ordem
+ * dentro de `ConsoleEntry.emulators` é regra de produto (standalone antes do
+ * RetroArch, ver Registry.ForConsole) — **nunca reordene no cliente**.
+ */
+export type ConsoleEmulatorOption = {
+  adapter_id: string;
+  name: string;
+  /**
+   * O core que este console pede no RetroArch, no mesmo vocabulário que
+   * `RetroArchCoreStatus.name` usa — as duas listas casam por este campo.
+   * Ausente para emulador standalone, que não carrega core nenhum: ausente
+   * é "não tem core", nunca "core ainda não escolhido".
+   */
+  core?: string;
+};
+
+/**
+ * Console do catálogo com as formas conhecidas de rodá-lo. Diferente de
+ * `ConsoleVerdict`, **não** exige consentimento nem scan — é catálogo
+ * embutido no binário, não leitura da máquina do usuário.
+ *
+ * Não traz estado de instalação de propósito: quem responde "está
+ * instalado?" continua sendo `GET /emulators`, e a tela cruza os dois por
+ * `adapter_id`. Duas rotas dizendo o mesmo sobre o mesmo disco poderiam
+ * discordar entre si.
+ */
+export type ConsoleEntry = {
+  console_id: string;
+  name: string;
+  short_name: string;
+  year: number;
+  /** Console amplamente conhecido por exigir BIOS/firmware (L3). */
+  requires_external_file?: boolean;
+  /** Pode vir vazia: console do catálogo que nenhum adapter atende ainda. */
+  emulators: ConsoleEmulatorOption[];
+};
+
 export type EmulatorEntry = {
   adapter_id: string;
   name: string;

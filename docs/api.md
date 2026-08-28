@@ -71,6 +71,7 @@ está em português e já pode ser exibida ao usuário como está.
 | POST | `/api/v1/hardware/scan` | Executa o scan (exige consentimento) |
 | GET | `/api/v1/hardware` | Devolve o último scan da sessão |
 | GET | `/api/v1/consoles/verdicts` | Parecer por console |
+| GET | `/api/v1/consoles` | Catálogo de consoles + como rodar cada um |
 | GET | `/api/v1/emulators` | Quais emuladores estão instalados |
 | GET | `/api/v1/custom-emulators` | Lista os emuladores personalizados do usuário |
 | POST | `/api/v1/custom-emulators` | Cria ou substitui um emulador personalizado |
@@ -334,6 +335,74 @@ Devolve o último scan guardado em memória. Mesma forma de resposta do
 
 **404 `no_scan_yet`** — nenhum scan foi executado nesta sessão do daemon.
 Reiniciar o daemon zera isso; revogar o consentimento também.
+
+---
+
+## GET /api/v1/consoles
+
+O catálogo de consoles com as formas conhecidas de rodar cada um.
+
+**Não exige consentimento nem scan**, diferente de `/consoles/verdicts`: o que
+sai daqui é o catálogo embutido no binário mais a lista de adapters — nada é
+lido da máquina do usuário, então não há o que consentir. É o que permite a
+tela de consoles funcionar também para quem recusou o scan.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/consoles
+```
+
+**200 OK** (recortado — a lista real traz os 33 consoles, em ordem cronológica):
+
+```json
+{
+  "consoles": [
+    {
+      "console_id": "gb",
+      "name": "Game Boy",
+      "short_name": "Game Boy",
+      "year": 1989,
+      "emulators": [
+        { "adapter_id": "retroarch", "name": "RetroArch", "core": "gambatte" }
+      ]
+    },
+    {
+      "console_id": "ps1",
+      "name": "PlayStation 1",
+      "short_name": "PS1",
+      "year": 1994,
+      "requires_external_file": true,
+      "emulators": [
+        { "adapter_id": "duckstation", "name": "DuckStation" },
+        { "adapter_id": "retroarch", "name": "RetroArch", "core": "beetle psx hw" }
+      ]
+    }
+  ]
+}
+```
+
+### Campos de cada console
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `console_id` | string | A mesma chave de `/games/launch`, `/library/folders` e `ConsoleVerdict.console_id`. |
+| `name` / `short_name` / `year` | string / string / int | Vêm do catálogo (`internal/verdict/data/consoles.json`). |
+| `requires_external_file` | bool | Console amplamente conhecido por exigir BIOS/firmware. **Ausente**, nunca `false`, quando não marcado. |
+| `emulators` | array | Formas de rodar este console. **Pode vir vazia**: console do catálogo que nenhum adapter atende ainda é um estado honesto, não um erro. |
+
+### Campos de cada entrada de `emulators`
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `adapter_id` | string | Cruze com `adapter_id` de `GET /emulators` para saber se está instalado — esta rota **não** repete estado de instalação de propósito, para não haver duas respostas capazes de discordar sobre o mesmo disco. |
+| `name` | string | Nome de exibição do adapter. |
+| `core` | string | O core que este console pede, no mesmo vocabulário de `name` em `GET /retroarch/cores` — as duas listas casam por este campo. **Ausente para emulador standalone**, que não carrega core nenhum: ausente é "não tem core", nunca "core ainda não escolhido". |
+
+> **A ordem de `emulators` é regra de produto, não detalhe de serialização.**
+> Um emulador dedicado vem antes do RetroArch, porque costuma ter
+> compatibilidade e desempenho melhores no console dele — a mesma ordem que
+> `Registry.ForConsole` usa para escolher o que lançar. Não reordene no
+> cliente. Em 2026-08-28, só 5 dos 33 consoles têm mais de uma opção: `ps1`,
+> `n64`, `dreamcast`, `psp` e `nds`.
 
 ---
 
@@ -1891,6 +1960,8 @@ catch { "HTTP $([int]$_.Exception.Response.StatusCode) -> $($_.ErrorDetails.Mess
 Invoke-RestMethod "$base/consent" -Method Post -Body '{"granted":true}' -ContentType "application/json"
 Invoke-RestMethod "$base/hardware/scan" -Method Post | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/consoles/verdicts" | ConvertTo-Json -Depth 6
+# Catálogo + emuladores por console (não exige o consentimento acima)
+Invoke-RestMethod "$base/consoles" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/emulators" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/emulator-sources" | ConvertTo-Json -Depth 5
 

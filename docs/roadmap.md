@@ -34,6 +34,114 @@ novo.
 
 ---
 
+## Sprint P — a entrada principal passa a ser o console (2026-08-28)
+
+Pedido do Douglas: "uma página de consoles, com todos que podemos gerenciar
+pelo ZeuX; a pessoa clica no console e vê os possíveis emuladores, os que já
+estão instalados e os que ela pode instalar. Se um emulador puder rodar mais
+de um console, ele aparece em todos." Junto do julgamento de que isso faz
+mais sentido do que a tela de emuladores como entrada principal.
+
+### O achado que mudou o desenho
+
+Rodando `Registry.ForConsole` sobre os 33 consoles do catálogo:
+
+| Situação | Quantos | Quais |
+|---|---|---|
+| Mais de um emulador possível | **5** | `ps1` (DuckStation + RetroArch), `n64` (RMG + RetroArch), `dreamcast` (Flycast + RetroArch), `psp` (PPSSPP + RetroArch), `nds` (melonDS + RetroArch) |
+| Só RetroArch | 19 | NES, SNES, Mega Drive, GB/GBC, GBA, Saturn, Arcade, Neo Geo… |
+| Só standalone | 9 | PS2, GameCube, Wii, Xbox, Xbox 360, PS3, 3DS, Vita, Wii U |
+
+A premissa está certa, mas "escolher entre emuladores" é a pergunta de **5**
+consoles. Por isso o eixo escolhido (decidido pelo Douglas nesta sessão) é
+**prontidão** — "o que falta para este console rodar": emulador instalado?
+core baixado? BIOS presente? pasta de jogos apontada? — que responde algo nos
+33. A escolha entre emuladores aparece onde ela existe, sem virar o esqueleto
+de uma tela que nos outros 28 mostraria uma opção só.
+
+### O que a tela pode prometer sobre BIOS, e o que não pode
+
+Três caminhos distintos tocam o disco do usuário, com permissões diferentes:
+
+1. **O daemon (`zeuxd`)** — sidecar do Tauri, roda como o usuário logado, sem
+   elevação/UAC. Lê e escreve o que o usuário pode. Raiz própria em
+   `os.UserConfigDir()/ZeuX` (`%AppData%\Roaming\ZeuX` no Windows).
+2. **O Explorer, pelo plugin `opener` do Tauri** — é o botão "Abrir pasta". A
+   capability (`src-tauri/capabilities/default.json`) libera `open-path`
+   **só em `$CONFIG/**`**. Um caminho fora de `%AppData%\Roaming` é recusado
+   pelo **Tauri**, não pelo Windows. (`reveal-item-in-dir` está liberado em
+   `**`.)
+3. **O seletor nativo (`plugin-dialog`)** — o usuário escolhe a pasta, sem
+   restrição de capability. É a válvula de escape.
+
+E o estado real de BIOS é bem mais magro do que a tela poderia sugerir:
+`BiosDir` (`internal/emulator/bios_dir.go`) só responde para **DuckStation
+instalado pelo ZeuX** e **PCSX2 no Linux** — no Windows o PCSX2 devolve nada
+de propósito (usa Documentos, convenção nunca verificada). O catálogo marca
+**11 consoles** com `requires_external_file`; no Windows, exatamente **um**
+deles (PS1) tem pasta para apontar hoje.
+
+**Consequência aceita, registrada aqui para não virar promessa vazia:** a
+prontidão só reporta "BIOS ausente" quando o ZeuX **sabe** onde aquele
+emulador lê o arquivo e a pasta está vazia. Console marcado
+`requires_external_file` cujo emulador não tem `bios_dir` conhecida não é
+reportado como faltando BIOS — princípio 4 do `CLAUDE.md`: dado que não pôde
+ser verificado não conta como atendido nem como não atendido.
+
+### P1 — `GET /api/v1/consoles` e a tela de lista — **feito em 2026-08-28**
+
+- [x] `CoreAdapter` (`internal/emulator/adapter.go`), capacidade opcional no
+      mesmo molde de `ConfigurableAdapter`/`KeyBindableAdapter`. Fecha a
+      lacuna que impedia a tela: `defaultCoreByConsole` não era exposto por
+      **nenhuma** rota. `ConsoleVerdict.core` chegava perto, mas some quando
+      o nível é `improvavel`, e é o core do *tier*, não o padrão do console.
+- [x] `Registry.OptionsForConsole` — a inversão de "adapter → consoles" para
+      "console → adapters" mora no backend porque o que ela carrega junto é a
+      **ordem** (standalone antes do RetroArch), que é regra de produto de
+      `ForConsole`. Invertida no cliente, a ordem se perderia e uma segunda
+      cópia da regra divergiria calada.
+- [x] `GET /api/v1/consoles`, **sem exigir consentimento** — catálogo não é
+      hardware. É o que faz a tela funcionar também para quem recusou o scan
+      (B8: "recusar não pode ser beco sem saída").
+- [x] `src/lib/consoleReadiness.ts` — a regra de prontidão num módulo próprio,
+      pelo mesmo motivo de `gameLaunchability.ts`: lista e detalhe precisam
+      responder igual. Índice montado uma vez por tela, `O(1)` por console.
+- [x] `ConsolesScreen` com busca (por console **ou** por emulador), filtros
+      por passo de prontidão com contagem, e filtro vazio se escondendo em
+      vez de levar a lista vazia.
+- [x] Sidebar: "Emuladores" → "Consoles". `EmulatorsScreen` **continua
+      existindo** como sub-visão ("Ver por emulador") — é a casa dos
+      emuladores personalizados, da lista dos 25 cores com "baixar os que
+      faltam" e dos painéis de configuração/mapeamento, nada disso pertence a
+      um console só.
+
+Verificado com o app rodando (Chromium/Playwright, `zeuxd` real): a rota
+devolve os 33 consoles com os 5 de escolha múltipla corretos, a grade fica
+regular (12 cards de 212 px), o filtro e a busca por emulador funcionam, e
+não há rolagem horizontal em 900 px de janela.
+
+**Achado ao ver a tela de verdade:** o selo de prontidão quebrava em duas
+linhas nos cards de título longo (NES, PC Engine) e esticava a altura do
+card, deixando a grade irregular. `shrink-0 whitespace-nowrap` no selo —
+local, não no `Badge`, que precisa poder quebrar em outros usos.
+
+### P2 — detalhe do console — **aberto**
+
+O que a Fatia 1 deixou para trás, e que "Ver jogos" hoje contorna indo direto
+para `GamesScreen`:
+
+- [ ] Tela de detalhe por console: as opções de emulador com instalar/remover
+      no lugar, o core com "baixar" quando falta, a pasta de BIOS quando o
+      ZeuX sabe onde ela fica, e a pasta de jogos.
+- [ ] Decidir o que fazer nos 9 consoles cujo emulador é `manual`
+      (RetroArch, Dolphin): hoje a prontidão diz "instalar emulador" e o
+      caminho de instalação só existe na tela de emuladores.
+- [ ] Rever a capability `opener:allow-open-path` (`$CONFIG/**`) se o detalhe
+      passar a apontar pasta de BIOS fora de `%AppData%` — hoje nenhuma
+      aponta, então a restrição não incomoda.
+
+---
+
 ## Auditoria de veracidade dos documentos (2026-08-28)
 
 Varredura de **todos** os `.md` do repositório contra o código e contra o app

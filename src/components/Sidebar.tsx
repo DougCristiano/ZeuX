@@ -3,7 +3,7 @@ import { Cpu, Gamepad2, LayoutGrid, Settings } from "lucide-react";
 import logoZeux from "../assets/logo-zeux.png";
 import { FOCUS_RING } from "./ui";
 
-export type NavID = "library" | "emulators" | "verdict" | "settings";
+export type NavID = "library" | "consoles" | "verdict" | "settings";
 
 // N14 (docs/roadmap.md, Sprint N): os 4 ícones eram SVG desenhado à mão —
 // decisão do Douglas: lucide-react (já dependência via ui/dialog.tsx e
@@ -15,8 +15,15 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
     icon: <LayoutGrid size={18} aria-hidden="true" />,
   },
   {
-    id: "emulators",
-    label: "Emuladores",
+    // Era "Emuladores" até 2026-08-28, quando o Douglas decidiu que a entrada
+    // principal passa a ser o console: só 5 dos 33 consoles do catálogo têm
+    // mais de um emulador possível, então uma lista de 14 emuladores nunca
+    // respondia "o que falta pro meu PS1 rodar". A tela de emuladores
+    // continua existindo (personalizados, cores do RetroArch, configuração e
+    // mapeamento) — alcançada de dentro de Consoles, não por item próprio,
+    // pelo mesmo motivo que "Biblioteca" cobre 3 fases sem 3 itens.
+    id: "consoles",
+    label: "Consoles",
     icon: <Gamepad2 size={18} aria-hidden="true" />,
   },
   {

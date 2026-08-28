@@ -3,6 +3,7 @@
 // Sprint B: "React, Tailwind e mais nada" sem justificativa escrita).
 import type {
   ConsentStatus,
+  ConsoleEntry,
   CustomDefinition,
   CustomEmulatorsResponse,
   EmulatorBindingsResponse,
@@ -125,6 +126,11 @@ export const api = {
   getHardware: () => request<HardwareInfo>("/hardware"),
 
   getVerdicts: () => request<Report>("/consoles/verdicts"),
+
+  // Catálogo de consoles + como rodar cada um. Rota irmã de getVerdicts, mas
+  // sem exigir consentimento nem scan — dá pra chamar antes do onboarding
+  // (e depois de recusar), diferente do parecer.
+  getConsoles: () => request<{ consoles: ConsoleEntry[] }>("/consoles"),
 
   getEmulators: () => request<{ emulators: EmulatorEntry[] }>("/emulators"),
   getRetroArchCores: () => request<{ cores: RetroArchCoreStatus[] }>("/retroarch/cores"),
