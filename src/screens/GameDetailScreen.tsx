@@ -20,7 +20,7 @@ import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
 import { consoleAccentColor } from "../lib/consoleColor";
-import { percentOf } from "../lib/format";
+import { faseExtraDeDownload, percentOf } from "../lib/format";
 
 function formatPlaytime(seconds: number): string {
   if (seconds <= 0) return "nunca jogado";
@@ -294,8 +294,8 @@ export function GameDetailScreen({
         {status.kind === "downloading-core" && (
           <div className="w-full max-w-md">
             <p className="text-sm text-muted">
-              O core {status.job.core_name ?? ""} ainda não estava no seu computador. Baixando…{" "}
-              {status.job.phase}
+              O core {status.job.core_name ?? ""} ainda não estava no seu computador. Baixando…
+              {faseExtraDeDownload(status.job.phase)}
               {percentOf(status.job) !== null && ` · ${percentOf(status.job)}%`}
             </p>
             <div className="mt-1">

@@ -58,8 +58,18 @@ func (m *Manager) StartCore(ctx context.Context, coreName string) (*Job, error) 
 		// Estado honesto do R1: a URL é conhecida, mas ninguém rodou
 		// cmd/generate-retroarch-manifest com acesso ao buildbot para medir
 		// tamanho e SHA256 desta combinação ainda.
+		//
+		// A mensagem fala com o JOGADOR, não com quem desenvolve o ZeuX
+		// (achado ao ver a tela de verdade no navegador, 2026-08-27: a
+		// versão anterior mandava "rode cmd/generate-retroarch-manifest e
+		// recorte uma nova versão do ZeuX", instrução de desenvolvedor
+		// aparecendo dentro do card de emuladores). Quem lê isto não tem o
+		// repositório na mão: o que ele pode fazer é usar o Online Updater
+		// do próprio RetroArch, que baixa cores sem depender do ZeuX. A
+		// lacuna é do app, e a frase assume isso em vez de deixar parecer
+		// erro do usuário.
 		return nil, fmt.Errorf(
-			"o manifesto ainda não tem o core %q medido para %s — rode cmd/generate-retroarch-manifest numa máquina com acesso a buildbot.libretro.com e recorte uma nova versão do ZeuX",
+			"esta versão do ZeuX ainda não traz o endereço verificado do core %q para %s. Enquanto isso, dá para instalá-lo pelo Online Updater, dentro do próprio RetroArch",
 			coreName, platform)
 	}
 

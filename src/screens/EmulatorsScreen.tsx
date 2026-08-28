@@ -86,13 +86,28 @@ type CoreInstallState =
 // mesmo padrão de pollJob() acima, só que por core. "cancelado" (fase nova
 // do R3) volta ao estado ocioso sem erro: desistir não é falha.
 //
-// **A grade continua sendo grade.** A primeira versão desta tela virou uma
-// lista de uma coluna para caber os botões, e 25 cores × ~40 px de botão
-// viravam uma parede de mil pixels dentro do card — o mesmo custo de
-// densidade que o M1 (docs/sprint-m-plano.md) já tinha diagnosticado ao
-// tirar o botão de baixo de cada tile de jogo. Aqui a maior parte da lista é
-// status (badge + nome), e só quem falta ganha ação: o botão é compacto
-// (`px-2 py-1 text-xs`) e o item cresce em altura só enquanto está baixando.
+// **Uma coluna, com altura limitada.** Esta lista mora dentro do card do
+// RetroArch, que é uma célula de uma grade de 3 cards — medido com
+// Playwright em 2026-08-27, o `<ul>` tem **326 px**, não a largura da tela.
+// Duas tentativas erradas antes desta, as duas medidas no navegador:
+//
+//  1. Lista de uma coluna com o `Button` padrão (`px-4 py-2 text-base`):
+//     cabia na largura, mas 25 × ~40 px empilhavam ~1000 px de parede dentro
+//     do card — o mesmo custo de densidade que o M1
+//     (docs/sprint-m-plano.md) já tinha diagnosticado ao tirar o botão de
+//     baixo de cada tile de jogo.
+//  2. Grade de 3 colunas "para ganhar densidade": 326 / 3 = 98 px por
+//     item, onde o badge "faltando" (74 px) mais o botão (76 px) já não
+//     cabem — o nome do core era espremido a **zero pixel** e os elementos
+//     transbordavam por cima do vizinho. Densidade que some com a
+//     informação principal não é densidade, é defeito.
+//
+// O que sobra é uma coluna (o que cabe em 326 px) com o botão compacto
+// (`px-2 py-1 text-xs`, item de 34 px) e a lista rolando dentro de uma
+// altura máxima. `max-h` + scroll interno é altura, não largura: nada aqui
+// deixa de acompanhar a janela, só se recusa a empurrar o resto do card
+// para fora da tela. O cabeçalho (resumo e "baixar os que faltam") fica
+// fora do scroll, sempre visível.
 function RetroArchCoresList() {
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -338,16 +353,16 @@ function RetroArchCoresList() {
           </div>
         )}
       </div>
-      {/* `lg:` e não `xl:`: o breakpoint mede a janela inteira, e a janela
-          padrão é 1280 px (src-tauri/tauri.conf.json) menos sidebar (64) e
-          barra de rolagem — um `xl:` (1280) nunca dispararia no tamanho
-          padrão. Regra registrada no CLAUDE.md depois de um bug real. */}
-      <ul className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
+      {/* Sem breakpoint de coluna de propósito: o que limita aqui não é a
+          janela, é a célula da grade de cards em que esta lista mora (326 px
+          na janela padrão). Um `sm:`/`lg:` mediria a janela inteira e
+          prometeria um espaço que este card nunca tem. */}
+      <ul className="max-h-64 overflow-y-auto pr-1 text-sm">
         {cores.map((core) => {
           const state = installState[core.name] ?? { kind: "idle" };
           const percent = state.kind === "installing" || state.kind === "canceling" ? percentOf(state.job) : null;
           return (
-            <li key={core.name} className="flex flex-col gap-0.5">
+            <li key={core.name} className="flex flex-col gap-0.5 py-0.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
                 <span className="truncate text-ink" title={core.path ?? core.filename}>
@@ -357,25 +372,31 @@ function RetroArchCoresList() {
                   // Compacto de propósito — ver o comentário do componente
                   // sobre densidade. `shrink-0`: o nome do core trunca antes
                   // do botão encolher, porque um botão cortado não clica.
+                  // `ml-auto`: a mesma ação repetida em 25 linhas precisa
+                  // cair sempre na mesma coluna — colada ao nome, ela ficava
+                  // numa posição diferente por linha (o nome varia de
+                  // "mame" a "mupen64plus-next") e o olho tinha que caçar o
+                  // botão em zigue-zague.
                   // Some enquanto a fila do "baixar os que faltam" roda: dois
                   // caminhos para o mesmo core só geram o erro "já existe um
                   // download em andamento".
                   <Button
                     variant="secondary"
-                    className="shrink-0 px-2 py-1 text-xs"
+                    className="ml-auto shrink-0 px-2 py-1 text-xs"
                     onClick={() => installCore(core.name)}
                   >
                     Instalar
                   </Button>
                 )}
                 {!core.installed && state.kind === "starting" && (
-                  <span className="shrink-0 text-xs text-muted">Iniciando…</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted">Iniciando…</span>
                 )}
               </div>
 
-              {/* Fase, percentual e cancelar ocupam a linha de baixo: numa
-                  grade de 3 colunas não cabem ao lado do nome sem espremer
-                  os dois. Só existe enquanto o download acontece. */}
+              {/* Segunda linha só enquanto o download acontece — a primeira
+                  já está ocupada por badge + nome, e espremer barra,
+                  percentual e "Cancelar" ao lado deles repetiria o erro que
+                  a grade de 3 colunas cometeu. */}
               {!core.installed && (state.kind === "installing" || state.kind === "canceling") && (
                 <div className="flex items-center gap-1.5">
                   <ProgressBar

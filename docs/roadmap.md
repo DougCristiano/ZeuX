@@ -1271,6 +1271,56 @@ percentual e um cancelar" estava marcado com base na tela de **Emuladores**
   "Baixando o core…", mesma técnica do "Abrindo…" que o A4 introduziu.
 - "Jogar" fica bloqueado enquanto o download corre, nas três telas.
 
+**Validação com o app rodando de verdade (2026-08-27/28, Chromium via
+Playwright — mesma técnica do M15).** Subir `zeuxd` + Vite e dirigir a UI
+achou coisas que nenhum teste de tipo ou de unidade pegaria:
+
+1. **Grade de 3 colunas espremia o nome do core a zero pixel.** A lista de
+   cores mora dentro do card do RetroArch, que é uma célula de uma grade de
+   3 cards: o `<ul>` tem **326 px**, não a largura da tela. Em 3 colunas cada
+   item ficava com 98 px, onde o badge "faltando" (74 px) mais o botão
+   (76 px) já não cabem — o nome sumia e os elementos transbordavam por cima
+   do vizinho. Corrigido para uma coluna com `max-h` + rolagem interna, e o
+   botão de ação com `ml-auto` (a mesma ação repetida em 25 linhas precisa
+   cair sempre na mesma coluna, não em zigue-zague conforme o tamanho do
+   nome). Medido depois: nome com 81 px, sem rolagem horizontal em 960,
+   1280 e 1920 de largura.
+2. **A sidebar cobria e roubava os cliques do conteúdo.** Clicar num item da
+   navegação deixa o foco nele, e `group-focus-within:w-52`
+   (`src/components/Sidebar.tsx`) mantinha o rail expandido em 208 px por
+   cima do conteúdo (`absolute z-20`) até o usuário clicar em outro lugar.
+   Tudo nos primeiros 208 px ficava inclicável — o botão "Ver cores" do card
+   do RetroArch fica em x=137 — e o clique caía num item de navegação,
+   levando para outra tela. Corrigido tirando o foco **só no clique de
+   mouse** (`e.detail > 0`); ativação por teclado mantém o foco, porque foco
+   é estado de primeira classe (ADR 0009) e quem navega por teclado precisa
+   dele. Os dois lados verificados no navegador.
+3. **Mensagem de desenvolvedor aparecendo para o jogador.** Com o manifesto
+   ainda sem hash medido (o estado real de hoje), clicar em "Instalar" num
+   core mostrava *"rode cmd/generate-retroarch-manifest numa máquina com
+   acesso a buildbot.libretro.com e recorte uma nova versão do ZeuX"* dentro
+   do card. Quem lê isso não tem o repositório na mão. Reescrita para dizer
+   o que a pessoa pode fazer (instalar pelo Online Updater do próprio
+   RetroArch) e assumir a lacuna como do app.
+4. **Verbo repetido no progresso:** "Baixando o core mesen… **baixando** ·
+   37%". `faseExtraDeDownload` (`src/lib/format.ts`) só mostra a fase quando
+   ela acrescenta algo ("verificando", "extraindo", "finalizando").
+
+Confirmado ao vivo que o bug do "sessão iniciada" está mesmo corrigido:
+com `/games/launch` respondendo 202, a tela mostra "Baixando o core mesen… ·
+37%" com barra e "Cancelar download", e **não** dispara o toast de sessão.
+
+**Achado pré-existente, não corrigido aqui (fica registrado):** o botão
+"Jogar" do tile da biblioteca (`GameTile`) mora dentro de um
+`<div role="button">`, e a árvore de acessibilidade colapsa o controle
+interno — `page.accessibility.snapshot()` não encontra o botão, e
+`getByRole("button", { name: "Jogar …" })` também não. O M1 registrou a
+troca de `<button>` por `role="button"` para evitar botão-dentro-de-botão, e
+deixou a tela de detalhe como o caminho alcançável por teclado; o efeito
+sobre leitor de tela na grade não estava escrito. Mexer no `GameTile` é a
+tela mais importante do app e tem decisão registrada — fica para o Douglas
+decidir, não para esta sessão.
+
 **Também ajustado, consequência direta de R4 (não do escopo original de
 R3):** `EmulatorCardActions` escondia o botão "Remover" do RetroArch com um
 `entry.adapter_id !== "retroarch"` cravado no componente — guard que só

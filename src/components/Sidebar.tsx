@@ -102,7 +102,27 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onNav(item.id)}
+                onClick={(e) => {
+                  onNav(item.id);
+                  // Achado ao dirigir a UI com Playwright (2026-08-27): o
+                  // clique deixa o foco neste botão, e `group-focus-within`
+                  // (no painel acima) mantém a sidebar expandida em 208 px
+                  // por cima do conteúdo — ela é `absolute z-20`. Resultado:
+                  // tudo nos primeiros 208 px da tela ficava coberto e
+                  // inclicável até o usuário clicar em algum outro lugar
+                  // para tirar o foco daqui; pior, o clique caía num item de
+                  // navegação e levava para outra tela. Medido: o botão "Ver
+                  // cores" do card do RetroArch fica em x=137.
+                  //
+                  // `detail > 0` distingue clique de mouse de ativação por
+                  // teclado (Enter/Espaço mandam `detail === 0`). Só o mouse
+                  // perde o foco: quem navega por teclado ou controle
+                  // precisa dele para continuar de onde parou — foco é
+                  // estado de primeira classe (ADR 0009), e a sidebar
+                  // expandida enquanto o foco está nela é o comportamento
+                  // certo para esse caso.
+                  if (e.detail > 0) e.currentTarget.blur();
+                }}
                 title={item.label}
                 aria-current={isActive ? "page" : undefined}
                 className={`flex h-[52px] w-full items-center border-l-2 transition-colors ${FOCUS_RING} ${

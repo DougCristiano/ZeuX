@@ -26,7 +26,7 @@ import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
-import { percentOf } from "../lib/format";
+import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 
 // M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24 nunca
@@ -590,7 +590,8 @@ export function AllGamesScreen({
         // `&&` solto que se sobreporia ao painel de instalação.
         <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
           <p className="text-sm text-ink">
-            Baixando o core {activeCoreDownload.job.core_name ?? ""}… {activeCoreDownload.job.phase}
+            Baixando o core {activeCoreDownload.job.core_name ?? ""}…
+            {faseExtraDeDownload(activeCoreDownload.job.phase)}
             {percentOf(activeCoreDownload.job) !== null && ` · ${percentOf(activeCoreDownload.job)}%`}
           </p>
           <div className="mt-2">

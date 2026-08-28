@@ -19,7 +19,7 @@ import { GameTile } from "../components/GameTile";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
-import { percentOf } from "../lib/format";
+import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { consoleAccentColor } from "../lib/consoleColor";
 
 type RowStatus =
@@ -468,7 +468,8 @@ export function GamesScreen({
                 {status.kind === "downloading-core" && (
                   <div>
                     <p className="text-sm text-muted">
-                      Baixando o core {status.job.core_name ?? ""}… {status.job.phase}
+                      Baixando o core {status.job.core_name ?? ""}…
+                      {faseExtraDeDownload(status.job.phase)}
                       {percentOf(status.job) !== null && ` · ${percentOf(status.job)}%`}
                     </p>
                     <div className="mt-1">
