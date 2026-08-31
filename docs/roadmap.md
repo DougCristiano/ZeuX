@@ -34,6 +34,137 @@ novo.
 
 ---
 
+## Sprint Q — do zero ao jogo bem configurado (2026-08-28)
+
+Nasceu de percorrer o app inteiro como usuário, do primeiro clique até um jogo
+abrindo, e comparar com a promessa do produto ("o app lê o hardware, diz o que
+a máquina alcança, e **autoconfigura o emulador**"). O caminho até "o jogo
+abriu" está de pé; o que falta é tudo que separa "abriu" de "abriu do jeito
+certo, com o meu controle, na minha tela".
+
+### O diagnóstico, medido no código (2026-08-28)
+
+| Peça | Estado real |
+|---|---|
+| Consentimento → scan → parecer | Funciona |
+| Instalar emulador em 1 clique | Funciona para **12 dos 14** adapters (RetroArch e Dolphin são `manual`) |
+| Baixar core sob demanda | **Nenhum core baixa hoje**: 0 de 125 assets do manifesto têm hash medido |
+| Apontar pasta de jogos, varrer, jogar | Funciona |
+| Preset aplicado ao lançar | **Só `fullscreen`** — ver Q2 |
+| Saber qual é a tela do usuário | **Não existe** — ver Q3 |
+| Controle detectado/configurado | **Não existe** — ver Q4 |
+
+Consequência combinada das duas primeiras linhas: hoje, **só os 12 consoles de
+emulador dedicado chegam ao jogo**. Os 21 que dependem do RetroArch esbarram
+ou na instalação manual dele, ou no core que não baixa.
+
+### Q1 — gerar o manifesto de cores — **bloqueado neste ambiente**
+
+O item mais barato e de maior impacto do backlog inteiro, e o único que não dá
+para fazer daqui: `buildbot.libretro.com` continua inacessível neste ambiente
+(reconferido em 2026-08-28, sem resposta). É um `go run` numa máquina com rede
+livre.
+
+- [ ] `go run ./cmd/generate-retroarch-manifest` numa máquina com acesso ao
+      buildbot, e commitar o manifesto medido.
+
+**Critério de aceite:** `TestRetroArchManifestEntriesAreWellFormed` continua
+passando, os 125 assets saem com `generated: true`, `size` e `sha256`
+preenchidos, e "Baixar core" na tela do console conclui de verdade para pelo
+menos um core em cada plataforma.
+
+### Q2 — o preset precisa ser aplicado, não só prometido
+
+`BuildCommand` só sabe emitir linha de comando, e a maior parte do preset não
+cabe em flag. Medido no `retroArchAdapter.BuildCommand`: ao lançar, sai
+`-L <core>`, `-f` se for tela cheia, e o caminho da ROM. `internal_scale`,
+`renderer` e `exit_on_close` vão **todos** para `Unapplied`.
+
+Ou seja, o parecer anuncia "Emulação de alta precisão, resolução interna 4x" e
+o que chega ao emulador é **tela cheia**. Existe um caminho que funciona —
+`ConfigurableAdapter.WriteConfig`, que grava no arquivo do próprio emulador e
+no PCSX2 aplica `upscale_multiplier` de verdade —, mas ele só é acionado pelo
+painel "Configurações", à mão, e não pelo botão Jogar.
+
+- [ ] O lançamento passa pelo `WriteConfig` do adapter (quando ele for
+      `ConfigurableAdapter`) antes de montar o comando, e junta os dois
+      `Unapplied` — o da configuração e o da linha de comando.
+- [ ] **A configuração explícita do usuário vence o preset.** Precedência já
+      registrada no `Registry` ("o que o usuário definiu à mão sempre vence o
+      que vem de fábrica"): se a pessoa salvou configuração pelo painel, o
+      lançamento **não** sobrescreve. Exige saber que ela salvou — linha em
+      SQLite (ADR 0011), gravada por `POST /emulators/{id}/config` e apagada
+      por `DELETE`.
+- [ ] `BuildCommand` continua puro (`CLAUDE.md`: não toca disco). A escrita
+      mora na camada de lançamento.
+
+**Critério de aceite:** lançar um jogo de PS2 com o preset de resolução
+interna 3x deixa `upscale_multiplier=3` no `PCSX2.ini`; lançar de novo depois
+de o usuário salvar 1x pelo painel **mantém** 1x. Teste sem emulador real,
+sobre arquivo de config temporário.
+
+### Q3 — o ZeuX não sabe qual é a sua tela
+
+`HardwareInfo` tem `OS`, `CPU`, `GPUs`, `Memory` — **nenhum campo de display**.
+Sem resolução, sem taxa de atualização, sem contagem de monitores. O
+`internal_scale: 4` do catálogo é constante escrita à mão, não conta a partir
+do monitor: PS1 em 4x num 1080p e num 4K são decisões diferentes, e o app não
+tem como saber qual é a sua.
+
+- [ ] `DisplayInfo` no `HardwareInfo` (resolução, taxa de atualização,
+      principal sim/não), um arquivo por SO como já é a detecção de GPU.
+- [ ] Display não lido **não** vira palpite: cai no parecer parcial, como
+      qualquer outro dado ausente (princípio 4).
+- [ ] O `internal_scale` do lançamento passa a considerar a resolução, sem
+      ultrapassar o que o patamar de hardware permite.
+
+**Critério de aceite:** `GET /hardware` traz o display nas três plataformas
+(compilação cruzada obrigatória, `CLAUDE.md`); a tela de Especificações mostra
+o monitor junto de CPU/GPU/memória; e o texto continua descritivo, nunca
+julgador ("esta tela é 2560×1440", nunca "sua tela é pequena").
+
+### Q4 — controle: nada é detectado, nada é configurado
+
+- `useGamepadNavigation` navega a **interface do ZeuX** com D-pad. Não toca o
+  emulador.
+- Mapeamento existe para **2 dos 14** adapters (PCSX2 e RetroArch).
+- No PCSX2 só **teclado** é gravado: todo `Button` vai para `Unapplied`, com a
+  nota de que o formato de botão físico nunca foi confirmado contra hardware
+  real.
+- No RetroArch botões são gravados (`input_player1_*_btn`), mas o usuário
+  **digita o índice à mão** — nada lê o controle plugado.
+
+- [ ] Detectar o controle conectado (a Gamepad API já está no app, usada hoje
+      só para navegar a UI) e exibir o que ele é.
+- [ ] "Mapear pelo controle": apertar o botão físico preenche o campo, em vez
+      de digitar índice.
+- [ ] Começar pelo RetroArch, o único que já aceita botão hoje. O PCSX2 fica
+      declarando `Unapplied` até alguém confirmar o formato dele contra
+      hardware real — **não inventar o formato** (a regra das flags não
+      validadas vale igual aqui).
+
+**Critério de aceite:** com um controle plugado, a tela mostra o nome dele e o
+mapeamento gravado no `retroarch.cfg` corresponde aos botões apertados. Sem
+controle, a tela diz isso e o caminho por teclado continua igual ao de hoje.
+
+### Q5 — os 21 consoles que dependem do RetroArch
+
+`Manager.Start` recusa fonte `manual` com uma mensagem — então "Jogar" com o
+emulador ausente, que deveria instalar sozinho (L8), morre para RetroArch e
+Dolphin.
+
+- [ ] Ou o RetroArch ganha instalação automatizada, ou o caminho manual vira
+      excelente: instruções na tela do console, e o ZeuX confirmando sozinho
+      quando o binário aparecer na pasta gerenciada.
+- [ ] `evaluateGameLaunchability` precisa distinguir "não instalado, dá para
+      instalar" de "não instalado, e o ZeuX não sabe instalar" — hoje o badge
+      é o mesmo e o clique leva a um erro.
+
+**Critério de aceite:** em nenhum dos 33 consoles o botão de instalar leva a
+um beco: ou instala, ou explica na hora o que fazer, antes do clique.
+
+---
+
 ## Sprint P — a entrada principal passa a ser o console (2026-08-28)
 
 Pedido do Douglas: "uma página de consoles, com todos que podemos gerenciar
