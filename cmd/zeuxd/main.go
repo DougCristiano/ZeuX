@@ -82,7 +82,12 @@ func run(addr string, logger *slog.Logger) error {
 	}
 	defer db.Close()
 
-	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), logger)
+	// Q2 (docs/roadmap.md, Sprint Q): o lançamento aplica o preset do catálogo
+	// no arquivo do emulador, mas nunca por cima de configuração que o usuário
+	// salvou à mão — quem responde "ele configurou?" é este store.
+	userConfig := emulator.NewUserConfigStore(db)
+
+	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), userConfig, logger)
 
 	sources, err := install.LoadCatalog()
 	if err != nil {
@@ -101,7 +106,7 @@ func run(addr string, logger *slog.Logger) error {
 	server := api.NewServer(
 		hardware.NewProbe(), catalog, consentStore,
 		registry, customStore, launcher, installer, libraryStore,
-		igdbCreds, igdbJobs, logger)
+		igdbCreds, igdbJobs, userConfig, logger)
 
 	// Só quem está rodando o front em modo desenvolvimento (`npm run tauri
 	// dev`) define esta variável — o instalador nunca a define, então o

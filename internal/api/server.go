@@ -40,7 +40,13 @@ type Server struct {
 	library   *library.Store
 	igdbCreds *igdb.CredentialsStore
 	igdbJobs  *igdb.ScrapeManager
-	logger    *slog.Logger
+
+	// userConfig registra que o usuário salvou configuração à mão para um
+	// emulador (Q2, docs/roadmap.md) — é o que faz o lançamento respeitar a
+	// escolha dele em vez de reaplicar o preset do catálogo por cima.
+	userConfig *emulator.UserConfigStore
+
+	logger *slog.Logger
 
 	// devOrigin é a origem extra liberada por SetDevOrigin. Só é lido, nunca
 	// escrito, depois que o servidor começa a atender requisições — daí não
@@ -63,20 +69,22 @@ func NewServer(
 	libraryStore *library.Store,
 	igdbCreds *igdb.CredentialsStore,
 	igdbJobs *igdb.ScrapeManager,
+	userConfig *emulator.UserConfigStore,
 	logger *slog.Logger,
 ) *Server {
 	return &Server{
-		probe:     probe,
-		catalog:   catalog,
-		consent:   store,
-		emulators: emulators,
-		customs:   customs,
-		launcher:  launcher,
-		installs:  installs,
-		library:   libraryStore,
-		igdbCreds: igdbCreds,
-		igdbJobs:  igdbJobs,
-		logger:    logger,
+		probe:      probe,
+		catalog:    catalog,
+		consent:    store,
+		emulators:  emulators,
+		customs:    customs,
+		launcher:   launcher,
+		installs:   installs,
+		library:    libraryStore,
+		igdbCreds:  igdbCreds,
+		igdbJobs:   igdbJobs,
+		userConfig: userConfig,
+		logger:     logger,
 	}
 }
 
@@ -494,7 +502,24 @@ func (s *Server) handleSetEmulatorConfig(w http.ResponseWriter, r *http.Request)
 		unapplied = []string{}
 	}
 
+	// Q2 (docs/roadmap.md, Sprint Q): a partir daqui o lançamento deixa de
+	// aplicar o preset do catálogo neste emulador — o que o usuário definiu à
+	// mão vence o que vem de fábrica. Falhar em registrar isso não desfaz a
+	// escrita que já aconteceu (o arquivo do emulador já mudou), então é aviso
+	// no log, não erro na resposta: o pior caso é um lançamento futuro
+	// reaplicar o preset, nunca a configuração pedida deixar de valer agora.
+	if err := s.userConfig.MarkUserConfigured(r.Context(), adapterIDOf(r)); err != nil {
+		s.logger.Warn("configuração gravada, mas não registrada como manual", "erro", err)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"unapplied": unapplied})
+}
+
+// adapterIDOf lê o {id} da rota. Existe para o par
+// MarkUserConfigured/ClearUserConfigured não repetir o literal em dois
+// handlers que precisam concordar sobre a mesma chave.
+func adapterIDOf(r *http.Request) string {
+	return r.PathValue("id")
 }
 
 func (s *Server) handleRestoreEmulatorConfig(w http.ResponseWriter, r *http.Request) {
@@ -507,6 +532,13 @@ func (s *Server) handleRestoreEmulatorConfig(w http.ResponseWriter, r *http.Requ
 		s.writeError(w, http.StatusBadRequest, "config_restore_failed", err.Error())
 		return
 	}
+
+	// Desfez a própria configuração: volta a aceitar o preset do catálogo nos
+	// próximos lançamentos (Q2). Simétrico ao MarkUserConfigured de POST.
+	if err := s.userConfig.ClearUserConfigured(r.Context(), adapterIDOf(r)); err != nil {
+		s.logger.Warn("configuração restaurada, mas o registro manual não foi apagado", "erro", err)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"restored": true})
 }
 

@@ -118,7 +118,8 @@ func newTestServerFull(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB
 	}
 	t.Cleanup(func() { db.Close() })
 
-	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), silentLogger())
+	userConfig := emulator.NewUserConfigStore(db)
+	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), userConfig, silentLogger())
 
 	sources, err := install.LoadCatalog()
 	if err != nil {
@@ -134,7 +135,7 @@ func newTestServerFull(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB
 	}
 	igdbJobs := igdb.NewScrapeManager(libraryStore, igdbCreds, silentLogger())
 
-	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, igdbCreds, igdbJobs, silentLogger())
+	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, igdbCreds, igdbJobs, userConfig, silentLogger())
 	return server, db, installer
 }
 

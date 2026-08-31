@@ -73,7 +73,7 @@ passando, os 125 assets saem com `generated: true`, `size` e `sha256`
 preenchidos, e "Baixar core" na tela do console conclui de verdade para pelo
 menos um core em cada plataforma.
 
-### Q2 — o preset precisa ser aplicado, não só prometido
+### Q2 — o preset precisa ser aplicado, não só prometido — **feito em 2026-08-28**
 
 `BuildCommand` só sabe emitir linha de comando, e a maior parte do preset não
 cabe em flag. Medido no `retroArchAdapter.BuildCommand`: ao lançar, sai
@@ -86,22 +86,38 @@ o que chega ao emulador é **tela cheia**. Existe um caminho que funciona —
 no PCSX2 aplica `upscale_multiplier` de verdade —, mas ele só é acionado pelo
 painel "Configurações", à mão, e não pelo botão Jogar.
 
-- [ ] O lançamento passa pelo `WriteConfig` do adapter (quando ele for
+- [x] O lançamento passa pelo `WriteConfig` do adapter (quando ele for
       `ConfigurableAdapter`) antes de montar o comando, e junta os dois
       `Unapplied` — o da configuração e o da linha de comando.
-- [ ] **A configuração explícita do usuário vence o preset.** Precedência já
+- [x] **A configuração explícita do usuário vence o preset.** Precedência já
       registrada no `Registry` ("o que o usuário definiu à mão sempre vence o
       que vem de fábrica"): se a pessoa salvou configuração pelo painel, o
-      lançamento **não** sobrescreve. Exige saber que ela salvou — linha em
-      SQLite (ADR 0011), gravada por `POST /emulators/{id}/config` e apagada
-      por `DELETE`.
-- [ ] `BuildCommand` continua puro (`CLAUDE.md`: não toca disco). A escrita
-      mora na camada de lançamento.
+      lançamento **não** sobrescreve. `emulator_user_config` (migração `0006`),
+      gravada por `POST /emulators/{id}/config` e apagada por `DELETE`.
+- [x] `BuildCommand` continua puro (`CLAUDE.md`: não toca disco). A escrita
+      mora em `Launcher.applyPreset`.
 
-**Critério de aceite:** lançar um jogo de PS2 com o preset de resolução
-interna 3x deixa `upscale_multiplier=3` no `PCSX2.ini`; lançar de novo depois
-de o usuário salvar 1x pelo painel **mantém** 1x. Teste sem emulador real,
-sobre arquivo de config temporário.
+**Feito em 2026-08-28.** Três decisões que valem registro:
+
+1. **Quando a configuração é aplicada, a linha de comando deixa de pedir as
+   mesmas opções.** `internal_scale` e `renderer` são zerados antes do
+   `BuildCommand`. Sem isso, o RetroArch diria "o driver de vídeo precisa ser
+   escolhido nas configurações" logo depois de o `WriteConfig` ter gravado
+   `video_driver` — uma mensagem de "não aplicado" sobre algo que acabou de
+   ser aplicado. `fullscreen` continua indo pelas duas vias de propósito: uma
+   flag é mais confiável que uma chave de arquivo.
+2. **Na dúvida, não mexer.** `IsUserConfigured` devolve `true` junto do erro:
+   um falso positivo custa um preset não aplicado numa vez (o jogo abre com a
+   configuração que já estava lá); um falso negativo sobrescreve calado a
+   escolha da pessoa, que do ponto de vista dela é irreversível.
+3. **Preset que falha não impede o jogo de abrir** (princípio 5 — informar,
+   não bloquear). A falha vira aviso no log, e a resolução interna volta a ir
+   pela linha de comando, que era a única chance antes deste item.
+
+**Ainda não verificado:** o efeito num `PCSX2.ini` de verdade. Os testes
+observam o que cada camada recebeu (adapter espião sobre `/bin/true`), não o
+arquivo final de um PCSX2 instalado — este ambiente não tem um. O
+`upscale_multiplier` em si já é coberto por `pcsx2_config_test.go` desde o H1.
 
 ### Q3 — o ZeuX não sabe qual é a sua tela
 

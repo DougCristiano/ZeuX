@@ -77,16 +77,25 @@ type SessionRepository interface {
 
 // Launcher executa jogos e mantém o registro das sessões.
 type Launcher struct {
-	registry *Registry
-	logger   *slog.Logger
-	sessions SessionRepository
+	registry   *Registry
+	logger     *slog.Logger
+	sessions   SessionRepository
+	userConfig UserConfigRepository
+}
+
+// UserConfigRepository responde se o usuário já salvou configuração à mão
+// para um emulador. Interface, e não o *UserConfigStore concreto, para que o
+// teste do lançamento (Q2) possa simular os dois lados da precedência sem
+// abrir um banco.
+type UserConfigRepository interface {
+	IsUserConfigured(ctx context.Context, adapterID string) (bool, error)
 }
 
 // NewLauncher cria o executor de jogos. sessions é onde o histórico de
 // sessões e o tempo de jogo (Playtime) são persistidos — antes da decisão do
 // ADR 0011, isso vivia num slice em memória e sumia a cada reinício.
-func NewLauncher(registry *Registry, sessions SessionRepository, logger *slog.Logger) *Launcher {
-	return &Launcher{registry: registry, sessions: sessions, logger: logger}
+func NewLauncher(registry *Registry, sessions SessionRepository, userConfig UserConfigRepository, logger *slog.Logger) *Launcher {
+	return &Launcher{registry: registry, sessions: sessions, userConfig: userConfig, logger: logger}
 }
 
 // LaunchInput descreve o pedido de execução vindo da interface.
@@ -118,15 +127,39 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		return Session{}, err
 	}
 
+	// Q2 (docs/roadmap.md, Sprint Q): o preset precisa ser APLICADO, não só
+	// prometido. Até aqui, lançar só emitia linha de comando — e a maior parte
+	// do preset não cabe em flag (no RetroArch, resolução interna, renderer e
+	// exit_on_close iam todos para Unapplied). O resultado era o parecer
+	// anunciar "resolução interna 4x" e o emulador receber apenas tela cheia.
+	//
+	// A escrita mora aqui, na camada de lançamento, e não em BuildCommand, que
+	// continua puro por regra do CLAUDE.md ("não faça BuildCommand executar
+	// nada nem tocar o sistema de arquivos").
+	options := input.Options
+	configUnapplied, persisted := l.applyPreset(ctx, adapter, install, options)
+	if persisted {
+		// O arquivo de configuração passou a carregar estas duas opções, então
+		// pedi-las de novo na linha de comando só produziria uma segunda
+		// mensagem de Unapplied dizendo o que a configuração já resolveu — ou,
+		// pior, uma mensagem dizendo que o renderer não foi aplicado logo
+		// depois de ele ter sido. Fullscreen continua indo pelas duas vias de
+		// propósito: uma flag é mais confiável que uma chave de arquivo.
+		options.InternalScale = 0
+		options.Renderer = RendererDefault
+	}
+
 	built, err := adapter.BuildCommand(install, Request{
 		ROMPath:   input.ROMPath,
 		ConsoleID: input.ConsoleID,
 		Core:      input.Core,
-		Options:   input.Options,
+		Options:   options,
 	})
 	if err != nil {
 		return Session{}, err
 	}
+
+	unapplied := append(append([]string{}, configUnapplied...), built.Unapplied...)
 
 	// O processo é desligado do contexto da requisição de propósito: o jogo
 	// precisa continuar rodando muito depois de a resposta HTTP ter sido
@@ -146,7 +179,7 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		Emulator:  adapter.Name(),
 		ROMPath:   input.ROMPath,
 		StartedAt: time.Now().UTC(),
-		Unapplied: built.Unapplied,
+		Unapplied: unapplied,
 		pid:       cmd.Process.Pid,
 	}
 
@@ -295,4 +328,60 @@ func ValidateROM(path string) error {
 	}
 
 	return nil
+}
+
+// applyPreset grava o preset do catálogo no arquivo de configuração do próprio
+// emulador, antes de abrir o jogo. Devolve o que o adapter não soube persistir
+// (mesmo espírito de Command.Unapplied, ADR 0006) e se algo chegou a ser
+// gravado.
+//
+// Três motivos para não fazer nada, todos devolvendo persisted=false:
+//
+//  1. O adapter não é ConfigurableAdapter. Só PCSX2 e RetroArch são hoje; os
+//     outros 12 continuam recebendo o que couber na linha de comando.
+//  2. **O usuário já configurou este emulador à mão.** É a precedência que o
+//     Registry já documenta para emulador personalizado — o que a pessoa
+//     definiu vence o que vem de fábrica. Sem esta checagem, todo lançamento
+//     sobrescreveria em silêncio a escolha dela.
+//  3. A escrita falhou. Nesse caso o jogo abre assim mesmo, com a
+//     configuração que já estava lá: um preset não aplicado é uma partida
+//     menos bonita, não uma partida impedida (princípio 5 — informar, não
+//     bloquear).
+func (l *Launcher) applyPreset(ctx context.Context, adapter Adapter, install Installation, opts Options) (unapplied []string, persisted bool) {
+	configurable, ok := adapter.(ConfigurableAdapter)
+	if !ok {
+		return nil, false
+	}
+
+	// Sem repositório (nenhum caminho de produção hoje, mas construtível em
+	// teste), o seguro é não tocar no arquivo do usuário.
+	if l.userConfig == nil {
+		return nil, false
+	}
+
+	userConfigured, err := l.userConfig.IsUserConfigured(ctx, adapter.ID())
+	if err != nil {
+		// IsUserConfigured já devolve true junto do erro — na dúvida, não
+		// mexer. Registrado como aviso: o lançamento segue.
+		l.logger.Warn("não foi possível checar a configuração manual; preset não aplicado",
+			"emulador", adapter.ID(), "erro", err)
+		return nil, false
+	}
+	if userConfigured {
+		l.logger.Info("preset do catálogo não aplicado: o usuário configurou este emulador à mão",
+			"emulador", adapter.ID())
+		return nil, false
+	}
+
+	unapplied, err = configurable.WriteConfig(install, opts)
+	if err != nil {
+		l.logger.Warn("não foi possível aplicar o preset; o jogo abre com a configuração atual",
+			"emulador", adapter.ID(), "erro", err)
+		return nil, false
+	}
+
+	l.logger.Info("preset do catálogo aplicado",
+		"emulador", adapter.ID(), "resolucao_interna", opts.InternalScale, "nao_aplicado", len(unapplied))
+
+	return unapplied, true
 }

@@ -938,6 +938,13 @@ nunca `null` (o front itera direto, e um `null` derrubava a tela; achado em
 | 400 | `invalid_body` | Corpo fora do formato `{"fullscreen": bool, "internal_scale": int, "renderer": string}`. |
 | 500 | `config_write_failed` | Não foi possível gravar o arquivo. |
 
+> **Efeito colateral que vale saber (Q2, `docs/roadmap.md`, Sprint Q):** salvar
+> aqui marca este emulador como **configurado pelo usuário**, e a partir disso
+> `POST /games/launch` **para de aplicar o preset do catálogo** nele. É a
+> precedência que o `Registry` já documenta para emulador personalizado — o que
+> a pessoa definiu à mão vence o que vem de fábrica. `DELETE` (abaixo) desfaz a
+> marca e o preset volta a valer.
+
 ---
 
 ## DELETE /api/v1/emulators/{id}/config
@@ -956,6 +963,10 @@ curl -X DELETE http://127.0.0.1:7777/api/v1/emulators/retroarch/config
 |---|---|---|
 | 404 | `not_found` · 400 `not_configurable` / `not_installed` | Iguais aos do `GET` acima. |
 | 400 | `config_restore_failed` | Não há backup para restaurar, ou a restauração falhou. Mensagem original no `message`. |
+
+Também apaga a marca de "configurado pelo usuário" (ver o aviso no `POST`
+acima): quem desfez a própria configuração volta a receber o preset do catálogo
+nos próximos lançamentos.
 
 ---
 
@@ -1213,6 +1224,25 @@ A chamada **não bloqueia**: responde assim que o processo do emulador sobe, e
 uma goroutine acompanha até o fim. O processo do jogo é deliberadamente
 desligado do contexto da requisição HTTP — ele precisa sobreviver muito depois
 da resposta.
+
+**Desde o Q2 (`docs/roadmap.md`, Sprint Q), o lançamento aplica o preset no
+arquivo de configuração do emulador antes de abrir o jogo.** Até aí, o preset
+só virava linha de comando, e a maior parte dele não cabe em flag: o parecer
+anunciava "resolução interna 4x" e o emulador recebia apenas tela cheia. Agora,
+quando o adapter é um `ConfigurableAdapter` (hoje PCSX2 e RetroArch, ver
+`configurable` em `GET /emulators`), o `WriteConfig` dele roda primeiro, e o
+`unapplied` da `Session` traz o que **nenhuma** das duas camadas conseguiu
+aplicar.
+
+Três coisas que isto **não** faz:
+
+- **Não sobrescreve configuração que o usuário salvou à mão.** Se houve um
+  `POST /emulators/{id}/config`, o preset não é aplicado naquele emulador até
+  um `DELETE` desfazer a marca.
+- **Não impede o jogo de abrir se a escrita falhar** — a partida acontece com a
+  configuração que já estava lá (princípio 5: informar, não bloquear).
+- **Não muda nada para os outros 12 adapters**, que não sabem persistir
+  configuração e seguem recebendo só o que couber na linha de comando.
 
 **Desde o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)
 (R3): um lançamento pelo RetroArch cujo core ainda não está no computador não
