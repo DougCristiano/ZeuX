@@ -26,7 +26,7 @@ import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
-import { percentOf } from "../lib/format";
+import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 
 // M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24 nunca
@@ -237,7 +237,8 @@ export function AllGamesScreen({
   // esperar os 300ms de debounce de novo.
   const [debouncedSearch, setDebouncedSearch] = useState(search.trim());
   const [error, setError] = useState<string | null>(null);
-  const { statusFor, launch, launchError, clearLaunchError, retryLaunch } = useLaunchGame();
+  const { statusFor, launch, activeCoreDownload, cancelCoreDownload, launchError, clearLaunchError, retryLaunch } =
+    useLaunchGame();
   const { toastMessage, showToast } = useToast();
   const igdbConfigured = useIGDBStatus();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
@@ -463,7 +464,8 @@ export function AllGamesScreen({
   // (deixa o erro real do servidor aparecer, em vez de esconder o botão) —
   // mesma escolha de GamesScreen.
   function playHandlerFor(game: LibraryGame): (() => void) | undefined {
-    if (statusFor(game.id).kind === "launching") return undefined;
+    const launchStatus = statusFor(game.id).kind;
+    if (launchStatus === "launching" || launchStatus === "downloading-core") return undefined;
     if (isPendingInstallFor(game.path)) return undefined;
     const verdict = verdictFor(game.console_id);
     return () => install.handlePlay(game, verdict, adapterEntryFor(verdict));
@@ -581,6 +583,30 @@ export function AllGamesScreen({
           <div className="mt-2">
             <ProgressBar percent={percentOf(install.state.job)} />
           </div>
+        </div>
+      ) : activeCoreDownload ? (
+        // R3 (ADR 0015): terceiro competidor pelo mesmo canto — encadeado no
+        // ternário pelo mesmo motivo que o N9 registra abaixo, não como um
+        // `&&` solto que se sobreporia ao painel de instalação.
+        <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
+          <p className="text-sm text-ink">
+            Baixando o core {activeCoreDownload.job.core_name ?? ""}…
+            {faseExtraDeDownload(activeCoreDownload.job.phase)}
+            {percentOf(activeCoreDownload.job) !== null && ` · ${percentOf(activeCoreDownload.job)}%`}
+          </p>
+          <div className="mt-2">
+            <ProgressBar
+              percent={percentOf(activeCoreDownload.job)}
+              label={`Baixando o core ${activeCoreDownload.job.core_name ?? ""}`}
+            />
+          </div>
+          <Button
+            className="mt-2 w-full text-xs"
+            variant="secondary"
+            onClick={() => cancelCoreDownload(activeCoreDownload.gameId, activeCoreDownload.job)}
+          >
+            Cancelar download
+          </Button>
         </div>
       ) : (
         // N9 (docs/roadmap.md, Sprint N): mesmo canto que o painel de

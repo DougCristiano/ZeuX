@@ -710,9 +710,27 @@ export function Pagination({
  * `percent` ausente (tamanho total desconhecido, `Job.total_bytes === 0`)
  * mostra a barra indeterminada em vez de fingir 0% ou 100%.
  */
-export function ProgressBar({ percent }: { percent: number | null }) {
+export function ProgressBar({
+  percent,
+  label,
+  className = "",
+}: {
+  percent: number | null;
+  /** O que esta barra mede. Sem isto, várias barras na mesma tela são
+   *  indistinguíveis para quem usa leitor de tela — o caso concreto é a
+   *  grade de cores do RetroArch, com uma barra por core baixando. */
+  label?: string;
+  className?: string;
+}) {
   return (
-    <div className="h-1.5 overflow-hidden rounded-sm border border-line" role="progressbar" aria-valuenow={percent ?? undefined}>
+    <div
+      className={`h-1.5 overflow-hidden rounded-sm border border-line ${className}`}
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={percent ?? undefined}
+      aria-valuemin={percent === null ? undefined : 0}
+      aria-valuemax={percent === null ? undefined : 100}
+    >
       <div
         className="h-full bg-accent transition-[width]"
         style={{ width: percent === null ? "100%" : `${percent}%`, opacity: percent === null ? 0.4 : 1 }}

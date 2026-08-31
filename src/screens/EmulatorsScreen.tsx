@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type {
@@ -6,7 +6,6 @@ import type {
   CustomDefinition,
   EmulatorEntry,
   EmulatorSource,
-  InstallJob,
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
@@ -32,7 +31,10 @@ import { SelectItem } from "../components/ui/select";
 import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { useCoreInstall } from "../hooks/useCoreInstall";
+import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { percentOf } from "../lib/format";
 
 const PAGE_SIZE = 6;
 // Quantos ícones de console cabem no card sem esticar a altura entre
@@ -47,43 +49,110 @@ const MAX_CONSOLE_ICONS = 6;
 // docs/roadmap.md), então `consoleFilter` continua "" pro resto da tela.
 const ALL_CONSOLES = "__all__";
 
-// Item B10 (docs/sprint-b-plano.md): instalar com ressalva de hardware. O
-// servidor já faz a parte que importa — hardwareBlocks recusa com 409 e
-// override_hint, /installs/{id} acompanha o progresso — esta tela só não pode
-// estragar isso.
-type RowState =
-  | { kind: "idle" }
-  | { kind: "starting" }
-  // message vem de ApiError.message (docs/api.md, code hardware_insufficient)
-  // — nunca uma frase escrita aqui. Ver ConsoleVerdict/handleInstall em
-  // internal/api/server.go, hardwareBlocks.
-  | { kind: "confirm-hardware"; message: string }
-  | { kind: "installing"; job: InstallJob }
-  | { kind: "done"; job: InstallJob }
-  | { kind: "error"; message: string }
-  | { kind: "confirm-remove" }
-  | { kind: "removing" }
-  | { kind: "remove-error"; message: string };
-
-function percentOf(job: InstallJob): number | null {
-  if (job.total_bytes <= 0) return null;
-  return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
-}
-
 // Achado em 2026-08-04: um core podia estar ausente por um bug silencioso
 // (log de aviso, nunca erro) e nada avisava até o usuário tentar lançar um
 // jogo e receber "core não encontrado" na cara — só o RetroArch carrega
 // cores plugáveis, então isto só aparece na linha dele.
+//
+// R3 (2026-08-27): cada core faltando ganha um botão "Instalar" que dispara
+// POST /retroarch/cores/{core}/install e acompanha o job por polling —
+// mesmo padrão de pollJob() acima, só que por core. "cancelado" (fase nova
+// do R3) volta ao estado ocioso sem erro: desistir não é falha.
+//
+// **Uma coluna, com altura limitada.** Esta lista mora dentro do card do
+// RetroArch, que é uma célula de uma grade de 3 cards — medido com
+// Playwright em 2026-08-27, o `<ul>` tem **326 px**, não a largura da tela.
+// Duas tentativas erradas antes desta, as duas medidas no navegador:
+//
+//  1. Lista de uma coluna com o `Button` padrão (`px-4 py-2 text-base`):
+//     cabia na largura, mas 25 × ~40 px empilhavam ~1000 px de parede dentro
+//     do card — o mesmo custo de densidade que o M1
+//     (docs/sprint-m-plano.md) já tinha diagnosticado ao tirar o botão de
+//     baixo de cada tile de jogo.
+//  2. Grade de 3 colunas "para ganhar densidade": 326 / 3 = 98 px por
+//     item, onde o badge "faltando" (74 px) mais o botão (76 px) já não
+//     cabem — o nome do core era espremido a **zero pixel** e os elementos
+//     transbordavam por cima do vizinho. Densidade que some com a
+//     informação principal não é densidade, é defeito.
+//
+// O que sobra é uma coluna (o que cabe em 326 px) com o botão compacto
+// (`px-2 py-1 text-xs`, item de 34 px) e a lista rolando dentro de uma
+// altura máxima. `max-h` + scroll interno é altura, não largura: nada aqui
+// deixa de acompanhar a janela, só se recusa a empurrar o resto do card
+// para fora da tela. O cabeçalho (resumo e "baixar os que faltam") fica
+// fora do scroll, sempre visível.
 function RetroArchCoresList() {
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Fila do "baixar os que faltam": quantos ainda restam e qual está na vez.
+  // `null` quando ninguém pediu a fila — o caminho de um core por clique
+  // continua independente dela.
+  const [bulk, setBulk] = useState<{ remaining: number; total: number; current: string } | null>(null);
+  // Ref, não estado: `downloadAllMissing` roda num laço `await` e leria um
+  // estado congelado no fechamento. O clique em "Parar" precisa ser visto
+  // pela iteração seguinte do laço, não pela próxima renderização.
+  const bulkStopped = useRef(false);
 
-  useEffect(() => {
+  function loadCores() {
     api
       .getRetroArchCores()
       .then((res) => setCores(res.cores))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os cores."));
+  }
+
+  // P2 (docs/roadmap.md, Sprint P): o polling, o "cancelado não é falha" e a
+  // readoção de jobs em andamento saíram daqui para `useCoreInstall`, para o
+  // detalhe do console poder baixar um core sozinho sem uma segunda cópia
+  // dessa máquina. Comportamento idêntico ao de antes — só mudou de casa.
+  // O badge "faltando" → "ok" continua sendo a confirmação de sucesso, agora
+  // via `onCoreReady`.
+  const { stateFor, setCoreState, installCore, cancelCore, waitForCore, adoptRunningJobs } = useCoreInstall({
+    onCoreReady: loadCores,
+  });
+
+  useEffect(() => {
+    loadCores();
+    // "Ver cores" é um toggle: fechar desmonta este componente e perde o
+    // estado de download. Readotar o que já está em andamento evita mostrar
+    // "Instalar" para um core que o daemon já está baixando.
+    adoptRunningJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Baixa os cores que faltam, um de cada vez. Sequencial de propósito: o
+  // servidor aceitaria 25 downloads simultâneos (cada core tem seu próprio
+  // job), mas isso saturaria a rede de quem está usando o app e daria uma
+  // barra de progresso por core que ninguém consegue acompanhar.
+  async function downloadAllMissing(names: string[]) {
+    bulkStopped.current = false;
+    let remaining = names.length;
+    for (const name of names) {
+      if (bulkStopped.current) break;
+      setBulk({ remaining, total: names.length, current: name });
+      setCoreState(name, { kind: "starting" });
+      try {
+        const job = await api.installRetroArchCore(name);
+        if (job.phase !== "concluido") {
+          setCoreState(name, { kind: "installing", job });
+          await waitForCore(name, job.id);
+        } else {
+          setCoreState(name, { kind: "idle" });
+        }
+      } catch (err) {
+        // Um core que falha não derruba a fila — o erro fica na linha dele e
+        // os outros continuam. Interromper tudo por causa de um obrigaria o
+        // usuário a recomeçar do zero.
+        setCoreState(name, {
+          kind: "error",
+          message: err instanceof ApiError ? err.message : "Não foi possível iniciar o download.",
+        });
+      }
+      remaining -= 1;
+    }
+    setBulk(null);
+    loadCores();
+  }
+
 
   if (error) return <InlineError>{error}</InlineError>;
   if (!cores) return <p className="text-sm text-muted">Carregando cores…</p>;
@@ -91,20 +160,125 @@ function RetroArchCoresList() {
   const missing = cores.filter((c) => !c.installed);
 
   return (
-    <div className="flex flex-col gap-1">
-      <p className="text-sm text-muted">
-        {cores.length - missing.length} de {cores.length} cores instalados
-        {missing.length > 0 && ` — faltam: ${missing.map((c) => c.name).join(", ")}`}
-      </p>
-      <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-sm sm:grid-cols-3">
-        {cores.map((core) => (
-          <li key={core.name} className="flex items-center gap-1.5">
-            <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
-            <span className="truncate text-ink" title={core.path ?? core.filename}>
-              {core.name}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted">
+          {cores.length - missing.length} de {cores.length} cores instalados
+          {/* Descritivo, nunca "faltam X" com tom de cobrança: o modelo sob
+              demanda (ADR 0015) baixa sozinho ao jogar, então um core ausente
+              não é pendência do usuário — é o comportamento normal. */}
+          {missing.length > 0 && " — os que faltam são baixados sozinhos ao abrir um jogo do console."}
+        </p>
+
+        {/* Baixar tudo de uma vez não é o caminho principal (o ADR 0015
+            existe justamente para NÃO empurrar 25 cores em quem vai usar
+            três), mas é o que serve a quem quer deixar a máquina pronta
+            antes de ficar sem rede — viagem, notebook, internet ruim. Por
+            isso é uma ação secundária ao lado do resumo, não um botão
+            primário chamando atenção. Só aparece quando há mais de um
+            faltando: para um só, o botão da linha já resolve. */}
+        {missing.length > 1 && !bulk && (
+          <Button
+            variant="secondary"
+            className="shrink-0 px-2 py-1 text-xs"
+            onClick={() => downloadAllMissing(missing.map((c) => c.name))}
+          >
+            Baixar os {missing.length} que faltam
+          </Button>
+        )}
+
+        {bulk && (
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-xs text-muted tabular-nums">
+              Baixando {bulk.total - bulk.remaining + 1} de {bulk.total} · {bulk.current}
             </span>
-          </li>
-        ))}
+            {/* "Parar" encerra a fila, mas não cancela o core que já está
+                baixando — esse tem o "Cancelar" da própria linha. Separar os
+                dois evita a ambiguidade de um botão só que faz duas coisas
+                diferentes conforme o momento. */}
+            <Button
+              variant="quiet"
+              className="px-1.5 py-0.5 text-xs"
+              onClick={() => {
+                bulkStopped.current = true;
+              }}
+            >
+              Parar depois deste
+            </Button>
+          </div>
+        )}
+      </div>
+      {/* Sem breakpoint de coluna de propósito: o que limita aqui não é a
+          janela, é a célula da grade de cards em que esta lista mora (326 px
+          na janela padrão). Um `sm:`/`lg:` mediria a janela inteira e
+          prometeria um espaço que este card nunca tem. */}
+      <ul className="max-h-64 overflow-y-auto pr-1 text-sm">
+        {cores.map((core) => {
+          const state = stateFor(core.name);
+          const percent = state.kind === "installing" || state.kind === "canceling" ? percentOf(state.job) : null;
+          return (
+            <li key={core.name} className="flex flex-col gap-0.5 py-0.5">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
+                <span className="truncate text-ink" title={core.path ?? core.filename}>
+                  {core.name}
+                </span>
+                {!core.installed && state.kind === "idle" && !bulk && (
+                  // Compacto de propósito — ver o comentário do componente
+                  // sobre densidade. `shrink-0`: o nome do core trunca antes
+                  // do botão encolher, porque um botão cortado não clica.
+                  // `ml-auto`: a mesma ação repetida em 25 linhas precisa
+                  // cair sempre na mesma coluna — colada ao nome, ela ficava
+                  // numa posição diferente por linha (o nome varia de
+                  // "mame" a "mupen64plus-next") e o olho tinha que caçar o
+                  // botão em zigue-zague.
+                  // Some enquanto a fila do "baixar os que faltam" roda: dois
+                  // caminhos para o mesmo core só geram o erro "já existe um
+                  // download em andamento".
+                  <Button
+                    variant="secondary"
+                    className="ml-auto shrink-0 px-2 py-1 text-xs"
+                    onClick={() => installCore(core.name)}
+                  >
+                    Instalar
+                  </Button>
+                )}
+                {!core.installed && state.kind === "starting" && (
+                  <span className="ml-auto shrink-0 text-xs text-muted">Iniciando…</span>
+                )}
+              </div>
+
+              {/* Segunda linha só enquanto o download acontece — a primeira
+                  já está ocupada por badge + nome, e espremer barra,
+                  percentual e "Cancelar" ao lado deles repetiria o erro que
+                  a grade de 3 colunas cometeu. */}
+              {!core.installed && (state.kind === "installing" || state.kind === "canceling") && (
+                <div className="flex items-center gap-1.5">
+                  <ProgressBar
+                    className="flex-1"
+                    percent={percent}
+                    // 25 barras anônimas numa grade não dizem nada a quem usa
+                    // leitor de tela — cada uma precisa se identificar.
+                    label={`Baixando o core ${core.name}`}
+                  />
+                  <span className="shrink-0 text-xs text-muted tabular-nums">
+                    {percent === null ? state.job.phase : `${percent}%`}
+                  </span>
+                  <Button
+                    variant="quiet"
+                    className="shrink-0 px-1.5 py-0.5 text-xs"
+                    disabled={state.kind === "canceling"}
+                    onClick={() => cancelCore(core.name, state.job)}
+                  >
+                    {state.kind === "canceling" ? "Cancelando…" : "Cancelar"}
+                  </Button>
+                </div>
+              )}
+
+              {!core.installed && state.kind === "error" && <InlineError>{state.message}</InlineError>}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -286,7 +460,10 @@ function EmulatorCardActions({
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
-  const [state, setState] = useState<RowState>({ kind: "idle" });
+  // P2 (docs/roadmap.md, Sprint P): a máquina de instalar/remover saiu daqui
+  // para `useEmulatorInstall`, compartilhada com o detalhe do console.
+  // Comportamento idêntico — só mudou de casa.
+  const { state, setState, install, remove } = useEmulatorInstall({ adapterId: entry.adapter_id, onChanged });
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -324,71 +501,14 @@ function EmulatorCardActions({
     }
   }
 
-  async function pollJob(jobId: string) {
-    try {
-      const job = await api.getInstallJob(jobId);
-      if (job.phase === "concluido") {
-        setState({ kind: "done", job });
-        onChanged();
-        return;
-      }
-      if (job.phase === "falhou") {
-        // job.error é a mensagem original do servidor (docs/api.md) — exibida
-        // como veio, igual ao erro de rota.
-        setState({ kind: "error", message: job.error ?? "A instalação falhou." });
-        return;
-      }
-      setState({ kind: "installing", job });
-      setTimeout(() => pollJob(jobId), 400);
-    } catch (err) {
-      setState({
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível acompanhar a instalação.",
-      });
-    }
-  }
-
-  async function install(force: boolean) {
-    setState({ kind: "starting" });
-    try {
-      const job = await api.installEmulator(entry.adapter_id, force);
-      setState({ kind: "installing", job });
-      pollJob(job.id);
-    } catch (err) {
-      if (err instanceof ApiError && err.code === "hardware_insufficient") {
-        setState({ kind: "confirm-hardware", message: err.message });
-        return;
-      }
-      setState({
-        kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível iniciar a instalação.",
-      });
-    }
-  }
-
-  async function remove() {
-    setState({ kind: "removing" });
-    try {
-      await api.uninstallEmulator(entry.adapter_id);
-      onChanged();
-    } catch (err) {
-      setState({
-        kind: "remove-error",
-        // err.message já vem do servidor (ex.: "o RetroArch vem empacotado
-        // com o ZeuX e não pode ser removido por aqui") — nunca reescrita
-        // aqui, mesma regra do resto da tela.
-        message: err instanceof ApiError ? err.message : "Não foi possível remover este emulador.",
-      });
-    }
-  }
-
-  // O RetroArch nunca oferece remoção nesta tela — ele vem empacotado com o
-  // próprio instalador do ZeuX (ADR 0012), não foi baixado por um clique em
-  // "Instalar", e removê-lo quebraria os 24 consoles que dependem dele sem
-  // uma forma simples de reinstalar. O backend (internal/install/manager.go,
-  // Uninstall) já recusa mesmo que esse botão apareça por engano — esconder
-  // aqui é só para não convidar o clique.
-  const canRemove = entry.installed && entry.installation?.managed && entry.adapter_id !== "retroarch";
+  // Até o ADR 0015 (R4), o RetroArch era um caso especial aqui: vinha
+  // empacotado no instalador do ZeuX (ADR 0012), e removê-lo quebraria os 24
+  // consoles que dependem dele sem forma simples de reinstalar. Isso deixou
+  // de valer — o RetroArch voltou a ser instalação manual, e
+  // internal/install/manager.go (Uninstall) não tem mais esse guard. "Managed"
+  // continua sendo a única condição real: só faz sentido remover o que o
+  // ZeuX colocou na pasta gerenciada.
+  const canRemove = entry.installed && entry.installation?.managed;
 
   return (
     <>
@@ -456,26 +576,6 @@ function EmulatorCardActions({
             </p>
           )}
         </div>
-      )}
-
-      {/* RetroArch ("kind": "bundled") deveria ser encontrado por Locate()
-          antes de qualquer clique — a cópia vem dentro do instalador do ZeuX
-          (ADR 0012). Mas isso só é verdade para o build oficial cortado com
-          RetroArch empacotado (ZEUX_BUNDLE_RETROARCH=1, hoje só a tag
-          v0.5.0 em release.yml); um `npm run tauri build`/`tauri dev` comum
-          empacota a pasta vazia. Chegar aqui com entry.installed=false
-          significa que este build não tem a cópia — mostrar o botão
-          genérico "Instalar" levava a um beco sem saída (Start() sempre
-          recusa "bundled" com "não há nada para baixar", já que o servidor
-          não sabe a diferença entre "ainda não copiou" e "este build nunca
-          empacotou"). Trata como "manual": manda para o site oficial, de
-          onde também se baixam os cores pelo Online Updater interno do
-          RetroArch (achado real, 2026-08-17). */}
-      {!entry.installed && source?.kind === "bundled" && (
-        <p className="text-sm text-muted">
-          Este build do ZeuX não trouxe o RetroArch empacotado. Baixe pelo site oficial — os cores
-          são baixados de dentro do próprio RetroArch, pelo Online Updater.
-        </p>
       )}
 
       {/* Emulador personalizado (I1) cujo caminho não foi encontrado —
@@ -570,7 +670,7 @@ function EmulatorCardActions({
               {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
             </Button>
           ))
-        ) : source?.kind === "manual" || source?.kind === "bundled" ? (
+        ) : source?.kind === "manual" ? (
           <Button variant="primary" onClick={() => openUrl(source.homepage)}>
             Abrir site oficial
           </Button>

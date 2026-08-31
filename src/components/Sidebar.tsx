@@ -3,7 +3,7 @@ import { Cpu, Gamepad2, LayoutGrid, Settings } from "lucide-react";
 import logoZeux from "../assets/logo-zeux.png";
 import { FOCUS_RING } from "./ui";
 
-export type NavID = "library" | "emulators" | "verdict" | "settings";
+export type NavID = "library" | "consoles" | "verdict" | "settings";
 
 // N14 (docs/roadmap.md, Sprint N): os 4 ícones eram SVG desenhado à mão —
 // decisão do Douglas: lucide-react (já dependência via ui/dialog.tsx e
@@ -15,8 +15,15 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
     icon: <LayoutGrid size={18} aria-hidden="true" />,
   },
   {
-    id: "emulators",
-    label: "Emuladores",
+    // Era "Emuladores" até 2026-08-28, quando o Douglas decidiu que a entrada
+    // principal passa a ser o console: só 5 dos 33 consoles do catálogo têm
+    // mais de um emulador possível, então uma lista de 14 emuladores nunca
+    // respondia "o que falta pro meu PS1 rodar". A tela de emuladores
+    // continua existindo (personalizados, cores do RetroArch, configuração e
+    // mapeamento) — alcançada de dentro de Consoles, não por item próprio,
+    // pelo mesmo motivo que "Biblioteca" cobre 3 fases sem 3 itens.
+    id: "consoles",
+    label: "Consoles",
     icon: <Gamepad2 size={18} aria-hidden="true" />,
   },
   {
@@ -102,7 +109,27 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onNav(item.id)}
+                onClick={(e) => {
+                  onNav(item.id);
+                  // Achado ao dirigir a UI com Playwright (2026-08-27): o
+                  // clique deixa o foco neste botão, e `group-focus-within`
+                  // (no painel acima) mantém a sidebar expandida em 208 px
+                  // por cima do conteúdo — ela é `absolute z-20`. Resultado:
+                  // tudo nos primeiros 208 px da tela ficava coberto e
+                  // inclicável até o usuário clicar em algum outro lugar
+                  // para tirar o foco daqui; pior, o clique caía num item de
+                  // navegação e levava para outra tela. Medido: o botão "Ver
+                  // cores" do card do RetroArch fica em x=137.
+                  //
+                  // `detail > 0` distingue clique de mouse de ativação por
+                  // teclado (Enter/Espaço mandam `detail === 0`). Só o mouse
+                  // perde o foco: quem navega por teclado ou controle
+                  // precisa dele para continuar de onde parou — foco é
+                  // estado de primeira classe (ADR 0009), e a sidebar
+                  // expandida enquanto o foco está nela é o comportamento
+                  // certo para esse caso.
+                  if (e.detail > 0) e.currentTarget.blur();
+                }}
                 title={item.label}
                 aria-current={isActive ? "page" : undefined}
                 className={`flex h-[52px] w-full items-center border-l-2 transition-colors ${FOCUS_RING} ${

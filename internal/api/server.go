@@ -40,7 +40,13 @@ type Server struct {
 	library   *library.Store
 	igdbCreds *igdb.CredentialsStore
 	igdbJobs  *igdb.ScrapeManager
-	logger    *slog.Logger
+
+	// userConfig registra que o usuário salvou configuração à mão para um
+	// emulador (Q2, docs/roadmap.md) — é o que faz o lançamento respeitar a
+	// escolha dele em vez de reaplicar o preset do catálogo por cima.
+	userConfig *emulator.UserConfigStore
+
+	logger *slog.Logger
 
 	// devOrigin é a origem extra liberada por SetDevOrigin. Só é lido, nunca
 	// escrito, depois que o servidor começa a atender requisições — daí não
@@ -63,20 +69,22 @@ func NewServer(
 	libraryStore *library.Store,
 	igdbCreds *igdb.CredentialsStore,
 	igdbJobs *igdb.ScrapeManager,
+	userConfig *emulator.UserConfigStore,
 	logger *slog.Logger,
 ) *Server {
 	return &Server{
-		probe:     probe,
-		catalog:   catalog,
-		consent:   store,
-		emulators: emulators,
-		customs:   customs,
-		launcher:  launcher,
-		installs:  installs,
-		library:   libraryStore,
-		igdbCreds: igdbCreds,
-		igdbJobs:  igdbJobs,
-		logger:    logger,
+		probe:      probe,
+		catalog:    catalog,
+		consent:    store,
+		emulators:  emulators,
+		customs:    customs,
+		launcher:   launcher,
+		installs:   installs,
+		library:    libraryStore,
+		igdbCreds:  igdbCreds,
+		igdbJobs:   igdbJobs,
+		userConfig: userConfig,
+		logger:     logger,
 	}
 }
 
@@ -91,6 +99,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/hardware/scan", s.handleScan)
 	mux.HandleFunc("GET /api/v1/hardware", s.handleGetHardware)
 	mux.HandleFunc("GET /api/v1/consoles/verdicts", s.handleVerdicts)
+	// Catálogo de consoles + como rodar cada um. Rota irmã da de cima, e
+	// não um campo dentro dela, porque esta **não** exige consentimento:
+	// /consoles/verdicts precisa do scan de hardware, esta só lê o catálogo
+	// embutido e a lista de adapters. Ver handleConsoles.
+	mux.HandleFunc("GET /api/v1/consoles", s.handleConsoles)
 	mux.HandleFunc("GET /api/v1/emulators", s.handleEmulators)
 	// Rota própria em vez de embutir em /emulators: cores só existem para o
 	// RetroArch (nenhum outro adapter carrega bibliotecas plugáveis), e
@@ -98,6 +111,11 @@ func (s *Server) Routes() http.Handler {
 	// detalhe em toda tela que só quer saber "instalado sim/não" por
 	// emulador.
 	mux.HandleFunc("GET /api/v1/retroarch/cores", s.handleRetroArchCores)
+	// R2 (ADR 0015): download sob demanda de um core individual. Nomes de
+	// core com espaço ("beetle vb", "parallel n64") precisam vir
+	// percent-encoded no path (%20) — o roteador do Go devolve o valor já
+	// decodificado em PathValue.
+	mux.HandleFunc("POST /api/v1/retroarch/cores/{core}/install", s.handleInstallRetroArchCore)
 	// Os emuladores personalizados ficam num prefixo próprio, e não sob
 	// /emulators/, porque "custom" colidiria com o {id} de
 	// /emulators/{id}/install — o roteador do Go recusa registrar padrões em
@@ -126,6 +144,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/emulators/{id}/bindings", s.handleSetEmulatorBindings)
 	mux.HandleFunc("GET /api/v1/installs", s.handleInstalls)
 	mux.HandleFunc("GET /api/v1/installs/{id}", s.handleInstallJob)
+	// R3 (ADR 0015): cancela um download de core em andamento. Só cores
+	// suportam isto hoje — instalação de emulador (Start) devolve
+	// cancel_failed, não um cancelamento silencioso fingido.
+	mux.HandleFunc("DELETE /api/v1/installs/{id}", s.handleCancelInstall)
 	mux.HandleFunc("POST /api/v1/games/launch", s.handleLaunch)
 	mux.HandleFunc("POST /api/v1/games/preview", s.handlePreviewLaunch)
 	mux.HandleFunc("GET /api/v1/sessions", s.handleSessions)
@@ -217,6 +239,58 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 	})
 }
 
+// consoleEntry é uma entrada de GET /api/v1/consoles: o console do catálogo
+// mais as formas conhecidas de rodá-lo.
+//
+// Repete de propósito só o que identifica o console (id/nome/ano) — nada de
+// estado de instalação, que GET /emulators já devolve por adapter e a tela
+// cruza por adapter_id. Duplicar "instalado sim/não" aqui criaria duas
+// respostas capazes de discordar entre si sobre o mesmo disco.
+type consoleEntry struct {
+	ConsoleID string `json:"console_id"`
+	Name      string `json:"name"`
+	ShortName string `json:"short_name"`
+	Year      int    `json:"year"`
+
+	// RequiresExternalFile repete ConsoleVerdict.RequiresExternalFile (L3) —
+	// aqui porque esta rota não exige consentimento e o parecer exige: sem
+	// isto, a tela de consoles não teria como avisar sobre BIOS antes do
+	// scan.
+	RequiresExternalFile bool `json:"requires_external_file,omitempty"`
+
+	// Emulators pode vir vazia: um console do catálogo sem nenhum adapter que
+	// o atenda é um estado real e honesto ("o ZeuX ainda não sabe rodar
+	// isto"), não um erro a esconder.
+	Emulators []emulator.ConsoleOption `json:"emulators"`
+}
+
+// handleConsoles lista o catálogo de consoles com as formas de rodar cada um.
+//
+// **Não exige consentimento**, diferente de /consoles/verdicts: o que sai
+// daqui é catálogo embutido no binário e a lista de adapters — nada é lido
+// da máquina do usuário, então não há o que consentir. É o que deixa a tela
+// de consoles funcionar também para quem recusou o scan (mesma regra do
+// docs/sprint-b-plano.md, B8: "recusar não pode ser beco sem saída").
+//
+// A ordem é a do catálogo (cronológica, o mais antigo primeiro), não a do
+// parecer — esta rota não conhece hardware, então não teria como ordenar por
+// patamar sem inventar um.
+func (s *Server) handleConsoles(w http.ResponseWriter, _ *http.Request) {
+	consoles := make([]consoleEntry, 0, len(s.catalog.Consoles))
+	for _, console := range s.catalog.Consoles {
+		consoles = append(consoles, consoleEntry{
+			ConsoleID:            console.ID,
+			Name:                 console.Name,
+			ShortName:            console.ShortName,
+			Year:                 console.Year,
+			RequiresExternalFile: console.RequiresExternalFile,
+			Emulators:            s.emulators.OptionsForConsole(console.ID),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"consoles": consoles})
+}
+
 func (s *Server) handleEmulators(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"emulators": s.emulators.Survey(r.Context()),
@@ -233,6 +307,25 @@ func (s *Server) handleRetroArchCores(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"cores": emulator.RetroArchCoreStatus(r.Context()),
 	})
+}
+
+// handleInstallRetroArchCore dispara o download sob demanda de um core do
+// RetroArch (ADR 0015, R2). Devolve 202 com o job sempre — inclusive quando
+// o core já está instalado, caso em que StartCore devolve o job já em
+// PhaseDone sem baixar nada de novo (no-op explícito).
+//
+// Diferente de handleInstall, não há checagem de hardware aqui: o core
+// sozinho não diz nada sobre o console que vai usá-lo, e o consentimento de
+// hardware já foi checado (ou recusado) quando o usuário mandou lançar o
+// jogo que disparou este download (R3).
+func (s *Server) handleInstallRetroArchCore(w http.ResponseWriter, r *http.Request) {
+	job, err := s.installs.StartCore(r.Context(), r.PathValue("core"))
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "core_install_refused", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, job)
 }
 
 func (s *Server) handleSources(w http.ResponseWriter, r *http.Request) {
@@ -409,7 +502,24 @@ func (s *Server) handleSetEmulatorConfig(w http.ResponseWriter, r *http.Request)
 		unapplied = []string{}
 	}
 
+	// Q2 (docs/roadmap.md, Sprint Q): a partir daqui o lançamento deixa de
+	// aplicar o preset do catálogo neste emulador — o que o usuário definiu à
+	// mão vence o que vem de fábrica. Falhar em registrar isso não desfaz a
+	// escrita que já aconteceu (o arquivo do emulador já mudou), então é aviso
+	// no log, não erro na resposta: o pior caso é um lançamento futuro
+	// reaplicar o preset, nunca a configuração pedida deixar de valer agora.
+	if err := s.userConfig.MarkUserConfigured(r.Context(), adapterIDOf(r)); err != nil {
+		s.logger.Warn("configuração gravada, mas não registrada como manual", "erro", err)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"unapplied": unapplied})
+}
+
+// adapterIDOf lê o {id} da rota. Existe para o par
+// MarkUserConfigured/ClearUserConfigured não repetir o literal em dois
+// handlers que precisam concordar sobre a mesma chave.
+func adapterIDOf(r *http.Request) string {
+	return r.PathValue("id")
 }
 
 func (s *Server) handleRestoreEmulatorConfig(w http.ResponseWriter, r *http.Request) {
@@ -422,6 +532,13 @@ func (s *Server) handleRestoreEmulatorConfig(w http.ResponseWriter, r *http.Requ
 		s.writeError(w, http.StatusBadRequest, "config_restore_failed", err.Error())
 		return
 	}
+
+	// Desfez a própria configuração: volta a aceitar o preset do catálogo nos
+	// próximos lançamentos (Q2). Simétrico ao MarkUserConfigured de POST.
+	if err := s.userConfig.ClearUserConfigured(r.Context(), adapterIDOf(r)); err != nil {
+		s.logger.Warn("configuração restaurada, mas o registro manual não foi apagado", "erro", err)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"restored": true})
 }
 
@@ -521,6 +638,19 @@ func (s *Server) handleInstallJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, job)
+}
+
+// handleCancelInstall interrompe um download de core em andamento (R3). Não
+// apaga o histórico do job — GET /installs/{id} continua achando-o, agora em
+// phase "cancelado".
+func (s *Server) handleCancelInstall(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := s.installs.CancelJob(id); err != nil {
+		s.writeError(w, http.StatusBadRequest, "cancel_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"canceled": id})
 }
 
 // handleListCustom devolve as definições do usuário junto do caminho do
@@ -667,6 +797,44 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validado aqui, antes de decidir se baixa um core: não faz sentido
+	// baixar dezenas de MB para uma ROM cujo caminho nem existe. Launch()
+	// também valida — mas só chega lá quando não entramos no caminho de
+	// download abaixo.
+	if err := emulator.ValidateROM(input.ROMPath); err != nil {
+		s.writeError(w, http.StatusBadRequest, "launch_failed", err.Error())
+		return
+	}
+
+	// R3 (ADR 0015): um lançamento pelo RetroArch cujo core ainda não está no
+	// computador dispara o download antes de tentar montar o comando — sem
+	// isso, o usuário só saberia que o core falta ao ver o RetroArch recusar
+	// abrir, e precisaria voltar para a tela de Emuladores para resolver.
+	if job, downloadErr, handled := s.startCoreDownloadForLaunch(input); handled {
+		if downloadErr != nil {
+			// Nomeia o que falta, não "erro ao lançar" genérico — mesmo
+			// `code` de sempre, porque para a interface ainda é "não deu
+			// para lançar", só que a causa é o core, não a ROM ou o emulador.
+			s.writeError(w, http.StatusBadRequest, "launch_failed", downloadErr.Error())
+			return
+		}
+
+		// O servidor NÃO lança o jogo sozinho quando o download terminar
+		// (decisão do Douglas, 2026-08-27, revendo a primeira versão do R3):
+		// quem abre o jogo é a tela, repetindo a chamada de lançamento
+		// depois que o job chegar a "concluido". Abrir um processo de jogo
+		// minutos depois, por conta própria, surpreende quem já tinha
+		// desistido e saído da tela — e o projeto já tinha o padrão certo
+		// em useInlineInstall (o front acompanha o job e relança). A
+		// resposta aqui é só o job, acompanhado por GET /installs/{id} como
+		// qualquer instalação.
+		writeJSON(w, http.StatusAccepted, map[string]any{
+			"downloading_core": true,
+			"install_job":      job,
+		})
+		return
+	}
+
 	session, err := s.launcher.Launch(r.Context(), input)
 	if err != nil {
 		// Falha de lançamento é quase sempre algo que o usuário pode resolver
@@ -677,6 +845,53 @@ func (s *Server) handleLaunch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, session)
+}
+
+// startCoreDownloadForLaunch decide se este lançamento precisa de um core do
+// RetroArch que ainda não está no computador. `handled=true` significa "não
+// chame Launch() — ou o download já foi disparado (job não-nil, err nil), ou
+// não foi possível disparar (err não-nil)". `handled=false` significa "siga o
+// caminho de sempre" — adapter não é o RetroArch, o core não pôde ser
+// resolvido (Launch() vai devolver o mesmo erro de sempre), ou o core já
+// está instalado.
+//
+// Só dispara o download: quem lança o jogo depois é a interface, chamando
+// /games/launch de novo quando o job terminar (ver handleLaunch).
+func (s *Server) startCoreDownloadForLaunch(input emulator.LaunchInput) (job *install.Job, err error, handled bool) {
+	ctx := context.Background()
+
+	adapter, _, resolveErr := s.emulators.Resolve(ctx, input.ConsoleID, input.EmulatorID)
+	if resolveErr != nil || adapter.ID() != "retroarch" {
+		return nil, nil, false
+	}
+
+	coreName, resolveErr := emulator.ResolveRetroArchCore(input.ConsoleID, input.Core)
+	if resolveErr != nil {
+		// Sem core resolvido (nenhum padrão para o console, ou core explícito
+		// desconhecido) não é um problema de download — Launch() devolve a
+		// mesma mensagem que sempre devolveu.
+		return nil, nil, false
+	}
+
+	// Checado ANTES de chamar StartCore, não depois: StartCore também detecta
+	// "já instalado" e devolve um job em vez de baixar de novo, mas aquele
+	// job apareceria em GET /installs mesmo sem baixar nada — o critério de
+	// aceite de R3 é explícito que o caminho já pronto não ganha nenhuma
+	// etapa nova, nem um job trivial.
+	for _, status := range emulator.RetroArchCoreStatus(ctx) {
+		if status.Name == coreName && status.Installed {
+			return nil, nil, false
+		}
+	}
+
+	startedJob, startErr := s.installs.StartCore(ctx, coreName)
+	if startErr != nil {
+		return nil, fmt.Errorf(
+			"o core %q ainda não está no seu computador e não foi possível baixá-lo agora: %w",
+			coreName, startErr), true
+	}
+
+	return startedJob, nil, true
 }
 
 // handlePreviewLaunch monta o comando sem executá-lo. Serve para a interface

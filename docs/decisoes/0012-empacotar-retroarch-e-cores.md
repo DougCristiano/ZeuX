@@ -1,6 +1,13 @@
 # 0012 — Empacotar RetroArch e cores selecionados no instalador do ZeuX
 
-**Status:** Aceito (decisão apenas — implementação não começou)
+**Status:** Substituído por [0015](0015-baixar-retroarch-e-cores-sob-demanda.md)
+
+> Esta decisão foi implementada e **funcionou** — o Douglas confirmou em
+> 2026-08-05 lançando jogos de 3 consoles pelo RetroArch empacotado. Ela não
+> foi substituída por ter falhado, e sim por uma escolha de produto do Douglas
+> em 2026-08-26 (instalador pequeno, tudo sob demanda). O texto abaixo fica
+> inteiro, sem edição, porque o ADR 0015 assume de volta custos que este
+> documento descreve — e quem for reabrir a discussão precisa lê-los aqui.
 
 ## Contexto
 

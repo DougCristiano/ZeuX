@@ -22,3 +22,16 @@ export function percentOf(job: { downloaded_bytes: number; total_bytes: number }
   if (job.total_bytes <= 0) return null;
   return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
 }
+
+/**
+ * Sufixo de fase para um download de core em andamento (ADR 0015, R3).
+ *
+ * "baixando" é a fase esperada e já está dita pelo verbo da frase ("Baixando
+ * o core X…") — repetir vira "Baixando o core mesen… baixando", que foi o que
+ * apareceu na tela ao rodar o app de verdade em 2026-08-27. As outras fases
+ * ("verificando", "extraindo", "finalizando") informam algo que o verbo não
+ * diz, e essas aparecem.
+ */
+export function faseExtraDeDownload(phase: string): string {
+  return phase === "baixando" ? "" : ` ${phase}`;
+}

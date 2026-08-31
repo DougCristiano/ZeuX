@@ -11,6 +11,8 @@ import {
   type AllGamesViewState,
 } from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
+import { ConsoleDetailScreen } from "./screens/ConsoleDetailScreen";
+import { ConsolesScreen } from "./screens/ConsolesScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
@@ -41,6 +43,8 @@ type Phase =
   // daqui.
   | "all-games"
   | "verdict"
+  | "consoles"
+  | "console-detail"
   | "emulators"
   | "library"
   | "games"
@@ -68,7 +72,7 @@ function App() {
   // De onde "games" foi aberto, para o botão "Voltar" de GamesScreen saber
   // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
   // a tela por console (LibraryScreen) continua existindo.
-  const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library">("all-games");
+  const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library" | "console-detail">("all-games");
   // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04). M5
   // (docs/sprint-m-plano.md, 2026-08-07): até aqui só vinha de
   // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
@@ -218,9 +222,9 @@ function App() {
   function navigateSidebar(id: NavID) {
     if (id === "library") setPhase("all-games");
     if (id === "verdict") setPhase("verdict");
-    if (id === "emulators") {
+    if (id === "consoles") {
       setCameFromDeclined(false);
-      setPhase("emulators");
+      setPhase("consoles");
     }
     if (id === "settings") setPhase("settings");
   }
@@ -325,9 +329,55 @@ function App() {
       screen = <VerdictScreen report={report!} />;
       break;
 
+    case "consoles":
+      screen = (
+        <ConsolesScreen
+          report={report ?? undefined}
+          onOpenEmulators={() => {
+            setCameFromDeclined(false);
+            setPhase("emulators");
+          }}
+          // P2: "Ver console" abre o detalhe, não os jogos. Sempre presente
+          // — diferente de `GamesScreen`, o detalhe não exige parecer (só
+          // esconde o bloco "Nesta máquina" quando não há).
+          onOpenConsole={(id, name, shortName) => {
+            setSelectedConsole({ id, name, shortName });
+            setPhase("console-detail");
+          }}
+        />
+      );
+      break;
+
+    case "console-detail":
+      screen = (
+        <ConsoleDetailScreen
+          consoleId={selectedConsole!.id}
+          report={report ?? undefined}
+          onBack={() => setPhase("consoles")}
+          // "Ver jogos" só existe com parecer carregado: `GamesScreen` tira
+          // dele o preset que manda pro lançamento.
+          onOpenGames={
+            report
+              ? () => {
+                  setGamesOrigin("console-detail");
+                  setPhase("games");
+                }
+              : undefined
+          }
+        />
+      );
+      break;
+
     case "emulators":
       screen = (
-        <EmulatorsScreen report={report ?? undefined} onBack={cameFromDeclined ? () => setPhase("declined") : undefined} />
+        <EmulatorsScreen
+          report={report ?? undefined}
+          // Sem consentimento, volta pra DeclinedScreen (nunca beco sem
+          // saída, B8). Com consentimento, esta tela virou sub-visão de
+          // Consoles em 2026-08-28 — a sidebar leva pra "Consoles", mas o
+          // caminho de volta explícito é o que confirma a hierarquia.
+          onBack={cameFromDeclined ? () => setPhase("declined") : () => setPhase("consoles")}
+        />
       );
       break;
 
@@ -377,7 +427,15 @@ function App() {
   // cheia, sem sidebar — ver EmulatorsScreen.onBack.
   if (report && SIDEBAR_PHASES.includes(phase)) {
     const active: NavID =
-      phase === "verdict" ? "verdict" : phase === "emulators" ? "emulators" : phase === "settings" ? "settings" : "library";
+      phase === "verdict"
+        ? "verdict"
+        : // "emulators" acende "Consoles": é sub-visão dela desde 2026-08-28,
+          // não um destino de sidebar próprio.
+          phase === "consoles" || phase === "console-detail" || phase === "emulators"
+          ? "consoles"
+          : phase === "settings"
+            ? "settings"
+            : "library";
     return (
       <div className="flex h-screen">
         <Sidebar active={active} onNav={navigateSidebar} />
@@ -394,6 +452,8 @@ function App() {
 const SIDEBAR_PHASES: Phase[] = [
   "all-games",
   "verdict",
+  "consoles",
+  "console-detail",
   "emulators",
   "library",
   "games",

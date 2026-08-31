@@ -65,11 +65,13 @@ está em português e já pode ser exibida ao usuário como está.
 | Método | Rota | Função |
 |---|---|---|
 | GET | `/api/v1/health` | Daemon no ar + versão do catálogo |
+| GET | `/api/v1/system/info` | Sistema operacional e versão do ZeuX |
 | GET | `/api/v1/consent` | Estado do consentimento + texto da política |
 | POST | `/api/v1/consent` | Registra ou revoga o consentimento |
 | POST | `/api/v1/hardware/scan` | Executa o scan (exige consentimento) |
 | GET | `/api/v1/hardware` | Devolve o último scan da sessão |
 | GET | `/api/v1/consoles/verdicts` | Parecer por console |
+| GET | `/api/v1/consoles` | Catálogo de consoles + como rodar cada um |
 | GET | `/api/v1/emulators` | Quais emuladores estão instalados |
 | GET | `/api/v1/custom-emulators` | Lista os emuladores personalizados do usuário |
 | POST | `/api/v1/custom-emulators` | Cria ou substitui um emulador personalizado |
@@ -78,12 +80,21 @@ está em português e já pode ser exibida ao usuário como está.
 | POST | `/api/v1/emulators/{id}/install` | Dispara a instalação 1-click |
 | DELETE | `/api/v1/emulators/{id}/install` | Remove uma instalação gerenciada pelo ZeuX |
 | POST | `/api/v1/emulators/{id}/open` | Abre o emulador sozinho, sem ROM (botão "Configurar") |
-| GET | `/api/v1/installs` | Histórico de instalações (jobs) |
-| GET | `/api/v1/installs/{id}` | Acompanha uma instalação em andamento |
+| GET | `/api/v1/emulators/{id}/config` | Lê a configuração persistida do emulador (H1) |
+| POST | `/api/v1/emulators/{id}/config` | Grava a configuração persistida (H1) |
+| DELETE | `/api/v1/emulators/{id}/config` | Restaura a configuração anterior ao ZeuX (H2) |
+| GET | `/api/v1/emulators/{id}/bindings` | Lê o mapeamento de teclado/controle (H3) |
+| POST | `/api/v1/emulators/{id}/bindings` | Grava o mapeamento (H4) |
+| GET | `/api/v1/retroarch/cores` | Lista todo core conhecido e se está instalado |
+| POST | `/api/v1/retroarch/cores/{core}/install` | Download sob demanda de um core do RetroArch ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), R2) |
+| GET | `/api/v1/installs` | Histórico de instalações (jobs) — cobre instalação de emulador e download de core |
+| GET | `/api/v1/installs/{id}` | Acompanha uma instalação ou download de core em andamento |
+| DELETE | `/api/v1/installs/{id}` | Cancela um download de core em andamento (R3) |
 | POST | `/api/v1/games/preview` | Monta a linha de comando sem executar |
 | POST | `/api/v1/games/launch` | Executa o jogo |
 | GET | `/api/v1/sessions` | Histórico de sessões + tempo de jogo |
 | POST | `/api/v1/library/folders` | Aponta uma pasta a um console e varre na hora |
+| POST | `/api/v1/library/folders/bulk` | Aponta uma pasta-mãe e casa cada subpasta a um console |
 | GET | `/api/v1/library/folders` | Lista as pastas apontadas |
 | DELETE | `/api/v1/library/folders/{id}` | Remove a referência à pasta (não apaga arquivo) |
 | POST | `/api/v1/library/folders/{id}/scan` | Revarre uma pasta já apontada |
@@ -324,6 +335,74 @@ Devolve o último scan guardado em memória. Mesma forma de resposta do
 
 **404 `no_scan_yet`** — nenhum scan foi executado nesta sessão do daemon.
 Reiniciar o daemon zera isso; revogar o consentimento também.
+
+---
+
+## GET /api/v1/consoles
+
+O catálogo de consoles com as formas conhecidas de rodar cada um.
+
+**Não exige consentimento nem scan**, diferente de `/consoles/verdicts`: o que
+sai daqui é o catálogo embutido no binário mais a lista de adapters — nada é
+lido da máquina do usuário, então não há o que consentir. É o que permite a
+tela de consoles funcionar também para quem recusou o scan.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/consoles
+```
+
+**200 OK** (recortado — a lista real traz os 33 consoles, em ordem cronológica):
+
+```json
+{
+  "consoles": [
+    {
+      "console_id": "gb",
+      "name": "Game Boy",
+      "short_name": "Game Boy",
+      "year": 1989,
+      "emulators": [
+        { "adapter_id": "retroarch", "name": "RetroArch", "core": "gambatte" }
+      ]
+    },
+    {
+      "console_id": "ps1",
+      "name": "PlayStation 1",
+      "short_name": "PS1",
+      "year": 1994,
+      "requires_external_file": true,
+      "emulators": [
+        { "adapter_id": "duckstation", "name": "DuckStation" },
+        { "adapter_id": "retroarch", "name": "RetroArch", "core": "beetle psx hw" }
+      ]
+    }
+  ]
+}
+```
+
+### Campos de cada console
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `console_id` | string | A mesma chave de `/games/launch`, `/library/folders` e `ConsoleVerdict.console_id`. |
+| `name` / `short_name` / `year` | string / string / int | Vêm do catálogo (`internal/verdict/data/consoles.json`). |
+| `requires_external_file` | bool | Console amplamente conhecido por exigir BIOS/firmware. **Ausente**, nunca `false`, quando não marcado. |
+| `emulators` | array | Formas de rodar este console. **Pode vir vazia**: console do catálogo que nenhum adapter atende ainda é um estado honesto, não um erro. |
+
+### Campos de cada entrada de `emulators`
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `adapter_id` | string | Cruze com `adapter_id` de `GET /emulators` para saber se está instalado — esta rota **não** repete estado de instalação de propósito, para não haver duas respostas capazes de discordar sobre o mesmo disco. |
+| `name` | string | Nome de exibição do adapter. |
+| `core` | string | O core que este console pede, no mesmo vocabulário de `name` em `GET /retroarch/cores` — as duas listas casam por este campo. **Ausente para emulador standalone**, que não carrega core nenhum: ausente é "não tem core", nunca "core ainda não escolhido". |
+
+> **A ordem de `emulators` é regra de produto, não detalhe de serialização.**
+> Um emulador dedicado vem antes do RetroArch, porque costuma ter
+> compatibilidade e desempenho melhores no console dele — a mesma ordem que
+> `Registry.ForConsole` usa para escolher o que lançar. Não reordene no
+> cliente. Em 2026-08-28, só 5 dos 33 consoles têm mais de uma opção: `ps1`,
+> `n64`, `dreamcast`, `psp` e `nds`.
 
 ---
 
@@ -592,10 +671,10 @@ curl http://127.0.0.1:7777/api/v1/emulator-sources
     {
       "adapter_id": "retroarch",
       "name": "RetroArch",
-      "kind": "bundled",
+      "kind": "manual",
       "homepage": "https://www.retroarch.com/?page=platforms",
       "license": "GPL-3.0",
-      "reason": "Já vem dentro do instalador do ZeuX (ADR 0012) — não precisa ser baixado."
+      "reason": "Distribuído pelo buildbot.libretro.com, sem estrutura estável para automação — precisa ser instalado manualmente. Os cores, esses sim, o ZeuX baixa sozinho sob demanda (ADR 0015)."
     },
     {
       "adapter_id": "dolphin",
@@ -613,18 +692,18 @@ curl http://127.0.0.1:7777/api/v1/emulator-sources
 |---|---|---|
 | `adapter_id` | string | Mesmo identificador usado em `/emulators/{id}/install` e `/emulators/{id}/open`. |
 | `name` | string | Nome de exibição. |
-| `kind` | string | Como o pacote é obtido: `"github"` (release resolvida pela API do GitHub), `"bundled"` (já vem dentro do instalador do ZeuX — hoje só o RetroArch, [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md)) ou `"manual"` (`/install` recusa esta fonte — `reason` explica o porquê). Nota: exemplos antigos desta página chegaram a mostrar `"github_release"` — o valor real gravado em `internal/install/sources.go` é `"github"`. |
+| `kind` | string | Como o pacote é obtido: `"github"` (release resolvida pela API do GitHub) ou `"manual"` (`/install` recusa esta fonte — `reason` explica o porquê). Até o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) (R4) existia um terceiro valor, `"bundled"` (RetroArch vinha dentro do instalador, [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md)) — retirado do código; o RetroArch é `"manual"` desde então, e os cores dele têm sua própria rota (`POST /retroarch/cores/{core}/install`, fora deste catálogo). Nota: exemplos antigos desta página chegaram a mostrar `"github_release"` — o valor real gravado em `internal/install/sources.go` é `"github"`. |
 | `repo` | string | `owner/repo` no GitHub. Presente nas fontes `"github"`. |
 | `homepage` | string | Site do projeto ou da release. |
 | `license` | string | Licença declarada pelo projeto, quando conhecida. Nem toda fonte traz este campo. |
-| `reason` | string | **Presente em fontes `"manual"`** (por que a automação não é possível) **e em `"bundled"`** (por que não há botão de instalar). Ausente em `"github"`. |
+| `reason` | string | **Presente em fontes `"manual"`** — por que a automação não é possível. Ausente em `"github"`. |
 
 Esta rota não tem caminho de erro.
 
-Hoje o catálogo (`internal/install/data/sources.json`) tem 12 fontes `"github"`,
-1 `"bundled"` (RetroArch) e 1 `"manual"` (Dolphin) — a única fonte manual, o que
-é o que faz a tela de Emuladores trocar o botão "Instalar" por "Abrir site
-oficial" só para o Dolphin (ver [`docs/adapters.md`](adapters.md)).
+Hoje o catálogo (`internal/install/data/sources.json`) tem 12 fontes `"github"`
+e 2 `"manual"` (RetroArch e Dolphin) — o que faz a tela de Emuladores trocar o
+botão "Instalar" por "Abrir site oficial" para os dois (ver
+[`docs/adapters.md`](adapters.md)).
 
 ---
 
@@ -663,7 +742,7 @@ curl -X POST http://127.0.0.1:7777/api/v1/emulators/duckstation/install
 
 | Campo | Tipo | Notas |
 |---|---|---|
-| `phase` | string | `"resolvendo"` → `"baixando"` → `"verificando"` → `"extraindo"` → `"finalizando"` → `"concluido"` ou `"falhou"`. Em português, de propósito — é o que a interface exibe como está. |
+| `phase` | string | `"resolvendo"` → `"baixando"` → `"verificando"` → `"extraindo"` → `"finalizando"` → `"concluido"` ou `"falhou"`. Download de core (R2/R3) nunca passa por `"resolvendo"` — a URL já vem do manifesto. `"cancelado"` (R3) só existe para download de core, via `DELETE /installs/{id}`, e é diferente de `"falhou"`: é o usuário desistindo, não um erro. Em português, de propósito — é o que a interface exibe como está. |
 | `downloaded_bytes` / `total_bytes` | int64 | `total_bytes` pode ser `0` (tamanho desconhecido); ver `Percent()` no código, que devolve `-1` nesse caso em vez de dividir por zero. |
 | `sha256` | string | Sempre registrado quando o download termina, mesmo que o projeto não publique soma oficial — permite comparar entre máquinas depois do fato. |
 | `checksum_verified` | bool | `true` só quando a soma foi conferida contra um valor **publicado pelo projeto**, não apenas calculada localmente. |
@@ -730,10 +809,271 @@ curl -X POST http://127.0.0.1:7777/api/v1/emulators/duckstation/open
 
 ---
 
+## POST /api/v1/retroarch/cores/{core}/install
+
+Dispara o download sob demanda de **um core** do RetroArch — o mecanismo que
+substitui o empacotamento fixo no instalador ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), R2).
+Diferente de `/emulators/{id}/install`, a URL e o SHA256 esperado já são
+conhecidos de antemão: vêm do manifesto embutido no binário (R1), não são
+resolvidos contra uma API de release. Por isso o job nunca passa por
+`"resolvendo"` — entra direto em `"baixando"`.
+
+`{core}` é o nome amigável do core, o mesmo usado em `options.core` de
+`/games/launch` e na resposta de `GET /retroarch/cores` (ex.: `mesen`,
+`parallel n64`, `beetle vb`). **Nomes com espaço precisam vir
+percent-encoded** (`%20`) no path — `beetle%20vb`, não `beetle vb` cru.
+
+**Não bloqueia**: devolve o `Job` imediatamente (`202 Accepted`), acompanhado
+por `GET /installs/{id}` como qualquer outra instalação. Baixar um core que
+já está instalado (por qualquer via — bundled, sessão anterior, Online
+Updater do próprio RetroArch) é **no-op explícito**: o job volta em
+`"concluido"` na hora, sem nenhuma requisição de rede.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/retroarch/cores/mesen/install
+```
+
+**202 Accepted**
+
+```json
+{
+  "id": "i7",
+  "adapter_id": "retroarch",
+  "core_name": "mesen",
+  "name": "core mesen do RetroArch",
+  "phase": "baixando",
+  "message": "Baixando o core mesen...",
+  "started_at": "2026-08-27T15:10:00Z",
+  "finished_at": null,
+  "checksum_verified": false
+}
+```
+
+`core_name` só aparece em jobs de core — um job de `/emulators/{id}/install`
+nunca traz este campo. `phase` segue o mesmo vocabulário de sempre
+(`"baixando"` → `"verificando"` → `"extraindo"` → `"finalizando"` →
+`"concluido"`/`"falhou"`), sem `"resolvendo"`.
+
+**Falha de hash não é um erro de requisição — é o job chegando em
+`"falhou"`** com um `code` estável no próprio `Job`:
+
+```json
+{
+  "id": "i7",
+  "phase": "falhou",
+  "code": "core_hash_mismatch",
+  "error": "o core \"mesen\" foi baixado, mas o arquivo recebido não confere com o SHA256 esperado (...) — nada foi instalado",
+  "finished_at": "2026-08-27T15:10:04Z"
+}
+```
+
+Nada é promovido para o diretório de cores do ZeuX quando isso acontece — o
+arquivo baixado fica só no diretório de trabalho temporário, que é apagado.
+
+**Erros da requisição** (não confundir com o job chegando em `"falhou"`):
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `core_install_refused` | Core desconhecido, plataforma sem asset no manifesto, manifesto ainda sem hash medido para esta combinação (`"generated": false` — ver ADR 0015/R1), ou já existe download deste core em andamento. A mensagem original do erro vai em `message`. |
+
+---
+
+## GET /api/v1/emulators/{id}/config
+
+Lê a configuração que o emulador tem **hoje no arquivo dele** — não uma cópia
+guardada pelo ZeuX. H1 (`docs/roadmap.md`).
+
+**Só existe para adapters que satisfazem `emulator.ConfigurableAdapter`** —
+hoje PCSX2 e RetroArch. Use `configurable` de `GET /emulators` para saber se
+a rota vale para um `id` antes de chamá-la.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/emulators/retroarch/config
+```
+
+**200 OK**
+
+```json
+{ "fullscreen": true, "internal_scale": 2, "renderer": "vulkan" }
+```
+
+Os três campos são **omitidos quando o ZeuX não conseguiu ler o valor real**
+do arquivo do emulador — nunca um chute nem um `false` de enfeite. Um
+emulador recém-instalado, sem arquivo de configuração ainda, devolve `{}`.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` | Nenhum emulador com este `id`. |
+| 400 | `not_configurable` | O emulador existe, mas o ZeuX não sabe ler/escrever a configuração dele. |
+| 400 | `not_installed` | O emulador não foi encontrado no disco — o caminho do arquivo depende de onde ele está instalado. |
+| 500 | `config_read_failed` | O arquivo existe mas não pôde ser lido/interpretado. |
+
+---
+
+## POST /api/v1/emulators/{id}/config
+
+Grava a configuração no arquivo do próprio emulador.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/emulators/retroarch/config \
+  -H "Content-Type: application/json" \
+  -d '{"fullscreen":true,"internal_scale":2,"renderer":"vulkan"}'
+```
+
+**200 OK**
+
+```json
+{ "unapplied": [] }
+```
+
+`unapplied` segue a mesma ideia do [ADR 0006](decisoes/0006-campo-unapplied.md)
+que `Command.unapplied` usa: o que o ZeuX **não** conseguiu aplicar, em
+frases prontas para exibir. Vem sempre como array — `[]` quando tudo coube,
+nunca `null` (o front itera direto, e um `null` derrubava a tela; achado em
+2026-08-05).
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` · 400 `not_configurable` / `not_installed` | Iguais aos do `GET` acima. |
+| 400 | `invalid_body` | Corpo fora do formato `{"fullscreen": bool, "internal_scale": int, "renderer": string}`. |
+| 500 | `config_write_failed` | Não foi possível gravar o arquivo. |
+
+> **Efeito colateral que vale saber (Q2, `docs/roadmap.md`, Sprint Q):** salvar
+> aqui marca este emulador como **configurado pelo usuário**, e a partir disso
+> `POST /games/launch` **para de aplicar o preset do catálogo** nele. É a
+> precedência que o `Registry` já documenta para emulador personalizado — o que
+> a pessoa definiu à mão vence o que vem de fábrica. `DELETE` (abaixo) desfaz a
+> marca e o preset volta a valer.
+
+---
+
+## DELETE /api/v1/emulators/{id}/config
+
+Restaura a configuração que existia **antes de o ZeuX escrever** nela (H2) —
+o escape hatch de "mexi e me arrependi". O ZeuX guarda o arquivo original ao
+gravar pela primeira vez; sem esse backup, não há o que restaurar.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/emulators/retroarch/config
+```
+
+**200 OK** — `{ "restored": true }`
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` · 400 `not_configurable` / `not_installed` | Iguais aos do `GET` acima. |
+| 400 | `config_restore_failed` | Não há backup para restaurar, ou a restauração falhou. Mensagem original no `message`. |
+
+Também apaga a marca de "configurado pelo usuário" (ver o aviso no `POST`
+acima): quem desfez a própria configuração volta a receber o preset do catálogo
+nos próximos lançamentos.
+
+---
+
+## GET /api/v1/emulators/{id}/bindings
+
+Lê o mapeamento de teclado/controle do emulador (H3).
+
+**Só existe para adapters que satisfazem `emulator.KeyBindableAdapter`** —
+ver `bindable` em `GET /emulators`.
+
+```bash
+curl http://127.0.0.1:7777/api/v1/emulators/retroarch/bindings
+```
+
+**200 OK**
+
+```json
+{
+  "actions": ["up", "down", "left", "right", "a", "b", "x", "y", "select", "start", "l", "r", "l2", "r2", "l3", "r3"],
+  "bindings": [{ "action": "up", "key": "up" }, { "action": "a" }]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `actions` | array de string | Vocabulário do **próprio emulador** — "Cross" no PCSX2 não é necessariamente o mesmo botão físico que "b" no RetroArch. |
+| `bindings` | array | Uma entrada por ação. `key`/`button` ausentes = ação sem nada vinculado. |
+
+**Sem arquivo de mapeamento, a resposta não é vazia:** vem a lista de ações
+conhecidas, cada uma sem vínculo — "não existe arquivo ainda" não é o mesmo
+que "este emulador não tem ações", e a tela sempre precisa ter o que mostrar.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` | Nenhum emulador com este `id`. |
+| 400 | `not_bindable` | O emulador existe, mas o ZeuX não sabe ler o mapeamento dele. |
+| 400 | `not_installed` | O emulador não foi encontrado no disco. |
+| 500 | `bindings_read_failed` | O arquivo existe mas não pôde ser lido. |
+
+---
+
+## POST /api/v1/emulators/{id}/bindings
+
+Grava o mapeamento (H4). Mesma forma de resposta do `POST .../config`.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/emulators/retroarch/bindings \
+  -H "Content-Type: application/json" \
+  -d '{"bindings":[{"action":"a","key":"z"}]}'
+```
+
+**200 OK** — `{ "unapplied": [] }`, sempre array.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 404 | `not_found` · 400 `not_bindable` / `not_installed` | Iguais aos do `GET` acima. |
+| 400 | `invalid_body` | Corpo fora de `{"bindings": [{"action": "...", "key": "..."}]}`. |
+| 500 | `bindings_write_failed` | Não foi possível gravar. |
+
+---
+
+## GET /api/v1/retroarch/cores
+
+Lista **todo core que o ZeuX conhece** — não só os instalados — com o estado
+de cada um. Rota própria, e não um campo dentro de `/emulators`, porque cores
+só existem para o RetroArch: nenhum outro adapter carrega bibliotecas
+plugáveis, e 25 cores dentro da resposta de `/emulators` infiltrariam esse
+detalhe em toda tela que só quer saber "instalado sim/não" por emulador.
+
+Existe porque um core podia estar ausente sem nada avisar até o usuário
+tentar abrir um jogo e receber "core não encontrado" (achado em 2026-08-04).
+
+```bash
+curl http://127.0.0.1:7777/api/v1/retroarch/cores
+```
+
+**200 OK**
+
+```json
+{
+  "cores": [
+    { "name": "beetle cygne", "filename": "mednafen_wswan_libretro.so", "installed": false },
+    { "name": "mesen", "filename": "mesen_libretro.so", "installed": true, "path": "/home/voce/.local/share/zeux/retroarch/cores/mesen_libretro.so" }
+  ]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `name` | string | Nome amigável — o mesmo usado em `options.core` de `/games/launch` e no path de `POST /retroarch/cores/{core}/install`. Vários têm espaço (`beetle vb`, `parallel n64`). |
+| `filename` | string | Nome do arquivo com a extensão desta plataforma (`.so`/`.dll`/`.dylib`). |
+| `installed` | bool | Achado em algum dos diretórios que o adapter procura — inclui o que o Online Updater do próprio RetroArch baixou, não só o que o ZeuX instalou. |
+| `path` | string | Só presente quando `installed` é `true`. |
+
+Ordenada por `name`, de forma estável — a ordem interna do adapter vem de um
+mapa e não é determinística.
+
+Esta rota não tem caminho de erro: sem RetroArch instalado, ela responde
+`200` com todos os cores em `installed: false`.
+
+---
+
 ## GET /api/v1/installs
 
 Histórico de todas as instalações desta execução do daemon (em andamento e
-concluídas).
+concluídas) — jobs de emulador (`adapter_id`) e de core do RetroArch
+(`adapter_id: "retroarch"` + `core_name`) na mesma lista.
 
 ```bash
 curl http://127.0.0.1:7777/api/v1/installs
@@ -757,6 +1097,36 @@ curl http://127.0.0.1:7777/api/v1/installs/i1
 **200 OK** — mesma forma do `Job` devolvido por `POST /install`.
 
 **404 `not_found`** — nenhuma instalação com este `id`.
+
+---
+
+## DELETE /api/v1/installs/{id}
+
+Cancela um download de core do RetroArch em andamento ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md),
+R3). **Só download de core suporta isto hoje** — instalação de emulador
+(`POST /emulators/{id}/install`) não tem cancelamento; cancelar aquele job
+devolve `cancel_failed`.
+
+O cancelamento é real: o download em andamento é interrompido, nada é
+promovido para o diretório de cores do ZeuX, e o job muda de fase para
+`"cancelado"` — uma fase própria, diferente de `"falhou"`, porque a interface
+precisa distinguir "o usuário desistiu" de "deu errado". Se o download já
+tinha disparado um lançamento automático (R3, `POST /games/launch`), cancelar
+o core impede esse lançamento — o jogo não abre.
+
+```bash
+curl -X DELETE http://127.0.0.1:7777/api/v1/installs/i9
+```
+
+**200 OK**
+
+```json
+{ "canceled": "i9" }
+```
+
+**400 `cancel_failed`** — o `id` não existe, já terminou (concluído, falhou,
+ou já foi cancelado), ou é um job de instalação de emulador (que não suporta
+cancelamento). A mensagem original do erro vai em `message`.
 
 ---
 
@@ -855,13 +1225,97 @@ uma goroutine acompanha até o fim. O processo do jogo é deliberadamente
 desligado do contexto da requisição HTTP — ele precisa sobreviver muito depois
 da resposta.
 
+**Desde o Q2 (`docs/roadmap.md`, Sprint Q), o lançamento aplica o preset no
+arquivo de configuração do emulador antes de abrir o jogo.** Até aí, o preset
+só virava linha de comando, e a maior parte dele não cabe em flag: o parecer
+anunciava "resolução interna 4x" e o emulador recebia apenas tela cheia. Agora,
+quando o adapter é um `ConfigurableAdapter` (hoje PCSX2 e RetroArch, ver
+`configurable` em `GET /emulators`), o `WriteConfig` dele roda primeiro, e o
+`unapplied` da `Session` traz o que **nenhuma** das duas camadas conseguiu
+aplicar.
+
+Três coisas que isto **não** faz:
+
+- **Não sobrescreve configuração que o usuário salvou à mão.** Se houve um
+  `POST /emulators/{id}/config`, o preset não é aplicado naquele emulador até
+  um `DELETE` desfazer a marca.
+- **Não impede o jogo de abrir se a escrita falhar** — a partida acontece com a
+  configuração que já estava lá (princípio 5: informar, não bloquear).
+- **Não muda nada para os outros 12 adapters**, que não sabem persistir
+  configuração e seguem recebendo só o que couber na linha de comando.
+
+**Desde o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)
+(R3): um lançamento pelo RetroArch cujo core ainda não está no computador não
+falha mais na hora.** O servidor dispara o download do core
+(`POST /retroarch/cores/{core}/install`, R2) e devolve **`202 Accepted`** em
+vez de `200`, com o `Job` do download — não um `Session`.
+
+**Quem abre o jogo é o cliente, não o servidor** (decisão do Douglas,
+2026-08-27). O fluxo esperado do front é:
+
+1. `POST /games/launch` → `202` com `install_job`.
+2. Acompanhar `GET /installs/{id}` até `phase: "concluido"` (mostrando o
+   progresso, e oferecendo `DELETE /installs/{id}` para desistir).
+3. **Repetir o mesmo `POST /games/launch`** — agora o core está no lugar e a
+   resposta é o `200` normal com a `Session`.
+
+Uma versão anterior desta rota lançava o jogo sozinho em segundo plano ao fim
+do download. Foi retirado: abrir um processo de jogo minutos depois
+surpreende quem já desistiu e saiu da tela, e o cliente ficava sem como
+impedir. Se a segunda chamada **também** devolver `202`, algo está errado (o
+core não ficou onde a busca procura) — o cliente deve parar aí em vez de
+repetir, ou entra num laço de downloads.
+
+Um core já presente **não muda nada** — a resposta continua `200` com o
+`Session`, sem nenhum job criado.
+
 ```bash
 curl -X POST http://127.0.0.1:7777/api/v1/games/launch \
   -H "Content-Type: application/json" \
   -d '{"rom_path":"/roms/jogo.rvz","console_id":"gamecube"}'
 ```
 
-**200 OK** — o corpo é um `emulator.Session`:
+**202 Accepted** — core do RetroArch ausente, download disparado:
+
+```json
+{
+  "downloading_core": true,
+  "install_job": {
+    "id": "i9",
+    "adapter_id": "retroarch",
+    "core_name": "sameboy",
+    "name": "core sameboy do RetroArch",
+    "phase": "baixando",
+    "message": "Baixando o core sameboy...",
+    "started_at": "2026-08-27T15:10:00Z",
+    "finished_at": null,
+    "checksum_verified": false
+  }
+}
+```
+
+Se o download **não puder nem começar** (core desconhecido, manifesto sem
+hash medido, já existe um download deste core em andamento), a resposta é
+`400 launch_failed` como qualquer outra falha de lançamento — a mensagem
+nomeia o core, nunca "erro ao lançar" genérico:
+
+```json
+{
+  "error": {
+    "code": "launch_failed",
+    "message": "o core \"sameboy\" ainda não está no seu computador e não foi possível baixá-lo agora: ..."
+  }
+}
+```
+
+Se o download **começar mas falhar depois** (hash divergente, rede caiu no
+meio), a chamada original já respondeu `202` — a falha só aparece em
+`GET /installs/{id}` (`phase: "falhou"`), não como um segundo erro HTTP. O
+cliente que estiver acompanhando o job é quem mostra isso; o jogo
+simplesmente não chega a ser lançado, porque a segunda chamada nunca é feita.
+
+**200 OK** — core já presente, lançamento direto (comportamento de sempre); o
+corpo é um `emulator.Session`:
 
 ```json
 {
@@ -902,8 +1356,10 @@ verificação:
 
 1. ROM inexistente, inacessível, ou o caminho aponta para uma pasta.
 2. Emulador desconhecido, que não atende o console, ou não encontrado no disco.
-3. `BuildCommand` recusou (core do RetroArch ausente, console não suportado).
-4. `cmd.Start()` falhou — binário sem permissão de execução, por exemplo.
+3. Core do RetroArch ausente **e o download não pôde nem começar** (ver R3
+   acima — quando o download começa, a resposta é `202`, não `launch_failed`).
+4. `BuildCommand` recusou por outro motivo (console não suportado).
+5. `cmd.Start()` falhou — binário sem permissão de execução, por exemplo.
 
 ---
 
@@ -1024,6 +1480,55 @@ esta resposta.
 | `path_not_found` | 400 | O caminho não existe ou não é uma pasta. Mensagem nomeia o caminho. |
 | `library_write_failed` | 500 | Erro de I/O gravando no banco local. |
 | `library_scan_failed` | 500 | Erro de I/O varrendo a pasta ou gravando os jogos achados. |
+
+---
+
+## POST /api/v1/library/folders/bulk
+
+Aponta **uma pasta-mãe** e deixa o ZeuX casar cada subpasta a um console pelo
+nome dela — o caminho de quem já organiza as ROMs em `roms/nes`, `roms/PS1`,
+`roms/snes`.
+
+Rota própria, e não um corpo opcional diferente em `POST /library/folders`:
+"console_id + path" (uma pasta, um console) e "path" sozinho (varre as
+subpastas) são operações distintas o bastante para merecer contrato próprio,
+em vez de um `if console_id == ""` escondido no meio.
+
+O casamento é por **nome normalizado**, e cada console entra no índice pelo
+`id`, pelo nome e pela sigla — `ps1`, `PS1` e `PlayStation` acham o mesmo
+console. Subpasta que não casa com nada não vira erro: sai em `unmatched`,
+para a tela poder dizer o que ficou de fora.
+
+```bash
+curl -X POST http://127.0.0.1:7777/api/v1/library/folders/bulk \
+  -H "Content-Type: application/json" \
+  -d '{"path":"/home/voce/roms"}'
+```
+
+**200 OK**
+
+```json
+{
+  "matched": [
+    { "console_id": "ps1", "name": "PlayStation 1", "path": "/home/voce/roms/PS1", "games_found": 0 },
+    { "console_id": "nes", "name": "Nintendo Entertainment System", "path": "/home/voce/roms/nes", "games_found": 1 }
+  ],
+  "unmatched": ["pasta-qualquer"]
+}
+```
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `matched` | array | Uma entrada por subpasta reconhecida, já apontada e varrida. `games_found` é o que a varredura achou **naquela** pasta — `0` é resultado normal (pasta vazia, ou só com extensão que aquele console não reconhece). |
+| `unmatched` | array de string | Nome das subpastas que não casaram com console nenhum. Nunca `null` — array vazio quando todas casaram. |
+
+Arquivos soltos na pasta-mãe são ignorados: só subpastas entram na conta.
+
+| Status | `code` | Quando |
+|---|---|---|
+| 400 | `invalid_body` | Corpo fora de `{"path": "..."}`. |
+| 400 | `missing_fields` | `path` vazio. |
+| 400 | `path_not_found` | A pasta não existe ou não pôde ser lida. |
 
 ---
 
@@ -1434,6 +1939,8 @@ em vez de JSON).
 | `hardware_insufficient` | 409 | POST `/emulators/{id}/install` | Nenhum console deste emulador é viável no último scan, e a chamada não trouxe `?force=true`. Corpo traz `override_hint`. |
 | `install_refused` | 400 | POST `/emulators/{id}/install` | Fonte desconhecida, fonte manual, ou instalação já em andamento para este emulador. |
 | `uninstall_failed` | 400 | DELETE `/emulators/{id}/install` | Nada gerenciado para remover, ou falha ao apagar os arquivos. |
+| `core_install_refused` | 400 | POST `/retroarch/cores/{core}/install` | Core desconhecido, sem asset para esta plataforma, manifesto ainda sem hash medido (`generated: false`), ou download já em andamento. Não confundir com o `Job` chegando em `phase: "falhou"` com `code: "core_hash_mismatch"` — isso é assíncrono, consultado via `GET /installs/{id}`, não um erro desta chamada. |
+| `cancel_failed` | 400 | DELETE `/installs/{id}` | `id` inexistente, job já terminado, ou é uma instalação de emulador (sem suporte a cancelamento). |
 | `open_failed` | 400 | POST `/emulators/{id}/open` | `id` desconhecido, emulador não encontrado no disco, ou falha ao iniciar o processo. |
 | `invalid_id` | 400 | DELETE `/library/folders/{id}`, POST `/library/folders/{id}/scan`, POST/DELETE `/library/games/{id}/favorite` | `{id}` não é numérico. |
 | `path_not_found` | 400 | POST `/library/folders` | O caminho informado não existe ou não é uma pasta. |
@@ -1483,6 +1990,8 @@ catch { "HTTP $([int]$_.Exception.Response.StatusCode) -> $($_.ErrorDetails.Mess
 Invoke-RestMethod "$base/consent" -Method Post -Body '{"granted":true}' -ContentType "application/json"
 Invoke-RestMethod "$base/hardware/scan" -Method Post | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/consoles/verdicts" | ConvertTo-Json -Depth 6
+# Catálogo + emuladores por console (não exige o consentimento acima)
+Invoke-RestMethod "$base/consoles" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/emulators" | ConvertTo-Json -Depth 5
 Invoke-RestMethod "$base/emulator-sources" | ConvertTo-Json -Depth 5
 

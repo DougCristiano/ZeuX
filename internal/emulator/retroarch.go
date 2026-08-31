@@ -8,12 +8,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 )
-
-// bundledCoresInitOnce garante que cores bundled são copiados apenas uma vez
-// por execução do daemon (idempotente na primeira vez).
-var bundledCoresInitOnce sync.Once
 
 // O RetroArch não é um emulador, e sim um front-end que carrega cores. Sem
 // core ele não roda nada, então este adapter carrega uma responsabilidade que
@@ -91,6 +86,22 @@ var defaultCoreByConsole = map[string]string{
 	"neogeo":       "fbneo",
 }
 
+// KnownCores devolve uma cópia de retroArchCores: nome amigável → nome do
+// arquivo sem extensão de plataforma.
+//
+// Existe para que o manifesto de download sob demanda (ADR 0015,
+// internal/install/retroarch_manifest.go) e o gerador que o produz
+// (cmd/generate-retroarch-manifest) leiam a mesma lista que o adapter usa,
+// em vez de manter uma segunda cópia que pode divergir silenciosamente. Cópia
+// porque o chamador não deve conseguir alterar o mapa interno do adapter.
+func KnownCores() map[string]string {
+	cores := make(map[string]string, len(retroArchCores))
+	for name, file := range retroArchCores {
+		cores[name] = file
+	}
+	return cores
+}
+
 type retroArchAdapter struct{}
 
 func newRetroArch() Adapter { return retroArchAdapter{} }
@@ -104,6 +115,14 @@ func (retroArchAdapter) Consoles() []string {
 		consoles = append(consoles, id)
 	}
 	return consoles
+}
+
+// DefaultCore satisfaz CoreAdapter — a mesma tabela que resolveCoreName já
+// consulta no lançamento, agora legível de fora para a tela de consoles
+// poder dizer "o RetroArch está instalado, mas o core Gambatte não está".
+func (retroArchAdapter) DefaultCore(consoleID string) (string, bool) {
+	core, ok := defaultCoreByConsole[consoleID]
+	return core, ok
 }
 
 func (a retroArchAdapter) Locate(ctx context.Context) (Installation, bool) {
@@ -173,6 +192,19 @@ func (a retroArchAdapter) BuildCommand(install Installation, req Request) (Comma
 	return Command{Argv: argv, Unapplied: unapplied}, nil
 }
 
+// ResolveRetroArchCore devolve o nome do core que um lançamento vai usar,
+// aplicando o mesmo fallback de resolveCoreName (core explícito, senão o
+// padrão do console) sem precisar montar um Request nem tocar o disco.
+//
+// Exportado para o R3 (ADR 0015, docs/decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md):
+// a API precisa saber QUAL core um lançamento vai precisar antes de montar o
+// comando, para decidir se dispara um download primeiro — duplicar essa
+// lógica de fallback na camada de API divergiria de resolveCoreName no
+// primeiro console novo que alguém adicionasse.
+func ResolveRetroArchCore(consoleID, explicitCore string) (string, error) {
+	return retroArchAdapter{}.resolveCoreName(Request{ConsoleID: consoleID, Core: explicitCore})
+}
+
 // resolveCoreName decide qual core usar: o pedido explicitamente, ou o padrão
 // do console.
 func (retroArchAdapter) resolveCoreName(req Request) (string, error) {
@@ -205,18 +237,7 @@ func coreExtension() string {
 
 // locateCore procura o arquivo do core nos diretórios onde o RetroArch os
 // mantém, que variam conforme a forma de instalação.
-//
-// Na primeira chamada, tenta copiar cores bundled do instalador para
-// ~/.local/share/zeux/retroarch/cores (Linux) ou equivalentes (ADR 0012).
 func locateCore(binaryPath, coreName string) (string, bool) {
-	// Garantir que cores bundled foram copiados (uma vez por daemon)
-	bundledCoresInitOnce.Do(func() {
-		if err := ensureBundledCoresAvailable(); err != nil {
-			// Aviso mas não bloqueia — cores podem vir do Online Updater
-			fmt.Fprintf(os.Stderr, "aviso ao copiar cores bundled: %v\n", err)
-		}
-	})
-
 	file, ok := retroArchCores[coreName]
 	if !ok {
 		return "", false
@@ -306,15 +327,6 @@ type CoreStatus struct {
 // (achado 2026-08-04: um core inteiro podia estar ausente por um bug de
 // caminho, e nada na tela avisava até o lançamento falhar).
 func RetroArchCoreStatus(ctx context.Context) []CoreStatus {
-	// Mesmo gatilho de locateCore: garante que cores bundled foram copiados
-	// antes de reportar o que está instalado, senão a primeira consulta a
-	// esta rota mostraria tudo como ausente até o primeiro lançamento.
-	bundledCoresInitOnce.Do(func() {
-		if err := ensureBundledCoresAvailable(); err != nil {
-			fmt.Fprintf(os.Stderr, "aviso ao copiar cores bundled: %v\n", err)
-		}
-	})
-
 	binaryPath := ""
 	if install, ok := (retroArchAdapter{}).Locate(ctx); ok {
 		binaryPath = install.BinaryPath

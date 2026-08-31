@@ -34,7 +34,6 @@
       "icons/icon.ico"
     ],
     "externalBin": ["binaries/zeuxd"],
-    "resources": ["resources/"],
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper",

@@ -13,6 +13,346 @@ dizendo o que dizia antes e como foi conferido** — as correções estão marca
 com a data em cada lugar, não apagadas. A tabela "Quantas faltam" foi
 **recontada item a item** nesta data.
 
+**Revisão parcial em 2026-08-26 — não é auditoria completa, e a distinção
+importa:** só foram revisados a Sprint C (RetroArch/cores), a Sprint G
+(G1/G2/G3), a seção "Fora do MVP" e o que a Sprint E dizia sobre
+RetroAchievements, tudo a partir de uma especificação externa trazida pelo
+Douglas ("Retro-Steam Frontend"). O resto do documento **não** foi conferido
+contra o código nesta data — a última verificação de verdade continua sendo a
+de 2026-08-07. A tabela "Quantas faltam" **não** foi recontada: ela agora
+ignora os 4 itens novos da Sprint C (R1–R4), o G6 e os 3 da Sprint P.
+
+**Atualizado em 2026-08-27:** R1, R2 e R3 (Sprint C) foram implementados e
+testados de ponta a ponta nesta sessão — `go build`/`go vet`/`go test ./...`
+verdes, compilação cruzada linux/darwin/windows. R4 também, com uma exceção:
+o `npm run tauri build`/`cargo check` de verificação final não rodou (sem
+cache do Rust nem `node_modules` neste ambiente) — fica **pendente do
+Douglas**, é o único checkbox aberto que sobra na Sprint C inteira. A tabela
+"Quantas faltam" abaixo continua **sem contar** os itens da Sprint C (mesma
+ressalva de 2026-08-26) — ela mede a v1.0/v2.0 originais, não este trabalho
+novo.
+
+---
+
+## Sprint Q — do zero ao jogo bem configurado (2026-08-28)
+
+Nasceu de percorrer o app inteiro como usuário, do primeiro clique até um jogo
+abrindo, e comparar com a promessa do produto ("o app lê o hardware, diz o que
+a máquina alcança, e **autoconfigura o emulador**"). O caminho até "o jogo
+abriu" está de pé; o que falta é tudo que separa "abriu" de "abriu do jeito
+certo, com o meu controle, na minha tela".
+
+### O diagnóstico, medido no código (2026-08-28)
+
+| Peça | Estado real |
+|---|---|
+| Consentimento → scan → parecer | Funciona |
+| Instalar emulador em 1 clique | Funciona para **12 dos 14** adapters (RetroArch e Dolphin são `manual`) |
+| Baixar core sob demanda | **Nenhum core baixa hoje**: 0 de 125 assets do manifesto têm hash medido |
+| Apontar pasta de jogos, varrer, jogar | Funciona |
+| Preset aplicado ao lançar | **Só `fullscreen`** — ver Q2 |
+| Saber qual é a tela do usuário | **Não existe** — ver Q3 |
+| Controle detectado/configurado | **Não existe** — ver Q4 |
+
+Consequência combinada das duas primeiras linhas: hoje, **só os 12 consoles de
+emulador dedicado chegam ao jogo**. Os 21 que dependem do RetroArch esbarram
+ou na instalação manual dele, ou no core que não baixa.
+
+### Q1 — gerar o manifesto de cores — **bloqueado neste ambiente**
+
+O item mais barato e de maior impacto do backlog inteiro, e o único que não dá
+para fazer daqui: `buildbot.libretro.com` continua inacessível neste ambiente
+(reconferido em 2026-08-28, sem resposta). É um `go run` numa máquina com rede
+livre.
+
+- [ ] `go run ./cmd/generate-retroarch-manifest` numa máquina com acesso ao
+      buildbot, e commitar o manifesto medido.
+
+**Critério de aceite:** `TestRetroArchManifestEntriesAreWellFormed` continua
+passando, os 125 assets saem com `generated: true`, `size` e `sha256`
+preenchidos, e "Baixar core" na tela do console conclui de verdade para pelo
+menos um core em cada plataforma.
+
+### Q2 — o preset precisa ser aplicado, não só prometido — **feito em 2026-08-28**
+
+`BuildCommand` só sabe emitir linha de comando, e a maior parte do preset não
+cabe em flag. Medido no `retroArchAdapter.BuildCommand`: ao lançar, sai
+`-L <core>`, `-f` se for tela cheia, e o caminho da ROM. `internal_scale`,
+`renderer` e `exit_on_close` vão **todos** para `Unapplied`.
+
+Ou seja, o parecer anuncia "Emulação de alta precisão, resolução interna 4x" e
+o que chega ao emulador é **tela cheia**. Existe um caminho que funciona —
+`ConfigurableAdapter.WriteConfig`, que grava no arquivo do próprio emulador e
+no PCSX2 aplica `upscale_multiplier` de verdade —, mas ele só é acionado pelo
+painel "Configurações", à mão, e não pelo botão Jogar.
+
+- [x] O lançamento passa pelo `WriteConfig` do adapter (quando ele for
+      `ConfigurableAdapter`) antes de montar o comando, e junta os dois
+      `Unapplied` — o da configuração e o da linha de comando.
+- [x] **A configuração explícita do usuário vence o preset.** Precedência já
+      registrada no `Registry` ("o que o usuário definiu à mão sempre vence o
+      que vem de fábrica"): se a pessoa salvou configuração pelo painel, o
+      lançamento **não** sobrescreve. `emulator_user_config` (migração `0006`),
+      gravada por `POST /emulators/{id}/config` e apagada por `DELETE`.
+- [x] `BuildCommand` continua puro (`CLAUDE.md`: não toca disco). A escrita
+      mora em `Launcher.applyPreset`.
+
+**Feito em 2026-08-28.** Três decisões que valem registro:
+
+1. **Quando a configuração é aplicada, a linha de comando deixa de pedir as
+   mesmas opções.** `internal_scale` e `renderer` são zerados antes do
+   `BuildCommand`. Sem isso, o RetroArch diria "o driver de vídeo precisa ser
+   escolhido nas configurações" logo depois de o `WriteConfig` ter gravado
+   `video_driver` — uma mensagem de "não aplicado" sobre algo que acabou de
+   ser aplicado. `fullscreen` continua indo pelas duas vias de propósito: uma
+   flag é mais confiável que uma chave de arquivo.
+2. **Na dúvida, não mexer.** `IsUserConfigured` devolve `true` junto do erro:
+   um falso positivo custa um preset não aplicado numa vez (o jogo abre com a
+   configuração que já estava lá); um falso negativo sobrescreve calado a
+   escolha da pessoa, que do ponto de vista dela é irreversível.
+3. **Preset que falha não impede o jogo de abrir** (princípio 5 — informar,
+   não bloquear). A falha vira aviso no log, e a resolução interna volta a ir
+   pela linha de comando, que era a única chance antes deste item.
+
+**Ainda não verificado:** o efeito num `PCSX2.ini` de verdade. Os testes
+observam o que cada camada recebeu (adapter espião sobre `/bin/true`), não o
+arquivo final de um PCSX2 instalado — este ambiente não tem um. O
+`upscale_multiplier` em si já é coberto por `pcsx2_config_test.go` desde o H1.
+
+### Q3 — o ZeuX não sabe qual é a sua tela
+
+`HardwareInfo` tem `OS`, `CPU`, `GPUs`, `Memory` — **nenhum campo de display**.
+Sem resolução, sem taxa de atualização, sem contagem de monitores. O
+`internal_scale: 4` do catálogo é constante escrita à mão, não conta a partir
+do monitor: PS1 em 4x num 1080p e num 4K são decisões diferentes, e o app não
+tem como saber qual é a sua.
+
+- [ ] `DisplayInfo` no `HardwareInfo` (resolução, taxa de atualização,
+      principal sim/não), um arquivo por SO como já é a detecção de GPU.
+- [ ] Display não lido **não** vira palpite: cai no parecer parcial, como
+      qualquer outro dado ausente (princípio 4).
+- [ ] O `internal_scale` do lançamento passa a considerar a resolução, sem
+      ultrapassar o que o patamar de hardware permite.
+
+**Critério de aceite:** `GET /hardware` traz o display nas três plataformas
+(compilação cruzada obrigatória, `CLAUDE.md`); a tela de Especificações mostra
+o monitor junto de CPU/GPU/memória; e o texto continua descritivo, nunca
+julgador ("esta tela é 2560×1440", nunca "sua tela é pequena").
+
+### Q4 — controle: nada é detectado, nada é configurado
+
+- `useGamepadNavigation` navega a **interface do ZeuX** com D-pad. Não toca o
+  emulador.
+- Mapeamento existe para **2 dos 14** adapters (PCSX2 e RetroArch).
+- No PCSX2 só **teclado** é gravado: todo `Button` vai para `Unapplied`, com a
+  nota de que o formato de botão físico nunca foi confirmado contra hardware
+  real.
+- No RetroArch botões são gravados (`input_player1_*_btn`), mas o usuário
+  **digita o índice à mão** — nada lê o controle plugado.
+
+- [ ] Detectar o controle conectado (a Gamepad API já está no app, usada hoje
+      só para navegar a UI) e exibir o que ele é.
+- [ ] "Mapear pelo controle": apertar o botão físico preenche o campo, em vez
+      de digitar índice.
+- [ ] Começar pelo RetroArch, o único que já aceita botão hoje. O PCSX2 fica
+      declarando `Unapplied` até alguém confirmar o formato dele contra
+      hardware real — **não inventar o formato** (a regra das flags não
+      validadas vale igual aqui).
+
+**Critério de aceite:** com um controle plugado, a tela mostra o nome dele e o
+mapeamento gravado no `retroarch.cfg` corresponde aos botões apertados. Sem
+controle, a tela diz isso e o caminho por teclado continua igual ao de hoje.
+
+### Q5 — os 21 consoles que dependem do RetroArch
+
+`Manager.Start` recusa fonte `manual` com uma mensagem — então "Jogar" com o
+emulador ausente, que deveria instalar sozinho (L8), morre para RetroArch e
+Dolphin.
+
+- [ ] Ou o RetroArch ganha instalação automatizada, ou o caminho manual vira
+      excelente: instruções na tela do console, e o ZeuX confirmando sozinho
+      quando o binário aparecer na pasta gerenciada.
+- [ ] `evaluateGameLaunchability` precisa distinguir "não instalado, dá para
+      instalar" de "não instalado, e o ZeuX não sabe instalar" — hoje o badge
+      é o mesmo e o clique leva a um erro.
+
+**Critério de aceite:** em nenhum dos 33 consoles o botão de instalar leva a
+um beco: ou instala, ou explica na hora o que fazer, antes do clique.
+
+---
+
+## Sprint P — a entrada principal passa a ser o console (2026-08-28)
+
+Pedido do Douglas: "uma página de consoles, com todos que podemos gerenciar
+pelo ZeuX; a pessoa clica no console e vê os possíveis emuladores, os que já
+estão instalados e os que ela pode instalar. Se um emulador puder rodar mais
+de um console, ele aparece em todos." Junto do julgamento de que isso faz
+mais sentido do que a tela de emuladores como entrada principal.
+
+### O achado que mudou o desenho
+
+Rodando `Registry.ForConsole` sobre os 33 consoles do catálogo:
+
+| Situação | Quantos | Quais |
+|---|---|---|
+| Mais de um emulador possível | **5** | `ps1` (DuckStation + RetroArch), `n64` (RMG + RetroArch), `dreamcast` (Flycast + RetroArch), `psp` (PPSSPP + RetroArch), `nds` (melonDS + RetroArch) |
+| Só RetroArch | 19 | NES, SNES, Mega Drive, GB/GBC, GBA, Saturn, Arcade, Neo Geo… |
+| Só standalone | 9 | PS2, GameCube, Wii, Xbox, Xbox 360, PS3, 3DS, Vita, Wii U |
+
+A premissa está certa, mas "escolher entre emuladores" é a pergunta de **5**
+consoles. Por isso o eixo escolhido (decidido pelo Douglas nesta sessão) é
+**prontidão** — "o que falta para este console rodar": emulador instalado?
+core baixado? BIOS presente? pasta de jogos apontada? — que responde algo nos
+33. A escolha entre emuladores aparece onde ela existe, sem virar o esqueleto
+de uma tela que nos outros 28 mostraria uma opção só.
+
+### O que a tela pode prometer sobre BIOS, e o que não pode
+
+Três caminhos distintos tocam o disco do usuário, com permissões diferentes:
+
+1. **O daemon (`zeuxd`)** — sidecar do Tauri, roda como o usuário logado, sem
+   elevação/UAC. Lê e escreve o que o usuário pode. Raiz própria em
+   `os.UserConfigDir()/ZeuX` (`%AppData%\Roaming\ZeuX` no Windows).
+2. **O Explorer, pelo plugin `opener` do Tauri** — é o botão "Abrir pasta". A
+   capability (`src-tauri/capabilities/default.json`) libera `open-path`
+   **só em `$CONFIG/**`**. Um caminho fora de `%AppData%\Roaming` é recusado
+   pelo **Tauri**, não pelo Windows. (`reveal-item-in-dir` está liberado em
+   `**`.)
+3. **O seletor nativo (`plugin-dialog`)** — o usuário escolhe a pasta, sem
+   restrição de capability. É a válvula de escape.
+
+E o estado real de BIOS é bem mais magro do que a tela poderia sugerir:
+`BiosDir` (`internal/emulator/bios_dir.go`) só responde para **DuckStation
+instalado pelo ZeuX** e **PCSX2 no Linux** — no Windows o PCSX2 devolve nada
+de propósito (usa Documentos, convenção nunca verificada). O catálogo marca
+**11 consoles** com `requires_external_file`; no Windows, exatamente **um**
+deles (PS1) tem pasta para apontar hoje.
+
+**Consequência aceita, registrada aqui para não virar promessa vazia:** a
+prontidão só reporta "BIOS ausente" quando o ZeuX **sabe** onde aquele
+emulador lê o arquivo e a pasta está vazia. Console marcado
+`requires_external_file` cujo emulador não tem `bios_dir` conhecida não é
+reportado como faltando BIOS — princípio 4 do `CLAUDE.md`: dado que não pôde
+ser verificado não conta como atendido nem como não atendido.
+
+### P1 — `GET /api/v1/consoles` e a tela de lista — **feito em 2026-08-28**
+
+- [x] `CoreAdapter` (`internal/emulator/adapter.go`), capacidade opcional no
+      mesmo molde de `ConfigurableAdapter`/`KeyBindableAdapter`. Fecha a
+      lacuna que impedia a tela: `defaultCoreByConsole` não era exposto por
+      **nenhuma** rota. `ConsoleVerdict.core` chegava perto, mas some quando
+      o nível é `improvavel`, e é o core do *tier*, não o padrão do console.
+- [x] `Registry.OptionsForConsole` — a inversão de "adapter → consoles" para
+      "console → adapters" mora no backend porque o que ela carrega junto é a
+      **ordem** (standalone antes do RetroArch), que é regra de produto de
+      `ForConsole`. Invertida no cliente, a ordem se perderia e uma segunda
+      cópia da regra divergiria calada.
+- [x] `GET /api/v1/consoles`, **sem exigir consentimento** — catálogo não é
+      hardware. É o que faz a tela funcionar também para quem recusou o scan
+      (B8: "recusar não pode ser beco sem saída").
+- [x] `src/lib/consoleReadiness.ts` — a regra de prontidão num módulo próprio,
+      pelo mesmo motivo de `gameLaunchability.ts`: lista e detalhe precisam
+      responder igual. Índice montado uma vez por tela, `O(1)` por console.
+- [x] `ConsolesScreen` com busca (por console **ou** por emulador), filtros
+      por passo de prontidão com contagem, e filtro vazio se escondendo em
+      vez de levar a lista vazia.
+- [x] Sidebar: "Emuladores" → "Consoles". `EmulatorsScreen` **continua
+      existindo** como sub-visão ("Ver por emulador") — é a casa dos
+      emuladores personalizados, da lista dos 25 cores com "baixar os que
+      faltam" e dos painéis de configuração/mapeamento, nada disso pertence a
+      um console só.
+
+Verificado com o app rodando (Chromium/Playwright, `zeuxd` real): a rota
+devolve os 33 consoles com os 5 de escolha múltipla corretos, a grade fica
+regular (12 cards de 212 px), o filtro e a busca por emulador funcionam, e
+não há rolagem horizontal em 900 px de janela.
+
+**Achado ao ver a tela de verdade:** o selo de prontidão quebrava em duas
+linhas nos cards de título longo (NES, PC Engine) e esticava a altura do
+card, deixando a grade irregular. `shrink-0 whitespace-nowrap` no selo —
+local, não no `Badge`, que precisa poder quebrar em outros usos.
+
+### P2 — detalhe do console — **feito em 2026-08-28**
+
+- [x] `ConsoleDetailScreen`: um card por forma de rodar o console (as 2 opções
+      do PS1, a única do Game Boy), cada uma com instalar/remover, "abrir
+      configurações do emulador", o estado do core e o caminho de instalação
+      manual quando a fonte é `manual`. A pasta de jogos (apontar, varrer de
+      novo, remover, contagem) e a de BIOS na coluna lateral, com o parecer
+      reusando `ConsoleVerdictCard` — nunca uma segunda formatação do mesmo
+      dado.
+- [x] A prontidão do topo reusa `evaluateConsoleReadiness`, a mesma da lista:
+      as duas telas não têm como discordar sobre o que falta.
+- [x] **Refatoração que veio junto, para não duplicar máquina de estado:**
+      `useCoreInstall` e `useEmulatorInstall` extraídos de dentro de
+      `EmulatorsScreen` (`RetroArchCoresList` e `EmulatorCardActions`) e
+      adotados pelas duas telas. `EmulatorsScreen` caiu de 1210 para 1011
+      linhas, com comportamento idêntico — o polling, o "cancelado não é
+      falha" e a readoção de jobs em andamento são detalhes que uma segunda
+      implementação por instinto erraria em silêncio.
+
+**Achado ao ver as duas telas juntas (2026-08-28), não corrigido de
+propósito:** no Game Boy, o detalhe mostra o core `gambatte` e o parecer
+mostra "RetroArch (core SameBoy)". Os dois estão certos e são coisas
+diferentes — `ConsoleVerdict.core` é o core do **patamar** do catálogo,
+`defaultCoreByConsole` é o que o lançamento realmente usa. E é o segundo que
+vale: `GamesScreen.doLaunch` manda só `rom_path`/`console_id`, então
+`resolveCoreName` cai no padrão e o `sameboy` do parecer **nunca é
+aplicado**. O detalhe mostra o core certo (o que roda); quem promete errado
+é o parecer. Fechar essa lacuna significa mudar o que o lançamento envia —
+decisão de produto, fora do escopo desta sprint.
+
+### P3 — o que a Sprint P deixou aberto
+
+- [ ] O parecer promete um core que o lançamento não usa (achado acima).
+      Decidir entre mandar `core` no lançamento ou parar de anunciar o core
+      do patamar no texto do parecer.
+- [ ] Os 2 emuladores de fonte `manual` (RetroArch, Dolphin) não têm 1-click:
+      a prontidão diz "instalar emulador" e o detalhe só sabe mostrar o site
+      oficial e a pasta de destino. Vale para os 21 consoles que dependem do
+      RetroArch.
+- [ ] Rever a capability `opener:allow-open-path` (`$CONFIG/**`) se algum dia
+      uma pasta de BIOS fora de `%AppData%` for apontada — hoje nenhuma é,
+      então a restrição não incomoda.
+
+---
+
+## Auditoria de veracidade dos documentos (2026-08-28)
+
+Varredura de **todos** os `.md` do repositório contra o código e contra o app
+rodando (Chromium/Playwright, `zeuxd` real). O que estava errado foi
+corrigido no próprio documento; registrado aqui o que a varredura achou,
+porque a maior parte era afirmação que envelheceu sem ninguém notar:
+
+| Documento | O que estava errado |
+|---|---|
+| `README.md` | Dizia **"ainda não há interface gráfica, scraper de metadados nem banco de dados"** — os três existem (Tauri + React com 10 telas, IGDB, SQLite). Dizia 13 emuladores (são 14) e que só o DuckStation tinha sido validado com jogo real (também PS2/PCSX2, N64/RMG e três consoles pelo RetroArch). |
+| `CLAUDE.md` | Faltavam `internal/igdb` e `cmd/generate-retroarch-manifest` na estrutura; `internal/library` ainda marcado "(não plugado — L5)"; a proibição "não introduza banco de dados" apontava para o **ADR 0002, que foi substituído pelo 0011** — lida ao pé da letra, proibia mexer no SQLite que já é a persistência oficial. Duas "armadilhas conhecidas" tinham deixado de ser verdade (`Installation.Version` nunca preenchido; README desatualizado). |
+| `docs/api.md` | Anunciava documentar "todas as rotas HTTP" com **6 rotas ausentes** (`/emulators/{id}/config` nos três métodos, `/emulators/{id}/bindings` nos dois, `/library/folders/bulk`) e 3 fora do índice (`/system/info`, `/covers/{caminho}`, `/retroarch/cores`). Escritas conferindo a resposta real do daemon; índice agora bate com as 42 rotas do roteador. |
+| `docs/adapters.md` | A tabela de cores listava **10 de 25**, e a de `defaultCoreByConsole` **7 de 24**, ambas sem dizer que eram amostra. A nota "`gambatte` está mapeado mas nenhum console o usa — não há entrada de Game Boy/GBC" era **falsa**: `gb` e `gbc` usam `gambatte` como padrão. Faltava o diretório gerenciado do ZeuX na ordem de busca de cores, e o texto ainda mandava o usuário ao Online Updater em vez do download sob demanda (R3). Seção regenerada a partir do código. |
+| `docs/arquitetura.md` | `internal/igdb` fora da tabela de pacotes; `internal/install` descrito sem o download de cores. |
+| `docs/wireframe.md` | "Sem scraper no MVP" (o G1 existe), "as tabelas da biblioteca ainda não" (existem, migrações `0002`–`0005`), painel de detalhe "em aberto" (virou `GameDetailScreen`). O item de BIOS foi mantido — continua verdade que não há catálogo de nome/hash — mas agora diz o que já existe (`requires_external_file`, `BiosDir`). |
+| `docs/decisoes/0011` | O Status dizia "pastas/jogos/BIOS da biblioteca ainda não têm tabela nem código". Pastas e jogos têm; só o BIOS continua fora do banco. |
+| `docs/THIRD-PARTY-LICENSES.md` | Escrito para o modelo empacotado (ADR 0012); ganhou aviso de que a distribuição mudou e que a seção de conformidade não foi revisada para o modelo novo. |
+| Comentários de código | Seis apontavam para `scripts/download-retroarch-cores.mjs`, **apagado no R4** — e um deles era a única fonte que documentava a estrutura real de URL do buildbot (confirmada em 2026-08-04). O conhecimento foi realojado em `BuildBotCoreURL` antes que se perdesse com o arquivo. |
+
+**Achado de segurança, fora do escopo de documentação:** o log do daemon
+imprimia o `client_secret` do IGDB. As credenciais iam na query string, e
+qualquer falha de rede vira um `*url.Error` que carrega a URL inteira na
+mensagem — que ia para o log. Com a credencial do próprio usuário (o caminho
+recomendado), o segredo **dele** apareceria num log colado num pedido de
+ajuda. Corrigido movendo para o corpo form-encoded, que é o que o OAuth 2
+espera (RFC 6749, §2.3.1), travado por
+`TestAuthenticateNaoColocaSegredoNaURL`. A credencial de teste embutida em
+`internal/igdb/credentials.go` **não** é um achado: é decisão consciente do
+Douglas (2026-08-17), com o trade-off documentado no próprio arquivo.
+
+**O que foi verificado na tela, não só no código:** as 4 telas de navegação
+abrem sem erro de console; a sidebar mede os 64 px que o `CLAUDE.md` afirma;
+a área útil em janela de 1280 é de 1216 px, confirmando a regra de nunca usar
+`xl:` esperando que dispare no tamanho padrão; nenhuma tela produz rolagem
+horizontal.
+
 ---
 
 ## Corte de versão: o que é v1.0 e o que é v2.0
@@ -142,7 +482,7 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | Dívida honesta | **1** | D2 (estratégia definida; execução depende de Sprint E/F — **não fecha na v1.0**, é dívida declarada) |
 | Sprint A | **0** | fechada; `Installation.Version` feito 2026-08-05, D11 feito 2026-08-04 |
 | Sprint B | **0** | fechada 2026-08-05; B11 verificado em máquina limpa dos 3 SOs pelo Douglas |
-| Sprint C | **0** | fechada; cores do RetroArch resolvidos via [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md), confirmados pelo Douglas em 2026-08-05 |
+| Sprint C | **0** | fechada com o escopo original (cores do RetroArch, confirmado pelo Douglas em 2026-08-05). **O ADR 0012 que resolvia isso foi substituído em 2026-08-26 pelo [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)** — reabriu a sprint com 4 itens novos (R1–R4), implementados em 2026-08-27; contagem aqui continua em 0 porque esta tabela não inclui R1–R4 (ver nota de 2026-08-26/27 no topo do documento) |
 | Sprint D (MVP) | **0** | os 11 itens fechados, critério de saída cumprido |
 | Sprint G (v1.0) | **0** | **Fechada em 2026-08-07** — G5 fechou os dois checkboxes (nenhum console cai num estado vazio; colisão de sigla de 4 letras achada por script e corrigida com `ICON_LABEL_OVERRIDES`). G1/G2/G4 já fechados; G3 fora da v1.0 por decisão |
 | **Sprint H (v1.0)** | **1** | **H3** — 1 checkbox: mapeamento respeitado com controle físico real. Só o Douglas fecha. H1/H2/H4/H5 fechados |
@@ -153,10 +493,10 @@ aberto** — é decisão tomada, não trabalho pendente. D11 aparece em dois lug
 | **Sprint M (v1.0)** | **9** | M1–M15. **Atualizado 2026-08-07** (Lote 11, testado ao vivo com Chromium/Playwright): **M15 fechou** (zero checkbox aberto — scanline movida pro placeholder-only, botão "Buscar capas" parou de mudar de largura durante a busca, os dois verificados ao vivo interceptando rede pra não depender de credencial real do IGDB; `PAGE_SIZE`/`defaultLibraryPageSize` já estavam em 30 desde um lote anterior). Com M15, **só M14 continua sem começar** — precisa de controle físico real, fora do alcance de qualquer sessão de IA (mesma limitação de H3/L3). Os outros 8 itens (M1/M2/M3/M4/M6/M7/M10/M11) têm código pronto e a maior parte do critério verificado ao vivo, cada um com 1 ressalva que só o Douglas fecha — janela real do Tauri, julgamento de "ficou legível"/"cores se distinguem", (M6) confirmar num build Tauri de verdade a permissão nova de `revealItemInDir` (esta sessão não tem Rust instalado, ADR 0004), ou (M11) conferir com uma capa real do IGDB em vez das imagens de teste sintéticas — exceto M1 que também tem a densidade de fileiras medida e **não batendo o alvo** (2 fileiras cheias em 1280×800, não 3 — ver o item). **6 dos 15 itens fechados sem ressalva nenhuma:** M5, M8, M9, M12, M13, M15. |
 | Sprint E (**v2.0**) | **7** | as 7 linhas da tabela da sprint |
 | Sprint F (**v2.0**) | **6** | as 6 linhas da tabela da sprint |
-| Sem sprint | **5** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma, resto do ADR 0012 (macOS + pinar versão). **Era 7**: "novos consoles" saiu (os 6 já estão no catálogo) e o RetroArch-não-é-1-click foi substituído pelo ADR 0012 |
+| Sem sprint | **4** | catálogo via nuvem, autenticação da API local, porta dinâmica, CI multiplataforma. **Era 5**: "resto do ADR 0012 (macOS + pinar versão)" saiu em 2026-08-27 — ADR 0012 foi substituído pelo [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) e implementado (R1–R4); a preocupação de macOS/versão fixa não tem mais equivalente pendente aqui (macOS já é coberto pelo manifesto de cores, e o hash fixado substitui "pinar versão" — ver R1) |
 | **Total do MVP e da dívida** | **1** | só o D2 — dívida + A + B + C + D |
 | **Total para fechar a v1.0** | **11** | H3 + L3 + os 9 restantes da Sprint M. **G5 fechou em 2026-08-07** (achado e corrigido: colisão de sigla de 4 letras em `ConsoleIcon`) e saiu desta conta. Recontado em 2026-08-07, Lote 11 — a Sprint M foi de 14 abertos no início do dia a 9 (M5/M8/M9/M12/M13/M15 fecharam sem ressalva). **Esta linha dizia 17** antes desta sessão recontar — desatualizada desde antes da Sprint M ter sido trabalhada. **O D2 não entra**: depende da Sprint F (v2.0) e sai declarado como dívida, não resolvido |
-| **Total geral** | **30** | 11 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 5 (sem sprint). **Esta linha dizia 36** — mesma causa da linha acima |
+| **Total geral** | **29** | 11 (v1.0) + 1 (D2) + 7 (E) + 6 (F) + 4 (sem sprint). **Era 30** — "sem sprint" caiu de 5 para 4 em 2026-08-27 (ver linha acima). Ainda não conta os itens novos da Sprint C (R1–R4, fechados) nem G6/Sprint P (abertos) — mesma ressalva de 2026-08-26 |
 | Fora do MVP, registrado | 2 | G3 (identificação por hash) e J5 (`DropdownMenu`) — os dois fora **por decisão escrita**, não por esquecimento |
 
 **Leitura honesta do número:** dos 18 itens da v1.0, **3 são verificação humana
@@ -999,7 +1339,7 @@ refletindo o estado certo.
 | ~~Extração para `ManagedRoot()`~~ | M | **Feito** — `extract.go` + `manager.go` (`promote`), atômico via diretório de trabalho + `rename` |
 | ~~Instalar/atualizar/remover apenas o que é `managed`~~ | M | **Feito** — `Uninstall` só apaga dentro de `ManagedRoot()`; atualização preserva dados de instalação portátil |
 | ~~Estrutura de diretórios por console (não achatada por adapter)~~ | M | **Feito 2026-08-02** — ver [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md); só a parte de emuladores, a de jogos depende da Sprint D |
-| ~~**Instalação de cores do RetroArch**~~ | M | **Resolvido — via empacotamento, não via instalação em tempo real.** Ver [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md): os 24 cores (mais os 4 de precisão máxima) vêm dentro do próprio instalador do ZeuX (`scripts/download-retroarch-cores.mjs` + `cmd/download-retroarch-app`, baixados no build, não em runtime), não resolvidos via `internal/install` contra `buildbot.libretro.com` como esta linha presumia originalmente. **Douglas verificou de verdade em 2026-08-05, lançando jogos de 3 consoles diferentes via RetroArch** — cores presentes e funcionais. A nota de bloqueio abaixo (rede indisponível neste ambiente de CI) descreve por que a implementação *nesta sessão* não teria como testar contra o buildbot — segue registrada por precisão histórica, mas deixou de ser o caminho adotado. |
+| ~~**Instalação de cores do RetroArch**~~ | M | **Reaberto em 2026-08-26 — ver [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) e os itens R1–R4 abaixo.** O empacotamento descrito nesta célula foi construído, verificado e **funciona**; o que mudou foi a decisão de produto do Douglas (instalador pequeno, core baixado sob demanda). O texto original segue abaixo, sem edição, porque o modelo novo assume de volta custos que ele descreve. — *Texto de 2026-08-05:* **Resolvido — via empacotamento, não via instalação em tempo real.** Ver [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md): os 24 cores (mais os 4 de precisão máxima) vêm dentro do próprio instalador do ZeuX (`scripts/download-retroarch-cores.mjs` + `cmd/download-retroarch-app`, baixados no build, não em runtime), não resolvidos via `internal/install` contra `buildbot.libretro.com` como esta linha presumia originalmente. **Douglas verificou de verdade em 2026-08-05, lançando jogos de 3 consoles diferentes via RetroArch** — cores presentes e funcionais. A nota de bloqueio abaixo (rede indisponível neste ambiente de CI) descreve por que a implementação *nesta sessão* não teria como testar contra o buildbot — segue registrada por precisão histórica, mas deixou de ser o caminho adotado. |
 | ~~**Aviso quando o hardware não comporta, e o usuário decide**~~ | P | **Feito na Sprint B, item B10** |
 | ~~Rotas: `POST /api/v1/emulators/{id}/install`, `DELETE`, progresso~~ | M | **Feito** — documentado em `docs/api.md`, testado de verdade no B10 |
 
@@ -1007,16 +1347,407 @@ refletindo o estado certo.
 automaticamente**. Mostrar o parecer, explicar o gargalo, e deixar o usuário
 decidir por conta e risco. Não bloquear — informar.
 
-### Bloqueio real: instalação de cores do RetroArch
+### Reaberto em 2026-08-26: cores e RetroArch baixados sob demanda (ADR 0015)
 
-**Resolvido por outra via (ver linha da tabela acima, ADR 0012) — seção
-mantida por registro histórico do porquê a rota abaixo foi descartada, não
-como pendência ativa.** Em vez de o `internal/install` resolver e baixar
-cores em tempo real contra o `buildbot.libretro.com` (a ideia original
-descrita abaixo), a decisão foi empacotar os cores dentro do instalador do
-ZeuX — baixados uma vez, no build, não a cada instalação do usuário. O
-Douglas testou o resultado empacotado com jogos reais de 3 consoles em
-2026-08-05 e confirmou funcionando.
+**Decisão do Douglas, 2026-08-26**, a partir de uma especificação externa
+("Retro-Steam Frontend", seção 3): o instalador do ZeuX volta a sair **sem**
+RetroArch e sem cores; o `zeuxd` baixa o que falta na primeira vez que o
+usuário manda abrir um jogo daquele console. Ver
+[ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md), que
+substitui o [0012](decisoes/0012-empacotar-retroarch-e-cores.md).
+
+**O que isto custa, escrito antes de alguém descobrir na prática:**
+
+- O primeiro jogo de cada console passa a **exigir rede** — o empacotamento
+  comprava exatamente isso, e é a regressão real desta virada.
+- O ZeuX volta a depender da estrutura do `buildbot.libretro.com`, que já
+  mordeu o projeto duas vezes em 2026-08-04 (URL com `/cores/` a mais → `404`
+  nos 20 cores; API errada da lib de descompactação).
+- **Nada disto é verificável em sessão de IA:** o host segue bloqueado por
+  política de rede neste ambiente (`gateway answered 403 to CONNECT (policy
+  denial)`, confirmado desde 2026-08-02). Todo item abaixo fecha na máquina do
+  Douglas, não aqui.
+- macOS **não** melhora: o buildbot entrega o app do RetroArch como `.dmg`, e
+  baixar sob demanda não muda o formato. No Mac, o RetroArch continua manual.
+
+**Mecanismo de progresso — decidido aqui para não virar discussão depois:**
+job + polling em `GET /api/v1/installs/{id}`, que já existe e já alimenta a
+tela de instalação 1-click. **Sem SSE, sem WebSocket** — `grep -rn
+"text/event-stream" internal/ src/` devolve vazio hoje, e um transporte novo
+para reaproveitar um painel de progresso que já funciona é a solução maior
+para o mesmo problema.
+
+#### R1 — Manifesto de runners: URL e SHA256 fixados por core (M) — **feito em 2026-08-27, com uma ressalva de rede**
+
+Sem hash fixado, o download sob demanda aceita qualquer bytes que o servidor
+devolver. O usuário precisa saber que o core que abriu o jogo dele é o mesmo
+que o Douglas conferiu ao cortar a versão.
+
+**Critério de aceite:**
+- [x] Existe um manifesto embutido no binário (`//go:embed`, mesmo padrão de
+      `internal/install/data/sources.json`) com, por core e por plataforma:
+      URL, nome do arquivo, tamanho esperado e **SHA256**. Implementado em
+      `internal/install/retroarch_manifest.go` +
+      `internal/install/data/retroarch_cores_manifest.json`.
+- [x] O manifesto cobre os 25 cores que o ADR 0012 listava — via
+      `emulator.KnownCores()` (novo acessor exportado de
+      `internal/emulator/retroarch.go`), para que as duas listas não possam
+      divergir silenciosamente. `TestRetroArchManifestCoversAllKnownCores`
+      (`internal/install/retroarch_manifest_test.go`) falha se algum core sair
+      de sincronia nos dois sentidos (falta no manifesto, ou sobra nele).
+- [x] `buildbot.libretro.com` entra em `allowedHosts`
+      (`internal/install/download.go`) — e só ele;
+      `TestAllowedHostsListIsExactlyTheExpectedSet`
+      (`internal/install/sources_test.go`) trava o conjunto exato.
+- [x] Existe um comando que **gera** o manifesto baixando e medindo os
+      arquivos: `cmd/generate-retroarch-manifest`. Não reaproveita o `.mjs`
+      nem o `cmd/download-retroarch-app` existentes porque nenhum dos dois
+      cobre múltiplas plataformas a partir de uma única máquina — o gerador
+      novo lê `emulator.KnownCores()` direto (mesma fonte que o teste de
+      cobertura) e usa `BuildBotCoreURL`, uma função só, para montar a URL do
+      buildbot — usada tanto pelo gerador quanto pelos testes, para que a
+      estrutura de URL não possa divergir entre os dois.
+- [x] Registrado (`HashSource`, no próprio manifesto, mais o comentário de
+      pacote em `retroarch_manifest.go`): **ninguém confirmou** se o buildbot
+      publica hash oficial por core — o host segue bloqueado neste ambiente.
+      O SHA256 é medido pelo próprio ZeuX no momento da geração.
+
+**Ressalva que fica registrada, não escondida:** rodando o gerador neste
+ambiente (`go run ./cmd/generate-retroarch-manifest`), as 125 combinações
+core/plataforma (25 cores × 5 plataformas) deram `403 Forbidden` — o buildbot
+segue inacessível daqui, exatamente como o ADR 0015 já previa. O manifesto
+commitado tem todas as URLs corretas e `"generated": false` em todo mundo;
+`size` e `sha256` ficam zerados/vazios até alguém rodar o gerador numa máquina
+com acesso real ao buildbot. **R2 precisa recusar instalar a partir de uma
+entrada `generated: false`** — isso não está implementado ainda, é o próximo
+passo (R2), não uma lacuna deste item.
+
+**Depende de:** nada · **Bloqueia:** R2, R3, R4
+
+#### R2 — Baixador sob demanda em Go, reusando o job de instalação (M) — **feito em 2026-08-27, com uma ressalva de rede**
+
+O download precisa ser o mesmo mecanismo já provado (atômico, com progresso e
+verificação), não um caminho paralelo com regras próprias.
+
+**Critério de aceite:**
+- [x] `POST /api/v1/retroarch/cores/{core}/install` devolve `202` com um `id`
+      de job, e `GET /api/v1/installs/{id}` reflete `baixando` → `verificando`
+      → `extraindo` → `finalizando` → `concluido`/`falhou` com percentual —
+      mesmos estados (`Phase`) que a instalação 1-click já usa, mesmo `Job`,
+      mesma rota `GET /installs/{id}`. Documentado em
+      [`docs/api.md`](api.md) antes de qualquer tela consumir a rota.
+      Implementado em `internal/install/retroarch_core_install.go`
+      (`Manager.StartCore`) + `handleInstallRetroArchCore`
+      (`internal/api/server.go`).
+- [x] SHA256 divergente do manifesto (R1) **falha o job** com `code` estável
+      (`"core_hash_mismatch"`) e mensagem em português nomeando o core. Nada é
+      promovido para o diretório gerenciado de cores. Verificado por
+      `TestStartCoreRejectsHashMismatch` — servidor de mentira
+      (`httptest.NewTLSServer`) devolvendo bytes que não batem com o SHA256
+      esperado, sem rede real.
+- [x] A promoção é atômica: o diretório de trabalho fica **dentro do próprio
+      destino** (`os.MkdirTemp(coresDir, ...)`, não `os.TempDir()`) para que o
+      `os.Rename` final nunca cruze sistema de arquivos e nunca deixe um core
+      pela metade — o rename só acontece depois que download, verificação de
+      hash e extração já terminaram com sucesso.
+- [x] Baixar um core que já existe é no-op explícito
+      (`TestStartCoreIsNoOpWhenAlreadyInstalled`): o job volta em `concluido`
+      na hora, sem nenhuma requisição de rede — checado **antes** até de
+      olhar o manifesto, para que um core já presente (bundled, sessão
+      anterior, Online Updater) não dependa do manifesto ter hash medido.
+- [x] Testes rodam sem rede: achou (no-op), hash errado
+      (`TestStartCoreRejectsHashMismatch`), `404`
+      (`TestStartCoreFailsOn404`), conexão caindo no meio
+      (`TestStartCoreFailsOnTruncatedDownload`, via `Content-Length` maior que
+      o corpo enviado), mais o caminho de sucesso
+      (`TestStartCoreInstallsWhenHashMatches`) e a decodificação de nomes de
+      core com espaço no path da API
+      (`TestInstallRetroArchCoreDecodesSpaceInPath`,
+      `internal/api/retroarch_core_install_test.go`).
+- [ ] Verificação contra o buildbot real: **pendente do Douglas** — este
+      ambiente não alcança o host (mesma restrição do R1). O item segue aberto
+      até alguém rodar o fluxo de ponta a ponta contra `buildbot.libretro.com`
+      de verdade — os testes acima provam a lógica (hash, atomicidade, no-op,
+      falha de rede), não que o buildbot responde do jeito que o código espera.
+
+**Compilação cruzada (linux/darwin/windows) e `go test ./...` completo
+passando em 2026-08-27.**
+
+**Depende de:** R1 · **Bloqueia:** R3
+
+#### R3 — "Jogar" baixa o que falta, dizendo o que está fazendo (M) — **feito em 2026-08-27, backend e tela**
+
+Um botão que demora sem explicar é um botão quebrado. O usuário precisa ver
+"baixando o core X" e poder desistir.
+
+**Critério de aceite:**
+- [x] Mandar abrir um jogo de console atendido pelo RetroArch, com o core
+      ausente, dispara o job do R2 **antes** do lançamento e abre o jogo sozinho
+      ao terminar — sem o usuário voltar para a tela de Emuladores.
+      `POST /games/launch` devolve `202` com o job (não mais `200`/`Session`)
+      quando isso acontece.
+      **Quem relança é a tela, não o servidor** (decisão do Douglas,
+      2026-08-27, revendo a primeira versão): o front acompanha o job e
+      repete `POST /games/launch` quando ele conclui. A primeira versão tinha
+      um `launchWhenCoreReady` que abria o jogo em segundo plano pelo lado do
+      servidor — retirado, porque abrir um processo de jogo minutos depois
+      surpreende quem já desistiu e saiu da tela, e o cliente não tinha como
+      impedir. O projeto já tinha o padrão certo em `useInlineInstall` (o
+      front espera o job e chama `onLaunch`). Trava contra laço: se a segunda
+      chamada também pedir download, a tela para e explica, em vez de baixar
+      em círculo. Testado em
+      `TestLaunchStartsCoreDownloadWithoutLaunchingByItself`
+      (`internal/api/launch_missing_core_test.go`), que prova as duas metades
+      — nenhuma sessão aparece por conta do servidor, e o relançamento abre o
+      jogo de verdade.
+- [x] Um cancelar que de fato interrompe: `DELETE /api/v1/installs/{id}`
+      (`Manager.CancelJob`) cancela o `context.Context` do download — o job
+      vai para uma fase própria, `"cancelado"` (não `"falhou"`, para a
+      interface distinguir desistência de erro), e nada é promovido, porque
+      a promoção só acontece depois que tudo deu certo. Testado sem rede
+      (`TestCancelJobInterruptsCoreDownload`, `internal/install`) e ponta a
+      ponta pela rota (`TestCancelInstallStopsCoreDownload`, `internal/api`).
+      **A tela existe** (`RetroArchCoresList`,
+      `src/screens/EmulatorsScreen.tsx`, dentro de "Ver cores" no card do
+      RetroArch): botão "Instalar" por core faltando, barra de progresso e
+      "Cancelar" durante o download — `tsc --noEmit` não aponta erro novo
+      introduzido por ela (o projeto não tem `node_modules/` neste ambiente,
+      então não roda de verdade no navegador aqui; `npm run build`/rodar o
+      app é o que falta, pendente do Douglas).
+- [x] Sem rede (ou sem hash medido), o erro é acionável e **nomeia o que
+      falta**: `"o core \"sameboy\" ainda não está no seu computador e não
+      foi possível baixá-lo agora: ..."`, com `code: "launch_failed"` — nunca
+      um "erro ao lançar" genérico. Testado em
+      `TestLaunchNamesTheMissingCoreWhenDownloadCannotStart`. Uma falha que
+      só aparece **depois** de o download já ter começado (hash divergente,
+      conexão caindo) não vira um segundo erro HTTP — já respondemos `202`;
+      ela só existe em `GET /installs/{id}`, documentado em `docs/api.md`.
+- [x] O caminho já pronto (core presente) **não ganha nenhuma etapa nova** —
+      `downloadMissingRetroArchCoreThenLaunch` checa
+      `emulator.RetroArchCoreStatus` **antes** de chamar `StartCore`, então
+      nenhum job é criado quando o core já está lá. Medido em
+      `TestLaunchDoesNotCreateJobWhenCoreAlreadyInstalled`: `POST
+      /games/launch` com core presente devolve `200`/`Session` de sempre e
+      `GET /installs` continua vazio.
+- [x] `GET /api/v1/retroarch/cores` continua listando o que está e o que não
+      está instalado, **agora com ação de instalar por linha de verdade**,
+      mais um "Baixar os N que faltam" (a pedido do Douglas, 2026-08-27) para
+      quem quer deixar a máquina pronta antes de ficar sem rede. A fila é
+      **sequencial** — o servidor aceitaria 25 downloads simultâneos, um job
+      por core, mas isso saturaria a rede de quem está usando o app e daria
+      25 barras que ninguém acompanha — e tem "Parar depois deste". Um core
+      que falha não derruba a fila. Continua sendo ação secundária, ao lado
+      do resumo: o caminho principal é o download sozinho ao jogar, e o
+      ADR 0015 existe justamente para não empurrar 25 cores em quem vai usar
+      três.
+      **Correção sobre o que este item dizia antes:** o texto original do
+      roadmap afirmava que "a tela já existe desde 2026-08-04" — falso,
+      conferido lendo o código: `RetroArchCoresList` só listava badges
+      `ok`/`faltando`, sem nenhum botão. O botão "Instalar" (por core),
+      "Cancelar" (durante o download) e a barra de progresso foram
+      construídos agora, junto com `installRetroArchCore`/`cancelInstall`
+      em `src/api/client.ts` e os campos novos (`core_name`, `code`, fase
+      `"cancelado"`) em `InstallJob`/`InstallPhase`
+      (`src/api/types.ts`) — sem esses campos no tipo, a tela não teria como
+      saber qual core um job pertence nem mostrar o cancelamento.
+      **Revisto na segunda passada:** a primeira versão trocou a grade de 3
+      colunas por uma lista de uma coluna para caber os botões — 25 cores ×
+      ~40 px de botão viravam ~1000 px de parede dentro do card, o mesmo
+      custo de densidade que o M1 já tinha diagnosticado ao tirar o botão de
+      baixo de cada tile. A grade voltou (`sm:grid-cols-2 lg:grid-cols-3`),
+      o botão ficou compacto (`px-2 py-1 text-xs`), o percentual virou
+      número além da barra, e `ProgressBar` ganhou `label` (25 barras
+      anônimas não dizem nada a leitor de tela). Também corrigido: fechar
+      "Ver cores" durante um download perdia o estado, e reabrir mostrava
+      "Instalar" para um core que já estava baixando — agora readota os jobs
+      em andamento por `GET /installs` (filtrando por `core_name`).
+
+**Correção de 2026-08-27 (segunda passada, revisão de design).** Os dois
+primeiros checkboxes deste item foram marcados cedo demais: o backend estava
+certo, mas **nenhuma tela sabia ler a resposta nova**. `POST /games/launch`
+passou a devolver `202` com o job em vez de `200` com a `Session`, e
+`api.launch()` continuava tipado como `Promise<Session>` — então:
+
+- `GamesScreen.doLaunch` gravava `{kind: "launched", session}` com um objeto
+  que não era `Session` e **disparava o toast "sessão iniciada"** enquanto o
+  ZeuX ainda baixava o core. O core do MAME passa de 400 MB: o usuário lia
+  "sessão iniciada", nada abria por minutos, e não havia nada na tela dizendo
+  o que estava acontecendo nem como desistir.
+- `useLaunchGame` (AllGamesScreen e GameDetailScreen) marcava `"launched"`
+  pelo mesmo motivo.
+
+Ou seja, o critério "a tela mostra o nome do que está sendo baixado, o
+percentual e um cancelar" estava marcado com base na tela de **Emuladores**
+(lista de cores) — que não é por onde o fluxo do R3 passa. Corrigido:
+
+- `LaunchResult = Session | LaunchDownloadingCore` + `isDownloadingCore()`
+  (`src/api/types.ts`, `src/api/client.ts`): o contrato agora obriga quem
+  chama a ramificar, em vez de deixar as duas formas passarem como uma.
+- Estado `downloading-core` em `useLaunchGame` e em `GamesScreen`, com
+  polling do job, texto nomeando o core, percentual, `ProgressBar` e
+  "Cancelar download". `AllGamesScreen` usa o painel flutuante do canto (a
+  grade é virtualizada — indicador presa ao tile some ao rolar), encadeado no
+  mesmo ternário que o N9 já usava para não competir pelo canto com o painel
+  de instalação. `GameDetailScreen` troca o rótulo do botão principal para
+  "Baixando o core…", mesma técnica do "Abrindo…" que o A4 introduziu.
+- "Jogar" fica bloqueado enquanto o download corre, nas três telas.
+
+**Validação com o app rodando de verdade (2026-08-27/28, Chromium via
+Playwright — mesma técnica do M15).** Subir `zeuxd` + Vite e dirigir a UI
+achou coisas que nenhum teste de tipo ou de unidade pegaria:
+
+1. **Grade de 3 colunas espremia o nome do core a zero pixel.** A lista de
+   cores mora dentro do card do RetroArch, que é uma célula de uma grade de
+   3 cards: o `<ul>` tem **326 px**, não a largura da tela. Em 3 colunas cada
+   item ficava com 98 px, onde o badge "faltando" (74 px) mais o botão
+   (76 px) já não cabem — o nome sumia e os elementos transbordavam por cima
+   do vizinho. Corrigido para uma coluna com `max-h` + rolagem interna, e o
+   botão de ação com `ml-auto` (a mesma ação repetida em 25 linhas precisa
+   cair sempre na mesma coluna, não em zigue-zague conforme o tamanho do
+   nome). Medido depois: nome com 81 px, sem rolagem horizontal em 960,
+   1280 e 1920 de largura.
+2. **A sidebar cobria e roubava os cliques do conteúdo.** Clicar num item da
+   navegação deixa o foco nele, e `group-focus-within:w-52`
+   (`src/components/Sidebar.tsx`) mantinha o rail expandido em 208 px por
+   cima do conteúdo (`absolute z-20`) até o usuário clicar em outro lugar.
+   Tudo nos primeiros 208 px ficava inclicável — o botão "Ver cores" do card
+   do RetroArch fica em x=137 — e o clique caía num item de navegação,
+   levando para outra tela. Corrigido tirando o foco **só no clique de
+   mouse** (`e.detail > 0`); ativação por teclado mantém o foco, porque foco
+   é estado de primeira classe (ADR 0009) e quem navega por teclado precisa
+   dele. Os dois lados verificados no navegador.
+3. **Mensagem de desenvolvedor aparecendo para o jogador.** Com o manifesto
+   ainda sem hash medido (o estado real de hoje), clicar em "Instalar" num
+   core mostrava *"rode cmd/generate-retroarch-manifest numa máquina com
+   acesso a buildbot.libretro.com e recorte uma nova versão do ZeuX"* dentro
+   do card. Quem lê isso não tem o repositório na mão. Reescrita para dizer
+   o que a pessoa pode fazer (instalar pelo Online Updater do próprio
+   RetroArch) e assumir a lacuna como do app.
+4. **Verbo repetido no progresso:** "Baixando o core mesen… **baixando** ·
+   37%". `faseExtraDeDownload` (`src/lib/format.ts`) só mostra a fase quando
+   ela acrescenta algo ("verificando", "extraindo", "finalizando").
+
+Confirmado ao vivo que o bug do "sessão iniciada" está mesmo corrigido:
+com `/games/launch` respondendo 202, a tela mostra "Baixando o core mesen… ·
+37%" com barra e "Cancelar download", e **não** dispara o toast de sessão.
+
+**Alarme falso registrado e desmentido no mesmo dia (2026-08-28), porque a
+conclusão errada é pior que nenhuma:** esta seção chegou a afirmar que o
+botão "Jogar" do tile (`GameTile`) não existia na árvore de acessibilidade
+por morar dentro de um `<div role="button">`. **Está errado.** A medição
+que gerou a afirmação tirou `page.accessibility.snapshot()` com o tile em
+repouso — e nesse estado o overlay está `display: none`
+(`hidden group-hover:flex group-focus-visible:flex`, `GameCover` em
+`src/components/ui.tsx`), então nenhum elemento oculto apareceria mesmo.
+Medido de novo, nos três estados:
+
+| estado do tile | `display` do overlay | botão na árvore a11y |
+|---|---|---|
+| em repouso | `none` | não (correto: está oculto) |
+| com o mouse por cima | `flex` | **sim** |
+| com foco de teclado no wrapper | `flex` | **sim** |
+
+Ou seja, o desenho do M1 se sustenta: `group-focus-visible:flex` faz o
+overlay aparecer quando o wrapper recebe foco, e o botão fica exposto. O
+`tabIndex={-1}` continua sendo escolha deliberada e documentada (um alvo
+por tile na navegação por Tab/D-pad; quem navega por teclado abre o detalhe
+e joga de lá) — não uma omissão.
+
+**O que sobra, e é opcional:** um `<button>` dentro de um `role="button"`
+segue sendo aninhamento de controle interativo, que o ARIA desaconselha
+mesmo funcionando no Chromium. Se algum dia incomodar, a correção é barata
+e não muda um pixel: mover o overlay para irmão do wrapper, posicionado
+absoluto sobre a capa — exatamente o que `FavoriteToggle` já faz no mesmo
+componente. Não há defeito observável hoje que justifique mexer na tela
+mais importante do app.
+
+**Também ajustado, consequência direta de R4 (não do escopo original de
+R3):** `EmulatorCardActions` escondia o botão "Remover" do RetroArch com um
+`entry.adapter_id !== "retroarch"` cravado no componente — guard que só
+fazia sentido enquanto o backend recusava desinstalar um `KindBundled`.
+Como esse guard saiu do `Manager.Uninstall` no R4, o frontend ficaria mais
+restritivo que o backend permite (esconderia uma ação que a API já aceita) —
+corrigido para depender só de `entry.installation?.managed`, mesma regra de
+qualquer outro emulador.
+
+Compilação cruzada de Go (linux/darwin/windows) e `go test ./...` completo
+passando em 2026-08-27. Lado front: `tsc --noEmit` não aponta erro novo nos
+arquivos tocados (ruído de `node_modules/` ausente à parte, igual no resto
+do projeto) — não roda de verdade sem o Douglas instalar as dependências e
+abrir o app.
+
+**Depende de:** R2 · **Bloqueia:** nada
+
+#### R4 — Aposentar o empacotamento (M) — **código feito em 2026-08-27; a verificação de build fica pendente do Douglas**
+
+Enquanto os dois modelos coexistirem, o instalador continua com 178 MB e há
+dois caminhos para achar um core — o tipo de ambiguidade que produz bug de
+caminho (já aconteceu duas vezes com `ZEUX_BUNDLED_*`).
+
+**Critério de aceite:**
+- [ ] `npm run tauri build` gera um pacote **sem** cores e sem o app do
+      RetroArch dentro. Verificável: `dpkg-deb -c` no `.deb` não lista nada em
+      `usr/lib/zeux/resources/retroarch/`, e o tamanho cai do patamar de 178 MB
+      (medir e escrever o número novo aqui). **Não executado nesta sessão** —
+      rodar o build completo do Tauri exigiria baixar toda a árvore de
+      dependências do Rust (sem cache local, `~/.cargo/registry` vazio) e do
+      npm (`node_modules/` não instalado), o mesmo tipo de peso que o
+      [ADR 0004](decisoes/0004-adiar-rust-e-tauri.md) evita buscar sem
+      necessidade comprovada. `src-tauri/resources/` foi apagado, `resources`
+      saiu de `tauri.conf.json`, e a leitura manual do `src-tauri/src/lib.rs`
+      resultante não indica erro de sintaxe — mas isso não substitui rodar
+      `cargo check`/`npm run tauri build` de verdade. **Só o Douglas pode
+      fechar este item**, numa máquina com o ambiente Tauri já montado.
+- [x] `KindBundled`, `bundled_cores.go`, `bundled_retroarch.go` e as variáveis
+      `ZEUX_BUNDLED_*` (`src-tauri/src/lib.rs`) saíram do código.
+      `bundled_cores.go` virou `internal/emulator/retroarch_cores_dir.go`,
+      mantendo só `RetroArchManagedCoresDir`/`bundledCoreDirsForWrite` — R2/R3
+      dependem delas para saber onde promover um core baixado; o resto do
+      arquivo (a cópia de cores empacotados) foi removido de verdade, não só
+      comentado. `bundled_retroarch.go` saiu inteiro: sem bundling, não há
+      mais nada para copiar para o diretório gerenciado.
+      `cmd/download-retroarch-app` e `scripts/download-retroarch-cores.mjs`
+      também saíram (ficariam mortos: nada mais define
+      `ZEUX_BUNDLE_RETROARCH=1` desde que o `.github/workflows/release.yml`
+      perdeu o input `bundle_retroarch` e a etapa que travava isso à tag
+      v0.5.0).
+- [x] `Manager.Uninstall` volta a aceitar remover o RetroArch — o guard de
+      `KindBundled` saiu; sem instalação gerenciada no disco (o caso comum,
+      já que o RetroArch agora é manual), a rota devolve o mesmo
+      "nada a remover" de qualquer emulador nunca instalado pelo ZeuX
+      (`TestUninstallRetroArchWithoutManagedInstallSaysNothingToRemove`).
+- [x] `internal/install/data/sources.json`: a entrada do RetroArch é
+      `"kind": "manual"`, com `reason` honesto (buildbot sem estrutura
+      estável para automação; cores baixados sob demanda pelo ZeuX). Mesmo
+      texto refletido em `docs/api.md` (`GET /emulator-sources`).
+- [x] Quem já tem cores de uma instalação bundled anterior **não perde
+      nada**: `RetroArchManagedCoresDir()`/`bundledCoreDirsForWrite()` são o
+      mesmo diretório de sempre — nada mudou de lugar, só parou de receber
+      cópia automática do instalador. Um core que já estava lá continua
+      sendo achado por `coreDirs()` exatamente como antes.
+
+**Também retirado, fora da lista original mas parte do mesmo "aposentar":**
+`src-tauri/resources/` (diretório inteiro), a entrada `resources` de
+`tauri.conf.json`, as regras correspondentes do `.gitignore`, e a dependência
+Node `unzipper` (só usada pelo script removido) — **removida do
+`package.json`, mas `package-lock.json` não foi regenerado** (rodar `npm
+install` exigiria a mesma rede/toolchain que o item acima já registra como
+pendente; ninguém tocou `node_modules/` nesta sessão, que nem existe aqui).
+`docs/adr-0012-implementation.md` ganhou um aviso de que descreve um mecanismo
+retirado, sem apagar o conteúdo histórico.
+
+Compilação cruzada de Go (linux/darwin/windows), `go vet` e `go test ./...`
+completo passando em 2026-08-27. O lado Rust/Tauri não foi compilado nesta
+sessão — ver o primeiro item acima.
+
+**Depende de:** R3 · **Bloqueia:** nada
+
+---
+
+### Registro histórico: por que este item já foi considerado bloqueado
+
+*(Mantido porque descreve o custo que o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)
+acaba de reassumir — não é pendência ativa.)*
 
 Os cores do RetroArch (libretro) são distribuídos pelo `buildbot.libretro.com`,
 não pelo GitHub Releases — um mecanismo de resolução diferente do que
@@ -1407,6 +2138,7 @@ chegou.
 | ~~Scraper de metadados: IGDB e/ou ScreenScraper~~ | G | Fora do MVP por decisão de 2026-08-02. Busca **metadado**, jamais o jogo. **Decisão reaberta em 2026-08-04** — virou o G1, dentro da v1.0 |
 | ~~Cache local de capas e metadados~~ | M | Só faz sentido com o scraper. **Reaberto junto, 2026-08-04** — virou o G2 |
 | Identificação de jogo por hash (em vez de nome) | M | Pré-requisito de scraper confiável; o MVP usa o nome (L10). **Continua fora** — ver G3, que registra por que |
+| Backend social do ZeuX: contas, reviews, fóruns, sync de tempo jogado entre dispositivos | G | **Registrado em 2026-08-26**, origem: especificação externa trazida pelo Douglas ("Retro-Steam Frontend"). **Não priorizado agora, por decisão dele** — sem critério de aceite de propósito, para não parecer trabalho pronto para começar. É a mesma dependência que já adia as Sprints E e F para a v2.0: identidade de usuário e servidor na nuvem, nenhum dos dois desenhado. Reviews e fóruns são **conteúdo gerado por usuário**, o que traz moderação e política de privacidade novas — escopo maior que a Sprint E já prevê |
 
 **Por que a decisão de 2026-08-02 foi reaberta, e o que ela dizia.** O texto
 original está preservado acima, riscado, de propósito: em 2026-08-02 decidiu-se
@@ -1522,6 +2254,18 @@ modernas, não só retro) pesou mais que a identificação por hash do
 ScreenScraper — G3 (hash) já ficou fora da v1.0 mesmo, então essa vantagem do
 ScreenScraper não estava em jogo.
 
+**Revisado em 2026-08-26, e mantido.** A especificação externa trazida pelo
+Douglas propõe o inverso: ScreenScraper.fr por CRC32/MD5 como fonte
+**primária**, com IGDB/TheGamesDB como fallback por nome sanitizado. Isso é uma
+boa ideia — e não é motivo para mexer no G1, que **está entregue e funcionando
+por nome**. Trocar a fonte primária de um item pronto custa reescrever o cliente,
+o cache (G2) e a conexão de conta, para comprar precisão que ninguém mediu que
+esteja faltando. A proposta foi anexada ao **G3**, onde ela pertence, e o **G6**
+abaixo é o passo barato que decide se ela entra: medir antes de construir. Nota
+relacionada: o achado de 2026-08-18 (credencial de teste do IGDB possivelmente
+suspensa) é sobre **credencial**, não sobre a fonte estar errada — não conta
+como argumento para trocar de fonte.
+
 **Decidido em 2026-08-04: cada usuário conecta a própria conta IGDB.** Evita
 cota compartilhada estourando com o uso real de todo mundo que instalar o
 ZeuX, ao custo de um passo de "conectar conta" — que precisa existir em algum
@@ -1572,9 +2316,42 @@ que construir para descobrir.
 
 **Critério para reavaliar (não é critério de aceite — é gatilho):** se, numa
 biblioteca real do Douglas, mais de ~20% dos jogos ficarem sem capa ou com capa
-errada depois do G1, este item entra na v1.0.
+errada depois do G1, este item entra na v1.0. **O G6 abaixo é quem mede isso** —
+até 2026-08-26 o gatilho existia sem ninguém encarregado de puxá-lo.
 
-**Depende de:** G1 · **Bloqueia:** nada
+**Fonte concreta anexada em 2026-08-26 (origem: especificação externa do
+Douglas):** quando este item entrar, a fonte é o **ScreenScraper.fr**, que
+aceita busca por **CRC32/MD5** do arquivo — é o que torna a identificação por
+hash útil de verdade, já que o IGDB não indexa ROM por hash. O desenho fica:
+ScreenScraper por hash primeiro, IGDB por nome sanitizado como fallback (o que
+já existe hoje, sem reescrita). Duas ressalvas que precisam ser conferidas
+**antes** de estimar, não depois: o ScreenScraper exige conta e impõe cota por
+usuário (mesma conversa do G1, "cada usuário conecta a própria conta"), e a
+regra legal do G1 vale igual — o cliente só sabe falar com endpoints de
+metadado/imagem, e isso é travado por teste.
+
+**Depende de:** G1, G6 · **Bloqueia:** nada
+
+### G6 — Medir a taxa de acerto das capas (P)
+
+O gatilho do G3 fala em "mais de ~20% sem capa ou com capa errada" desde
+2026-08-04 e **ninguém mediu**. Enquanto o número não existir, a decisão de
+promover ou não o G3 é palpite — e o projeto tem cultura de verificar.
+
+**Critério de aceite:**
+- [ ] Sai um número, contra a biblioteca real do Douglas: quantos jogos têm
+      capa, quantos ficaram sem, e quantos vieram com capa de outro jogo (esta
+      última só o Douglas consegue julgar, olhando).
+- [ ] O número é obtido sem tela nova: basta `GET /api/v1/library/games` contando
+      quantos trazem `cover_url`, mais uma passada de olho na grade. Se alguém
+      propuser construir um relatório para isso, o item cresceu além do valor.
+- [ ] O resultado é escrito **aqui no G3**, com a data, e a decisão de promover
+      ou não fica registrada com o número que a motivou.
+- [ ] Se a medição não puder ser feita porque a credencial do IGDB está
+      suspensa (ver achado de 2026-08-18), isso fica escrito no item em vez de
+      um número inventado.
+
+**Depende de:** G1 (entregue) · **Bloqueia:** G3
 
 ### G4 — Favoritar jogo (M)
 
@@ -4193,6 +4970,102 @@ aceitar o risco de novo com uma chave nova.
 
 ---
 
+## Sprint P — RetroAchievements (**pós-v1.0, mas NÃO depende do backend do ZeuX**)
+
+**Criada em 2026-08-26**, origem: especificação externa trazida pelo Douglas
+("Retro-Steam Frontend"). A Sprint E já tinha uma linha "Integração
+RetroAchievements | M" na tabela dela — essa linha vira **ponteiro para cá**,
+porque colocá-la dentro da E dava a entender que ela depende do backend na
+nuvem do ZeuX, e **não depende**: a conta é do usuário, no serviço deles, e o
+ZeuX só lê. Isso muda o custo e a posição no roadmap; deixá-la na E a
+manteria refém de um produto inteiro que não existe.
+
+**Fica pós-v1.0 mesmo assim**, por prioridade: a v1.0 ainda tem itens de
+verificação humana abertos (G5, H3, L3) e a Sprint M inteira. Conquista é valor
+direto ao usuário — quarto lugar na ordem de prioridade deste documento, não
+primeiro.
+
+**Duas coisas precisam ser confirmadas antes de qualquer estimativa virar
+compromisso** (nenhuma foi verificada — este é o tipo de suposição que o D1 já
+mostrou custar caro):
+
+1. **O ZeuX não desbloqueia conquista nenhuma.** Quem faz isso é o emulador
+   (RetroArch e alguns standalone têm suporte próprio a RetroAchievements). O
+   escopo aqui é **exibir**, e possivelmente **configurar as credenciais dentro
+   do emulador** pela tela do ZeuX (Sprint H já sabe escrever config de
+   emulador). Se alguém desenhar isto como "o ZeuX rastreia o jogo e concede a
+   conquista", o item está errado.
+2. **O hash do RetroAchievements não é um MD5 do arquivo.** Eles usam um
+   cálculo próprio por sistema (cabeçalho descartado, trilha de CD específica,
+   etc.). Antes de assumir que o G3 resolve este problema de graça, alguém
+   precisa ler a documentação/implementação de referência deles. Pode ser que
+   sejam dois hashes diferentes convivendo.
+
+### P1 — Conectar a conta do RetroAchievements (M)
+
+Sem credencial não há nada para mostrar. Mesmo princípio do G1: conta **do
+usuário**, nunca uma chave do ZeuX compartilhada por todo mundo — o achado de
+2026-08-18 (credencial de teste do IGDB provavelmente suspensa) é a prova de
+que o caminho contrário cobra.
+
+**Critério de aceite:**
+- [ ] Uma tela em Configurações aceita usuário + chave de API do
+      RetroAchievements, guardada localmente com o mesmo cuidado da credencial
+      do IGDB (nunca no repositório, nunca embutida no binário).
+- [ ] Credencial inválida devolve erro **nomeado e em português**, distinguindo
+      "credencial recusada" de "o serviço não respondeu" — o usuário precisa
+      saber se conserta digitando de novo ou se é só esperar.
+- [ ] **Sem conta conectada, nada na interface muda.** Nenhuma seção vazia,
+      nenhum "conecte sua conta" ocupando espaço na tela de jogo. Mesma regra
+      que o G1 já segue.
+- [ ] Um teste roda sem rede, contra servidor de mentira: conectou / recusou /
+      caiu.
+
+**Depende de:** nada · **Bloqueia:** P2, P3
+
+### P2 — Resolver o jogo pelo hash e trazer as conquistas (M)
+
+**Critério de aceite:**
+- [ ] Dado um jogo da biblioteca, o backend calcula o identificador que o
+      RetroAchievements espera **para aquele console** e consulta a lista de
+      conquistas + o que o usuário já desbloqueou.
+- [ ] Jogo que o serviço não reconhece devolve **desconhecido**, e a tela não
+      mostra nada — nunca as conquistas de um jogo parecido. Mesma regra do
+      parecer parcial e do G1.
+- [ ] O resultado é cacheado localmente (tabela nova, migração em
+      `internal/store/migrations/`), e abrir a mesma tela duas vezes **não faz
+      duas requisições** — medível pelo log do `--debug`, mesmo critério do G2.
+- [ ] A consulta é sob demanda (abrir o jogo), nunca uma varredura silenciosa
+      mandando a biblioteca inteira para um terceiro.
+- [ ] Está escrito no código, com comentário, **qual** algoritmo de hash foi
+      implementado e contra qual documentação ele foi conferido. Se só uma parte
+      dos consoles foi coberta, os demais devolvem desconhecido em vez de
+      chutar.
+- [ ] Testes sem rede: reconhecido / não reconhecido / resposta malformada /
+      serviço fora.
+
+**Depende de:** P1 · **Bloqueia:** P3
+
+### P3 — Badges na tela do jogo (M)
+
+**Critério de aceite:**
+- [ ] `GameDetailScreen` ganha uma seção com as conquistas: ícone, título,
+      descrição e se está desbloqueada, mais um contador (`12/40`).
+- [ ] As imagens de badge vêm de **arquivo local já baixado**, nunca URL de
+      terceiro renderizada direto pelo WebView — mesma regra que o G1 travou
+      para capa, pelo mesmo motivo (offline e uma requisição por render).
+- [ ] Alcançável só com Tab/Enter e pelo controle, sem depender de hover
+      ([ADR 0009](decisoes/0009-desktop-agora-controle-depois.md),
+      [ADR 0014](decisoes/0014-navegacao-por-controle.md)).
+- [ ] O texto **não julga o jogador**: "12 de 40 conquistas", nunca "você só
+      conseguiu 12". Mesma disciplina do texto sobre hardware.
+- [ ] Sem rede, a seção mostra o que já está em cache; sem cache, ela não
+      aparece — a tela de jogo nunca quebra por causa disto.
+
+**Depende de:** P2 · **Bloqueia:** nada
+
+---
+
 ## Sprint E — Perfil e camada social (**v2.0 — pós-v1.0**)
 
 > **Adiada para a v2.0 por decisão do Douglas, 2026-08-04.** Nada nesta sprint
@@ -4211,7 +5084,7 @@ Objetivo: a promessa social do PRD, agora que há dado para exibir.
 | Perfil público: consoles, tempo de jogo, hardware como comparativo | M | ↑ |
 | Navbar: comunidade, amigos, perfil, conquistas | M | Sprint B |
 | Amigos e feed de atividade | M | ↑ |
-| Integração RetroAchievements | M | ↑ |
+| ~~Integração RetroAchievements~~ | M | **Movida em 2026-08-26 para a Sprint P** — ela não depende do backend na nuvem do ZeuX (a conta é do usuário, no serviço deles), e mantê-la aqui a prendia a uma dependência que ela não tem |
 | Integração Speedrun.com | M | ↑ |
 
 **Consentimento:** o hardware é usado como base de comparação entre jogadores —
@@ -4281,7 +5154,7 @@ de imagem de disco), não apenas uma regra de termos de uso.
 | ~~Detecção de BIOS/firmware necessários por console~~ | M | **Duplicata removida em 2026-08-03** — é o mesmo trabalho do L3 (simplificado no mesmo dia para aviso genérico, sem catálogo de arquivo), na Sprint D. Duas linhas para o mesmo item fariam alguém estimar duas vezes |
 | ~~Suporte a controles: detecção e mapeamento~~ | G | **Promovido em 2026-08-04 para a Sprint H (v1.0)**, itens H3 (joystick) e H4 (teclado). Continua sendo pré-requisito dos perfis de controle compartilháveis (Sprint F, agora v2.0) — a diferença é que agora tem valor próprio na v1.0, sem esperar a nuvem |
 | ~~Emulador dedicado 1-click para os consoles que hoje só têm RetroArch~~ | G | **Substituído em 2026-08-03** pela decisão do [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — em vez de um adapter dedicado por console, empacotar o RetroArch + cores selecionados dentro do próprio instalador do ZeuX. N64 continua com o `rmg` como adapter dedicado (não foi desfeito), mas os outros 23 consoles vão pelo empacotamento, não por pesquisa individual |
-| **Implementar o ADR 0012**: empacotar RetroArch + cores no instalador | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 25 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. **Corrigido em 2026-08-07:** esta célula ainda dizia "Falta: confirmar em Windows/macOS e testar a instalação de verdade", o que contradizia os dois `[x]` logo abaixo — Windows e o lançamento real com cores bundled foram confirmados pelo Douglas em 2026-08-05. **O que resta de verdade:** só macOS (o buildbot distribui `.dmg`, sem rota simples em Go puro — decisão registrada no ADR 0012) e trocar o alias móvel `RetroArch.7z` por uma versão datada fixa |
+| ~~**Implementar o ADR 0012**: empacotar RetroArch + cores no instalador~~ **Fechado por substituição em 2026-08-26** — o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) trocou o modelo por download sob demanda; o que sobrava aqui (macOS e trocar o alias `RetroArch.7z` por versão datada) deixou de ser trabalho a fazer neste formato. O trabalho vigente são os itens **R1–R4** da Sprint C. *Texto original abaixo, preservado:* | G | [ADR 0012](decisoes/0012-empacotar-retroarch-e-cores.md) — download dos 20 cores **desbloqueado em 2026-08-04**, `npm run tauri build` de ponta a ponta **confirmado em 2026-08-04** (Linux: `.deb`/`.rpm`/`.AppImage`, 25 cores e sidecar `zeuxd` verificados dentro do pacote), ver detalhe abaixo. **Corrigido em 2026-08-07:** esta célula ainda dizia "Falta: confirmar em Windows/macOS e testar a instalação de verdade", o que contradizia os dois `[x]` logo abaixo — Windows e o lançamento real com cores bundled foram confirmados pelo Douglas em 2026-08-05. **O que resta de verdade:** só macOS (o buildbot distribui `.dmg`, sem rota simples em Go puro — decisão registrada no ADR 0012) e trocar o alias móvel `RetroArch.7z` por uma versão datada fixa |
 
 **Download dos cores do RetroArch desbloqueado em 2026-08-04 — dois bugs reais
 achados e corrigidos, verificados pelo Douglas numa máquina com acesso ao
@@ -4660,6 +5533,14 @@ graph LR
     D2["D2 — calibrar limiares<br/>(depende da Sprint F, ou seja: v2.0)"] -.-> F
 ```
 
+**O diagrama acima está desatualizado desde 2026-08-26 e não foi redesenhado**
+— dizer isso é mais honesto que redesenhá-lo às pressas. Duas mudanças que ele
+ainda não mostra: a **Sprint C reabriu** (R1–R4, download de cores sob demanda,
+[ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)) e nasceu a
+**Sprint P** (RetroAchievements), que é pós-v1.0 mas **não** entra no bloco
+`v2` — ela não depende do backend na nuvem, e desenhá-la lá dentro repetiria o
+erro que a linha na Sprint E cometia.
+
 A Sprint A veio primeiro porque era a única que podia invalidar código já
 escrito. **G, H e I não dependiam umas das outras** — eram paralelizáveis, e a
 ordem entre elas foi escolha de prioridade, não de dependência técnica.
@@ -4698,6 +5579,28 @@ acabou de ser feita. Depois dele, a ordem é L1 → L2 → L5 → L6 → L7 (os 
 que é o caminho mais curto até o critério de saída da Sprint D.
 *(D11 foi fechado em 2026-08-04 — parágrafo mantido como registro do raciocínio
 da época, não como recomendação vigente.)*
+
+**Próximo passo recomendado (2026-08-26): o R1 — manifesto de cores com URL e
+SHA256 fixados.**
+
+Recomendo **um**, e não é a Sprint M (que continua sendo o trabalho de v1.0 mais
+volumoso). O motivo é a ordem de prioridade deste documento: o ADR 0015 acabou
+de criar uma **promessa descoberta nova** — a partir da decisão de 2026-08-26, o
+que o `sources.json` diz sobre o RetroArch ("já vem dentro do instalador") e o
+que o produto pretende fazer deixaram de bater. Enquanto R1–R4 não fecharem, o
+app fica com dois modelos coexistindo, que é exatamente a condição que já
+produziu dois bugs de caminho com `ZEUX_BUNDLED_*`.
+
+Dentro deles, o R1 vem primeiro porque **bloqueia os outros três** e é o único
+que dá para começar sem acesso ao buildbot: fixar a estrutura do manifesto,
+o `allowedHosts` e o teste que amarra a lista de cores ao catálogo é trabalho de
+código local. O download real (R2) e o gatilho no "Jogar" (R3) só fecham na sua
+máquina — este ambiente não alcança `buildbot.libretro.com`.
+
+O que eu cortaria, se o tempo apertar: o **R4** (aposentar o empacotamento) pode
+esperar sem prejuízo funcional — ele compra instalador menor, não capacidade
+nova. O que **não** dá para cortar é a verificação de hash do R2: sem ela, o
+download sob demanda é pior que o empacotamento em segurança, não só em UX.
 
 **Próximo passo recomendado (2026-08-07): a Sprint M, começando pelo M2.**
 

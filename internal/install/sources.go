@@ -33,15 +33,11 @@ const (
 
 	// KindManual é o emulador cujo download não pode ser automatizado de forma
 	// confiável. O ZeuX manda o usuário para a página oficial em vez de tentar
-	// adivinhar uma URL que pode mudar sem aviso.
+	// adivinhar uma URL que pode mudar sem aviso. Era também o destino do
+	// RetroArch entre o ADR 0012 (empacotado no instalador) e o ADR 0015
+	// (cores sob demanda) — o app do RetroArch em si nunca deixou de ser
+	// manual, só os cores passaram a ser baixados pelo ZeuX.
 	KindManual Kind = "manual"
-
-	// KindBundled é o emulador que já vem dentro do próprio instalador do
-	// ZeuX (RetroArch, ver docs/decisoes/0012-empacotar-retroarch-e-cores.md)
-	// — nunca precisa de download nem de um botão "instalar": Locate() já o
-	// encontra assim que o daemon copia a cópia empacotada para o diretório
-	// gerenciado (internal/emulator/bundled_retroarch.go).
-	KindBundled Kind = "bundled"
 )
 
 // Archive é o formato do pacote baixado.
