@@ -18,6 +18,8 @@ import {
 } from "../components/ui";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { SelectItem } from "../components/ui/select";
+import { useT } from "../i18n/i18n";
+import { dict } from "./LibraryScreen.i18n";
 
 type ConsoleInfo = { console_id: string; name: string; short_name: string };
 
@@ -32,6 +34,7 @@ type ConsoleInfo = { console_id: string; name: string; short_name: string };
  * reorganização não construiu um segundo.
  */
 function BulkFolderPicker({ onDone }: { onDone: () => void }) {
+  const t = useT(dict);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ matched: BulkMatchedFolder[]; unmatched: string[] } | null>(null);
@@ -48,7 +51,7 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
       setResult(res);
       onDone();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível varrer esta pasta.");
+      setError(err instanceof ApiError ? err.message : t("couldNotScanFolder"));
     } finally {
       setBusy(false);
     }
@@ -58,14 +61,11 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
     <Card filled className="mb-4 flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-semibold text-ink">Selecionar pasta para todos os jogos</p>
-          <p className="text-sm text-muted">
-            Escolha uma pasta com uma subpasta por console (ex.: "PS1", "SNES") — o ZeuX aponta cada uma para o
-            console certo de uma vez.
-          </p>
+          <p className="font-semibold text-ink">{t("selectFolderForAllGames")}</p>
+          <p className="text-sm text-muted">{t("selectFolderDescription")}</p>
         </div>
         <Button type="button" variant="primary" disabled={busy} onClick={handlePick}>
-          {busy ? "Varrendo…" : "Escolher pasta"}
+          {busy ? t("scanning") : t("chooseFolderButton")}
         </Button>
       </div>
 
@@ -75,17 +75,15 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
         <div className="flex flex-col gap-2">
           {result.matched.length > 0 ? (
             <p className="text-sm text-ink">
-              {result.matched.length} console(s) reconhecido(s):{" "}
-              {result.matched.map((m) => `${m.name} (${m.games_found})`).join(", ")}.
+              {t("consolesMatched", { count: result.matched.length, names: result.matched.map((m) => `${m.name} (${m.games_found})`).join(", ") })}
             </p>
           ) : (
-            <p className="text-sm text-muted">Nenhuma subpasta bateu com um console do catálogo.</p>
+            <p className="text-sm text-muted">{t("noConsolesMatched")}</p>
           )}
 
           {result.unmatched.length > 0 && (
-            <Callout label="Subpastas não reconhecidas">
-              {result.unmatched.join(", ")} — nomeie a subpasta com o nome ou a sigla do console (ex. "PS1",
-              "Mega Drive") e escolha a pasta de novo.
+            <Callout label={t("unmatchedSubfolders")}>
+              {result.unmatched.join(", ")} {t("unmatchedFoldersHelp")}
             </Callout>
           )}
         </div>
@@ -123,6 +121,7 @@ function ConfiguredConsoleRow({
   onOpenGames: () => void;
   onSelectConsole: () => void;
 }) {
+  const t = useT(dict);
   // A5 (achado do critico-design, 2026-08-18): "Remover" apagava a pasta
   // apontada sem confirmação nenhuma, com o mesmo peso visual de
   // "Revarrer" (que é reversível/barato) — a única ação destrutiva do app
@@ -135,13 +134,13 @@ function ConfiguredConsoleRow({
     <Card filled dense className="flex flex-col gap-1.5">
       {confirmingFolder && (
         <ConfirmModal
-          title="Remover pasta da biblioteca?"
-          message={`"${confirmingFolder.path}" sai da lista do ZeuX. Os arquivos continuam no disco — nada é apagado, só o apontamento.`}
+          title={t("removeFolderTitle")}
+          message={t("removeFolderMessage", { path: confirmingFolder.path })}
           onClose={() => setConfirmingRemove(null)}
           actions={
             <>
               <Button variant="secondary" onClick={() => setConfirmingRemove(null)}>
-                Cancelar
+                {t("cancel")}
               </Button>
               <Button
                 variant="danger"
@@ -151,7 +150,7 @@ function ConfiguredConsoleRow({
                   setConfirmingRemove(null);
                 }}
               >
-                Remover mesmo assim
+                {t("removeAnyway")}
               </Button>
             </>
           }
@@ -161,13 +160,15 @@ function ConfiguredConsoleRow({
         <ConsoleIcon consoleId={consoleInfo.console_id} label={consoleInfo.short_name} onClick={onSelectConsole} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-ink">{consoleInfo.name}</p>
-          <p className="text-xs text-muted">{games ? `${games.length} jogo(s)` : "contando jogos…"}</p>
+          <p className="text-xs text-muted">
+            {games ? t("gamesCount", { count: games.length }) : t("countingGames")}
+          </p>
         </div>
         {/* Sempre visível, mesmo com 0 jogos (2026-08-04) — é em GamesScreen
             que fica "Abrir pasta do BIOS"; configurar o BIOS não deveria
             depender de já ter um jogo achado primeiro (critério do M9). */}
         <Button type="button" variant="secondary" onClick={onOpenGames}>
-          Ver jogos {games ? `(${games.length})` : ""}
+          {t("seeGames")} {games ? `(${games.length})` : ""}
         </Button>
       </div>
 
@@ -179,10 +180,10 @@ function ConfiguredConsoleRow({
             </span>
             <span className="flex shrink-0 gap-2">
               <Button type="button" variant="quiet" disabled={busy} onClick={() => onRescan(folder.id)}>
-                Revarrer
+                {t("rescan")}
               </Button>
               <Button type="button" variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
-                Remover
+                {t("remove")}
               </Button>
             </span>
           </li>
@@ -209,6 +210,7 @@ function AddConsoleSection({
   availableConsoles: ConsoleInfo[];
   onAdded: () => void;
 }) {
+  const t = useT(dict);
   const [consoleId, setConsoleId] = useState<string | undefined>(availableConsoles[0]?.console_id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,24 +235,24 @@ function AddConsoleSection({
       await api.addLibraryFolder(consoleId, picked);
       onAdded();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível apontar esta pasta.");
+      setError(err instanceof ApiError ? err.message : t("couldNotPointFolder"));
     } finally {
       setBusy(false);
     }
   }
 
   if (availableConsoles.length === 0) {
-    return <p className="text-sm text-muted">Todos os consoles do catálogo já têm pasta apontada.</p>;
+    return <p className="text-sm text-muted">{t("allConsolesConfigured")}</p>;
   }
 
   return (
     <Card filled className="flex flex-col gap-3">
-      <p className="font-semibold text-ink">Adicionar console</p>
+      <p className="font-semibold text-ink">{t("addConsole")}</p>
       <div className="flex flex-wrap items-center gap-2">
         {/* O2 (docs/roadmap.md, Sprint O): largura fixa cortava nomes longos de
             console ("Nintendo Entertainment System") mesmo sobrando espaço ao lado —
             `max-w-xs` (via ZSelect, N4) encolhe e tem teto ao mesmo tempo. */}
-        <ZSelect ariaLabel="Escolher console" value={consoleId} onValueChange={setConsoleId} placeholder="Escolher console" className="max-w-xs">
+        <ZSelect ariaLabel={t("chooseConsole")} value={consoleId} onValueChange={setConsoleId} placeholder={t("chooseConsole")} className="max-w-xs">
           {availableConsoles.map((c) => (
             <SelectItem key={c.console_id} value={c.console_id}>
               {c.name}
@@ -258,7 +260,7 @@ function AddConsoleSection({
           ))}
         </ZSelect>
         <Button type="button" variant="primary" disabled={busy || !consoleId} onClick={handlePick}>
-          {busy ? "Apontando…" : "Escolher pasta"}
+          {busy ? t("pointing") : t("chooseFolderButton")}
         </Button>
       </div>
       {error && <InlineError>{error}</InlineError>}
@@ -281,6 +283,7 @@ function AddConsoleSection({
  * vez no topo do modal.
  */
 function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: () => void }) {
+  const t = useT(dict);
   const consoles = [...report.verdicts].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -289,11 +292,9 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
           "sm:max-w-sm" da base do DialogContent — sem ele o modal renderiza em
           384px, cortando a lista de 33 consoles em vez de usar a largura pedida. */}
       <DialogContent className="max-h-[85vh] sm:max-w-lg overflow-y-auto rounded border border-line bg-fill p-5 ring-0">
-        <DialogTitle className="mb-1 text-lg font-semibold text-ink">Nomes de pasta aceitos</DialogTitle>
+        <DialogTitle className="mb-1 text-lg font-semibold text-ink">{t("acceptedFolderNames")}</DialogTitle>
         <p className="mb-4 text-sm text-muted">
-          Em "Selecionar pasta para todos os jogos", cada subpasta é reconhecida pelo nome — copie um dos valores
-          abaixo (id, nome completo ou sigla) para nomear a subpasta daquele console. Maiúscula/minúscula, espaço e
-          hífen não importam.
+          {t("folderNamesGuideText")}
         </p>
         <ul className="flex flex-col gap-2">
           {consoles.map((c) => {
@@ -310,7 +311,7 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
         </ul>
         <div className="mt-4 flex justify-end">
           <Button variant="primary" autoFocus onClick={onClose}>
-            Fechar
+            {t("close")}
           </Button>
         </div>
       </DialogContent>
@@ -344,6 +345,7 @@ export function LibraryScreen({
   onBack: () => void;
   onOpenGames: (consoleId: string, name: string, shortName: string) => void;
 }) {
+  const t = useT(dict);
   const [folders, setFolders] = useState<LibraryFolder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -360,8 +362,8 @@ export function LibraryScreen({
     api
       .getLibraryFolders()
       .then((res) => setFolders(res.folders))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar as pastas."));
-  }, [reloadKey]);
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("couldNotListFolders")));
+  }, [reloadKey, t]);
 
   // report.verdicts já cobre os 33 consoles do catálogo (Evaluate nunca
   // filtra nenhum, mesmo "improvavel").
@@ -408,7 +410,7 @@ export function LibraryScreen({
       await api.rescanLibraryFolder(folderId);
       fetchGamesFor(consoleId);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível revarrer esta pasta.");
+      setError(err instanceof ApiError ? err.message : t("couldNotScanFolder"));
     } finally {
       setRowBusy((prev) => ({ ...prev, [consoleId]: false }));
     }
@@ -426,7 +428,7 @@ export function LibraryScreen({
         return next;
       });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível remover esta pasta.");
+      setError(err instanceof ApiError ? err.message : t("couldNotRemoveFolder"));
       setRowBusy((prev) => ({ ...prev, [consoleId]: false }));
     }
   }
@@ -449,15 +451,15 @@ export function LibraryScreen({
           (all-games), não pro Parecer/Especificações — ficou desatualizado
           desde a reestruturação da sidebar (Sprint 1). */}
       <Button variant="secondary" onClick={onBack} className="mb-4">
-        Voltar
+        {t("back")}
       </Button>
-      <h1 className="mb-4 text-2xl font-semibold text-ink">Biblioteca</h1>
+      <h1 className="mb-4 text-2xl font-semibold text-ink">{t("library")}</h1>
 
       <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
 
       <div className="mb-4 -mt-2 flex justify-end">
         <Button type="button" variant="quiet" onClick={() => setShowNameGuide(true)}>
-          Ver nomes de pasta aceitos
+          {t("seeFolderNamesAccepted")}
         </Button>
       </div>
       {showNameGuide && <FolderNameGuideModal report={report} onClose={() => setShowNameGuide(false)} />}
@@ -467,7 +469,7 @@ export function LibraryScreen({
           achado do Douglas em GamesScreen/AllGamesScreen, 2026-08-07).
           Falha de revarrer/remover por linha continua inline, dentro da
           própria seção. */}
-      {error && <ErrorModal title="Não foi possível listar as pastas" message={error} onClose={() => setError(null)} />}
+      {error && <ErrorModal title={t("couldNotListFolders")} message={error} onClose={() => setError(null)} />}
 
       {/* N11 (docs/roadmap.md, Sprint N): antes, `folders === null` não
           renderizava nada — a tela ficava em branco entre abrir e a resposta
@@ -476,7 +478,7 @@ export function LibraryScreen({
           card de grade). */}
       {folders === null && (
         <div role="status" aria-live="polite" className="flex flex-col gap-2">
-          <span className="sr-only">Carregando pastas…</span>
+          <span className="sr-only">{t("loadingFolders")}</span>
           {Array.from({ length: 3 }, (_, i) => (
             <CardSkeleton key={i} className="h-16" />
           ))}
@@ -491,13 +493,13 @@ export function LibraryScreen({
               do app) vale para título de tela E de seção interna, sem
               distinção. */}
           <div>
-            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Consoles configurados</h2>
+            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("configuredConsoles")}</h2>
             {configuredConsoles.length === 0 ? (
               // N11 (docs/roadmap.md, Sprint N): sem botão de ação aqui — a
               // seção "Adicionar console" (a ação que resolve este vazio) já
               // fica sempre visível logo abaixo, um botão duplicado só
               // repetiria o que a tela já mostra.
-              <EmptyState message="Nenhum console com pasta apontada ainda." />
+              <EmptyState message={t("noConsolesFolderYet")} />
             ) : (
               <div className="flex flex-col gap-2">
                 {configuredConsoles.map((consoleInfo) => (
@@ -518,7 +520,7 @@ export function LibraryScreen({
           </div>
 
           <div>
-            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar console</h2>
+            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("addConsole")}</h2>
             <AddConsoleSection availableConsoles={availableConsoles} onAdded={() => setReloadKey((k) => k + 1)} />
           </div>
         </div>

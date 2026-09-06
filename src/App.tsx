@@ -3,7 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
+import { useT } from "./i18n/i18n";
 import type { LibraryGame } from "./api/types";
+import { dict } from "./App.i18n";
 import {
   AllGamesScreen,
   loadInitialAllGamesView,
@@ -56,6 +58,8 @@ function App() {
   // Tab, A ≈ clique, B ≈ Esc. Um lugar só, não por tela — o hook opera sobre
   // document.activeElement, não precisa saber a phase atual.
   useGamepadNavigation();
+
+  const t = useT(dict);
 
   const [phase, setPhase] = useState<Phase>("checking-port");
   const [policy, setPolicy] = useState<{ text: string; version: string } | null>(null);
@@ -160,7 +164,7 @@ function App() {
         attempt += 1;
         if (attempt >= maxAttempts) {
           if (!cancelled) {
-            setErrorMessage(err instanceof ApiError ? err.message : "O zeuxd não respondeu.");
+            setErrorMessage(err instanceof ApiError ? err.message : t("daemonUnreachable"));
             setPhase("daemon-unreachable");
           }
           return;
@@ -187,7 +191,7 @@ function App() {
       setReport(nextReport);
       setPhase("all-games");
     } catch (err) {
-      setErrorMessage(err instanceof ApiError ? err.message : "Não foi possível ler este computador.");
+      setErrorMessage(err instanceof ApiError ? err.message : t("scanError"));
       setPhase("scan-error");
     }
   }
@@ -198,7 +202,7 @@ function App() {
       await api.setConsent(true);
     } catch (err) {
       setBusy(false);
-      setErrorMessage(err instanceof ApiError ? err.message : "Não foi possível registrar o consentimento.");
+      setErrorMessage(err instanceof ApiError ? err.message : t("consentError"));
       setPhase("daemon-unreachable");
       return;
     }
@@ -212,7 +216,7 @@ function App() {
       await api.setConsent(false);
       setPhase("declined");
     } catch (err) {
-      setErrorMessage(err instanceof ApiError ? err.message : "Não foi possível registrar o consentimento.");
+      setErrorMessage(err instanceof ApiError ? err.message : t("consentError"));
       setPhase("daemon-unreachable");
     } finally {
       setBusy(false);
@@ -245,7 +249,7 @@ function App() {
   switch (phase) {
     case "checking-port":
     case "connecting":
-      screen = <LoadingScreen message="lendo o consentimento…" />;
+      screen = <LoadingScreen message={t("loadingConsent")} />;
       break;
 
     case "port-conflict":
@@ -256,7 +260,7 @@ function App() {
       // (checkPortConflict troca a phase para "connecting").
       screen = (
         <ErrorScreen
-          message="A porta 7777 já está sendo usada por outro programa, não pelo ZeuX. Feche o que estiver usando essa porta e tente de novo."
+          message={t("portConflict")}
           onRetry={checkPortConflict}
         />
       );
@@ -293,7 +297,7 @@ function App() {
       break;
 
     case "scanning":
-      screen = <LoadingScreen message="lendo este computador…" />;
+      screen = <LoadingScreen message={t("scanningHardware")} />;
       break;
 
     case "scan-error":

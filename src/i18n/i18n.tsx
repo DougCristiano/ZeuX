@@ -101,7 +101,9 @@ export function useT<D extends Dict>(dict: D) {
       }
       if (vars) {
         for (const [k, v] of Object.entries(vars)) {
-          text = text.replaceAll(`{{${k}}}`, String(v));
+          // split/join em vez de replaceAll: o target do tsconfig é ES2020,
+          // que não tem String.prototype.replaceAll (só a partir de ES2021).
+          text = text.split(`{{${k}}}`).join(String(v));
         }
       }
       return text;

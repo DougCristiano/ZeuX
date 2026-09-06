@@ -9,6 +9,8 @@ import type {
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
+import { useT } from "../i18n/i18n";
+import { dict } from "./EmulatorsScreen.i18n";
 import {
   Badge,
   Button,
@@ -82,6 +84,7 @@ const ALL_CONSOLES = "__all__";
 // para fora da tela. O cabeçalho (resumo e "baixar os que faltam") fica
 // fora do scroll, sempre visível.
 function RetroArchCoresList() {
+  const t = useT(dict);
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Fila do "baixar os que faltam": quantos ainda restam e qual está na vez.
@@ -97,7 +100,7 @@ function RetroArchCoresList() {
     api
       .getRetroArchCores()
       .then((res) => setCores(res.cores))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os cores."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListCores")));
   }
 
   // P2 (docs/roadmap.md, Sprint P): o polling, o "cancelado não é falha" e a
@@ -144,7 +147,7 @@ function RetroArchCoresList() {
         // usuário a recomeçar do zero.
         setCoreState(name, {
           kind: "error",
-          message: err instanceof ApiError ? err.message : "Não foi possível iniciar o download.",
+          message: err instanceof ApiError ? err.message : t("failedToInitiateCoreDownload"),
         });
       }
       remaining -= 1;
@@ -155,7 +158,7 @@ function RetroArchCoresList() {
 
 
   if (error) return <InlineError>{error}</InlineError>;
-  if (!cores) return <p className="text-sm text-muted">Carregando cores…</p>;
+  if (!cores) return <p className="text-sm text-muted">{t("loadingCores")}</p>;
 
   const missing = cores.filter((c) => !c.installed);
 
@@ -163,11 +166,11 @@ function RetroArchCoresList() {
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted">
-          {cores.length - missing.length} de {cores.length} cores instalados
+          {t("coresInstalledStatus", { installed: cores.length - missing.length, total: cores.length })}
           {/* Descritivo, nunca "faltam X" com tom de cobrança: o modelo sob
               demanda (ADR 0015) baixa sozinho ao jogar, então um core ausente
               não é pendência do usuário — é o comportamento normal. */}
-          {missing.length > 0 && " — os que faltam são baixados sozinhos ao abrir um jogo do console."}
+          {missing.length > 0 && t("missingCoresNote")}
         </p>
 
         {/* Baixar tudo de uma vez não é o caminho principal (o ADR 0015
@@ -183,14 +186,14 @@ function RetroArchCoresList() {
             className="shrink-0 px-2 py-1 text-xs"
             onClick={() => downloadAllMissing(missing.map((c) => c.name))}
           >
-            Baixar os {missing.length} que faltam
+            {t("downloadAllMissing", { missing: missing.length })}
           </Button>
         )}
 
         {bulk && (
           <div className="flex shrink-0 items-center gap-2">
             <span className="text-xs text-muted tabular-nums">
-              Baixando {bulk.total - bulk.remaining + 1} de {bulk.total} · {bulk.current}
+              {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
             </span>
             {/* "Parar" encerra a fila, mas não cancela o core que já está
                 baixando — esse tem o "Cancelar" da própria linha. Separar os
@@ -203,7 +206,7 @@ function RetroArchCoresList() {
                 bulkStopped.current = true;
               }}
             >
-              Parar depois deste
+              {t("stopAfterThis")}
             </Button>
           </div>
         )}
@@ -219,7 +222,7 @@ function RetroArchCoresList() {
           return (
             <li key={core.name} className="flex flex-col gap-0.5 py-0.5">
               <div className="flex min-w-0 items-center gap-1.5">
-                <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
+                <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? t("coreStatusOk") : t("coreStatusMissing")}</Badge>
                 <span className="truncate text-ink" title={core.path ?? core.filename}>
                   {core.name}
                 </span>
@@ -240,11 +243,11 @@ function RetroArchCoresList() {
                     className="ml-auto shrink-0 px-2 py-1 text-xs"
                     onClick={() => installCore(core.name)}
                   >
-                    Instalar
+                    {t("coreInstall")}
                   </Button>
                 )}
                 {!core.installed && state.kind === "starting" && (
-                  <span className="ml-auto shrink-0 text-xs text-muted">Iniciando…</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted">{t("coreInitiating")}</span>
                 )}
               </div>
 
@@ -270,7 +273,7 @@ function RetroArchCoresList() {
                     disabled={state.kind === "canceling"}
                     onClick={() => cancelCore(core.name, state.job)}
                   >
-                    {state.kind === "canceling" ? "Cancelando…" : "Cancelar"}
+                    {state.kind === "canceling" ? t("coreCanceling") : t("coreCancelButton")}
                   </Button>
                 </div>
               )}
@@ -369,13 +372,14 @@ function EmulatorCardConsoles({
  * bloco — não precisam subir para o card.
  */
 function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
+  const t = useT(dict);
   const [showConfig, setShowConfig] = useState(false);
   const [showBindings, setShowBindings] = useState(false);
 
   if (!entry.installed) return null;
 
   if (!entry.configurable && !entry.bindable) {
-    return <p className="text-xs text-muted">Configuração e controles ainda só dentro do próprio {entry.name}.</p>;
+    return <p className="text-xs text-muted">{t("configurationAndControls", { emulatorName: entry.name })}</p>;
   }
 
   return (
@@ -383,12 +387,12 @@ function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
       <div className="flex flex-wrap gap-2">
         {entry.configurable && (
           <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
-            {showConfig ? "Ocultar configurações" : "Configurações"}
+            {showConfig ? t("hideConfigurations") : t("configurations")}
           </Button>
         )}
         {entry.bindable && (
           <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
-            {showBindings ? "Ocultar mapeamento" : "Mapear controles"}
+            {showBindings ? t("hideBindings") : t("mapControls")}
           </Button>
         )}
       </div>
@@ -412,6 +416,7 @@ function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
  * — nunca um palpite por convenção.
  */
 function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
+  const t = useT(dict);
   const [biosError, setBiosError] = useState<string | null>(null);
 
   if (!entry.bios_dir) return null;
@@ -421,19 +426,19 @@ function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
     try {
       await openPath(entry.bios_dir!);
     } catch (err) {
-      setBiosError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+      setBiosError(t("failedToOpenBiosFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
   return (
     <div className="flex flex-col gap-2">
       {entry.bios_dir_empty && (
-        <Callout label="BIOS ausente">
-          A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
+        <Callout label={t("biosAbsent")}>
+          {t("biosEmptyWarning")}
         </Callout>
       )}
       <Button type="button" variant="secondary" onClick={openBiosFolder}>
-        Abrir pasta do BIOS
+        {t("openBiosFolder")}
       </Button>
       {biosError && <InlineError>{biosError}</InlineError>}
     </div>
@@ -460,6 +465,7 @@ function EmulatorCardActions({
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
+  const t = useT(dict);
   // P2 (docs/roadmap.md, Sprint P): a máquina de instalar/remover saiu daqui
   // para `useEmulatorInstall`, compartilhada com o detalhe do console.
   // Comportamento idêntico — só mudou de casa.
@@ -478,7 +484,7 @@ function EmulatorCardActions({
       await api.deleteCustomEmulator(customDef.id);
       onChanged();
     } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : "Não foi possível excluir este emulador.");
+      setDeleteError(err instanceof ApiError ? err.message : t("failedToDeleteEmulator"));
     } finally {
       setDeleting(false);
       setConfirmingDelete(false);
@@ -495,7 +501,7 @@ function EmulatorCardActions({
     try {
       await api.openEmulator(entry.adapter_id);
     } catch (err) {
-      setOpenError(err instanceof ApiError ? err.message : "Não foi possível abrir o emulador.");
+      setOpenError(err instanceof ApiError ? err.message : t("failedToOpenEmulator"));
     } finally {
       setOpening(false);
     }

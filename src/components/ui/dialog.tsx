@@ -3,6 +3,8 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { XIcon } from "lucide-react"
+import { useT } from "../../i18n/i18n"
+import { dict } from "./dialog.i18n"
 
 // N4 (docs/roadmap.md, Sprint N): o X de fechar usava o `Button` do shadcn
 // (src/components/ui/button.tsx) — o único lugar do app onde ele era
@@ -67,6 +69,7 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const t = useT(dict)
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -86,7 +89,7 @@ function DialogContent({
               className={`absolute top-2 right-2 flex size-7 items-center justify-center rounded border border-transparent text-muted transition-colors hover:border-line-strong hover:bg-fill hover:text-ink ${CLOSE_BUTTON_FOCUS_RING}`}
             >
               <XIcon className="size-4" />
-              <span className="sr-only">Fechar</span>
+              <span className="sr-only">{t("closeButton")}</span>
             </button>
           </DialogPrimitive.Close>
         )}
@@ -113,6 +116,7 @@ function DialogFooter({
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean
 }) {
+  const t = useT(dict)
   return (
     <div
       data-slot="dialog-footer"
@@ -129,7 +133,7 @@ function DialogFooter({
             type="button"
             className={`rounded border border-line-strong bg-transparent px-4 py-2 text-sm text-ink transition-colors hover:bg-fill ${CLOSE_BUTTON_FOCUS_RING}`}
           >
-            Fechar
+            {t("closeButton")}
           </button>
         </DialogPrimitive.Close>
       )}

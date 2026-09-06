@@ -5,6 +5,8 @@ import { translateKeyForAdapter } from "../lib/keyMapping";
 import { Button, Callout, InlineError, Toast } from "./ui";
 import { useToast } from "../hooks/useToast";
 import { useGamepad } from "../hooks/useGamepad";
+import { useT } from "../i18n/i18n";
+import { dict } from "./EmulatorBindingsPanel.i18n";
 
 /**
  * Tela de mapeamento de teclado/controle (H3/H4, docs/roadmap.md) — só
@@ -26,6 +28,7 @@ import { useGamepad } from "../hooks/useGamepad";
  * classe de achado que D11/B11 já registram: fica para o Douglas fechar.
  */
 export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: string; adapterName: string }) {
+  const t = useT(dict);
   const [actions, setActions] = useState<string[]>([]);
   const [bindings, setBindings] = useState<InputBinding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +77,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         setActions(res.actions ?? []);
         setBindings(res.bindings ?? []);
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível ler o mapeamento."))
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("errorLoadingBindings")))
       .finally(() => setLoading(false));
   }
 
@@ -82,7 +85,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     setUnapplied([]);
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapterId]);
+  }, [adapterId, t]);
 
   // Devolve se gravou. A sequência (Q4) depende disso: avançar depois de uma
   // falha faria a fila correr inteira gravando nada — foi o que aconteceu ao
@@ -102,12 +105,12 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         // Durante a sequência o toast por ação seria um piscar constante — o
         // progresso já aparece no cabeçalho, e o "Controle mapeado." do fim
         // fecha a conversa.
-        showToast("Mapeamento salvo.");
+        showToast(t("bindingSaved"));
       }
       load();
       return true;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível salvar o mapeamento.");
+      setError(err instanceof ApiError ? err.message : t("errorSavingBindings"));
       return false;
     }
   }
@@ -138,7 +141,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       const translated = translateKeyForAdapter(adapterId, e);
       setListeningKeyFor(null);
       if (!translated) {
-        setError(`A tecla "${e.key}" não pode ser mapeada para o ${adapterName}.`);
+        setError(t("keyNotMappable", { key: e.key, adapter: adapterName }));
         return;
       }
       const owner = currentKeyOwner(translated, action);
@@ -152,7 +155,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listeningKeyFor]);
+  }, [listeningKeyFor, t, adapterId, adapterName]);
 
   // Ref espelhando `sequence`: o laço de captura (requestAnimationFrame,
   // abaixo) tem `listeningButtonFor` nas dependências e leria um `sequence`
@@ -181,7 +184,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     const proximo = atual.index + 1;
     if (proximo >= atual.actions.length) {
       setSequence(null);
-      showToast("Controle mapeado.");
+      showToast(t("gamepadMapped"));
       return;
     }
     setSequence({ ...atual, index: proximo });
@@ -265,14 +268,14 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listeningButtonFor]);
 
-  if (loading) return <p className="text-sm text-muted">Lendo o mapeamento do {adapterName}…</p>;
+  if (loading) return <p className="text-sm text-muted">{t("loadingBindings", { adapterName })}</p>;
 
   return (
     <div className="flex flex-col gap-3">
       {toastMessage && <Toast message={toastMessage} />}
       {error && <InlineError>{error}</InlineError>}
       {unapplied.length > 0 && (
-        <Callout label="Não aplicado" tone="amber">
+        <Callout label={t("unappliedLabel")} tone="amber">
           <ul className="list-disc pl-4">
             {unapplied.map((msg, i) => (
               <li key={i}>{msg}</li>
@@ -288,16 +291,16 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       {gamepadConnected ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-line bg-fill px-3 py-2">
           <p className="text-sm text-ink">
-            Controle detectado
+            {t("gamepadDetected")}
             {gamepad.name && <span className="text-muted"> · {gamepad.name}</span>}
           </p>
           {sequence ? (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted tabular-nums">
-                {sequence.index + 1} de {sequence.actions.length} · aperte o botão para "{sequence.actions[sequence.index]}"
+                {t("sequenceProgress", { index: sequence.index + 1, total: sequence.actions.length, action: sequence.actions[sequence.index] })}
               </span>
               <Button variant="quiet" className="px-2 py-1 text-xs" onClick={pararSequencia}>
-                Parar
+                {t("stopButton")}
               </Button>
             </div>
           ) : (
@@ -311,15 +314,13 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
               disabled={listeningButtonFor !== null || actions.length === 0}
               onClick={iniciarSequencia}
             >
-              Mapear o controle inteiro
+              {t("mapEntireGamepad")}
             </Button>
           )}
         </div>
       ) : (
         <p className="text-xs text-muted">
-          Nenhum controle detectado ainda. Se já conectou um, aperte um botão nele — a Gamepad API do navegador só
-          percebe a conexão depois do primeiro aperto, mesmo com o controle já plugado antes de abrir esta tela. O
-          mapeamento de teclado funciona sem controle nenhum.
+          {t("noGamepadDetected")}
         </p>
       )}
 
@@ -327,9 +328,9 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         <div className="rounded border border-dashed border-line-strong p-3">
           <p className="text-sm text-ink">
             {conflict.key
-              ? `A tecla já está em "${conflict.withAction}".`
-              : `O botão ${conflict.button} já está em "${conflict.withAction}".`}{" "}
-            Trocar para "{conflict.action}" também?
+              ? t("keyConflictMessage", { action: conflict.withAction })
+              : t("buttonConflictMessage", { button: conflict.button, action: conflict.withAction })}{" "}
+            {t("switchConfirmationSuffix", { action: conflict.action })}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
@@ -341,10 +342,10 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
                 saveBinding(action, key ? { key } : { button });
               }}
             >
-              Trocar mesmo assim
+              {t("switchButton")}
             </Button>
             <Button variant="secondary" onClick={() => setConflict(null)}>
-              Cancelar
+              {t("cancelButton")}
             </Button>
           </div>
         </div>

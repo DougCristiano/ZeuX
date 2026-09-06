@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { Renderer } from "../api/types";
+import { useT } from "../i18n/i18n";
+import { dict } from "./EmulatorConfigPanel.i18n";
 import { Button, Callout, ConfirmModal, InlineError, inputClass, Toast, ZSelect } from "./ui";
 import { SelectItem } from "./ui/select";
 import { useToast } from "../hooks/useToast";
@@ -32,6 +34,7 @@ const DEFAULT_RENDERER = "__default__";
  * ainda não expõe por opção.
  */
 export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: string; adapterName: string }) {
+  const t = useT(dict);
   const [fullscreen, setFullscreen] = useState<boolean | null>(null);
   const [internalScale, setInternalScale] = useState<number | null>(null);
   const [renderer, setRenderer] = useState<Renderer>("");
@@ -55,7 +58,7 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
         setInternalScale(cfg.internal_scale ?? null);
         setRenderer(cfg.renderer ?? "");
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível ler a configuração."))
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("readError")))
       .finally(() => setLoading(false));
   }
 
@@ -73,9 +76,9 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
       });
       setUnapplied(result.unapplied ?? []);
       load();
-      showToast("Configuração salva.");
+      showToast(t("savedToast"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível salvar a configuração.");
+      setError(err instanceof ApiError ? err.message : t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -89,13 +92,13 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
       setConfirmingRestore(false);
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível restaurar a configuração original.");
+      setError(err instanceof ApiError ? err.message : t("restoreError"));
     } finally {
       setRestoring(false);
     }
   }
 
-  if (loading) return <p className="text-sm text-muted">Lendo a configuração do {adapterName}…</p>;
+  if (loading) return <p className="text-sm text-muted">{t("loading", { name: adapterName })}</p>;
 
   return (
     <div className="flex flex-col gap-3">
@@ -109,26 +112,26 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
           onChange={(e) => setFullscreen(e.target.checked)}
           className="h-4 w-4"
         />
-        Tela cheia
-        {fullscreen === null && <span className="text-xs text-muted">(desconhecido — nunca lido do arquivo)</span>}
+        {t("fullscreenLabel")}
+        {fullscreen === null && <span className="text-xs text-muted">{t("fullscreenUnknown")}</span>}
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Resolução interna (multiplicador)
+        {t("internalScaleLabel")}
         <input
           type="number"
           min={0}
           value={internalScale ?? ""}
-          placeholder={internalScale === null ? "desconhecido" : undefined}
+          placeholder={internalScale === null ? t("internalScalePlaceholder") : undefined}
           onChange={(e) => setInternalScale(e.target.value ? Number(e.target.value) : null)}
           className={inputClass}
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Backend gráfico
+        {t("rendererLabel")}
         <ZSelect
-          ariaLabel="Backend gráfico"
+          ariaLabel={t("rendererLabel")}
           value={renderer || DEFAULT_RENDERER}
           onValueChange={(v) => setRenderer((v === DEFAULT_RENDERER ? "" : v) as Renderer)}
         >
@@ -144,7 +147,7 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
           borda/fundo âmbar copiados — `Callout` (tone="amber") já é
           exatamente esse componente, reaproveitado em vez de duplicado. */}
       {unapplied.length > 0 && (
-        <Callout label="Não aplicado" tone="amber">
+        <Callout label={t("unappliedLabel")} tone="amber">
           <ul className="list-disc pl-4">
             {unapplied.map((msg, i) => (
               <li key={i}>{msg}</li>
@@ -155,29 +158,29 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
 
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" disabled={saving} onClick={save}>
-          {saving ? "Salvando…" : "Salvar"}
+          {saving ? t("saving") : t("save")}
         </Button>
         {confirmingRestore ? (
           // N13 (docs/roadmap.md, Sprint N): irreversível (descarta a
           // configuração personalizada salva) — era painel inline, virou modal.
           <ConfirmModal
-            title="Restaurar configuração padrão?"
-            message={`As opções personalizadas de ${adapterName} salvas aqui serão descartadas.`}
+            title={t("restoreConfirmTitle")}
+            message={t("restoreConfirmMessage", { name: adapterName })}
             onClose={() => setConfirmingRestore(false)}
             actions={
               <>
                 <Button variant="secondary" onClick={() => setConfirmingRestore(false)}>
-                  Cancelar
+                  {t("cancel")}
                 </Button>
                 <Button variant="danger" autoFocus disabled={restoring} onClick={restore}>
-                  Restaurar mesmo assim
+                  {t("restoreAnyway")}
                 </Button>
               </>
             }
           />
         ) : (
           <Button variant="secondary" onClick={() => setConfirmingRestore(true)}>
-            Restaurar padrão
+            {t("restoreDefault")}
           </Button>
         )}
       </div>

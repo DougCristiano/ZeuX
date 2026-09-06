@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { SystemInfo } from "../api/types";
+import { useT } from "../i18n/i18n";
+import { dict } from "./SettingsScreen.i18n";
 import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, Toast } from "../components/ui";
+import { LanguageSelector } from "../components/LanguageSelector";
 import { useToast } from "../hooks/useToast";
 
 // `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
@@ -30,6 +33,7 @@ type SystemInfoState =
  * acionável ("confira o client_id/client_secret").
  */
 export function SettingsScreen() {
+  const t = useT(dict);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -48,7 +52,7 @@ export function SettingsScreen() {
       .catch((err) =>
         setSystemInfo({
           kind: "error",
-          message: err instanceof ApiError ? err.message : "Não foi possível localizar a pasta de instalação.",
+          message: err instanceof ApiError ? err.message : t("locateInstallError"),
         }),
       );
   }, []);
@@ -66,7 +70,7 @@ export function SettingsScreen() {
     try {
       await openPath(systemInfo.info.app_data_dir);
     } catch (err) {
-      setPathError(`Não foi possível abrir a pasta: ${err instanceof Error ? err.message : String(err)}`);
+      setPathError(t("pathOpenError", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -93,7 +97,7 @@ export function SettingsScreen() {
       await openUrl("ms-settings:appsfeatures");
     } catch (err) {
       setUninstallError(
-        `Não foi possível abrir a tela de desinstalação do Windows: ${err instanceof Error ? err.message : String(err)}`,
+        t("uninstallOpenError", { error: err instanceof Error ? err.message : String(err) }),
       );
     }
   }
@@ -104,7 +108,7 @@ export function SettingsScreen() {
       .getIGDBCredentials()
       .then((status) => setState({ kind: "loaded", personal: status.personal }))
       .catch((err) =>
-        setState({ kind: "error", message: err instanceof ApiError ? err.message : "Não foi possível ler o estado da conta." }),
+        setState({ kind: "error", message: err instanceof ApiError ? err.message : t("accountStatusError") }),
       );
   }
 
@@ -122,9 +126,9 @@ export function SettingsScreen() {
       setClientId("");
       setClientSecret("");
       loadStatus();
-      showToast("Conta conectada.");
+      showToast(t("connectedToast"));
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Não foi possível conectar a conta.");
+      setFormError(err instanceof ApiError ? err.message : t("connectError"));
     } finally {
       setSaving(false);
     }
@@ -136,9 +140,9 @@ export function SettingsScreen() {
       await api.clearIGDBCredentials();
       setConfirmingDisconnect(false);
       loadStatus();
-      showToast("Conta desconectada.");
+      showToast(t("disconnectedToast"));
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Não foi possível desconectar a conta.");
+      setFormError(err instanceof ApiError ? err.message : t("disconnectError"));
     } finally {
       setSaving(false);
     }
@@ -147,16 +151,20 @@ export function SettingsScreen() {
   return (
     <ScreenContainer variant="listing">
       {toastMessage && <Toast message={toastMessage} />}
-      <h1 className="mb-5 text-2xl font-semibold text-ink">Configurações</h1>
+      <h1 className="mb-5 text-2xl font-semibold text-ink">{t("title")}</h1>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Instalação</h2>
+        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("languageLabel")}</h2>
+        <LanguageSelector />
+      </Card>
+
+      <Card className="mb-6">
+        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("installationHeading")}</h2>
         <p className="mb-4 text-sm text-muted">
-          Emuladores instalados pelo ZeuX, biblioteca, capas e configurações desta máquina ficam todos dentro da
-          mesma pasta.
+          {t("installationDescription")}
         </p>
 
-        {systemInfo.kind === "loading" && <p className="text-sm text-muted">Localizando a pasta…</p>}
+        {systemInfo.kind === "loading" && <p className="text-sm text-muted">{t("locatingFolder")}</p>}
         {systemInfo.kind === "error" && <InlineError>{systemInfo.message}</InlineError>}
 
         {systemInfo.kind === "loaded" && (
@@ -166,26 +174,23 @@ export function SettingsScreen() {
             </p>
             {pathError && <InlineError>{pathError}</InlineError>}
             <Button variant="secondary" onClick={openInstallFolder} className="w-fit">
-              Abrir pasta de instalação
+              {t("openInstallFolder")}
             </Button>
           </div>
         )}
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Desinstalar o ZeuX</h2>
+        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("uninstallHeading")}</h2>
 
         {systemInfo.kind === "loaded" && systemInfo.info.os === "windows" && (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted">
-              O ZeuX já tem um desinstalador registrado no Windows — este botão só leva direto até ele, em
-              Configurações › Aplicativos. Remover o programa por lá não apaga a pasta acima (seus emuladores
-              instalados, saves e biblioteca continuam no disco, para o caso de reinstalar depois); apague-a
-              manualmente se quiser também limpar esses dados.
+              {t("uninstallWindowsDescription")}
             </p>
             {uninstallError && <InlineError>{uninstallError}</InlineError>}
             <Button variant="secondary" onClick={openWindowsUninstall} className="w-fit">
-              Abrir desinstalação do Windows
+              {t("openWindowsUninstall")}
             </Button>
           </div>
         )}
@@ -193,63 +198,59 @@ export function SettingsScreen() {
         {systemInfo.kind === "loaded" && systemInfo.info.os !== "windows" && (
           <p className="text-sm text-muted">
             {systemInfo.info.os === "darwin"
-              ? "No macOS, desinstalar é mover o ZeuX.app para a Lixeira, como qualquer outro aplicativo."
-              : "No Linux, desinstale pelo mesmo gerenciador de pacotes usado para instalar (ex.: seu gerenciador de .deb/.rpm, ou apague o AppImage)."}{" "}
-            Isso não apaga a pasta acima — apague-a manualmente se também quiser remover emuladores instalados,
-            saves e biblioteca.
+              ? t("uninstallMacDescription")
+              : t("uninstallLinuxDescription")}{" "}
+            {t("uninstallSuffix")}
           </p>
         )}
 
         {systemInfo.kind !== "loaded" && (
-          <p className="text-sm text-muted">Aguardando localizar a instalação…</p>
+          <p className="text-sm text-muted">{t("waitingForInstall")}</p>
         )}
       </Card>
 
       <Card>
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Capas de jogo (IGDB)</h2>
+        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("igdbHeading")}</h2>
         <p className="mb-4 text-sm text-muted">
-          O ZeuX pode buscar a capa e a data de lançamento dos seus jogos no IGDB. O ideal é cada pessoa conectar a
-          própria conta — o ID e o segredo do cliente, obtidos no painel de desenvolvedor do Twitch — para que a
-          busca de todo mundo que usa o ZeuX não divida a mesma cota. A credencial fica guardada só nesta máquina,
-          nunca é enviada a nenhum servidor do ZeuX.
+          {t("igdbDescription")}
         </p>
 
-        {state.kind === "loading" && <p className="text-sm text-muted">Lendo o estado da conta…</p>}
+        {state.kind === "loading" && <p className="text-sm text-muted">{t("readingAccountStatus")}</p>}
 
         {state.kind === "error" && (
           <div>
             <InlineError className="mb-2">{state.message}</InlineError>
             <Button variant="secondary" onClick={loadStatus}>
-              Tentar de novo
+              {t("tryAgain")}
             </Button>
           </div>
         )}
 
         {state.kind === "loaded" && state.personal && (
           <div>
-            <p className="mb-3 text-sm text-ink">Conta conectada.</p>
+            <p className="mb-3 text-sm text-ink">{t("accountConnected")}</p>
             {formError && <InlineError className="mb-3">{formError}</InlineError>}
             {confirmingDisconnect ? (
               // N13 (docs/roadmap.md, Sprint N): irreversível (apaga a
               // credencial pessoal salva) — era painel inline, virou modal.
               <ConfirmModal
-                title="Desconectar conta?"
-                message="O ZeuX volta a usar a credencial de teste compartilhada (abaixo) até você conectar de novo."
+                title={t("disconnectConfirmTitle")}
+                message={t("disconnectConfirmMessage")}
                 onClose={() => setConfirmingDisconnect(false)}
                 actions={
                   <>
                     <Button variant="secondary" disabled={saving} onClick={() => setConfirmingDisconnect(false)}>
-                      Cancelar
+                      {t("cancel")}
                     </Button>
                     <Button variant="danger" disabled={saving} onClick={handleDisconnect}>
-                      Desconectar
+                      {t("disconnect")}
                     </Button>
                   </>
                 }
               />
             ) : (
               <Button variant="secondary" onClick={() => setConfirmingDisconnect(true)}>
-                Desconectar conta
+                {t("disconnect")}
               </Button>
             )}
           </div>
@@ -265,13 +266,11 @@ export function SettingsScreen() {
                 O formulário abaixo continua disponível pra quem quiser
                 conectar a própria conta e sair da cota compartilhada. */}
             <p className="text-sm text-ink">
-              Usando a credencial de teste do ZeuX — a busca de capa já funciona, sem precisar configurar nada.
-              Ela é compartilhada com quem também não conectou a própria conta; conecte a sua para não depender
-              dessa cota.
+              {t("usingTestCredential")}
             </p>
             {formError && <InlineError>{formError}</InlineError>}
             <label className="flex flex-col gap-1 text-sm text-ink">
-              ID do cliente
+              {t("clientIdLabel")}
               <input
                 type="text"
                 value={clientId}
@@ -281,7 +280,7 @@ export function SettingsScreen() {
               />
             </label>
             <label className="flex flex-col gap-1 text-sm text-ink">
-              Segredo do cliente
+              {t("clientSecretLabel")}
               <input
                 type="password"
                 value={clientSecret}
@@ -296,7 +295,7 @@ export function SettingsScreen() {
               onClick={handleConnect}
               className="w-fit"
             >
-              {saving ? "Conectando…" : "Conectar"}
+              {saving ? t("connecting") : t("connect")}
             </Button>
           </div>
         )}

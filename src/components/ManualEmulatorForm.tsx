@@ -2,6 +2,8 @@ import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { CustomDefinition } from "../api/types";
+import { useT } from "../i18n/i18n";
+import { dict } from "./ManualEmulatorForm.i18n";
 import { Button, InlineError, inputClass } from "./ui";
 
 // slugify vira o nome digitado num id estável (mesmo alfabeto de
@@ -45,6 +47,7 @@ export function ManualEmulatorForm({
   onSaved: () => void;
   onCancel: () => void;
 }) {
+  const t = useT(dict);
   const [name, setName] = useState(existing?.name ?? "");
   const [consoles, setConsoles] = useState((existing?.consoles ?? []).join(", "));
   const [binaryPath, setBinaryPath] = useState(existing?.binary_path ?? "");
@@ -93,7 +96,7 @@ export function ManualEmulatorForm({
       // é o que nomeia exatamente o que falhou (ex.: "os argumentos
       // precisam conter {rom}", "o caminho X não existe ou não é um
       // executável").
-      setError(err instanceof ApiError ? err.message : "Não foi possível salvar este emulador.");
+      setError(err instanceof ApiError ? err.message : t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -106,12 +109,12 @@ export function ManualEmulatorForm({
     // então alinhado à mão aos mesmos tokens que o componente usa.
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded border border-line bg-fill p-4">
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Nome
+        {t("nameLabel")}
         <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Consoles atendidos (ids separados por vírgula, ex.: ps1, ps2)
+        {t("consolesLabel")}
         <input
           type="text"
           required
@@ -122,7 +125,7 @@ export function ManualEmulatorForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Caminho do executável
+        {t("binaryPathLabel")}
         <div className="flex gap-2">
           <input
             type="text"
@@ -132,13 +135,13 @@ export function ManualEmulatorForm({
             className={inputClass}
           />
           <Button type="button" variant="secondary" onClick={pickBinary} className="shrink-0">
-            Escolher arquivo
+            {t("chooseFile")}
           </Button>
         </div>
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Argumentos (um por linha — precisa incluir {"{rom}"} em algum deles)
+        {t("argsLabel", { rom: "{rom}" })}
         <textarea
           required
           rows={4}
@@ -154,7 +157,7 @@ export function ManualEmulatorForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Notas (opcional)
+        {t("notesLabel")}
         <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
       </label>
 
@@ -162,10 +165,10 @@ export function ManualEmulatorForm({
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="primary" disabled={saving}>
-          {saving ? "Salvando…" : "Salvar"}
+          {saving ? t("saving") : t("save")}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={saving}>
-          Cancelar
+          {t("cancel")}
         </Button>
       </div>
     </form>

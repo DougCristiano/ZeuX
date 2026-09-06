@@ -1,6 +1,8 @@
 import type { LibraryGame } from "../api/types";
 import type { GameLaunchability } from "../lib/gameLaunchability";
 import { formatPlaytime } from "../lib/format";
+import { useT } from "../i18n/i18n";
+import { dict } from "./GameListRow.i18n";
 import { Badge, FavoriteToggle, FOCUS_RING, PlayIcon } from "./ui";
 
 /**
@@ -43,6 +45,7 @@ export function GameListRow({
   /** Só relevante quando `launchability.reason === "not_installed"` — dispara a instalação inline (L8) a partir do badge. */
   onInstall?: () => void;
 }) {
+  const t = useT(dict);
   const blocked = launchability !== undefined && !launchability.launchable;
 
   return (
@@ -59,7 +62,7 @@ export function GameListRow({
         // usa no hover — reaproveita o vocabulário em vez de inventar um novo.
         className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded px-1 py-1 text-left transition-colors hover:bg-fill ${FOCUS_RING}`}
         title={game.title}
-        aria-label={`Ver detalhes de ${game.title}`}
+        aria-label={t("seeDetails", { title: game.title })}
         onClick={onOpenDetail}
         onKeyDown={(e) => {
           if (e.key !== "Enter" && e.key !== " ") return;
@@ -98,7 +101,7 @@ export function GameListRow({
         <button
           type="button"
           tabIndex={-1}
-          aria-label={`Jogar ${game.title}`}
+          aria-label={t("playGame", { title: game.title })}
           onClick={(e) => {
             e.stopPropagation();
             onPlay();

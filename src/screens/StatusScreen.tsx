@@ -1,5 +1,7 @@
 import logoZeux from "../assets/logo-zeux.png";
+import { useT } from "../i18n/i18n";
 import { Button, OnboardingGlow } from "../components/ui";
+import { dict } from "./StatusScreen.i18n";
 
 /**
  * Estado de carregamento — nunca fica girando para sempre (ver ErrorScreen).
@@ -35,6 +37,8 @@ export function LoadingScreen({ message }: { message: string }) {
  * novo — nunca fica girando indefinidamente".
  */
 export function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const t = useT(dict);
+
   return (
     // N3/N8 (docs/roadmap.md, Sprint N): max-w-3xl é o teto de leitura do
     // resto do app (era max-w-sm, isolado); glow de identidade (N8).
@@ -43,7 +47,7 @@ export function ErrorScreen({ message, onRetry }: { message: string; onRetry: ()
       <div className="relative z-10 flex w-full max-w-3xl flex-col items-start gap-4">
         <p className="text-base text-danger">{message}</p>
         <Button variant="primary" autoFocus onClick={onRetry}>
-          Tentar de novo
+          {t("retry")}
         </Button>
       </div>
     </main>

@@ -28,22 +28,10 @@ import {
   type ConsoleReadiness,
   type ReadinessStep,
 } from "../lib/consoleReadiness";
+import { useT } from "../i18n/i18n";
+import { dict } from "./ConsolesScreen.i18n";
 
 const PAGE_SIZE = 12;
-
-// Os filtros são os passos de prontidão, não os patamares do parecer: a
-// pergunta desta tela é "o que falta montar", e "falta o core" é acionável
-// de um jeito que "limitado" não é. O parecer continua aparecendo no card,
-// como informação — nunca como filtro que esconderia um console que o
-// usuário quer configurar assim mesmo (princípio 5: informar, não bloquear).
-const FILTERS: { id: ReadinessStep | "todos"; label: string }[] = [
-  { id: "todos", label: "Todos" },
-  { id: "pronto", label: "Prontos" },
-  { id: "sem-emulador", label: "Falta emulador" },
-  { id: "sem-core", label: "Falta core" },
-  { id: "sem-bios", label: "Falta BIOS" },
-  { id: "sem-pasta", label: "Falta pasta" },
-];
 
 // `pronto` é o único estado que merece destaque visual positivo; os demais
 // são pendências equivalentes entre si — nenhuma é "pior" que a outra, só
@@ -69,6 +57,7 @@ function ConsoleCard({
   verdict?: ConsoleVerdict;
   onOpen: () => void;
 }) {
+  const t = useT(dict);
   const accent = consoleAccentColor(entry.console_id);
   const style: CSSProperties = { borderLeftColor: accent, borderLeftWidth: 3 };
 
@@ -126,12 +115,12 @@ function ConsoleCard({
             (sem consentimento/scan) em vez de virar um "desconhecido" que
             ocuparia o mesmo espaço sem dizer nada. */}
         {verdict ? (
-          <span className="text-xs text-muted">Parecer: {LEVEL_LABEL[verdict.level].toLowerCase()}</span>
+          <span className="text-xs text-muted">{t("verdict")} {LEVEL_LABEL[verdict.level].toLowerCase()}</span>
         ) : (
           <span />
         )}
         <Button variant="secondary" onClick={onOpen}>
-          Ver console
+          {t("seeConsole")}
         </Button>
       </div>
     </Card>
@@ -168,6 +157,7 @@ export function ConsolesScreen({
   onOpenConsole: (consoleId: string, name: string, shortName: string) => void;
   onOpenEmulators: () => void;
 }) {
+  const t = useT(dict);
   const [consoles, setConsoles] = useState<ConsoleEntry[] | null>(null);
   const [emulators, setEmulators] = useState<EmulatorEntry[]>([]);
   const [cores, setCores] = useState<RetroArchCoreStatus[]>([]);
@@ -176,6 +166,20 @@ export function ConsolesScreen({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ReadinessStep | "todos">("todos");
   const [page, setPage] = useState(1);
+
+  // Os filtros são os passos de prontidão, não os patamares do parecer: a
+  // pergunta desta tela é "o que falta montar", e "falta o core" é acionável
+  // de um jeito que "limitado" não é. O parecer continua aparecendo no card,
+  // como informação — nunca como filtro que esconderia um console que o
+  // usuário quer configurar assim mesmo (princípio 5: informar, não bloquear).
+  const FILTERS: { id: ReadinessStep | "todos"; label: string }[] = [
+    { id: "todos", label: t("filterAll") },
+    { id: "pronto", label: t("filterReady") },
+    { id: "sem-emulador", label: t("filterMissingEmulator") },
+    { id: "sem-core", label: t("filterMissingCore") },
+    { id: "sem-bios", label: t("filterMissingBios") },
+    { id: "sem-pasta", label: t("filterMissingFolder") },
+  ];
 
   useEffect(() => {
     // O catálogo é o único indispensável — falhar nele deixa a tela sem
@@ -186,12 +190,12 @@ export function ConsolesScreen({
     api
       .getConsoles()
       .then((res) => setConsoles(res.consoles))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os consoles."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("errorLoadingConsoles")));
 
     api.getEmulators().then((res) => setEmulators(res.emulators)).catch(() => {});
     api.getRetroArchCores().then((res) => setCores(res.cores)).catch(() => {});
     api.getLibraryFolders().then((res) => setFolders(res.folders)).catch(() => {});
-  }, []);
+  }, [t]);
 
   const index = useMemo(() => buildReadinessIndex(emulators, cores, folders), [emulators, cores, folders]);
   const verdictById = useMemo(() => new Map(report?.verdicts.map((v) => [v.console_id, v]) ?? []), [report]);
@@ -243,9 +247,9 @@ export function ConsolesScreen({
     <ScreenContainer variant="listing">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">Consoles</h1>
+          <h1 className="text-2xl font-semibold text-ink">{t("consoles")}</h1>
           <p className="mt-1 text-sm text-muted">
-            O que cada console precisa para rodar nesta máquina: emulador, core, BIOS e pasta de jogos.
+            {t("consolesDescription")}
           </p>
         </div>
         {/* A tela de emuladores continua existindo — é onde moram os
@@ -258,7 +262,7 @@ export function ConsolesScreen({
             de ação que "← Consoles"/"Voltar" nas outras telas — `quiet` (sem
             borda) lê como texto solto, não como algo clicável. */}
         <Button variant="secondary" onClick={onOpenEmulators}>
-          Ver por emulador
+          {t("seeByEmulator")}
         </Button>
       </div>
 
@@ -266,7 +270,7 @@ export function ConsolesScreen({
 
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor="consoles-search" className="sr-only">
-          Buscar console ou emulador
+          {t("searchConsoleOrEmulator")}
         </label>
         <input
           id="consoles-search"
@@ -275,7 +279,7 @@ export function ConsolesScreen({
           autoComplete="off"
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Buscar console ou emulador…"
+          placeholder={t("searchConsoleOrEmulatorPlaceholder")}
           className={`${inputClass} max-w-xs`}
         />
         <div className="flex flex-wrap gap-1.5">
@@ -307,7 +311,7 @@ export function ConsolesScreen({
           aria-live="polite"
           className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 min-[2000px]:grid-cols-4"
         >
-          <span className="sr-only">Carregando consoles…</span>
+          <span className="sr-only">{t("loadingConsoles")}</span>
           {Array.from({ length: 6 }, (_, i) => (
             <CardSkeleton key={i} className="h-44" />
           ))}
@@ -316,7 +320,7 @@ export function ConsolesScreen({
 
       {consoles !== null && filtrados.length === 0 && (
         <div className="mt-4">
-          <EmptyState message="Nenhum console encontrado com esse filtro." />
+          <EmptyState message={t("noConsolesFound")} />
         </div>
       )}
 

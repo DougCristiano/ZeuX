@@ -22,6 +22,8 @@ import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { useT } from "../i18n/i18n";
+import { dict } from "./GamesScreen.i18n";
 
 type RowStatus =
   | { kind: "idle" }
@@ -84,6 +86,7 @@ export function GamesScreen({
    * instalação manual. Ausente se a tela for alcançada sem esse caminho. */
   onOpenConsole?: () => void;
 }) {
+  const t = useT(dict);
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
@@ -105,7 +108,7 @@ export function GamesScreen({
     try {
       await openPath(dir);
     } catch (err) {
-      setError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+      setError(t("couldNotOpenBiosFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -114,7 +117,7 @@ export function GamesScreen({
       const res = await api.getLibraryGames(consoleId);
       setGames(res.games);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível listar os jogos.");
+      setError(err instanceof ApiError ? err.message : t("couldNotListGames"));
     }
   }
 
@@ -138,7 +141,7 @@ export function GamesScreen({
       // Não muda o estado aqui: o poll em andamento vê a fase "cancelado" na
       // próxima resposta e volta a linha para "idle" sozinho.
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Não foi possível cancelar o download.";
+      const message = err instanceof ApiError ? err.message : t("couldNotCancelDownload");
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
       setLaunchError(message);
     }
@@ -160,7 +163,7 @@ export function GamesScreen({
         return;
       }
       if (job.phase === "falhou") {
-        const message = job.error ?? "O download do core não foi concluído.";
+        const message = job.error ?? t("coreDownloadedNotFound");
         setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
         setLaunchError(message);
         return;
@@ -168,7 +171,7 @@ export function GamesScreen({
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "downloading-core", job } }));
       setTimeout(() => pollCoreDownload(gameId, jobId, romPath), 400);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Não foi possível acompanhar o download do core.";
+      const message = err instanceof ApiError ? err.message : t("coreDownloadedNotFound");
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
       setLaunchError(message);
     }
@@ -189,8 +192,7 @@ export function GamesScreen({
       // ainda.
       if (isDownloadingCore(result)) {
         if (afterCoreDownload) {
-          const message =
-            "O core foi baixado, mas o ZeuX continua não encontrando ele no computador. Tente abrir o jogo de novo; se persistir, confira a lista de cores na tela de Emuladores.";
+          const message = t("coreDownloadedNotFound");
           setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
           setLaunchError(message);
           return;
@@ -203,10 +205,10 @@ export function GamesScreen({
       // B4 (achado do critico-design, 2026-08-18): "Sessão iniciada." era
       // texto que nunca somia sozinho, preso na célula do jogo — virou
       // toast, mesma confirmação de sucesso que o resto do app já usa.
-      showToast(`${game.title}: sessão iniciada.`);
+      showToast(t("sessionStarted", { title: game.title }));
       loadGames(); // atualiza playtime_seconds/last_played_at sem recarregar a tela
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Não foi possível abrir o jogo.";
+      const message = err instanceof ApiError ? err.message : t("couldNotLaunchGame");
       setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
       setLaunchError(message);
     }
@@ -229,10 +231,10 @@ export function GamesScreen({
     // numa tela e não confirmar em outra.
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
     call
-      .then(() => showToast(next ? "Adicionado aos favoritos." : "Removido dos favoritos."))
+      .then(() => showToast(next ? t("addedToFavorites") : t("removedFromFavorites")))
       .catch(() => {
         setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
-        setError("Não foi possível salvar o favorito. Tente de novo.");
+        setError(t("couldNotSaveFavorite"));
       });
   }
 

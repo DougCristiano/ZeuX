@@ -1,17 +1,20 @@
 import type { ReactNode } from "react";
 import { Cpu, Gamepad2, LayoutGrid, Settings } from "lucide-react";
 import logoZeux from "../assets/logo-zeux.png";
+import { useT } from "../i18n/i18n";
+import { LanguageSelector } from "./LanguageSelector";
 import { FOCUS_RING } from "./ui";
+import { dict } from "./Sidebar.i18n";
 
 export type NavID = "library" | "consoles" | "verdict" | "settings";
 
 // N14 (docs/roadmap.md, Sprint N): os 4 ícones eram SVG desenhado à mão —
 // decisão do Douglas: lucide-react (já dependência via ui/dialog.tsx e
 // ui/select.tsx) vira a família padrão do app.
-const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
+const NAV_ITEMS: { id: NavID; labelKey: keyof typeof dict; icon: ReactNode }[] = [
   {
     id: "library",
-    label: "Biblioteca",
+    labelKey: "navLibrary",
     icon: <LayoutGrid size={18} aria-hidden="true" />,
   },
   {
@@ -23,7 +26,7 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
     // mapeamento) — alcançada de dentro de Consoles, não por item próprio,
     // pelo mesmo motivo que "Biblioteca" cobre 3 fases sem 3 itens.
     id: "consoles",
-    label: "Consoles",
+    labelKey: "navConsoles",
     icon: <Gamepad2 size={18} aria-hidden="true" />,
   },
   {
@@ -32,9 +35,9 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
     // 2026-08-07 (M13, docs/sprint-m-plano.md) — revertida porque não
     // comunicava nada ("ESP" não lê como "Especificações") e "CON" (item
     // abaixo teria a mesma sigla que a própria palavra "console", onipresente
-    // nesta tela). A sidebar agora expande no hover/foco e mostra o `label`
+    // nesta tela). A sidebar agora expande no hover/foco e mostra o rótulo
     // completo em vez de qualquer sigla.
-    label: "Especificações",
+    labelKey: "navSpecs",
     icon: <Cpu size={18} aria-hidden="true" />,
   },
   {
@@ -43,7 +46,7 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
     // de migração visual, que travava a sidebar em 3 itens — aprovado pelo
     // Douglas nesta sessão para dar lugar a "conectar conta do IGDB", sem
     // uma tela nem um modal específicos para isso antes.
-    label: "Configurações",
+    labelKey: "navSettings",
     icon: <Settings size={18} aria-hidden="true" />,
   },
 ];
@@ -69,7 +72,7 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
  * M13 (docs/sprint-m-plano.md, 2026-08-07, decidido pelo Douglas: "rail que
  * expande"): recolhida, mostra só o ícone (`w-16`, a mesma largura de
  * sempre); no hover **ou** foco de teclado/gamepad, expande e revela o
- * `item.label` inteiro — nada de sigla derivada em nenhum dos dois estados
+ * rótulo inteiro — nada de sigla derivada em nenhum dos dois estados
  * (ADR 0009, "nenhuma ação existe apenas em hover": o painel expandido
  * também abre por `:focus-within`, então quem navega só por teclado/D-pad
  * chega ao mesmo texto completo que quem usa mouse).
@@ -83,6 +86,8 @@ const NAV_ITEMS: { id: NavID; label: string; icon: ReactNode }[] = [
  * absoluto por dentro que cresce, sem afetar a largura que `<main>` calcula.
  */
 export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) => void }) {
+  const t = useT(dict);
+
   return (
     // `w-16` aqui é o que participa do `flex` de App.tsx — nunca muda. `group`
     // e `relative` existem só para ancorar e disparar o painel absoluto abaixo.
@@ -102,9 +107,10 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
           <img src={logoZeux} alt="" width={36} height={36} className="object-contain" />
         </div>
 
-        <nav className="flex w-full flex-1 flex-col" aria-label="Navegação principal">
+        <nav className="flex w-full flex-1 flex-col" aria-label={t("navAriaLabel")}>
           {NAV_ITEMS.map((item) => {
             const isActive = active === item.id;
+            const label = t(item.labelKey);
             return (
               <button
                 key={item.id}
@@ -130,7 +136,7 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
                   // certo para esse caso.
                   if (e.detail > 0) e.currentTarget.blur();
                 }}
-                title={item.label}
+                title={label}
                 aria-current={isActive ? "page" : undefined}
                 className={`flex h-[52px] w-full items-center border-l-2 transition-colors ${FOCUS_RING} ${
                   isActive
@@ -153,12 +159,16 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
                     pesado, e era o motivo da sidebar precisar de tanta
                     largura (ver comentário no painel acima). */}
                 <span className="max-w-0 overflow-hidden text-[13px] font-medium whitespace-nowrap tracking-wide opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[144px] group-hover:opacity-100 group-focus-within:max-w-[144px] group-focus-within:opacity-100">
-                  {item.label}
+                  {label}
                 </span>
               </button>
             );
           })}
         </nav>
+
+        <div className="mt-auto w-full px-2">
+          <LanguageSelector className="justify-center" />
+        </div>
       </div>
     </aside>
   );
