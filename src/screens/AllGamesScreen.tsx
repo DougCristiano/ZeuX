@@ -616,7 +616,10 @@ export function AllGamesScreen({
        */}
       {install.state.kind === "installing" ? (
         <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
-          <p className="text-sm text-ink">
+          {/* A11y 4.1.3: o texto de fase da instalação muda sozinho — sem
+              `aria-live` o leitor de tela não anuncia o progresso a menos que
+              o usuário volte o foco ao elemento. */}
+          <p className="text-sm text-ink" aria-live="polite">
             Instalando {install.state.job.name}… {install.state.job.phase}
           </p>
           <div className="mt-2">
@@ -628,7 +631,8 @@ export function AllGamesScreen({
         // ternário pelo mesmo motivo que o N9 registra abaixo, não como um
         // `&&` solto que se sobreporia ao painel de instalação.
         <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
-          <p className="text-sm text-ink">
+          {/* A11y 4.1.3: progresso que muda sozinho — anunciado por `aria-live`. */}
+          <p className="text-sm text-ink" aria-live="polite">
             {t("downloadingCore", { coreName: activeCoreDownload.job.core_name ?? "" })}
             {faseExtraDeDownload(activeCoreDownload.job.phase)}
             {percentOf(activeCoreDownload.job) !== null && ` · ${percentOf(activeCoreDownload.job)}%`}
@@ -686,7 +690,8 @@ export function AllGamesScreen({
               {scrapeJob && (
                 <>
                   <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
-                  <p className="text-center text-xs text-muted">
+                  {/* A11y 4.1.3: contador que muda sozinho — anunciado por aria-live. */}
+                  <p className="text-center text-xs text-muted" aria-live="polite">
                     {scrapeJob.processed}/{scrapeJob.total}
                   </p>
                 </>
@@ -717,14 +722,17 @@ export function AllGamesScreen({
           do item).
           N4 (docs/roadmap.md, Sprint N): input e select medem 38px agora
           (inputClass/ZSelect); os chips de tag (grade/lista, favoritos,
-          plataforma — abaixo) ficam de propósito nos 26px que já tinham.
+          plataforma — abaixo) ficam de propósito mais baixos que os 38px.
           Decisão revista durante a implementação: o achado do crítico era
           "quatro alturas diferentes por acidente", não "toda barra precisa
-          da mesma caixa" — um chip de tag pixel-font do tamanho de um botão
-          de 38px ficaria desproporcional ao próprio texto que carrega.
-          `items-center` nesta linha já alinha os dois tamanhos pelo centro
-          vertical, o mesmo padrão que Steam/GitHub usam em barra mista de
-          input + tag. */}
+          da mesma caixa". `items-center` nesta linha já alinha os dois
+          tamanhos pelo centro vertical, o mesmo padrão que Steam/GitHub usam
+          em barra mista de input + tag.
+          2026-09-06 (critico-design + auditoria de a11y): os chips saíram do
+          `font-pixel text-[11px]` para Inter `text-xs` medium — um chip de
+          filtro *ativável* é um controle, não badge nem título de navegação,
+          e Press Start 2P a 11px colorido tem leitura ruim. Mesma decisão da
+          N17 (que tirou a pixel font da sidebar), agora nos controles. */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <label htmlFor="all-games-search" className="sr-only">
           {t("searchPlaceholder")}
@@ -760,7 +768,7 @@ export function AllGamesScreen({
               type="button"
               aria-pressed={viewMode === mode}
               onClick={() => onViewChange({ viewMode: mode })}
-              className={`rounded-sm px-2 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+              className={`rounded-sm px-2 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                 viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
               }`}
             >
@@ -773,7 +781,7 @@ export function AllGamesScreen({
           type="button"
           onClick={() => onViewChange({ favoriteOnly: !favoriteOnly })}
           aria-pressed={favoriteOnly}
-          className={`flex items-center gap-1 rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+          className={`flex items-center gap-1 rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
             favoriteOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
           }`}
         >
@@ -787,7 +795,11 @@ export function AllGamesScreen({
             <button
               type="button"
               onClick={() => onViewChange({ platformFilter: null, page: 1 })}
-              className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+              // A11y 4.1.2: os chips de plataforma são filtros alternáveis
+              // mutuamente exclusivos — `aria-pressed` expõe qual está ativo
+              // para o leitor de tela (o estilo só comunicava a quem vê).
+              aria-pressed={platformFilter === null}
+              className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                 platformFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
               }`}
             >
@@ -804,9 +816,23 @@ export function AllGamesScreen({
                 // navegação aqui. Filtrando um console, o chip ativo herda
                 // a cor dele; "TODOS" continua roxo (não representa um
                 // console específico).
-                style={platformFilter === id ? { borderColor: consoleAccentColor(id), color: consoleAccentColor(id) } : undefined}
-                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
-                  platformFilter === id ? "" : "border-line-strong text-muted hover:text-ink"
+                //
+                // A11y 1.4.3 (auditoria de acessibilidade, 2026-09-06): a cor
+                // de identidade por console reprova contraste como TEXTO em
+                // ~metade dos 33 consoles (Nintendo, PS3, Saturn — cores de
+                // marca, não de legibilidade), o mesmo motivo pelo qual `Badge`
+                // já tinha largado `color: accentColor`. Agora a cor fica só na
+                // borda + fundo tingido (`${accent}1a`); o texto do chip ativo
+                // vai para `text-ink`, que passa contraste sobre qualquer
+                // fundo do app.
+                aria-pressed={platformFilter === id}
+                style={
+                  platformFilter === id
+                    ? { borderColor: consoleAccentColor(id), background: `${consoleAccentColor(id)}1a` }
+                    : undefined
+                }
+                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
+                  platformFilter === id ? "text-ink" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
                 {label.toUpperCase()}

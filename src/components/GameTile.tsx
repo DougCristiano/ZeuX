@@ -84,7 +84,14 @@ export function GameTile({
           tabIndex={0}
           className={`group block w-full cursor-pointer rounded text-left ${FOCUS_RING}`}
           title={game.title}
-          aria-label={t("seeDetails", { title: game.title })}
+          // A11y 4.1.2: quando bloqueado, o motivo (`launchability.title`)
+          // entra no nome acessível — senão o leitor de tela anuncia só "Ver
+          // detalhes de X" sem pista de que o jogo não abre.
+          aria-label={
+            blocked && launchability
+              ? `Ver detalhes de ${game.title} — ${launchability.title}`
+              : t("seeDetails", { title: game.title })
+          }
           onClick={onOpenDetail}
           onKeyDown={(e) => {
             if (e.key !== "Enter" && e.key !== " ") return;
@@ -156,6 +163,9 @@ export function GameTile({
  */
 export function GameTileSkeleton() {
   return (
+    // A11y 2.3.3: sob `prefers-reduced-motion: reduce`, o bloco global em
+    // src/index.css troca o pulso destes `animate-pulse` por `opacity: 0.6`
+    // fixo — o placeholder continua visível, só para de piscar.
     <div className="flex flex-col gap-2" aria-hidden="true">
       <div className="aspect-[3/4] animate-pulse rounded border border-line-strong bg-fill" />
       <div className="flex flex-col gap-1.5">

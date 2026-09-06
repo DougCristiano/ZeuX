@@ -27,6 +27,7 @@ import {
   Pagination,
   ProgressBar,
   ScreenContainer,
+  SectionHeading,
   ZSelect,
 } from "../components/ui";
 import { SelectItem } from "../components/ui/select";
@@ -194,6 +195,10 @@ function RetroArchCoresList() {
           <div className="flex shrink-0 items-center gap-2">
             <span className="text-xs text-muted tabular-nums">
               {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
+            {/* A11y 4.1.3: progresso da fila que avança sozinho — anunciado
+                por `aria-live` para quem usa leitor de tela. */}
+            <span className="text-xs text-muted tabular-nums" aria-live="polite">
+              {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
             </span>
             {/* "Parar" encerra a fila, mas não cancela o core que já está
                 baixando — esse tem o "Cancelar" da própria linha. Separar os
@@ -201,7 +206,9 @@ function RetroArchCoresList() {
                 diferentes conforme o momento. */}
             <Button
               variant="quiet"
-              className="px-1.5 py-0.5 text-xs"
+              // A11y 2.5.8: `py-1` (não `py-0.5`) + `min-h-[24px]` do Button
+              // base — o `py-0.5` deixava o alvo em ~20px de altura.
+              className="px-1.5 py-1 text-xs"
               onClick={() => {
                 bulkStopped.current = true;
               }}
@@ -215,12 +222,15 @@ function RetroArchCoresList() {
           janela, é a célula da grade de cards em que esta lista mora (326 px
           na janela padrão). Um `sm:`/`lg:` mediria a janela inteira e
           prometeria um espaço que este card nunca tem. */}
-      <ul className="max-h-64 overflow-y-auto pr-1 text-sm">
+      {/* A11y 2.5.8: `gap-1.5` entre linhas (era `pr-1` sem gap) e `py-1` na
+          `<li>` (era `py-0.5`) — os botões "Instalar"/"Cancelar" de cada core
+          ficavam colados verticalmente numa lista de 25, difíceis de acertar. */}
+      <ul className="flex max-h-64 flex-col gap-1.5 overflow-y-auto pr-1 text-sm">
         {cores.map((core) => {
           const state = stateFor(core.name);
           const percent = state.kind === "installing" || state.kind === "canceling" ? percentOf(state.job) : null;
           return (
-            <li key={core.name} className="flex flex-col gap-0.5 py-0.5">
+            <li key={core.name} className="flex flex-col gap-0.5 py-1">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? t("coreStatusOk") : t("coreStatusMissing")}</Badge>
                 <span className="truncate text-ink" title={core.path ?? core.filename}>
@@ -269,7 +279,8 @@ function RetroArchCoresList() {
                   </span>
                   <Button
                     variant="quiet"
-                    className="shrink-0 px-1.5 py-0.5 text-xs"
+                    // A11y 2.5.8: `py-1` + `min-h-[24px]` do Button base.
+                    className="shrink-0 px-1.5 py-1 text-xs"
                     disabled={state.kind === "canceling"}
                     onClick={() => cancelCore(core.name, state.job)}
                   >
@@ -878,7 +889,8 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
           (era ao lado do h1, à direita). */}
       {onBack && (
-        <Button variant="secondary" onClick={onBack} className="mb-4">
+        // A11y 2.1.4: `data-nav-back` — alvo do botão B do controle.
+        <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
           {t("back")}
         </Button>
       )}
@@ -991,7 +1003,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           (GET/POST/DELETE /custom-emulators, internal/emulator/custom.go) —
           esta tela era o único pedaço faltando. */}
       <div className="mt-6">
-        <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("addEmulatorSectionTitle")}</p>
+        <SectionHeading className="mb-2">{t("addEmulatorSectionTitle")}</SectionHeading>
         {formMode === "closed" ? (
           // B8 (achado do critico-design, 2026-08-18): reescrevia as quatro
           // classes do FOCUS_RING à mão em vez de usar o componente — único

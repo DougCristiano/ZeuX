@@ -50,8 +50,12 @@ export const FOCUS_RING =
 // `border-line` quase desaparece sobre `bg-fill` (as duas cores ficam muito
 // próximas); os dois controles lado a lado na mesma barra tinham a mesma
 // altura e bordas visivelmente diferentes.
+// A11y 1.4.11 (auditoria de acessibilidade, 2026-09-06): `border-line-strong`
+// (1.89:1 sobre --paper, 1.76:1 sobre --fill) não atinge o 3:1 que a WCAG AA
+// exige para o limite visual de um controle de formulário. `border-control-border`
+// é o token dedicado calibrado ≥3:1 nos dois fundos (ver src/index.css).
 export const inputClass =
-  `h-[38px] w-full rounded border border-line-strong bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
+  `h-[38px] w-full rounded border border-control-border bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
 
 /**
  * N4 (docs/roadmap.md, Sprint N): wrapper sobre o `Select` do shadcn (J3)
@@ -93,7 +97,7 @@ export function ZSelect({
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger
         aria-label={ariaLabel}
-        className={`h-[38px] w-full rounded border-line-strong bg-fill px-3 text-sm text-ink data-[size=default]:h-[38px] focus-visible:border-line-strong focus-visible:ring-0 ${FOCUS_RING} ${className}`}
+        className={`h-[38px] w-full rounded border-control-border bg-fill px-3 text-sm text-ink data-[size=default]:h-[38px] focus-visible:border-control-border focus-visible:ring-0 ${FOCUS_RING} ${className}`}
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -110,7 +114,9 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 const buttonVariants: Record<ButtonVariant, string> = {
   primary: "border border-accent bg-accent font-semibold text-accent-ink hover:bg-accent-hover",
-  secondary: "border border-line-strong bg-transparent text-ink hover:bg-fill",
+  // A11y 1.4.11: `border-control-border` (≥3:1 sobre --paper e --fill) em vez
+  // de `border-line-strong` — a borda é o único contorno deste botão.
+  secondary: "border border-control-border bg-transparent text-ink hover:bg-fill",
   // `ghost` foi desenhado como bloco tracejado de placeholder (slot vazio,
   // "adicione algo aqui") — achado do critico-design em 2026-08-18: virou,
   // na prática, "botão terciário genérico" em lugares que não são slot
@@ -131,7 +137,12 @@ const buttonVariants: Record<ButtonVariant, string> = {
 export function Button({ variant = "secondary", className = "", ...props }: ButtonProps) {
   return (
     <button
-      className={`rounded px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
+      // A11y 2.5.8 (Target Size, WCAG 2.2 AA): piso de 24px de altura em todo
+      // botão, mesmo os "compactos" que passam `py-0.5`/`py-1` + `text-xs` via
+      // `className` (lista de cores do RetroArch, painel de mapeamento) — esses
+      // ficavam em ~20px. `inline-flex`/`items-center` mantém o rótulo centrado
+      // quando o `min-h` passa a mandar na altura.
+      className={`inline-flex min-h-[24px] items-center justify-center rounded px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
       {...props}
     />
   );
@@ -319,6 +330,27 @@ export function PartialNotice({ children }: { children: ReactNode }) {
       <Badge>parcial</Badge>
       <p className="mt-2">{children}</p>
     </div>
+  );
+}
+
+/**
+ * Título de seção dentro de uma tela (`<h2>`). Papel intermediário da
+ * hierarquia entre o `<h1>` de 28px e o corpo de 15px (achado do
+ * critico-design, 2026-09-06 — "o app salta de 28px para 15px sem degrau no
+ * meio"): ocupa o `text-lg` (17px) que a escala de seis degraus define mas
+ * quase ninguém usava.
+ *
+ * Saiu do `font-pixel text-[11px]` que os `<h2>` de seção usavam: pixel font a
+ * 11px é *menor* que o corpo e comunica "título" só pelo estilo, não pelo
+ * tamanho — o mesmo raciocínio da N17, que tirou a pixel font dos rótulos da
+ * sidebar. A pixel font continua nos *rótulos* de card ("SISTEMA",
+ * "PROCESSADOR" no SpecsPanel) e em badge/contador — ali é tempero, não
+ * estrutura de página. Mantém `uppercase tracking-wide text-muted` para não
+ * romper o vocabulário visual do app; só o tamanho sobe.
+ */
+export function SectionHeading({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <h2 className={`text-lg font-semibold tracking-wide text-muted uppercase ${className}`}>{children}</h2>
   );
 }
 
@@ -861,6 +893,9 @@ export function CardSkeleton({ className = "" }: { className?: string }) {
   // sobrescrito — mesma armadilha do O1 (largura do modal) e do N4 (altura
   // do ZSelect): a ordem das classes no CSS compilado, não a ordem no JSX,
   // decide quem vence, e isso não é garantido.
+  // A11y 2.3.3: sob `prefers-reduced-motion: reduce`, o bloco global em
+  // src/index.css troca o pulso do `animate-pulse` por `opacity: 0.6` fixo —
+  // o skeleton continua perceptível como "carregando", só não pisca.
   return <div aria-hidden="true" className={`animate-pulse rounded border border-line-strong bg-fill ${className}`} />;
 }
 

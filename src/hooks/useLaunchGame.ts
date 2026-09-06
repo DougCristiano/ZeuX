@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError, isDownloadingCore } from "../api";
 import type { InstallJob, LibraryGame } from "../api/types";
+import { pollJob } from "../lib/pollJob";
 
 export type LaunchStatus =
   | { kind: "idle" }
@@ -45,32 +46,29 @@ export function useLaunchGame() {
   // sozinho (decisão do Douglas, 2026-08-27): abrir um processo de jogo
   // minutos depois surpreenderia quem já tinha saído da tela. A segunda
   // chamada acha o core no lugar e cai no caminho normal de lançamento.
-  async function pollCoreDownload(game: LibraryGame, jobId: string) {
+  function pollCoreDownload(game: LibraryGame, jobId: string) {
     const gameId = game.id;
-    try {
-      const job = await api.getInstallJob(jobId);
-      if (job.phase === "concluido") {
-        await launch(game, true);
-        return;
-      }
-      if (job.phase === "cancelado") {
-        setStatus(gameId, { kind: "idle" });
-        return;
-      }
-      if (job.phase === "falhou") {
+    pollJob(jobId, {
+      onProgress: (job) => setStatus(gameId, { kind: "downloading-core", job }),
+      // Core baixado: **esta tela** repete o lançamento (ver comentário acima).
+      // A proteção anti-laço-infinito de `afterCoreDownload` vive dentro de
+      // `launch`, não aqui.
+      onDone: () => {
+        void launch(game, true);
+      },
+      onCanceled: () => setStatus(gameId, { kind: "idle" }),
+      onFailed: (job) => {
         // Mensagem literal do servidor, que já nomeia o core e o motivo.
         const message = job.error ?? "O download do core não foi concluído.";
         setStatus(gameId, { kind: "error", message });
         setLaunchError(message);
-        return;
-      }
-      setStatus(gameId, { kind: "downloading-core", job });
-      setTimeout(() => pollCoreDownload(game, jobId), 400);
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Não foi possível acompanhar o download do core.";
-      setStatus(gameId, { kind: "error", message });
-      setLaunchError(message);
-    }
+      },
+      onError: (message) => {
+        setStatus(gameId, { kind: "error", message });
+        setLaunchError(message);
+      },
+      networkErrorFallback: "Não foi possível acompanhar o download do core.",
+    });
   }
 
   /**

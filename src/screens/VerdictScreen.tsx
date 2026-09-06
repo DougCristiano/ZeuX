@@ -299,7 +299,12 @@ export function VerdictScreen({ report }: { report: Report }) {
               <button
                 type="button"
                 onClick={() => handleLevelFilter(null)}
-                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+                // A11y 4.1.2: filtros de patamar alternáveis e mutuamente
+                // exclusivos — `aria-pressed` expõe o estado ativo para o
+                // leitor de tela (mesmo tratamento que ConsolesScreen e os
+                // chips de plataforma de AllGamesScreen).
+                aria-pressed={levelFilter === null}
+                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                   levelFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
@@ -310,7 +315,8 @@ export function VerdictScreen({ report }: { report: Report }) {
                   key={level}
                   type="button"
                   onClick={() => handleLevelFilter(level)}
-                  className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+                  aria-pressed={levelFilter === level}
+                  className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                     levelFilter === level ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                   }`}
                 >

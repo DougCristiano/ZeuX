@@ -65,6 +65,24 @@
   --muted: #94a3b8;
   --line: #1e2d4f;
   --line-strong: #2c3f66;
+  /* A11y 1.4.11 (auditoria de acessibilidade, 2026-09-06): `--line-strong`
+     (#2c3f66) é o contorno de todo <input>/<textarea>/<select> estilizado e
+     do Button variant="secondary" — mede 1.89:1 sobre --paper e 1.76:1 sobre
+     --fill, abaixo do 3:1 que a WCAG AA (Non-text Contrast) exige para o
+     limite visual de um controle de formulário. Quem tem baixa visão não
+     enxerga onde clicar/digitar. Token dedicado só para borda de controle
+     (input, select, botão secundário e a divisória que separa linhas de
+     lista) — as divisórias decorativas de Card continuam em --line-strong,
+     que não carrega informação.
+
+     #4a6b9e calibrado nesta sessão pela fórmula da WCAG (hex → sRGB → linear
+     γ2.4 → L = 0.2126R+0.7152G+0.0722B → ratio (L1+0.05)/(L2+0.05)):
+     L(#4a6b9e) ≈ 0.144; contra --paper (L=0.00366) → 3.6:1 ✅; contra
+     --fill (L=0.00752) → 3.4:1 ✅. O candidato #4a6394 do relatório ficava
+     perto do limite sobre --fill, então subi o canal azul até os dois
+     fundos passarem com folga. Mesma matiz azul da paleta, só mais claro —
+     "variar tom/brilho, nunca matiz" (src/lib/consoleColor.ts). */
+  --control-border: #4a6b9e;
   --fill: #0f1629;
   --fill-strong: #131d35;
   --accent: #9d4eff;
@@ -131,6 +149,9 @@
   --color-ink: var(--ink);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
+  /* A11y 1.4.11 — borda de controle de formulário/botão secundário, ≥3:1
+     sobre --paper e --fill (ver comentário do token em :root). */
+  --color-control-border: var(--control-border);
   --color-fill: var(--fill);
   --color-fill-strong: var(--fill-strong);
   --color-muted: var(--muted);
@@ -146,12 +167,20 @@
 
   --font-sans: "Inter", system-ui, sans-serif;
   /*
-   * Fonte pixel — restrita de propósito a chrome de navegação (labels da
-   * sidebar, títulos de seção curtos, badges/contadores). Nunca parágrafo,
-   * descrição ou mensagem de erro/aviso: o mockup em layout/ usa Press
-   * Start 2P a partir de 5.5px em corpo de texto, ilegível fora de uma tela
-   * de design. `text-size-pixel-min` é o piso de tamanho para qualquer uso
-   * dela — nada abaixo de 11px.
+   * Fonte pixel — restrita de propósito a tempero de marca: logo, badges,
+   * contadores decorativos, sigla de console na capa (GameCover) e rótulos
+   * CURTOS de card ("SISTEMA"/"PROCESSADOR" no SpecsPanel — rótulo, não
+   * título de seção). Nunca parágrafo, descrição ou mensagem de erro/aviso:
+   * o mockup em layout/ usa Press Start 2P a partir de 5.5px em corpo de
+   * texto, ilegível fora de uma tela de design. `text-size-pixel-min` é o
+   * piso de tamanho para qualquer uso dela — nada abaixo de 11px.
+   *
+   * N17 tirou a pixel font dos rótulos da sidebar (é navegação, não marca).
+   * 2026-09-06 (critico-design + auditoria de a11y) estendeu a mesma regra:
+   * chips de filtro *ativáveis* (grade/lista, favoritos, plataforma,
+   * prontidão, patamar) são controles — foram para Inter; e os `<h2>` de
+   * seção saíram da pixel font 11px (menor que o corpo, comunicava "título"
+   * só pelo estilo) para `SectionHeading` em `text-lg` Inter.
    */
   --font-pixel: "Press Start 2P", monospace;
 
@@ -255,5 +284,44 @@ body {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+}
+
+/*
+ * A11y 2.3.3 / 2.2.2 (auditoria de acessibilidade, 2026-09-06): regressão do
+ * wireframe não portada — `docs/wireframe.html` já traz este bloco, mas ele
+ * nunca entrou no `src/index.css`. Sem ele, o único respeito a
+ * `prefers-reduced-motion` no app inteiro era o `motion-reduce:animate-none`
+ * do spinner de `StatusScreen` — o glow/zoom dos modais do Radix, a transição
+ * de largura da sidebar (desliza 144px a cada hover/foco), o `animate-pulse`
+ * dos skeletons e toda `transition-*` de foco/hover continuavam a se mexer
+ * para quem tem distúrbio vestibular / enxaqueca e pediu ao SO para reduzir
+ * movimento.
+ *
+ * Não usamos `transition: none` cru (como o wireframe faz) e sim
+ * `duration: 0.01ms`: alguns componentes do Radix dependem do evento
+ * `transitionend`/`animationend` disparar para desmontar — zerar a duração o
+ * mantém disparando, num tempo imperceptível. Os skeletons têm um override
+ * abaixo (o `animate-pulse` zerado ficaria congelado num quadro qualquer,
+ * possivelmente perto de invisível) — trocam o pulso por uma opacidade
+ * estática ainda perceptível.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Skeleton (CardSkeleton em ui.tsx, GameTileSkeleton em GameTile.tsx):
+     sob movimento reduzido o `animate-pulse` para de pulsar — sem isto
+     congelaria no meio da animação, às vezes quase transparente. Opacidade
+     fixa perceptível mantém o placeholder legível como "carregando". */
+  .animate-pulse {
+    animation: none !important;
+    opacity: 0.6 !important;
   }
 }

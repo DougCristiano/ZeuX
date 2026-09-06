@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../api";
 import type { InstallJob } from "../api/types";
+import { pollJob } from "../lib/pollJob";
 
 /**
  * Item B10 (docs/sprint-b-plano.md): instalar com ressalva de hardware. O
@@ -37,30 +38,19 @@ export type EmulatorInstallState =
 export function useEmulatorInstall({ adapterId, onChanged }: { adapterId: string; onChanged: () => void }) {
   const [state, setState] = useState<EmulatorInstallState>({ kind: "idle" });
 
-  function pollJob(jobId: string) {
-    api
-      .getInstallJob(jobId)
-      .then((job) => {
-        if (job.phase === "concluido") {
-          setState({ kind: "done", job });
-          onChanged();
-          return;
-        }
-        if (job.phase === "falhou") {
-          // job.error é a mensagem original do servidor (docs/api.md) —
-          // exibida como veio, igual ao erro de rota.
-          setState({ kind: "error", message: job.error ?? "A instalação falhou." });
-          return;
-        }
-        setState({ kind: "installing", job });
-        setTimeout(() => pollJob(jobId), 400);
-      })
-      .catch((err) => {
-        setState({
-          kind: "error",
-          message: err instanceof ApiError ? err.message : "Não foi possível acompanhar a instalação.",
-        });
-      });
+  function track(jobId: string) {
+    pollJob(jobId, {
+      onProgress: (job) => setState({ kind: "installing", job }),
+      onDone: (job) => {
+        setState({ kind: "done", job });
+        onChanged();
+      },
+      // job.error é a mensagem original do servidor (docs/api.md) — exibida
+      // como veio, igual ao erro de rota.
+      onFailed: (job) => setState({ kind: "error", message: job.error ?? "A instalação falhou." }),
+      onError: (message) => setState({ kind: "error", message }),
+      networkErrorFallback: "Não foi possível acompanhar a instalação.",
+    });
   }
 
   async function install(force: boolean) {
@@ -68,7 +58,7 @@ export function useEmulatorInstall({ adapterId, onChanged }: { adapterId: string
     try {
       const job = await api.installEmulator(adapterId, force);
       setState({ kind: "installing", job });
-      pollJob(job.id);
+      track(job.id);
     } catch (err) {
       if (err instanceof ApiError && err.code === "hardware_insufficient") {
         setState({ kind: "confirm-hardware", message: err.message });

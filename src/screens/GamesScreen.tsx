@@ -359,7 +359,8 @@ export function GamesScreen({
       {/* B9 (achado do critico-design, 2026-08-18): mesma posição que
           GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
           (era ao lado do h1, à direita). */}
-      <Button variant="secondary" onClick={onBack} className="mb-4">
+      {/* A11y 2.1.4: `data-nav-back` — alvo do botão B do controle. */}
+      <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
         {t("backToLibrary")}
       </Button>
       {/* N12 (docs/roadmap.md, Sprint N): mesmo tratamento de borda esquerda
