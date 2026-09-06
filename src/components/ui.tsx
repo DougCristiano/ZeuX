@@ -860,6 +860,12 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
         </p>
       )}
 
+      {/* Q3 (docs/roadmap.md, Sprint Q): o preset do catálogo é calibrado para
+          1080p, e numa tela menor a resolução interna cai junto. A nota
+          aparece porque, sem ela, o texto do preset ("Resolução interna 4x")
+          contradiria o que o ZeuX vai realmente aplicar. */}
+      {verdict.display_note && <p className="text-xs text-muted">{verdict.display_note}</p>}
+
       {verdict.precision === "parcial" && (
         <PartialNotice>
           Não foi possível confirmar todos os requisitos deste console — este parecer é uma estimativa.

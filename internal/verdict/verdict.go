@@ -50,6 +50,11 @@ type ConsoleVerdict struct {
 	NextLevel   Level    `json:"next_level,omitempty"`
 	Bottlenecks []string `json:"bottlenecks,omitempty"`
 
+	// DisplayNote explica, quando a resolução interna do preset foi ajustada
+	// à tela do usuário (Q3), o que mudou e por quê. Ausente quando nada foi
+	// ajustado — não há nota a dar sobre o caso normal.
+	DisplayNote string `json:"display_note,omitempty"`
+
 	Precision Precision `json:"precision"`
 }
 
@@ -123,6 +128,14 @@ func evaluateConsole(console Console, info hardware.HardwareInfo) ConsoleVerdict
 		result.Preset = tier.Preset
 
 		options := tier.Options
+		// Q3 (docs/roadmap.md, Sprint Q): a resolução interna do catálogo é
+		// calibrada para 1080p — os próprios presets dizem isso no texto
+		// ("Resolução interna 3x (1080p)"). Numa tela menor, renderizar nessa
+		// escala gasta GPU sem nada aparecer.
+		if scale, note, adjusted := scaleForDisplay(tier.Options.InternalScale, info); adjusted {
+			options.InternalScale = scale
+			result.DisplayNote = note
+		}
 		result.Options = &options
 
 		// Atendeu um patamar que não é o melhor: explicamos o que falta acima.
@@ -230,4 +243,52 @@ func levelRank(level Level) int {
 	default:
 		return 3
 	}
+}
+
+// referenceDisplayHeight é a altura de tela para a qual os `internal_scale` do
+// catálogo foram escritos. Não é uma escolha nossa: os próprios textos de
+// preset dizem isso ("Resolução interna 3x (1080p)"), então é a única leitura
+// coerente com o dado que já está lá.
+const referenceDisplayHeight = 1080
+
+// scaleForDisplay ajusta a resolução interna do preset à tela do usuário.
+//
+// **Só reduz, nunca aumenta.** Reduzir é seguro e claramente certo: renderizar
+// 4x internamente para exibir num monitor de 768 linhas gasta GPU e não aparece
+// em lugar nenhum. Aumentar seria outra conversa — o patamar do catálogo foi
+// escolhido pelo que o *hardware* aguenta, não pelo que a tela mostra, e subir
+// a escala num 4K entregaria à GPU um trabalho que o patamar não orçou. Quem
+// quiser mais que isso tem o painel "Configurações" do emulador.
+//
+// Sem monitor detectado, devolve adjusted=false e o preset do catálogo vale
+// como está: dado que não pôde ser lido não vira palpite (princípio 4).
+//
+// A regra em si é uma heurística, não uma medição — mesma ressalva do D2, que
+// segue aberto sobre os limiares do catálogo.
+func scaleForDisplay(tierScale int, info hardware.HardwareInfo) (scale int, note string, adjusted bool) {
+	// Escala 0 ou 1 é "resolução nativa do console": não há o que reduzir.
+	if tierScale <= 1 {
+		return 0, "", false
+	}
+
+	display, ok := info.PrimaryDisplay()
+	if !ok || display.Height <= 0 || display.Height >= referenceDisplayHeight {
+		return 0, "", false
+	}
+
+	// Arredonda para cima: entre ficar abaixo do que a tela mostra e um pouco
+	// acima, o excesso é invisível e a falta aparece como imagem mais grosseira.
+	adjustedScale := (tierScale*display.Height + referenceDisplayHeight - 1) / referenceDisplayHeight
+	if adjustedScale < 1 {
+		adjustedScale = 1
+	}
+	if adjustedScale >= tierScale {
+		return 0, "", false
+	}
+
+	// Descritivo, nunca julgador (princípio 2): diz os números e o que foi
+	// feito, sem qualificar a tela do usuário.
+	return adjustedScale, fmt.Sprintf(
+		"Resolução interna ajustada de %dx para %dx: esta tela tem %d×%d, e o preset do catálogo é calibrado para %d linhas.",
+		tierScale, adjustedScale, display.Width, display.Height, referenceDisplayHeight), true
 }

@@ -119,7 +119,7 @@ observam o que cada camada recebeu (adapter espião sobre `/bin/true`), não o
 arquivo final de um PCSX2 instalado — este ambiente não tem um. O
 `upscale_multiplier` em si já é coberto por `pcsx2_config_test.go` desde o H1.
 
-### Q3 — o ZeuX não sabe qual é a sua tela
+### Q3 — o ZeuX não sabe qual é a sua tela — **feito em 2026-08-28**
 
 `HardwareInfo` tem `OS`, `CPU`, `GPUs`, `Memory` — **nenhum campo de display**.
 Sem resolução, sem taxa de atualização, sem contagem de monitores. O
@@ -127,17 +127,51 @@ Sem resolução, sem taxa de atualização, sem contagem de monitores. O
 do monitor: PS1 em 4x num 1080p e num 4K são decisões diferentes, e o app não
 tem como saber qual é a sua.
 
-- [ ] `DisplayInfo` no `HardwareInfo` (resolução, taxa de atualização,
-      principal sim/não), um arquivo por SO como já é a detecção de GPU.
-- [ ] Display não lido **não** vira palpite: cai no parecer parcial, como
-      qualquer outro dado ausente (princípio 4).
-- [ ] O `internal_scale` do lançamento passa a considerar a resolução, sem
-      ultrapassar o que o patamar de hardware permite.
+- [x] `DisplayInfo` no `HardwareInfo` (resolução, taxa, saída, principal),
+      um arquivo por SO como já é a detecção de GPU.
+- [x] Display não lido **não** vira palpite: vira aviso, e o preset do catálogo
+      vale como está.
+- [x] O `internal_scale` passa a considerar a resolução, sem ultrapassar o que
+      o patamar de hardware permite.
 
-**Critério de aceite:** `GET /hardware` traz o display nas três plataformas
-(compilação cruzada obrigatória, `CLAUDE.md`); a tela de Especificações mostra
-o monitor junto de CPU/GPU/memória; e o texto continua descritivo, nunca
-julgador ("esta tela é 2560×1440", nunca "sua tela é pequena").
+**Feito em 2026-08-28.** Como cada SO responde:
+
+| SO | Fonte | Traz taxa? |
+|---|---|---|
+| Windows | `user32.dll` por syscall (`EnumDisplayDevicesW` + `EnumDisplaySettingsW`) | sim |
+| Linux | `xrandr --query`; sem ele, `/sys/class/drm/*/modes` | só pelo xrandr |
+| macOS | `system_profiler SPDisplaysDataType -json` | quando o macOS informa |
+
+No Windows é syscall direto, sem processo externo e sem cgo: o `wmic` está
+descontinuado, a consulta WMI equivalente devolve os modos **suportados** e não
+o que está em uso, e o PowerShell custa segundos num scan que precisa ser
+rápido.
+
+**A regra de ajuste só reduz, nunca aumenta.** Os `internal_scale` do catálogo
+são calibrados para 1080p — os próprios textos de preset dizem isso
+("Resolução interna 3x (1080p)"). Numa tela menor, renderizar nessa escala
+gasta GPU e não aparece em lugar nenhum, então a escala cai
+proporcionalmente. Numa tela maior, **não sobe**: o patamar foi escolhido pelo
+que o *hardware* aguenta, não pelo que a tela mostra, e subir num 4K
+entregaria à GPU um trabalho que o patamar não orçou. Quem quiser mais tem o
+painel "Configurações".
+
+Quando há ajuste, `ConsoleVerdict.display_note` explica o que mudou e por quê
+— sem isso, o texto do preset ("Resolução interna 4x") contradiria o que o
+ZeuX vai realmente aplicar. Um teste trava que essa nota não julga a tela do
+usuário (princípio 2).
+
+**Não verificado neste ambiente:** o caminho do Windows e o do macOS só foram
+compilados de forma cruzada, nunca executados — este container não tem
+monitor (o `GET /hardware` daqui devolve `displays: null` e o aviso honesto,
+que é o comportamento certo). Os parsers do Linux têm teste contra saída real
+de `xrandr` e uma árvore de sysfs de mentira. **O Windows é o que mais precisa
+de olho ao instalar o app:** o layout da `DEVMODEW` é lido por deslocamento de
+bytes pelo próprio sistema, e um campo fora de lugar daria resolução errada em
+vez de erro.
+
+A regra de ajuste em si é heurística, não medição — mesma ressalva do D2, que
+segue aberto sobre os limiares do catálogo.
 
 ### Q4 — controle: nada é detectado, nada é configurado
 

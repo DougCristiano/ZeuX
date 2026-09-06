@@ -64,6 +64,12 @@ export type HardwareInfo = {
   /** Pode vir vazio ou `null` — é o caminho normal quando a detecção falha. */
   gpus: GPUInfo[] | null;
   memory: MemoryInfo;
+  /**
+   * Monitores conectados (Q3). Pode vir vazio ou `null` pelo mesmo motivo que
+   * `gpus`: nem todo sistema expõe isso de forma confiável, e lista vazia é
+   * estado honesto — nunca um monitor inventado.
+   */
+  displays?: DisplayInfo[] | null;
   warnings: string[];
 };
 
@@ -78,6 +84,21 @@ export type LaunchOptions = {
   renderer?: string;
   exit_on_close?: boolean;
   extra?: string[];
+};
+
+/**
+ * Um monitor conectado (Q3, docs/roadmap.md, Sprint Q). `refresh_hz` ausente
+ * significa que o sistema não reportou — nunca um valor presumido (no Linux
+ * fora do X11, o caminho pelo sysfs só informa resolução).
+ */
+export type DisplayInfo = {
+  name?: string;
+  width: number;
+  height: number;
+  refresh_hz?: number;
+  primary?: boolean;
+  /** Como o dado foi obtido: "user32", "xrandr", "drm", "system_profiler". */
+  source: string;
 };
 
 export type ConsoleVerdict = {
@@ -95,6 +116,12 @@ export type ConsoleVerdict = {
   core?: string;
   preset?: string;
   options?: LaunchOptions;
+  /**
+   * Presente só quando a resolução interna do preset foi reduzida para
+   * acompanhar a tela do usuário (Q3). Ausente no caso normal — não há nota a
+   * dar quando nada foi ajustado.
+   */
+  display_note?: string;
   /** Ausente quando o console já está no melhor patamar alcançável. */
   next_level?: string;
   /**
