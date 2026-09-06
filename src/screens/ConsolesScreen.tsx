@@ -17,9 +17,9 @@ import {
   FOCUS_RING,
   InlineError,
   inputClass,
-  LEVEL_LABEL,
   Pagination,
   ScreenContainer,
+  useLevelLabel,
 } from "../components/ui";
 import { consoleAccentColor } from "../lib/consoleColor";
 import {
@@ -58,6 +58,7 @@ function ConsoleCard({
   onOpen: () => void;
 }) {
   const t = useT(dict);
+  const levelLabel = useLevelLabel();
   const accent = consoleAccentColor(entry.console_id);
   const style: CSSProperties = { borderLeftColor: accent, borderLeftWidth: 3 };
 
@@ -115,7 +116,7 @@ function ConsoleCard({
             (sem consentimento/scan) em vez de virar um "desconhecido" que
             ocuparia o mesmo espaço sem dizer nada. */}
         {verdict ? (
-          <span className="text-xs text-muted">{t("verdict")} {LEVEL_LABEL[verdict.level].toLowerCase()}</span>
+          <span className="text-xs text-muted">{t("verdict")} {levelLabel(verdict.level).toLowerCase()}</span>
         ) : (
           <span />
         )}

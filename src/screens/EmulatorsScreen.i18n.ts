@@ -225,4 +225,12 @@ export const dict = {
     "pt-BR": "Instalar mesmo assim",
     en: "Install anyway",
   },
+  addEmulatorSectionTitle: {
+    "pt-BR": "Adicionar emulador",
+    en: "Add emulator",
+  },
+  addEmulatorManuallyButton: {
+    "pt-BR": "+ Adicionar emulador manualmente",
+    en: "+ Add emulator manually",
+  },
 } satisfies Dict;

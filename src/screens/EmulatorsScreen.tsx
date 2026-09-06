@@ -991,7 +991,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           (GET/POST/DELETE /custom-emulators, internal/emulator/custom.go) —
           esta tela era o único pedaço faltando. */}
       <div className="mt-6">
-        <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar emulador</p>
+        <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("addEmulatorSectionTitle")}</p>
         {formMode === "closed" ? (
           // B8 (achado do critico-design, 2026-08-18): reescrevia as quatro
           // classes do FOCUS_RING à mão em vez de usar o componente — único
@@ -1000,7 +1000,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           // aqui" (B7); texto em `text-base` normal, não `font-pixel` — é
           // rótulo de ação, não título de seção nem chip.
           <Button type="button" variant="ghost" onClick={() => setFormMode("new")} className="w-full text-center">
-            + Adicionar emulador manualmente
+            {t("addEmulatorManuallyButton")}
           </Button>
         ) : (
           <ManualEmulatorForm

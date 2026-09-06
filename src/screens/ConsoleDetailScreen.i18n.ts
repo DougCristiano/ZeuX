@@ -193,10 +193,6 @@ export const dict = {
     en:
       "Games from it will be removed from ZeuX's library. No files are deleted from your disk.",
   },
-  removeAnyway: {
-    "pt-BR": "Remover mesmo assim",
-    en: "Remove anyway",
-  },
   chooseFolder: {
     "pt-BR": "Escolher pasta",
     en: "Choose folder",
@@ -278,5 +274,25 @@ export const dict = {
   onThisMachine: {
     "pt-BR": "Nesta máquina",
     en: "On this machine",
+  },
+  couldNotPointFolder: {
+    "pt-BR": "Não foi possível apontar esta pasta.",
+    en: "Could not assign this folder.",
+  },
+  couldNotScanFolder: {
+    "pt-BR": "Não foi possível varrer a pasta.",
+    en: "Could not scan this folder.",
+  },
+  couldNotRemoveFolder: {
+    "pt-BR": "Não foi possível remover a pasta.",
+    en: "Could not remove this folder.",
+  },
+  couldNotOpenBiosFolder: {
+    "pt-BR": "Não foi possível abrir a pasta do BIOS: {{error}}",
+    en: "Could not open BIOS folder: {{error}}",
+  },
+  biosAbsent: {
+    "pt-BR": "BIOS ausente",
+    en: "BIOS absent",
   },
 } satisfies Dict;

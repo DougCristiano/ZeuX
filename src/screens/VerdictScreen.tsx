@@ -9,7 +9,7 @@ import {
   FOCUS_RING,
   InlineError,
   inputClass,
-  LEVEL_LABEL,
+  useLevelLabel,
   Pagination,
   PartialNotice,
   ScreenContainer,
@@ -226,6 +226,7 @@ const THRESHOLDS_CALIBRATED = false;
  */
 export function VerdictScreen({ report }: { report: Report }) {
   const t = useT(dict);
+  const levelLabel = useLevelLabel();
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<ConsoleVerdict["level"] | null>(null);
   const [page, setPage] = useState(1);
@@ -313,7 +314,7 @@ export function VerdictScreen({ report }: { report: Report }) {
                     levelFilter === level ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                   }`}
                 >
-                  {LEVEL_LABEL[level].toUpperCase()}
+                  {levelLabel(level).toUpperCase()}
                 </button>
               ))}
             </div>

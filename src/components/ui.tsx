@@ -880,7 +880,12 @@ export function EmptyState({ message, action }: { message: string; action?: Reac
   );
 }
 
-export function LEVEL_LABEL_FUNCTION(level: ConsoleVerdict["level"]): string {
+// `level` é chave de enum (inglês/sem acento, ver CLAUDE.md: "chaves de JSON
+// e valores de enum ficam em inglês/sem acento") — o texto que o usuário lê é
+// sempre resolvido por este hook, nunca lido direto da chave. Antes era um
+// objeto estático `LEVEL_LABEL` em português fixo; virou hook porque o rótulo
+// muda com o idioma escolhido (`useT` precisa do contexto de locale).
+export function useLevelLabel(): (level: ConsoleVerdict["level"]) => string {
   const t = useT(dict);
   const labels: Record<ConsoleVerdict["level"], string> = {
     otimo: t("levelOtimo"),
@@ -888,16 +893,8 @@ export function LEVEL_LABEL_FUNCTION(level: ConsoleVerdict["level"]): string {
     limitado: t("levelLimitado"),
     improvavel: t("levelImprovavel"),
   };
-  return labels[level];
+  return (level) => labels[level];
 }
-
-// Para manter compatibilidade com código existente que usa LEVEL_LABEL como objeto
-export const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
-  otimo: "ótimo",
-  bom: "bom",
-  limitado: "limitado",
-  improvavel: "improvável",
-};
 
 /**
  * Cartão de parecer por console — extraído de VerdictScreen (2026-08-04) para
@@ -907,6 +904,7 @@ export const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
  */
 export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
   const t = useT(dict);
+  const levelLabel = useLevelLabel();
   const isGoodTier = verdict.level === "otimo" || verdict.level === "bom";
   // N12 (docs/roadmap.md, Sprint N): mesmo tratamento que `EmulatorCard`
   // (src/screens/EmulatorsScreen.tsx) já usa — borda esquerda de 3px na cor
@@ -919,7 +917,7 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
     <Card className="flex flex-col gap-2" style={{ borderLeftColor: accent, borderLeftWidth: 3 }}>
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold text-ink">{verdict.name}</p>
-        <Badge variant={isGoodTier ? "solid" : "default"}>{LEVEL_LABEL[verdict.level]}</Badge>
+        <Badge variant={isGoodTier ? "solid" : "default"}>{levelLabel(verdict.level)}</Badge>
       </div>
 
       {/* `headline` vem de `Level.Headline()` — é o mesmo texto para TODO
@@ -1068,6 +1066,7 @@ export function ConsoleInfoModal({
   onClose: () => void;
 }) {
   const t = useT(dict);
+  const levelLabel = useLevelLabel();
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -1081,7 +1080,7 @@ export function ConsoleInfoModal({
           </div>
           {verdict && (
             <Badge variant={verdict.level === "otimo" || verdict.level === "bom" ? "solid" : "default"}>
-              {LEVEL_LABEL[verdict.level]}
+              {levelLabel(verdict.level)}
             </Badge>
           )}
         </div>
