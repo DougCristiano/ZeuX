@@ -23,6 +23,8 @@ import {
   ProgressBar,
   ScreenContainer,
 } from "../components/ui";
+import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -60,6 +62,8 @@ function EmulatorOptionCard({
   const coreInstall = useCoreInstall({ onCoreReady: onChanged });
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
+  const [showBindings, setShowBindings] = useState(false);
 
   const installed = entry?.installed ?? false;
   // Só faz sentido remover o que o ZeuX colocou na pasta gerenciada — o
@@ -226,6 +230,45 @@ function EmulatorOptionCard({
             </p>
           )}
         </div>
+      )}
+
+      {/* Q4 (docs/roadmap.md, Sprint Q): configuração e mapeamento passam a ser
+          alcançáveis daqui. Até então só existiam na tela de Emuladores — que
+          deixou de ser a entrada principal na Sprint P, deixando o caminho
+          para "mapear o controle deste console" atrás de uma tela que o
+          usuário não visita mais. `configurable`/`bindable` vêm de
+          GET /emulators e dizem a capacidade real de cada adapter (hoje só
+          PCSX2 e RetroArch), em vez de a tela tentar a rota e tratar erro. */}
+      {installed && (entry?.configurable || entry?.bindable) && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            {entry.configurable && (
+              <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
+                {showConfig ? "Ocultar configurações" : "Configurações"}
+              </Button>
+            )}
+            {entry.bindable && (
+              <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
+                {showBindings ? "Ocultar mapeamento" : "Mapear controles"}
+              </Button>
+            )}
+          </div>
+          {showConfig && entry.configurable && (
+            <EmulatorConfigPanel adapterId={option.adapter_id} adapterName={option.name} />
+          )}
+          {showBindings && entry.bindable && (
+            <EmulatorBindingsPanel adapterId={option.adapter_id} adapterName={option.name} />
+          )}
+        </div>
+      )}
+
+      {/* Degrada visivelmente (H5) em vez de simplesmente não ter botão: o
+          usuário precisa saber que aquele emulador ainda se configura por
+          fora, não ficar procurando um botão que nunca existiu. */}
+      {installed && !entry?.configurable && !entry?.bindable && (
+        <p className="text-xs text-muted">
+          Configuração e controles deste emulador ainda só dentro do próprio {option.name}.
+        </p>
       )}
 
       <div className="flex flex-wrap items-center gap-2">

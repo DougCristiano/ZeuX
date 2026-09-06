@@ -173,29 +173,67 @@ vez de erro.
 A regra de ajuste em si é heurística, não medição — mesma ressalva do D2, que
 segue aberto sobre os limiares do catálogo.
 
-### Q4 — controle: nada é detectado, nada é configurado
+### Q4 — controle — **feito em 2026-08-28**
 
-- `useGamepadNavigation` navega a **interface do ZeuX** com D-pad. Não toca o
-  emulador.
-- Mapeamento existe para **2 dos 14** adapters (PCSX2 e RetroArch).
-- No PCSX2 só **teclado** é gravado: todo `Button` vai para `Unapplied`, com a
-  nota de que o formato de botão físico nunca foi confirmado contra hardware
-  real.
-- No RetroArch botões são gravados (`input_player1_*_btn`), mas o usuário
-  **digita o índice à mão** — nada lê o controle plugado.
+**Correção do diagnóstico desta sprint.** A versão original deste item dizia
+que nada lia o controle plugado e que o usuário "digita o índice à mão". Isso
+estava **errado**: `EmulatorBindingsPanel` já detectava o controle e já
+capturava o botão físico (poll por `requestAnimationFrame` procurando a
+transição solto→pressionado), desde o H3/H4. O diagnóstico foi escrito olhando
+o backend e o hook de navegação, sem ler o painel até o fim.
 
-- [ ] Detectar o controle conectado (a Gamepad API já está no app, usada hoje
-      só para navegar a UI) e exibir o que ele é.
-- [ ] "Mapear pelo controle": apertar o botão físico preenche o campo, em vez
-      de digitar índice.
-- [ ] Começar pelo RetroArch, o único que já aceita botão hoje. O PCSX2 fica
-      declarando `Unapplied` até alguém confirmar o formato dele contra
-      hardware real — **não inventar o formato** (a regra das flags não
-      validadas vale igual aqui).
+O que **de fato** faltava, e foi feito:
 
-**Critério de aceite:** com um controle plugado, a tela mostra o nome dele e o
-mapeamento gravado no `retroarch.cfg` corresponde aos botões apertados. Sem
-controle, a tela diz isso e o caminho por teclado continua igual ao de hoje.
+- [x] Dizer **qual** controle está conectado. A tela só sabia "conectado
+      sim/não" — e quem tem dois não tinha como confirmar qual está sendo
+      lido. `useGamepad` (novo) devolve o nome já enxugado dos
+      identificadores de fornecedor/produto que a Gamepad API acrescenta.
+- [x] **Mapear o controle inteiro em sequência**, uma ação por aperto. O
+      caminho de um clique em "Mapear controle" antes de cada aperto era o que
+      fazia ninguém terminar: o RetroArch tem 16 ações.
+- [x] **Conflito de botão**, que só existia para tecla. No controle o sintoma
+      é pior que no teclado: a pessoa aperta um botão no jogo e duas coisas
+      acontecem.
+- [x] O painel alcançável do **detalhe do console**. Até aqui só existia na
+      tela de Emuladores — que deixou de ser a entrada principal na Sprint P,
+      deixando "mapear o controle deste console" atrás de uma tela que o
+      usuário não visita mais.
+
+O PCSX2 continua declarando `Unapplied` para botão: o formato de botão físico
+dele nunca foi confirmado contra hardware real, e inventar seria o mesmo erro
+que a regra das flags não validadas proíbe.
+
+**Três bugs achados dirigindo a tela com um controle simulado** (Playwright
+substituindo `navigator.getGamepads`), nenhum deles visível em teste de
+unidade:
+
+1. **Um botão segurado consumia a sequência inteira.** A captura zerava o
+   estado anterior dos botões ao armar a próxima ação, então um botão ainda
+   pressionado contava como aperto novo no primeiro quadro seguinte — um
+   aperto de 400 ms gravou o mesmo botão nas 16 ações. Agora o estado é
+   semeado com o que está pressionado **agora**, e só um aperto novo conta.
+2. **A sequência avançava mesmo com a gravação falhando.** `saveBinding` não
+   dizia se tinha dado certo; a fila corria inteira gravando nada. Agora ela
+   devolve sucesso, e uma falha para a fila com o erro na tela.
+3. **`backupBeforeFirstWrite` falhava quando a pasta de configuração não
+   existia** — o caso de um emulador recém-instalado que o usuário nunca
+   abriu, que é exatamente o caminho "do zero ao primeiro jogo". A primeira
+   tentativa de gravar configuração ou mapeamento devolvia 500 com um erro de
+   sistema de arquivos cru. Corrigido em `internal/emulator/configbackup.go`,
+   com teste.
+
+O terceiro é um bug de produto que existia desde o H1 e não tem nada a ver com
+controle — apareceu porque o mapeamento é a primeira coisa que escreve nesse
+arquivo.
+
+**Verificado ao vivo:** com o controle simulado, a sequência anda uma ação por
+aperto (um aperto de 1,5 s consome uma só), nenhum erro HTTP, e o
+`retroarch.cfg` sai com `input_player1_up_btn = "0"` e
+`input_player1_down_btn = "1"` — os botões apertados.
+
+**Não verificado:** controle físico de verdade. O índice que a Gamepad API
+reporta é o do mapeamento "standard" do navegador; se ele corresponde ao que o
+RetroArch entende por aquele botão, só um controle na mão confirma.
 
 ### Q5 — os 21 consoles que dependem do RetroArch
 
