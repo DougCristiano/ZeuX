@@ -317,8 +317,9 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </div>
       ) : (
         <p className="text-xs text-muted">
-          Nenhum controle detectado — conecte um para mapear botões. O mapeamento de teclado funciona sem controle
-          nenhum.
+          Nenhum controle detectado ainda. Se já conectou um, aperte um botão nele — a Gamepad API do navegador só
+          percebe a conexão depois do primeiro aperto, mesmo com o controle já plugado antes de abrir esta tela. O
+          mapeamento de teclado funciona sem controle nenhum.
         </p>
       )}
 

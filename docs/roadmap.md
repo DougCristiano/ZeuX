@@ -235,6 +235,18 @@ aperto (um aperto de 1,5 s consome uma só), nenhum erro HTTP, e o
 reporta é o do mapeamento "standard" do navegador; se ele corresponde ao que o
 RetroArch entende por aquele botão, só um controle na mão confirma.
 
+**Achado ao testar com controle físico de verdade (2026-09-06):** o Douglas
+conectou um controle antes de abrir a tela e a mensagem negativa
+("Nenhum controle detectado — conecte um") apareceu mesmo com o controle
+plugado — parecia um bug de detecção, mas é o comportamento documentado da
+própria Gamepad API do Chromium/WebView2: `getGamepads()` só populam o
+controle depois do **primeiro botão apertado nele**, não só por estar
+conectado. `useGamepad.ts` já registrava essa armadilha em comentário e já
+cobria o evento `gamepadconnected`, mas a mensagem da tela não avisava a
+pessoa sobre a necessidade do aperto — dizia "conecte um" como se o problema
+fosse a conexão. Corrigido: a mensagem agora explica que é preciso apertar um
+botão no controle já plugado.
+
 ### Q5 — os 21 consoles que dependem do RetroArch — **feito em 2026-08-28**
 
 `Manager.Start` recusa fonte `manual` com uma mensagem — então "Jogar" com o
