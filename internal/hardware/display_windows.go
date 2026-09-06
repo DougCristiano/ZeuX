@@ -77,8 +77,20 @@ type devModeW struct {
 	dmPanningHeight      uint32
 }
 
-func detectDisplays(_ context.Context) ([]DisplayInfo, []string) {
-	var displays []DisplayInfo
+func detectDisplays(_ context.Context) (displays []DisplayInfo, warnings []string) {
+	// Rede de segurança para o caminho menos verificado do projeto: o layout da
+	// DEVMODEW é preenchido pelo próprio Windows por deslocamento de bytes, e um
+	// campo fora de lugar numa versão futura do sistema poderia levar a um
+	// acesso inválido. Ler o monitor é conveniência — a mesma regra que já vale
+	// para a GPU: falhar vira aviso, e o parecer continua saindo com CPU,
+	// memória e placa de vídeo. Sem isto, um pânico aqui derrubaria o scan
+	// inteiro, e com ele o onboarding.
+	defer func() {
+		if r := recover(); r != nil {
+			displays = nil
+			warnings = []string{"Não foi possível identificar o monitor conectado."}
+		}
+	}()
 
 	for index := uint32(0); ; index++ {
 		var device displayDeviceW
