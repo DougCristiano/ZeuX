@@ -184,9 +184,10 @@
       "repo": "DougCristiano/Retroarch-for-Zeux",
       "homepage": "https://www.retroarch.com/?page=platforms",
       "license": "GPL-3.0",
-      "_note": "O buildbot.libretro.com não expõe uma API estável para resolver 'a versão mais recente' (mudou de formato sem aviso em 2026-08-04 — ver ADR 0015). Este repositório é um mirror público mantido pelo Douglas, republicando o build oficial sem modificação (ver README do repositório para a atribuição de licença completa) — exatamente o gatilho de revisão 3 do ADR 0015 ('aparecer um espelho ou release estável com estrutura previsível — nesse caso não se volta ao empacotamento, se troca a origem'). Os cores continuam vindo do download sob demanda (ADR 0015); só o app do RetroArch trocou de origem. Só há asset para windows/amd64 até o Douglas publicar as demais plataformas.",
+      "_note": "O buildbot.libretro.com não expõe uma API estável para resolver 'a versão mais recente' (mudou de formato sem aviso em 2026-08-04 — ver ADR 0015). Este repositório é um mirror público mantido pelo Douglas, republicando o build oficial sem modificação (ver README do repositório para a atribuição de licença completa) — exatamente o gatilho de revisão 3 do ADR 0015 ('aparecer um espelho ou release estável com estrutura previsível — nesse caso não se volta ao empacotamento, se troca a origem'). Os cores continuam vindo do download sob demanda (ADR 0015); só o app do RetroArch trocou de origem. O asset linux/amd64 é o AppImage oficial dentro de um 7z (inclui uma pasta de config de sessão portátil ao lado — o ZeuX ignora, só usa o .AppImage solto após a extração, achado pelo fallback de discovery.go). macOS continua sem asset até o Douglas publicar essa plataforma.",
       "assets": {
-        "windows/amd64": { "include": "^RetroArch\\.7z$", "archive": "7z" }
+        "windows/amd64": { "include": "^RetroArch\\.7z$", "archive": "7z" },
+        "linux/amd64": { "include": "^RetroArch_Linux\\.7z$", "archive": "7z" }
       }
     },
     {
