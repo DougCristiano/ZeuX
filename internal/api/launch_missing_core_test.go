@@ -278,20 +278,39 @@ func TestLaunchDoesNotCreateJobWhenCoreAlreadyInstalled(t *testing.T) {
 	_ = installer // installer só é usado para injeção de manifesto no outro teste
 }
 
-// Sem manifesto sintético injetado, o core cai no manifesto real embutido —
-// hoje "generated: false" para tudo (ADR 0015/R1, host bloqueado neste
-// ambiente). O lançamento precisa recusar nomeando o core, não com "erro ao
-// lançar" genérico, e sem criar nenhuma sessão fantasma.
+// Manifesto sintético injetado com generated:false para o core pedido — desde
+// que cmd/generate-retroarch-manifest rodou de verdade contra o buildbot
+// (2026-09-06), o manifesto real embutido já tem a maioria dos cores medida
+// para linux/amd64 e windows/amd64 (generated:true), então depender do estado
+// real faria "mesen" disparar um download de verdade em vez do 400 que este
+// teste quer travar. O lançamento precisa recusar nomeando o core, não com
+// "erro ao lançar" genérico, e sem criar nenhuma sessão fantasma.
 func TestLaunchNamesTheMissingCoreWhenDownloadCannotStart(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
-	server, _ := newTestServerWithInstaller(t, fakeProbe{info: beefyHardware()})
+	server, installer := newTestServerWithInstaller(t, fakeProbe{info: beefyHardware()})
 	handler := server.Routes()
 
 	doJSON(t, handler, http.MethodPost, "/api/v1/consent", map[string]bool{"granted": true})
 	doJSON(t, handler, http.MethodPost, "/api/v1/hardware/scan", nil)
 
 	fakeManagedRetroArch(t)
+
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	installer.SetRetroArchManifestForTesting(&install.RetroArchCoreManifest{
+		Cores: map[string]install.RetroArchCoreEntry{
+			"mesen": {
+				LibretroName: "mesen_libretro",
+				Platforms: map[string]install.RetroArchCoreAsset{
+					platform: {
+						URL:       "https://buildbot.libretro.com/nightly/mesen.zip",
+						Filename:  "mesen_libretro.so.zip",
+						Generated: false,
+					},
+				},
+			},
+		},
+	})
 
 	romPath := filepath.Join(t.TempDir(), "jogo.nes")
 	if err := os.WriteFile(romPath, []byte("rom de mentira"), 0o644); err != nil {
