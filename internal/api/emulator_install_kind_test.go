@@ -40,11 +40,13 @@ func listarEmuladores(t *testing.T) []emulatorEntryResposta {
 // "instalar emulador" dos outros e o clique terminava num 400.
 func TestEmuladoresDeclaramComoPodemSerInstalados(t *testing.T) {
 	esperado := map[string]string{
-		// Fontes manuais: buildbot/site próprio, sem release do GitHub que o
-		// ZeuX consiga resolver por API.
-		"retroarch": "manual",
-		"dolphin":   "manual",
-		// 1-click por release do GitHub.
+		// 1-click por release do GitHub. RetroArch e Dolphin viraram
+		// KindGitHub em 2026-09-06: o buildbot/site oficial continuam sem API
+		// estável de "última versão" (motivo do ADR 0015), mas passaram a
+		// resolver contra um mirror próprio (sources.json) — gatilho de
+		// revisão 3 do ADR 0015 se concretizando.
+		"retroarch":   "github",
+		"dolphin":     "github",
 		"duckstation": "github",
 		"pcsx2":       "github",
 		"rmg":         "github",

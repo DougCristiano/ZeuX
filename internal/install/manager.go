@@ -349,9 +349,11 @@ func (m *Manager) promote(stagingDir, adapterID string) error {
 //
 // Até o ADR 0015 (R4), o RetroArch tinha uma recusa própria aqui: vinha
 // empacotado no instalador (ADR 0012), então apagá-lo não tinha como se
-// recuperar sem reinstalar o ZeuX inteiro. Isso deixou de valer — o RetroArch
-// voltou a ser `KindManual` (sources.json), sem instalação gerenciada nenhuma
-// para remover por aqui (o `os.Stat` abaixo já recusa naturalmente).
+// recuperar sem reinstalar o ZeuX inteiro. Isso deixou de valer quando o
+// RetroArch virou `KindManual` (sem instalação gerenciada nenhuma pra
+// remover) e continua sem sentido agora que voltou a `KindGitHub` em
+// 2026-09-06 (mirror próprio, ver `sources.json`): apagar e reinstalar de
+// novo é exatamente o fluxo normal de qualquer fonte automatizada.
 //
 // Os cores do RetroArch nunca passam por Uninstall — eles vivem em
 // bundledCoreDirsForWrite() (internal/emulator/retroarch_cores_dir.go), fora

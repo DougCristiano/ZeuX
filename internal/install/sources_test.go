@@ -222,40 +222,16 @@ func TestJobPercent(t *testing.T) {
 	}
 }
 
-// Emulador sem automação precisa devolver a página oficial em vez de tentar
-// adivinhar uma URL.
-func TestManualSourceRefusesWithLink(t *testing.T) {
-	catalog, err := LoadCatalog()
-	if err != nil {
-		t.Fatalf("carregando catálogo: %v", err)
-	}
-
-	manager := NewManager(catalog, discardLogger())
-
-	if _, err := manager.Start("dolphin"); err == nil {
-		t.Fatal("fonte manual não deveria iniciar instalação automática")
-	} else if !strings.Contains(err.Error(), "dolphin-emu.org") {
-		t.Errorf("o erro deveria apontar a página oficial: %v", err)
-	}
-}
-
-// RetroArch é KindManual desde o ADR 0015 (R4) — Start() precisa recusar com
-// a mesma mensagem de qualquer outra fonte manual (site oficial), não mais
-// "já vem empacotado" (isso valia enquanto era KindBundled, ADR 0012).
-func TestManualRetroArchRefusesStart(t *testing.T) {
-	catalog, err := LoadCatalog()
-	if err != nil {
-		t.Fatalf("carregando catálogo: %v", err)
-	}
-
-	manager := NewManager(catalog, discardLogger())
-
-	if _, err := manager.Start("retroarch"); err == nil {
-		t.Fatal("fonte manual não deveria iniciar instalação automática")
-	} else if !strings.Contains(err.Error(), "instalado manualmente") {
-		t.Errorf("o erro deveria explicar que o RetroArch precisa ser instalado manualmente: %v", err)
-	}
-}
+// Dolphin e RetroArch trocaram de KindManual para KindGitHub em 2026-09-06:
+// o gatilho de revisão 3 do ADR 0015 ("aparecer um espelho ou release estável
+// com estrutura previsível — nesse caso não se volta ao empacotamento, se
+// troca a origem") se concretizou com os mirrors públicos que o Douglas
+// mantém (DougCristiano/Dolphin-For-Zeux, DougCristiano/Retroarch-for-Zeux).
+// Start() não recusa mais essas duas fontes de saída — ResolveLatest é quem
+// resolve a release, igual a qualquer outro adapter KindGitHub. O teste que
+// existia aqui (TestManualSourceRefusesWithLink / TestManualRetroArchRefusesStart)
+// travava o comportamento antigo; TestLoadCatalog já cobre a validação
+// genérica de KindManual para as fontes que continuarem assim no futuro.
 
 func TestStartRefusesUnknownAdapter(t *testing.T) {
 	catalog, _ := LoadCatalog()

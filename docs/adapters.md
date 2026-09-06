@@ -130,10 +130,13 @@ atendidos.
 | `xenia` | Xenia | `xbox360` |
 | `rmg` | RMG (Rosalie's Mupen GUI) | `n64` (patamares "bom"/"limitado" — ver nota) |
 
-**`rmg`, adicionado em 2026-08-03:** o RetroArch atende N64, mas não é
-instalável pelo 1-click (distribuição própria, fora do GitHub — ver
-`retroarch` em `internal/install/data/sources.json`, `kind: "manual"`). Sem
-um adapter dedicado, N64 nunca seria "plug and play" de verdade. O RMG
+**`rmg`, adicionado em 2026-08-03:** na época, o RetroArch atendia N64 mas não
+era instalável pelo 1-click (distribuição própria, fora do GitHub — ver
+`retroarch` em `internal/install/data/sources.json`, então `kind: "manual"`).
+Sem um adapter dedicado, N64 nunca seria "plug and play" de verdade. Em
+2026-09-06 o RetroArch passou a `kind: "github"` (mirror próprio, ver
+`sources.json`), mas o RMG continua fazendo sentido: ele é um front-end
+dedicado ao Mupen64Plus, sem o menu completo do RetroArch em volta. O RMG
 (front-end do Mupen64Plus com release real no GitHub, AppImage no Linux)
 resolve isso para os patamares "bom" e "limitado" do catálogo, que já usavam
 o core Mupen64Plus-Next. O patamar "otimo" continua no RetroArch + core

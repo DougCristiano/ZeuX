@@ -177,9 +177,11 @@ type Status struct {
 	// emulador ainda não instalado, e mesmo achado por outro caminho — ex.:
 	// Program Files), exceto para emulador personalizado (Custom): esse não
 	// tem "a pasta certa", o caminho é o que o próprio usuário escolheu.
-	// Existe para a fonte "manual" (hoje só o Dolphin, sem 1-click possível)
-	// mostrar exatamente onde extrair o download, em vez de deixar o
-	// usuário adivinhar (achado real, 2026-08-17).
+	// Existe para uma fonte "manual" mostrar exatamente onde extrair o
+	// download, em vez de deixar o usuário adivinhar (achado real,
+	// 2026-08-17). Continua preenchido mesmo sem fonte manual nenhuma hoje
+	// (Dolphin e RetroArch viraram KindGitHub em 2026-09-06, ver
+	// sources.json) — é campo de conveniência, não amarrado ao Kind.
 	ManagedDir string `json:"managed_dir,omitempty"`
 }
 
