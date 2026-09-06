@@ -300,7 +300,7 @@ export function VerdictScreen({ report }: { report: Report }) {
                 // leitor de tela (mesmo tratamento que ConsolesScreen e os
                 // chips de plataforma de AllGamesScreen).
                 aria-pressed={levelFilter === null}
-                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                   levelFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
@@ -312,7 +312,7 @@ export function VerdictScreen({ report }: { report: Report }) {
                   type="button"
                   onClick={() => handleLevelFilter(level)}
                   aria-pressed={levelFilter === level}
-                  className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+                  className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                     levelFilter === level ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                   }`}
                 >

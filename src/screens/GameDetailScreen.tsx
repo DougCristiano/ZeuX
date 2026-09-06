@@ -16,6 +16,7 @@ import {
   PlayIcon,
   ProgressBar,
   ScreenContainer,
+  SectionHeading,
   Toast,
 } from "../components/ui";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
@@ -518,7 +519,7 @@ export function GameDetailScreen({
       )}
 
       <Card className="mt-6">
-        <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Suas estatísticas</h2>
+        <SectionHeading className="mb-3">Suas estatísticas</SectionHeading>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs text-muted">Tempo jogado</p>

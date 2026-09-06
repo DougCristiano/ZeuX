@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type { SystemInfo } from "../api/types";
-import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, Toast } from "../components/ui";
+import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, SectionHeading, Toast } from "../components/ui";
 import { useToast } from "../hooks/useToast";
 
 // `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
@@ -150,7 +150,7 @@ export function SettingsScreen() {
       <h1 className="mb-5 text-2xl font-semibold text-ink">Configurações</h1>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Instalação</h2>
+        <SectionHeading className="mb-2">Instalação</SectionHeading>
         <p className="mb-4 text-sm text-muted">
           Emuladores instalados pelo ZeuX, biblioteca, capas e configurações desta máquina ficam todos dentro da
           mesma pasta.
@@ -173,7 +173,7 @@ export function SettingsScreen() {
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Desinstalar o ZeuX</h2>
+        <SectionHeading className="mb-2">Desinstalar o ZeuX</SectionHeading>
 
         {systemInfo.kind === "loaded" && systemInfo.info.os === "windows" && (
           <div className="flex flex-col gap-3">
@@ -206,7 +206,7 @@ export function SettingsScreen() {
       </Card>
 
       <Card>
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Capas de jogo (IGDB)</h2>
+        <SectionHeading className="mb-2">Capas de jogo (IGDB)</SectionHeading>
         <p className="mb-4 text-sm text-muted">
           O ZeuX pode buscar a capa e a data de lançamento dos seus jogos no IGDB. O ideal é cada pessoa conectar a
           própria conta — o ID e o segredo do cliente, obtidos no painel de desenvolvedor do Twitch — para que a

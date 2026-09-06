@@ -14,6 +14,7 @@ import {
   ErrorModal,
   InlineError,
   ScreenContainer,
+  SectionHeading,
   ZSelect,
 } from "../components/ui";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
@@ -488,11 +489,13 @@ export function LibraryScreen({
         <div className="flex flex-col gap-6">
           {/* N2 (docs/roadmap.md, Sprint N): era `text-sm font-semibold` — a
               única tela com essa segunda convenção de título de seção.
-              Decisão do Douglas: `font-pixel text-[11px]` (o mesmo do resto
-              do app) vale para título de tela E de seção interna, sem
-              distinção. */}
+              2026-09-06 (critico-design + auditoria de a11y): título de seção
+              vira `SectionHeading` (`text-lg` Inter), recuperando o degrau
+              intermediário da hierarquia — pixel font a 11px ficava menor que
+              o corpo e comunicava "título" só pelo estilo. Mesma decisão da
+              N17 na sidebar, agora estendida aos `<h2>`. */}
           <div>
-            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Consoles configurados</h2>
+            <SectionHeading className="mb-2">Consoles configurados</SectionHeading>
             {configuredConsoles.length === 0 ? (
               // N11 (docs/roadmap.md, Sprint N): sem botão de ação aqui — a
               // seção "Adicionar console" (a ação que resolve este vazio) já
@@ -519,7 +522,7 @@ export function LibraryScreen({
           </div>
 
           <div>
-            <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar console</h2>
+            <SectionHeading className="mb-2">Adicionar console</SectionHeading>
             <AddConsoleSection availableConsoles={availableConsoles} onAdded={() => setReloadKey((k) => k + 1)} />
           </div>
         </div>

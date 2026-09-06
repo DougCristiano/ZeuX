@@ -294,7 +294,7 @@ export function ConsolesScreen({
                 // exclusivos — `aria-pressed` expõe o estado ativo (o estilo
                 // `border-accent`/`text-accent` só comunicava a quem vê).
                 aria-pressed={filter === item.id}
-                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                   filter === item.id ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >

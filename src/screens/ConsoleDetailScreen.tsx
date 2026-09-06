@@ -22,6 +22,7 @@ import {
   InlineError,
   ProgressBar,
   ScreenContainer,
+  SectionHeading,
 } from "../components/ui";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
@@ -748,9 +749,9 @@ export function ConsoleDetailScreen({
           só com "sobre a sua biblioteca/máquina" (Jogos + Nesta máquina). */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_minmax(280px,360px)]">
         <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold text-ink">
+          <SectionHeading>
             {entry.emulators.length === 1 ? "Como rodar" : `Como rodar — ${entry.emulators.length} opções`}
-          </h2>
+          </SectionHeading>
 
           {entry.emulators.length === 0 ? (
             <Card filled>
@@ -791,7 +792,7 @@ export function ConsoleDetailScreen({
               informação. Ausente sem consentimento/scan. */}
           {verdict && (
             <div className="flex flex-col gap-2">
-              <h2 className="text-lg font-semibold text-ink">Nesta máquina</h2>
+              <SectionHeading>Nesta máquina</SectionHeading>
               <ConsoleVerdictCard verdict={verdict} />
             </div>
           )}

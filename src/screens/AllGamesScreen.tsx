@@ -708,14 +708,17 @@ export function AllGamesScreen({
           do item).
           N4 (docs/roadmap.md, Sprint N): input e select medem 38px agora
           (inputClass/ZSelect); os chips de tag (grade/lista, favoritos,
-          plataforma — abaixo) ficam de propósito nos 26px que já tinham.
+          plataforma — abaixo) ficam de propósito mais baixos que os 38px.
           Decisão revista durante a implementação: o achado do crítico era
           "quatro alturas diferentes por acidente", não "toda barra precisa
-          da mesma caixa" — um chip de tag pixel-font do tamanho de um botão
-          de 38px ficaria desproporcional ao próprio texto que carrega.
-          `items-center` nesta linha já alinha os dois tamanhos pelo centro
-          vertical, o mesmo padrão que Steam/GitHub usam em barra mista de
-          input + tag. */}
+          da mesma caixa". `items-center` nesta linha já alinha os dois
+          tamanhos pelo centro vertical, o mesmo padrão que Steam/GitHub usam
+          em barra mista de input + tag.
+          2026-09-06 (critico-design + auditoria de a11y): os chips saíram do
+          `font-pixel text-[11px]` para Inter `text-xs` medium — um chip de
+          filtro *ativável* é um controle, não badge nem título de navegação,
+          e Press Start 2P a 11px colorido tem leitura ruim. Mesma decisão da
+          N17 (que tirou a pixel font da sidebar), agora nos controles. */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <label htmlFor="all-games-search" className="sr-only">
           Buscar jogos
@@ -751,7 +754,7 @@ export function AllGamesScreen({
               type="button"
               aria-pressed={viewMode === mode}
               onClick={() => onViewChange({ viewMode: mode })}
-              className={`rounded-sm px-2 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+              className={`rounded-sm px-2 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                 viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
               }`}
             >
@@ -764,7 +767,7 @@ export function AllGamesScreen({
           type="button"
           onClick={() => onViewChange({ favoriteOnly: !favoriteOnly })}
           aria-pressed={favoriteOnly}
-          className={`flex items-center gap-1 rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+          className={`flex items-center gap-1 rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
             favoriteOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
           }`}
         >
@@ -782,7 +785,7 @@ export function AllGamesScreen({
               // mutuamente exclusivos — `aria-pressed` expõe qual está ativo
               // para o leitor de tela (o estilo só comunicava a quem vê).
               aria-pressed={platformFilter === null}
-              className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+              className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                 platformFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
               }`}
             >
@@ -814,7 +817,7 @@ export function AllGamesScreen({
                     ? { borderColor: consoleAccentColor(id), background: `${consoleAccentColor(id)}1a` }
                     : undefined
                 }
-                className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
+                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
                   platformFilter === id ? "text-ink" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >

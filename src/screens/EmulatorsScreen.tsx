@@ -25,6 +25,7 @@ import {
   Pagination,
   ProgressBar,
   ScreenContainer,
+  SectionHeading,
   ZSelect,
 } from "../components/ui";
 import { SelectItem } from "../components/ui/select";
@@ -994,8 +995,9 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
       <div className="mt-6">
         {/* A11y 1.3.1: cabeçalho de seção real — era `<p>`, virou `<h2>` para
             entrar na navegação por headings (mesmo padrão de LibraryScreen/
-            SettingsScreen, que já usam `<h2 className="font-pixel …">`). */}
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Adicionar emulador</h2>
+            SettingsScreen). 2026-09-06: `SectionHeading` (`text-lg` Inter) no
+            lugar da pixel font 11px. */}
+        <SectionHeading className="mb-2">Adicionar emulador</SectionHeading>
         {formMode === "closed" ? (
           // B8 (achado do critico-design, 2026-08-18): reescrevia as quatro
           // classes do FOCUS_RING à mão em vez de usar o componente — único

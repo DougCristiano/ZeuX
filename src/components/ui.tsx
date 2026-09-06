@@ -332,6 +332,27 @@ export function PartialNotice({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Título de seção dentro de uma tela (`<h2>`). Papel intermediário da
+ * hierarquia entre o `<h1>` de 28px e o corpo de 15px (achado do
+ * critico-design, 2026-09-06 — "o app salta de 28px para 15px sem degrau no
+ * meio"): ocupa o `text-lg` (17px) que a escala de seis degraus define mas
+ * quase ninguém usava.
+ *
+ * Saiu do `font-pixel text-[11px]` que os `<h2>` de seção usavam: pixel font a
+ * 11px é *menor* que o corpo e comunica "título" só pelo estilo, não pelo
+ * tamanho — o mesmo raciocínio da N17, que tirou a pixel font dos rótulos da
+ * sidebar. A pixel font continua nos *rótulos* de card ("SISTEMA",
+ * "PROCESSADOR" no SpecsPanel) e em badge/contador — ali é tempero, não
+ * estrutura de página. Mantém `uppercase tracking-wide text-muted` para não
+ * romper o vocabulário visual do app; só o tamanho sobe.
+ */
+export function SectionHeading({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <h2 className={`text-lg font-semibold tracking-wide text-muted uppercase ${className}`}>{children}</h2>
+  );
+}
+
+/**
  * Modal de erro: para falhas que merecem atenção explícita do usuário (ex.:
  * lançar um jogo falhou) em vez de um texto discreto que passa despercebido
  * na tela — achado em 2026-08-04, quando "Não foi possível abrir o jogo"
