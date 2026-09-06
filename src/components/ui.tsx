@@ -896,10 +896,19 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
         <Badge variant={isGoodTier ? "solid" : "default"}>{LEVEL_LABEL[verdict.level]}</Badge>
       </div>
 
-      <p className="text-sm text-muted">{verdict.headline}</p>
+      {/* `headline` vem de `Level.Headline()` — é o mesmo texto para TODO
+          console do mesmo patamar (33 consoles, 4 patamares possíveis). Numa
+          tela com vários cards "ótimo" lado a lado, essa repetição treinava o
+          olho a pular o bloco inteiro — e o preset, que é a informação que
+          de fato muda por console, tinha exatamente o mesmo peso visual
+          (`text-sm text-muted`) que essa frase fixa. Achado de design ao
+          testar com o Douglas (2026-09-06): reduzido para legenda (`text-xs`)
+          e o preset promovido a `text-ink`/`font-medium`, que é o único dos
+          dois que carrega decisão real do hardware da pessoa. */}
+      <p className="text-xs text-muted">{verdict.headline}</p>
 
       {verdict.preset && (
-        <p className="text-sm text-muted">
+        <p className="text-sm font-medium text-ink">
           {verdict.emulator} · {verdict.preset}
         </p>
       )}

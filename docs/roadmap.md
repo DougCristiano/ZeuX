@@ -119,6 +119,34 @@ observam o que cada camada recebeu (adapter espião sobre `/bin/true`), não o
 arquivo final de um PCSX2 instalado — este ambiente não tem um. O
 `upscale_multiplier` em si já é coberto por `pcsx2_config_test.go` desde o H1.
 
+**Achado de design ao testar com o Douglas em máquina real (2026-09-06):**
+`upscale_multiplier=4` batia certinho no `PCSX2.ini` — o Q2 em si funcionava
+— mas o Douglas não conseguiu achar onde o ZeuX *mostra* esse preset. Não era
+falta de UI: `ConsoleVerdictCard` (`src/components/ui.tsx`) já exibe
+`{emulator} · {preset}` tanto no detalhe do console ("Nesta máquina") quanto
+na tela do próprio jogo (logo abaixo do botão Jogar). Medido com Playwright
+contra o app rodando de verdade: o problema era **hierarquia visual**, não
+ausência de dado. O preset (`verdict.preset`, o único texto que muda por
+console/hardware) e o `headline` (`Level.Headline()`, texto **fixo por
+patamar** — idêntico em todo console "ótimo") tinham exatamente o mesmo
+`text-sm text-muted` — contraste de cor medido em 7.62:1 (acima do mínimo
+WCAG AA/AAA), então não era problema de acessibilidade estrita. O olho tratava
+as duas linhas como a mesma classe de informação, e como a de cima se repete
+em toda tela "Especificações" (33 consoles, 4 patamares possíveis), o padrão
+ensinava a pular o bloco inteiro. Corrigido: `headline` caiu para `text-xs`
+(legenda), preset subiu para `text-sm font-medium text-ink` (o dado que
+carrega decisão real do hardware ganha peso, o texto fixo do catálogo não).
+Mesmo componente serve `ConsoleDetailScreen`, `GameDetailScreen` e
+`VerdictScreen` — a correção vale nas três telas de uma vez.
+
+**Decisão registrada, não tomada:** a cor da borda esquerda de
+`ConsoleVerdictCard` (`consoleAccentColor`, decidida no N12) é identidade
+visual do console, igual usada em `GameTile`/`EmulatorCard`/`ConsoleIcon` —
+**não** codifica o patamar de hardware. Numa parede de cards "ótimo" lado a
+lado isso pode parecer que a cor deveria significar status; recolorir só
+neste card quebraria a identidade cruzada com as outras telas que mostram o
+mesmo console. Fica para o Douglas decidir se vale a pena.
+
 ### Q3 — o ZeuX não sabe qual é a sua tela — **feito em 2026-08-28**
 
 `HardwareInfo` tem `OS`, `CPU`, `GPUs`, `Memory` — **nenhum campo de display**.
