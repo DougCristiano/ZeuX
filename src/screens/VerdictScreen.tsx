@@ -9,17 +9,19 @@ import {
   FOCUS_RING,
   InlineError,
   inputClass,
-  LEVEL_LABEL,
+  useLevelLabel,
   Pagination,
   PartialNotice,
   ScreenContainer,
 } from "../components/ui";
+import { useT } from "../i18n/i18n";
+import { dict } from "./VerdictScreen.i18n";
 
 const LEVEL_ORDER: ConsoleVerdict["level"][] = ["otimo", "bom", "limitado", "improvavel"];
 const PAGE_SIZE = 9;
 
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return "desconhecido";
+function formatBytes(bytes: number, unknownText: string): string {
+  if (bytes <= 0) return unknownText;
   const gib = bytes / 1024 ** 3;
   return `${gib.toFixed(gib >= 10 ? 0 : 1)} GB`;
 }
@@ -31,6 +33,7 @@ function formatBytes(bytes: number): string {
  * strings pré-formatadas. Busca separada porque `Report` não carrega isso.
  */
 function SpecsPanel() {
+  const t = useT(dict);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +41,8 @@ function SpecsPanel() {
     api
       .getHardware()
       .then(setHardware)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível ler o hardware."));
-  }, []);
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("errorLoadingHardware")));
+  }, [t]);
 
   if (error) {
     return (
@@ -56,7 +59,7 @@ function SpecsPanel() {
     // forma evita o conteúdo saltar quando os dados chegam.
     return (
       <div role="status" aria-live="polite" className="flex flex-col gap-4">
-        <span className="sr-only">Lendo hardware…</span>
+        <span className="sr-only">{t("loadingHardware")}</span>
         <CardSkeleton className="h-32" />
         <CardSkeleton className="h-44" />
         <CardSkeleton className="h-24" />
@@ -68,42 +71,42 @@ function SpecsPanel() {
   return (
     <div className="flex flex-col gap-4">
       <Card filled>
-        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Sistema</p>
+        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("system")}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          <dt className="text-muted">Plataforma</dt>
+          <dt className="text-muted">{t("platform")}</dt>
           <dd className="text-ink">{hardware.os.platform}</dd>
-          <dt className="text-muted">Versão</dt>
+          <dt className="text-muted">{t("version")}</dt>
           <dd className="text-ink">{hardware.os.version}</dd>
-          <dt className="text-muted">Arquitetura</dt>
+          <dt className="text-muted">{t("architecture")}</dt>
           <dd className="text-ink">{hardware.os.arch}</dd>
         </dl>
       </Card>
 
       <Card filled>
-        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Processador</p>
+        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("processor")}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          <dt className="text-muted">Modelo</dt>
+          <dt className="text-muted">{t("model")}</dt>
           <dd className="text-ink">{hardware.cpu.model}</dd>
-          <dt className="text-muted">Fabricante</dt>
+          <dt className="text-muted">{t("vendor")}</dt>
           <dd className="text-ink">{hardware.cpu.vendor}</dd>
-          <dt className="text-muted">Núcleos físicos</dt>
+          <dt className="text-muted">{t("physicalCores")}</dt>
           <dd className="text-ink">{hardware.cpu.physical_cores}</dd>
-          <dt className="text-muted">Núcleos lógicos</dt>
+          <dt className="text-muted">{t("logicalCores")}</dt>
           <dd className="text-ink">{hardware.cpu.logical_cores}</dd>
-          <dt className="text-muted">Clock-base</dt>
+          <dt className="text-muted">{t("baseClock")}</dt>
           <dd className="text-ink">
-            {hardware.cpu.base_clock_mhz > 0 ? `${(hardware.cpu.base_clock_mhz / 1000).toFixed(2)} GHz` : "desconhecido"}
+            {hardware.cpu.base_clock_mhz > 0 ? `${(hardware.cpu.base_clock_mhz / 1000).toFixed(2)} GHz` : t("unknown")}
           </dd>
         </dl>
       </Card>
 
       <Card filled>
-        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Memória</p>
+        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("memory")}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          <dt className="text-muted">Total</dt>
-          <dd className="text-ink">{formatBytes(hardware.memory.total_bytes)}</dd>
-          <dt className="text-muted">Disponível</dt>
-          <dd className="text-ink">{formatBytes(hardware.memory.available_bytes)}</dd>
+          <dt className="text-muted">{t("total")}</dt>
+          <dd className="text-ink">{formatBytes(hardware.memory.total_bytes, t("unknown"))}</dd>
+          <dt className="text-muted">{t("available")}</dt>
+          <dd className="text-ink">{formatBytes(hardware.memory.available_bytes, t("unknown"))}</dd>
         </dl>
       </Card>
 
@@ -111,32 +114,32 @@ function SpecsPanel() {
         hardware.gpus.map((gpu, i) => (
           <Card filled key={`${gpu.model}-${i}`}>
             <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">
-              Placa de vídeo{hardware.gpus!.length > 1 ? ` ${i + 1}` : ""}
+              {t("gpuCard")}{hardware.gpus!.length > 1 ? ` ${i + 1}` : ""}
             </p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-              <dt className="text-muted">Modelo</dt>
+              <dt className="text-muted">{t("model")}</dt>
               <dd className="text-ink">{gpu.model}</dd>
-              <dt className="text-muted">Fabricante</dt>
+              <dt className="text-muted">{t("vendor")}</dt>
               <dd className="text-ink">{gpu.vendor}</dd>
-              <dt className="text-muted">Memória de vídeo</dt>
-              <dd className="text-ink">{formatBytes(gpu.vram_bytes)}</dd>
-              <dt className="text-muted">Tipo</dt>
-              <dd className="text-ink">{gpu.integrated ? "integrada" : "dedicada"}</dd>
+              <dt className="text-muted">{t("vram")}</dt>
+              <dd className="text-ink">{formatBytes(gpu.vram_bytes, t("unknown"))}</dd>
+              <dt className="text-muted">{t("type")}</dt>
+              <dd className="text-ink">{gpu.integrated ? t("integrated") : t("dedicated")}</dd>
               {gpu.driver_version && (
                 <>
-                  <dt className="text-muted">Driver</dt>
+                  <dt className="text-muted">{t("driver")}</dt>
                   <dd className="text-ink">{gpu.driver_version}</dd>
                 </>
               )}
-              <dt className="text-muted">Fonte da leitura</dt>
+              <dt className="text-muted">{t("readingSource")}</dt>
               <dd className="text-ink">{gpu.source}</dd>
             </dl>
           </Card>
         ))
       ) : (
         <Card filled>
-          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Placa de vídeo</p>
-          <p className="text-sm text-muted">Nenhuma placa de vídeo foi identificada nesta leitura.</p>
+          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("gpuCard")}</p>
+          <p className="text-sm text-muted">{t("gpuNotIdentified")}</p>
         </Card>
       )}
 
@@ -148,10 +151,10 @@ function SpecsPanel() {
         hardware.displays.map((display, i) => (
           <Card filled key={`${display.name ?? "tela"}-${i}`}>
             <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">
-              Tela{hardware.displays!.length > 1 ? ` ${i + 1}` : ""}
+              {t("display")}{hardware.displays!.length > 1 ? ` ${i + 1}` : ""}
             </p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-              <dt className="text-muted">Resolução</dt>
+              <dt className="text-muted">{t("resolution")}</dt>
               <dd className="text-ink">
                 {display.width}×{display.height}
               </dd>
@@ -160,36 +163,36 @@ function SpecsPanel() {
                   de mostrar um zero que pareceria medição. */}
               {display.refresh_hz ? (
                 <>
-                  <dt className="text-muted">Taxa</dt>
-                  <dd className="text-ink">{display.refresh_hz} Hz</dd>
+                  <dt className="text-muted">{t("refreshRate")}</dt>
+                  <dd className="text-ink">{display.refresh_hz} {t("hz")}</dd>
                 </>
               ) : null}
               {display.name && (
                 <>
-                  <dt className="text-muted">Saída</dt>
+                  <dt className="text-muted">{t("output")}</dt>
                   <dd className="text-ink">{display.name}</dd>
                 </>
               )}
               {display.primary && (
                 <>
-                  <dt className="text-muted">Principal</dt>
-                  <dd className="text-ink">sim</dd>
+                  <dt className="text-muted">{t("primary")}</dt>
+                  <dd className="text-ink">{t("yes")}</dd>
                 </>
               )}
-              <dt className="text-muted">Fonte da leitura</dt>
+              <dt className="text-muted">{t("readingSource")}</dt>
               <dd className="text-ink">{display.source}</dd>
             </dl>
           </Card>
         ))
       ) : (
         <Card filled>
-          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Tela</p>
-          <p className="text-sm text-muted">Nenhum monitor foi identificado nesta leitura.</p>
+          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("display")}</p>
+          <p className="text-sm text-muted">{t("displayNotIdentified")}</p>
         </Card>
       )}
 
       {hardware.warnings.length > 0 && (
-        <Callout label="Avisos da leitura de hardware">
+        <Callout label={t("hardwareWarnings")}>
           <ul className="list-disc space-y-1 pl-4">
             {hardware.warnings.map((line) => (
               <li key={line}>{line}</li>
@@ -222,6 +225,8 @@ const THRESHOLDS_CALIBRATED = false;
  * não é uma lista, é um retrato só desta máquina.
  */
 export function VerdictScreen({ report }: { report: Report }) {
+  const t = useT(dict);
+  const levelLabel = useLevelLabel();
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<ConsoleVerdict["level"] | null>(null);
   const [page, setPage] = useState(1);
@@ -259,27 +264,26 @@ export function VerdictScreen({ report }: { report: Report }) {
           `<aside>` some porque a coluna do grid já é o teto, era redundante. */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(260px,340px)_1fr]">
         <aside className="flex flex-col gap-4">
-          <h1 className="text-2xl font-semibold text-ink">Especificações</h1>
+          <h1 className="text-2xl font-semibold text-ink">{t("specifications")}</h1>
           <SpecsPanel />
         </aside>
 
         <div>
           {!THRESHOLDS_CALIBRATED && (
             <p className="mb-4 text-sm text-muted">
-              Os patamares abaixo são uma estimativa: os requisitos do catálogo ainda não foram medidos em
-              hardware real.
+              {t("thresholdsNotCalibrated")}
             </p>
           )}
 
           {report.precision === "parcial" && (
             <div className="mb-4">
-              <PartialNotice>Nem tudo pôde ser lido desta máquina — o parecer abaixo é uma estimativa.</PartialNotice>
+              <PartialNotice>{t("partialPrecision")}</PartialNotice>
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-3">
             <label htmlFor="verdict-search" className="sr-only">
-              Buscar console
+              {t("searchConsole")}
             </label>
             <input
               id="verdict-search"
@@ -288,7 +292,7 @@ export function VerdictScreen({ report }: { report: Report }) {
               autoComplete="off"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Buscar console…"
+              placeholder={t("searchConsolePlaceholder")}
               className={`${inputClass} max-w-xs`}
             />
             <div className="flex flex-wrap gap-1.5">
@@ -304,7 +308,7 @@ export function VerdictScreen({ report }: { report: Report }) {
                   levelFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
-                TODOS
+                {t("filterAll")}
               </button>
               {LEVEL_ORDER.map((level) => (
                 <button
@@ -316,14 +320,14 @@ export function VerdictScreen({ report }: { report: Report }) {
                     levelFilter === level ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                   }`}
                 >
-                  {LEVEL_LABEL[level].toUpperCase()}
+                  {levelLabel(level).toUpperCase()}
                 </button>
               ))}
             </div>
           </div>
 
           {filtered.length === 0 && (
-            <p className="mt-4 text-base text-muted">Nenhum console encontrado para "{search}".</p>
+            <p className="mt-4 text-base text-muted">{t("noConsolesFound", { search })}</p>
           )}
 
           {/* 2xl, não xl (CLAUDE.md, regra de breakpoint): esta grade divide

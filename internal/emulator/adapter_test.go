@@ -370,8 +370,12 @@ func TestRetroArchFailsWithCoreNameWhenCoreMissing(t *testing.T) {
 	// 2026-08-04, que testou o download/cópia de cores bundled de ponta a
 	// ponta na máquina real do Douglas) — coreDirs() acharia o core
 	// genuíno e BuildCommand não devolveria mais o erro que este teste
-	// trava.
+	// trava. APPDATA isolado pelo mesmo motivo, cobrindo o Windows do
+	// Douglas: desde que coreDirs() passou a olhar %APPDATA%\RetroArch\cores
+	// (achado de 2026-09-06), uma instalação real do RetroArch nesse
+	// caminho faria este teste achar o core de verdade e não falhar.
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("APPDATA", t.TempDir())
 
 	_, err := newRetroArch().BuildCommand(
 		install("retroarch", "/opt/retroarch/retroarch"),

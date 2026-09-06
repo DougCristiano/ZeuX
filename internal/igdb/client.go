@@ -23,6 +23,9 @@ var allowedHosts = map[string]bool{
 	"api.igdb.com":    true,
 	"images.igdb.com": true,
 	"id.twitch.tv":    true,
+	// thumbnails.libretro.com: fonte alternativa de capa sem conta nem cota
+	// (ver thumbnails.go) — mesmo pacote, mesma trava de host.
+	"thumbnails.libretro.com": true,
 }
 
 // insecureTestHosts existe só para os testes deste pacote poderem apontar
@@ -341,37 +344,55 @@ func (c *Client) DownloadCover(ctx context.Context, imageID, destPath string) er
 	}
 
 	reqURL := igdbImageBase + "/t_cover_big/" + imageID + ".jpg"
-	if err := checkHost(reqURL); err != nil {
+	status, err := downloadImage(ctx, reqURL, destPath)
+	if err != nil {
 		return err
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("o servidor de imagens do IGDB respondeu %d", status)
+	}
+	return nil
+}
+
+// downloadImage é a mecânica de baixar uma imagem para destPath, gravando de
+// forma atômica (arquivo temporário + rename) — compartilhada por
+// DownloadCover (IGDB) e fetchLibretroThumbnail (thumbnails.go, fallback
+// sem conta). Devolve o status HTTP da resposta; um status diferente de 200
+// não é erro aqui (cabe a quem chama decidir se 404 é "capa não existe,
+// tenta a próxima fonte" ou motivo de falha) — só falha de rede de verdade,
+// ou o corpo vindo maior que maxCoverBytes, vira error.
+func downloadImage(ctx context.Context, reqURL, destPath string) (int, error) {
+	if err := checkHost(reqURL); err != nil {
+		return 0, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	req.Header.Set("User-Agent", "ZeuX")
 
 	response, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("baixando a capa: %w", err)
+		return 0, fmt.Errorf("baixando a imagem: %w", err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("o servidor de imagens do IGDB respondeu %s", response.Status)
+		return response.StatusCode, nil
 	}
 	if response.ContentLength > maxCoverBytes {
-		return fmt.Errorf("a imagem tem %d bytes, acima do limite aceito para uma capa", response.ContentLength)
+		return 0, fmt.Errorf("a imagem tem %d bytes, acima do limite aceito para uma capa", response.ContentLength)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
-		return fmt.Errorf("criando a pasta da capa: %w", err)
+		return 0, fmt.Errorf("criando a pasta da capa: %w", err)
 	}
 
 	temp := destPath + ".tmp"
 	file, err := os.Create(temp)
 	if err != nil {
-		return fmt.Errorf("gravando a capa: %w", err)
+		return 0, fmt.Errorf("gravando a capa: %w", err)
 	}
 
 	// Copia até um byte a mais que o limite: se o servidor ignorar
@@ -383,21 +404,21 @@ func (c *Client) DownloadCover(ctx context.Context, imageID, destPath string) er
 	closeErr := file.Close()
 	if err != nil {
 		os.Remove(temp)
-		return fmt.Errorf("gravando a capa: %w", err)
+		return 0, fmt.Errorf("gravando a capa: %w", err)
 	}
 	if closeErr != nil {
 		os.Remove(temp)
-		return fmt.Errorf("gravando a capa: %w", closeErr)
+		return 0, fmt.Errorf("gravando a capa: %w", closeErr)
 	}
 	if written > maxCoverBytes {
 		os.Remove(temp)
-		return fmt.Errorf("a imagem excede o limite aceito para uma capa")
+		return 0, fmt.Errorf("a imagem excede o limite aceito para uma capa")
 	}
 
 	if err := os.Rename(temp, destPath); err != nil {
 		os.Remove(temp)
-		return fmt.Errorf("finalizando a gravação da capa: %w", err)
+		return 0, fmt.Errorf("finalizando a gravação da capa: %w", err)
 	}
 
-	return nil
+	return http.StatusOK, nil
 }

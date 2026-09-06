@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError, isDownloadingCore } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
+import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
   Button,
   Callout,
@@ -22,6 +23,8 @@ import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { useT } from "../i18n/i18n";
+import { dict } from "./GamesScreen.i18n";
 
 type RowStatus =
   | { kind: "idle" }
@@ -84,6 +87,7 @@ export function GamesScreen({
    * instalação manual. Ausente se a tela for alcançada sem esse caminho. */
   onOpenConsole?: () => void;
 }) {
+  const t = useT(dict);
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
@@ -105,7 +109,7 @@ export function GamesScreen({
     try {
       await openPath(dir);
     } catch (err) {
-      setError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+      setError(t("couldNotOpenBiosFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -114,7 +118,7 @@ export function GamesScreen({
       const res = await api.getLibraryGames(consoleId);
       setGames(res.games);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível listar os jogos.");
+      setError(err instanceof ApiError ? err.message : t("couldNotListGames"));
     }
   }
 
@@ -124,6 +128,11 @@ export function GamesScreen({
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
       .catch(() => setEmulators([]));
+    // Auto-rescan (2026-09-06): revarre as pastas configuradas sozinho ao
+    // abrir a tela, e recarrega a lista se algo novo apareceu — sem isto, um
+    // jogo copiado pra pasta só aparecia depois de um clique manual em
+    // "Revarrer" (ver src/lib/autoRescan.ts).
+    rescanAllFoldersIfStale().then(loadGames);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consoleId]);
 
@@ -138,7 +147,7 @@ export function GamesScreen({
       // Não muda o estado aqui: o poll em andamento vê a fase "cancelado" na
       // próxima resposta e volta a linha para "idle" sozinho.
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Não foi possível cancelar o download.";
+      const message = err instanceof ApiError ? err.message : t("couldNotCancelDownload");
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
       setLaunchError(message);
     }
@@ -160,7 +169,7 @@ export function GamesScreen({
         return;
       }
       if (job.phase === "falhou") {
-        const message = job.error ?? "O download do core não foi concluído.";
+        const message = job.error ?? t("coreDownloadedNotFound");
         setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
         setLaunchError(message);
         return;
@@ -168,7 +177,7 @@ export function GamesScreen({
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "downloading-core", job } }));
       setTimeout(() => pollCoreDownload(gameId, jobId, romPath), 400);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Não foi possível acompanhar o download do core.";
+      const message = err instanceof ApiError ? err.message : t("coreDownloadedNotFound");
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
       setLaunchError(message);
     }
@@ -189,8 +198,7 @@ export function GamesScreen({
       // ainda.
       if (isDownloadingCore(result)) {
         if (afterCoreDownload) {
-          const message =
-            "O core foi baixado, mas o ZeuX continua não encontrando ele no computador. Tente abrir o jogo de novo; se persistir, confira a lista de cores na tela de Emuladores.";
+          const message = t("coreDownloadedNotFound");
           setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
           setLaunchError(message);
           return;
@@ -203,10 +211,10 @@ export function GamesScreen({
       // B4 (achado do critico-design, 2026-08-18): "Sessão iniciada." era
       // texto que nunca somia sozinho, preso na célula do jogo — virou
       // toast, mesma confirmação de sucesso que o resto do app já usa.
-      showToast(`${game.title}: sessão iniciada.`);
+      showToast(t("sessionStarted", { title: game.title }));
       loadGames(); // atualiza playtime_seconds/last_played_at sem recarregar a tela
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Não foi possível abrir o jogo.";
+      const message = err instanceof ApiError ? err.message : t("couldNotLaunchGame");
       setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
       setLaunchError(message);
     }
@@ -229,10 +237,10 @@ export function GamesScreen({
     // numa tela e não confirmar em outra.
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
     call
-      .then(() => showToast(next ? "Adicionado aos favoritos." : "Removido dos favoritos."))
+      .then(() => showToast(next ? t("addedToFavorites") : t("removedFromFavorites")))
       .catch(() => {
         setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
-        setError("Não foi possível salvar o favorito. Tente de novo.");
+        setError(t("couldNotSaveFavorite"));
       });
   }
 
@@ -255,15 +263,15 @@ export function GamesScreen({
        */}
       {toastMessage && <Toast message={toastMessage} />}
       {launchError ? (
-        <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={() => setLaunchError(null)} />
+        <ErrorModal title={t("couldNotLaunchGameTitle")} message={launchError} onClose={() => setLaunchError(null)} />
       ) : install.state.kind === "error" ? (
         <ErrorModal
-          title="Não foi possível instalar o emulador"
+          title={t("couldNotInstallEmulator")}
           message={install.state.message}
           onClose={() => install.setState({ kind: "idle" })}
         />
       ) : (
-        error && <ErrorModal title="Não foi possível carregar a tela" message={error} onClose={() => setError(null)} />
+        error && <ErrorModal title={t("couldNotLoadScreen")} message={error} onClose={() => setError(null)} />
       )}
 
       {/* N13 (docs/roadmap.md, Sprint N): antes, esta tela mostrava as duas
@@ -277,19 +285,19 @@ export function GamesScreen({
           const confirmState = install.state;
           return (
             <ConfirmModal
-              title="Hardware abaixo do recomendado"
+              title={t("hardwareBelowRecommended")}
               message={confirmState.message}
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
                   <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
-                    Cancelar
+                    {t("cancel")}
                   </Button>
                   <Button
                     variant="primary"
                     onClick={() => install.startInstall(confirmState.adapterId, true, confirmState.pendingGamePath)}
                   >
-                    Instalar mesmo assim
+                    {t("installAnyway")}
                   </Button>
                 </>
               }
@@ -320,17 +328,17 @@ export function GamesScreen({
           const confirmState = install.state;
           return (
             <ConfirmModal
-              title="BIOS ausente"
-              message="A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir."
+              title={t("biosAbsent")}
+              message={t("biosEmptyMessage")}
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
                   <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
-                    Cancelar
+                    {t("cancel")}
                   </Button>
                   {adapterEntry?.bios_dir && (
                     <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
-                      Abrir pasta do BIOS
+                      {t("openBiosFolder")}
                     </Button>
                   )}
                   <Button
@@ -340,7 +348,7 @@ export function GamesScreen({
                       doLaunch(confirmState.pendingGamePath);
                     }}
                   >
-                    Jogar mesmo assim
+                    {t("playAnyway")}
                   </Button>
                 </>
               }
@@ -353,7 +361,7 @@ export function GamesScreen({
           (era ao lado do h1, à direita). */}
       {/* A11y 2.1.4: `data-nav-back` — alvo do botão B do controle. */}
       <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
-        Voltar à biblioteca
+        {t("backToLibrary")}
       </Button>
       {/* N12 (docs/roadmap.md, Sprint N): mesmo tratamento de borda esquerda
           que EmulatorCard/ConsoleVerdictCard já usam — antes, esta era uma
@@ -372,13 +380,12 @@ export function GamesScreen({
           errada seria pior que nenhuma. */}
       {verdict?.requires_external_file && (
         <div className="mb-4">
-          <Callout label="Dependência externa">
-            Este console costuma exigir um arquivo externo (BIOS, firmware ou plugin) que o ZeuX não fornece nem
-            verifica. Se o jogo não abrir, confira essa configuração diretamente no emulador.
+          <Callout label={t("externalDependency")}>
+            {t("externalFileMessage")}
             {adapterEntry?.bios_dir && (
               <div className="mt-2">
                 <Button type="button" variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
-                  Abrir pasta do BIOS
+                  {t("openBiosFolder")}
                 </Button>
               </div>
             )}
@@ -392,9 +399,8 @@ export function GamesScreen({
           seria pior que dizer uma vez só aqui em cima. */}
       {!canAutoConfigure && (
         <div className="mb-4">
-          <Callout label="Sem preset automático">
-            Este computador não alcançou nenhum patamar de compatibilidade conhecido para {consoleName}. Os jogos
-            continuam listados, mas o ZeuX não tem uma configuração para sugerir.
+          <Callout label={t("noAutoPreset")}>
+            {t("noAutoPresetMessage", { consoleName })}
           </Callout>
         </div>
       )}
@@ -407,7 +413,7 @@ export function GamesScreen({
           carregar. */}
       {games === null && (
         <div role="status" aria-live="polite">
-          <span className="sr-only">Carregando jogos…</span>
+          <span className="sr-only">{t("loadingGames")}</span>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
             {Array.from({ length: 10 }, (_, i) => (
               <CardSkeleton key={i} className="aspect-[3/4] h-auto" />
@@ -416,12 +422,12 @@ export function GamesScreen({
         </div>
       )}
 
-      {games && games.length === 0 && <EmptyState message="Nenhum jogo achado ainda para este console." />}
+      {games && games.length === 0 && <EmptyState message={t("noGamesFound")} />}
 
       {games && games.length > 0 && (
         <>
           <label htmlFor="games-search" className="sr-only">
-            Buscar jogos
+            {t("searchGames")}
           </label>
           <input
             id="games-search"
@@ -430,14 +436,14 @@ export function GamesScreen({
             autoComplete="off"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar jogos…"
+            placeholder={t("searchGamesPlaceholder")}
             className={`mb-4 ${inputClass} max-w-xs`}
           />
         </>
       )}
 
       {games && games.length > 0 && visibleGames && visibleGames.length === 0 && (
-        <p className="text-base text-muted">Nenhum jogo encontrado para "{trimmedSearch}".</p>
+        <p className="text-base text-muted">{t("noGamesMatchingSearch", { search: trimmedSearch })}</p>
       )}
 
       {/* B5 (achado do critico-design, 2026-08-18): a Sprint O escalonou a
@@ -497,19 +503,19 @@ export function GamesScreen({
                 {status.kind === "downloading-core" && (
                   <div>
                     <p className="text-sm text-muted">
-                      Baixando o core {status.job.core_name ?? ""}…
+                      {t("downloadingCore", { coreName: status.job.core_name ?? "" })}
                       {faseExtraDeDownload(status.job.phase)}
                       {percentOf(status.job) !== null && ` · ${percentOf(status.job)}%`}
                     </p>
                     <div className="mt-1">
-                      <ProgressBar percent={percentOf(status.job)} label={`Baixando o core ${status.job.core_name ?? ""}`} />
+                      <ProgressBar percent={percentOf(status.job)} label={t("downloadingCore", { coreName: status.job.core_name ?? "" })} />
                     </div>
                     <Button
                       className="mt-2"
                       variant="secondary"
                       onClick={() => cancelCoreDownload(game.id, status.job)}
                     >
-                      Cancelar download
+                      {t("cancelDownload")}
                     </Button>
                   </div>
                 )}
@@ -519,7 +525,7 @@ export function GamesScreen({
                     aparência diferente do mesmo aviso no app (a outra era
                     `Callout tone="amber"` em EmulatorConfigPanel). */}
                 {status.kind === "launched" && status.session.unapplied && status.session.unapplied.length > 0 && (
-                  <Callout label="Não aplicado" tone="amber">
+                  <Callout label={t("notApplied")} tone="amber">
                     <ul className="list-disc pl-4">
                       {status.session.unapplied.map((note, i) => (
                         <li key={i}>{note}</li>

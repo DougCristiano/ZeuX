@@ -4,6 +4,7 @@ import { Star } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
+import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
   Button,
   ConfirmModal,
@@ -21,6 +22,8 @@ import {
 } from "../components/ui";
 import { SelectItem } from "../components/ui/select";
 import { useToast } from "../hooks/useToast";
+import { useT } from "../i18n/i18n";
+import { dict } from "./AllGamesScreen.i18n";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
@@ -231,6 +234,7 @@ export function AllGamesScreen({
    */
   initialScrollTop: number;
 }) {
+  const t = useT(dict);
   const { page, search, platformFilter, favoriteOnly, sort, viewMode } = view;
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [total, setTotal] = useState(0);
@@ -314,10 +318,20 @@ export function AllGamesScreen({
           onViewChange({ platformFilter: null });
         }
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os jogos."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListGames")));
   }
 
   useEffect(loadGames, [page, debouncedSearch, favoriteOnly, platformFilter, sort]);
+
+  // Auto-rescan (2026-09-06): "Todos os jogos" é a tela de entrada mais
+  // comum do app (ver comentário de App.tsx sobre a fase "all-games") — é
+  // aqui que um jogo copiado recentemente teria mais chance de aparecer sem
+  // o usuário precisar saber que existe um botão "Revarrer" escondido em
+  // "Gerenciar pastas" (ver src/lib/autoRescan.ts).
+  useEffect(() => {
+    rescanAllFoldersIfStale().then(loadGames);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Toggle otimista (G4): atualiza a lista na hora, sem esperar a resposta
   // nem recarregar a página inteira. Se a chamada falhar, desfaz.
@@ -330,10 +344,10 @@ export function AllGamesScreen({
     // duplicado em cima do próprio `setError` do catch abaixo seria ruído.
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
     call
-      .then(() => showToast(next ? "Adicionado aos favoritos." : "Removido dos favoritos."))
+      .then(() => showToast(next ? t("addedToFavorites") : t("removedFromFavorites")))
       .catch(() => {
         setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
-        setError("Não foi possível salvar o favorito. Tente de novo.");
+        setError(t("failedToSaveFavorite"));
       });
   }
 
@@ -353,15 +367,15 @@ export function AllGamesScreen({
           // próxima busca. Virou toast, mesma confirmação de sucesso.
           showToast(
             notFound > 0
-              ? `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}, ${notFound} não encontrada${notFound === 1 ? "" : "s"}.`
-              : `${found} capa${found === 1 ? "" : "s"} encontrada${found === 1 ? "" : "s"}.`,
+              ? t("scrapeCoversSuccess", { found, pluralFound: found === 1 ? "" : "s", pluralFoundEn: found === 1 ? "" : "s", notFound, pluralNotFound: notFound === 1 ? "" : "s" })
+              : t("scrapeCoversSingleSuccess", { found, pluralFound: found === 1 ? "" : "s", pluralFoundEn: found === 1 ? "" : "s" }),
           );
           setScrapeJob(null);
           loadGames();
           return;
         }
         if (job.phase === "falhou") {
-          setScrapeError(job.error ?? "Não foi possível buscar capas agora.");
+          setScrapeError(job.error ?? t("failedToScrapeCovers"));
           setScrapeJob(null);
           return;
         }
@@ -381,7 +395,7 @@ export function AllGamesScreen({
         setScrapeJob(job);
         pollScrapeJob(job.id);
       })
-      .catch((err) => setScrapeError(err instanceof ApiError ? err.message : "Não foi possível iniciar a busca de capas."));
+      .catch((err) => setScrapeError(err instanceof ApiError ? err.message : t("failedToInitiateCoverScrape")));
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -402,7 +416,7 @@ export function AllGamesScreen({
     try {
       await openPath(dir);
     } catch (err) {
-      setError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+      setError(t("failedToOpenBiosFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -418,7 +432,7 @@ export function AllGamesScreen({
     onLaunch: (romPath) => {
       const game = games?.find((g) => g.path === romPath);
       if (game) {
-        showToast(`Abrindo ${game.title}…`);
+        showToast(t("openingGame", { title: game.title }));
         launch(game);
       }
     },
@@ -491,19 +505,19 @@ export function AllGamesScreen({
        */}
       {launchError ? (
         <ErrorModal
-          title="Não foi possível abrir o jogo"
+          title={t("failedToOpenGame")}
           message={launchError}
           onClose={clearLaunchError}
           onRetry={retryLaunch}
         />
       ) : install.state.kind === "error" ? (
         <ErrorModal
-          title="Não foi possível instalar o emulador"
+          title={t("failedToInstallEmulator")}
           message={install.state.message}
           onClose={() => install.setState({ kind: "idle" })}
         />
       ) : (
-        error && <ErrorModal title="Não foi possível carregar a biblioteca" message={error} onClose={() => setError(null)} />
+        error && <ErrorModal title={t("failedToLoadLibrary")} message={error} onClose={() => setError(null)} />
       )}
 
       {/*
@@ -538,19 +552,19 @@ export function AllGamesScreen({
           const confirmState = install.state;
           return (
             <ConfirmModal
-              title="Hardware abaixo do recomendado"
+              title={t("weakHardware")}
               message={confirmState.message}
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
                   <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
-                    Cancelar
+                    {t("cancel")}
                   </Button>
                   <Button
                     variant="primary"
                     onClick={() => install.startInstall(confirmState.adapterId, true, confirmState.pendingGamePath)}
                   >
-                    Instalar mesmo assim
+                    {t("installAnyway")}
                   </Button>
                 </>
               }
@@ -566,17 +580,17 @@ export function AllGamesScreen({
           const pendingAdapterEntry = adapterEntryFor(pendingVerdict);
           return (
             <ConfirmModal
-              title="BIOS ausente"
-              message="A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir."
+              title={t("biosAbsent")}
+              message={t("biosEmptyWarning")}
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
                   <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
-                    Cancelar
+                    {t("cancel")}
                   </Button>
                   {pendingAdapterEntry?.bios_dir && (
                     <Button variant="secondary" onClick={() => openBiosFolder(pendingAdapterEntry.bios_dir!)}>
-                      Abrir pasta do BIOS
+                      {t("openBiosFolder")}
                     </Button>
                   )}
                   <Button
@@ -586,7 +600,7 @@ export function AllGamesScreen({
                       if (pendingGame) launch(pendingGame);
                     }}
                   >
-                    Jogar mesmo assim
+                    {t("playAnyway")}
                   </Button>
                 </>
               }
@@ -619,14 +633,14 @@ export function AllGamesScreen({
         <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
           {/* A11y 4.1.3: progresso que muda sozinho — anunciado por `aria-live`. */}
           <p className="text-sm text-ink" aria-live="polite">
-            Baixando o core {activeCoreDownload.job.core_name ?? ""}…
+            {t("downloadingCore", { coreName: activeCoreDownload.job.core_name ?? "" })}
             {faseExtraDeDownload(activeCoreDownload.job.phase)}
             {percentOf(activeCoreDownload.job) !== null && ` · ${percentOf(activeCoreDownload.job)}%`}
           </p>
           <div className="mt-2">
             <ProgressBar
               percent={percentOf(activeCoreDownload.job)}
-              label={`Baixando o core ${activeCoreDownload.job.core_name ?? ""}`}
+              label={t("downloadingCore", { coreName: activeCoreDownload.job.core_name ?? "" })}
             />
           </div>
           <Button
@@ -634,7 +648,7 @@ export function AllGamesScreen({
             variant="secondary"
             onClick={() => cancelCoreDownload(activeCoreDownload.gameId, activeCoreDownload.job)}
           >
-            Cancelar download
+            {t("cancelDownload")}
           </Button>
         </div>
       ) : (
@@ -671,7 +685,7 @@ export function AllGamesScreen({
                   `ProgressBar`, abaixo — mesmo componente que a instalação
                   inline já usa. Rótulo do botão agora é fixo. */}
               <Button variant="secondary" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
-                {scrapeJob ? "Buscando capas…" : "Buscar capas"}
+                {scrapeJob ? t("fetchingCovers") : t("fetchCoversButton")}
               </Button>
               {scrapeJob && (
                 <>
@@ -689,7 +703,7 @@ export function AllGamesScreen({
               sub-navegação da própria Biblioteca, não um destino de primeiro
               nível. */}
           <Button variant="secondary" onClick={onOpenLibrary}>
-            Gerenciar pastas
+            {t("manageFolders")}
           </Button>
         </div>
       </div>
@@ -698,7 +712,7 @@ export function AllGamesScreen({
         <InlineError className="mb-3">
           {scrapeError}{" "}
           <button type="button" onClick={startScrapeCovers} className="underline">
-            Tentar de novo
+            {t("retryButton")}
           </button>
         </InlineError>
       )}
@@ -721,7 +735,7 @@ export function AllGamesScreen({
           N17 (que tirou a pixel font da sidebar), agora nos controles. */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <label htmlFor="all-games-search" className="sr-only">
-          Buscar jogos
+          {t("searchPlaceholder")}
         </label>
         <input
           id="all-games-search"
@@ -730,12 +744,12 @@ export function AllGamesScreen({
           autoComplete="off"
           value={search}
           onChange={(e) => onViewChange({ search: e.target.value })}
-          placeholder="Buscar jogos…"
+          placeholder={t("searchPlaceholder")}
           className={`${inputClass} max-w-xs`}
         />
 
         <ZSelect
-          ariaLabel="Ordenar por"
+          ariaLabel={t("sortByLabel")}
           value={sort}
           onValueChange={(v) => onViewChange({ sort: v as SortValue })}
           className="w-fit"
@@ -747,7 +761,7 @@ export function AllGamesScreen({
           ))}
         </ZSelect>
 
-        <div className="flex gap-1 rounded-sm border border-line-strong p-0.5" role="group" aria-label="Modo de exibição">
+        <div className="flex gap-1 rounded-sm border border-line-strong p-0.5" role="group" aria-label={t("viewModeLabel")}>
           {(["grade", "lista"] as const).map((mode) => (
             <button
               key={mode}
@@ -758,7 +772,7 @@ export function AllGamesScreen({
                 viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
               }`}
             >
-              {mode === "grade" ? "GRADE" : "LISTA"}
+              {mode === "grade" ? t("gridMode") : t("listMode")}
             </button>
           ))}
         </div>
@@ -774,7 +788,7 @@ export function AllGamesScreen({
           {/* N14 (docs/roadmap.md, Sprint N): era o caractere "★" — lucide
               agora é a família de ícone padrão do app. */}
           <Star size={11} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden="true" />
-          FAVORITOS
+          {t("favoritesLabel")}
         </button>
         {platformOptions.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
@@ -789,7 +803,7 @@ export function AllGamesScreen({
                 platformFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
               }`}
             >
-              TODOS
+              {t("allPlatforms")}
             </button>
             {platformOptions.map(({ id, label }) => (
               <button
@@ -839,7 +853,7 @@ export function AllGamesScreen({
           alinhar, só uma grade estática de PAGE_SIZE itens. */}
       {games === null && (
         <div role="status" aria-live="polite">
-          <span className="sr-only">Carregando jogos…</span>
+          <span className="sr-only">{t("loadingGames")}</span>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
             {Array.from({ length: PAGE_SIZE }, (_, i) => (
               <GameTileSkeleton key={i} />
@@ -860,10 +874,10 @@ export function AllGamesScreen({
           if (trulyEmpty) {
             return (
               <EmptyState
-                message="Nenhum jogo na biblioteca ainda."
+                message={t("noGamesInLibrary")}
                 action={
                   <Button variant="primary" onClick={onOpenLibrary}>
-                    Escolher pasta com meus jogos
+                    {t("chooseFolderWithGames")}
                   </Button>
                 }
               />
@@ -872,10 +886,10 @@ export function AllGamesScreen({
           return (
             <p className="text-base text-muted">
               {debouncedSearch
-                ? `Nenhum jogo encontrado para "${debouncedSearch}".`
+                ? t("noGamesFound", { search: debouncedSearch })
                 : platformFilter
-                  ? `Nenhum jogo de ${shortNameFor(platformFilter)} nesta busca.`
-                  : "Nenhum jogo favoritado ainda."}
+                  ? t("noGamesForPlatform", { platformName: shortNameFor(platformFilter) })
+                  : t("noFavoritedGames")}
             </p>
           );
         })()

@@ -266,7 +266,20 @@ func coreDirs(binaryPath string) []string {
 	if home, err := os.UserHomeDir(); err == nil {
 		switch runtime.GOOS {
 		case "windows":
-			// Nada além do diretório do executável.
+			// Achado real (2026-09-06, relato do Douglas): o RetroArch tem
+			// dois modos de instalação no Windows. No modo "portable" (o
+			// instalador oficial pergunta isso na hora), os cores realmente
+			// ficam ao lado do executável — já coberto acima. Mas o modo
+			// padrão do instalador oficial (e o da Microsoft Store) grava
+			// a config e os cores em %APPDATA%\RetroArch\cores, igual ao
+			// que o ZeuX já faz para a própria pasta gerida (ver
+			// bundledCoreDirs). Sem este caminho, um core baixado e
+			// instalado por fora do ZeuX (ou pelo próprio RetroArch)
+			// aparecia como "não instalado" mesmo funcionando de verdade
+			// dentro do RetroArch.
+			if appData := os.Getenv("APPDATA"); appData != "" {
+				dirs = append(dirs, filepath.Join(appData, "RetroArch", "cores"))
+			}
 		case "darwin":
 			dirs = append(dirs,
 				filepath.Join(home, "Library", "Application Support", "RetroArch", "cores"))

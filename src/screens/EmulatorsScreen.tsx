@@ -9,6 +9,8 @@ import type {
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
+import { useT } from "../i18n/i18n";
+import { dict } from "./EmulatorsScreen.i18n";
 import {
   Badge,
   Button,
@@ -83,6 +85,7 @@ const ALL_CONSOLES = "__all__";
 // para fora da tela. O cabeçalho (resumo e "baixar os que faltam") fica
 // fora do scroll, sempre visível.
 function RetroArchCoresList() {
+  const t = useT(dict);
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Fila do "baixar os que faltam": quantos ainda restam e qual está na vez.
@@ -98,7 +101,7 @@ function RetroArchCoresList() {
     api
       .getRetroArchCores()
       .then((res) => setCores(res.cores))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os cores."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListCores")));
   }
 
   // P2 (docs/roadmap.md, Sprint P): o polling, o "cancelado não é falha" e a
@@ -145,7 +148,7 @@ function RetroArchCoresList() {
         // usuário a recomeçar do zero.
         setCoreState(name, {
           kind: "error",
-          message: err instanceof ApiError ? err.message : "Não foi possível iniciar o download.",
+          message: err instanceof ApiError ? err.message : t("failedToInitiateCoreDownload"),
         });
       }
       remaining -= 1;
@@ -156,7 +159,7 @@ function RetroArchCoresList() {
 
 
   if (error) return <InlineError>{error}</InlineError>;
-  if (!cores) return <p className="text-sm text-muted">Carregando cores…</p>;
+  if (!cores) return <p className="text-sm text-muted">{t("loadingCores")}</p>;
 
   const missing = cores.filter((c) => !c.installed);
 
@@ -164,11 +167,11 @@ function RetroArchCoresList() {
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted">
-          {cores.length - missing.length} de {cores.length} cores instalados
+          {t("coresInstalledStatus", { installed: cores.length - missing.length, total: cores.length })}
           {/* Descritivo, nunca "faltam X" com tom de cobrança: o modelo sob
               demanda (ADR 0015) baixa sozinho ao jogar, então um core ausente
               não é pendência do usuário — é o comportamento normal. */}
-          {missing.length > 0 && " — os que faltam são baixados sozinhos ao abrir um jogo do console."}
+          {missing.length > 0 && t("missingCoresNote")}
         </p>
 
         {/* Baixar tudo de uma vez não é o caminho principal (o ADR 0015
@@ -184,16 +187,18 @@ function RetroArchCoresList() {
             className="shrink-0 px-2 py-1 text-xs"
             onClick={() => downloadAllMissing(missing.map((c) => c.name))}
           >
-            Baixar os {missing.length} que faltam
+            {t("downloadAllMissing", { missing: missing.length })}
           </Button>
         )}
 
         {bulk && (
           <div className="flex shrink-0 items-center gap-2">
+            <span className="text-xs text-muted tabular-nums">
+              {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
             {/* A11y 4.1.3: progresso da fila que avança sozinho — anunciado
                 por `aria-live` para quem usa leitor de tela. */}
             <span className="text-xs text-muted tabular-nums" aria-live="polite">
-              Baixando {bulk.total - bulk.remaining + 1} de {bulk.total} · {bulk.current}
+              {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
             </span>
             {/* "Parar" encerra a fila, mas não cancela o core que já está
                 baixando — esse tem o "Cancelar" da própria linha. Separar os
@@ -208,7 +213,7 @@ function RetroArchCoresList() {
                 bulkStopped.current = true;
               }}
             >
-              Parar depois deste
+              {t("stopAfterThis")}
             </Button>
           </div>
         )}
@@ -227,7 +232,7 @@ function RetroArchCoresList() {
           return (
             <li key={core.name} className="flex flex-col gap-0.5 py-1">
               <div className="flex min-w-0 items-center gap-1.5">
-                <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? "ok" : "faltando"}</Badge>
+                <Badge variant={core.installed ? "solid" : undefined}>{core.installed ? t("coreStatusOk") : t("coreStatusMissing")}</Badge>
                 <span className="truncate text-ink" title={core.path ?? core.filename}>
                   {core.name}
                 </span>
@@ -248,11 +253,11 @@ function RetroArchCoresList() {
                     className="ml-auto shrink-0 px-2 py-1 text-xs"
                     onClick={() => installCore(core.name)}
                   >
-                    Instalar
+                    {t("coreInstall")}
                   </Button>
                 )}
                 {!core.installed && state.kind === "starting" && (
-                  <span className="ml-auto shrink-0 text-xs text-muted">Iniciando…</span>
+                  <span className="ml-auto shrink-0 text-xs text-muted">{t("coreInitiating")}</span>
                 )}
               </div>
 
@@ -279,7 +284,7 @@ function RetroArchCoresList() {
                     disabled={state.kind === "canceling"}
                     onClick={() => cancelCore(core.name, state.job)}
                   >
-                    {state.kind === "canceling" ? "Cancelando…" : "Cancelar"}
+                    {state.kind === "canceling" ? t("coreCanceling") : t("coreCancelButton")}
                   </Button>
                 </div>
               )}
@@ -378,13 +383,14 @@ function EmulatorCardConsoles({
  * bloco — não precisam subir para o card.
  */
 function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
+  const t = useT(dict);
   const [showConfig, setShowConfig] = useState(false);
   const [showBindings, setShowBindings] = useState(false);
 
   if (!entry.installed) return null;
 
   if (!entry.configurable && !entry.bindable) {
-    return <p className="text-xs text-muted">Configuração e controles ainda só dentro do próprio {entry.name}.</p>;
+    return <p className="text-xs text-muted">{t("configurationAndControls", { emulatorName: entry.name })}</p>;
   }
 
   return (
@@ -392,12 +398,12 @@ function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
       <div className="flex flex-wrap gap-2">
         {entry.configurable && (
           <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
-            {showConfig ? "Ocultar configurações" : "Configurações"}
+            {showConfig ? t("hideConfigurations") : t("configurations")}
           </Button>
         )}
         {entry.bindable && (
           <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
-            {showBindings ? "Ocultar mapeamento" : "Mapear controles"}
+            {showBindings ? t("hideBindings") : t("mapControls")}
           </Button>
         )}
       </div>
@@ -421,6 +427,7 @@ function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
  * — nunca um palpite por convenção.
  */
 function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
+  const t = useT(dict);
   const [biosError, setBiosError] = useState<string | null>(null);
 
   if (!entry.bios_dir) return null;
@@ -430,19 +437,19 @@ function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
     try {
       await openPath(entry.bios_dir!);
     } catch (err) {
-      setBiosError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+      setBiosError(t("failedToOpenBiosFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
   return (
     <div className="flex flex-col gap-2">
       {entry.bios_dir_empty && (
-        <Callout label="BIOS ausente">
-          A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.
+        <Callout label={t("biosAbsent")}>
+          {t("biosEmptyWarning")}
         </Callout>
       )}
       <Button type="button" variant="secondary" onClick={openBiosFolder}>
-        Abrir pasta do BIOS
+        {t("openBiosFolder")}
       </Button>
       {biosError && <InlineError>{biosError}</InlineError>}
     </div>
@@ -469,6 +476,7 @@ function EmulatorCardActions({
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
+  const t = useT(dict);
   // P2 (docs/roadmap.md, Sprint P): a máquina de instalar/remover saiu daqui
   // para `useEmulatorInstall`, compartilhada com o detalhe do console.
   // Comportamento idêntico — só mudou de casa.
@@ -487,7 +495,7 @@ function EmulatorCardActions({
       await api.deleteCustomEmulator(customDef.id);
       onChanged();
     } catch (err) {
-      setDeleteError(err instanceof ApiError ? err.message : "Não foi possível excluir este emulador.");
+      setDeleteError(err instanceof ApiError ? err.message : t("failedToDeleteEmulator"));
     } finally {
       setDeleting(false);
       setConfirmingDelete(false);
@@ -504,7 +512,7 @@ function EmulatorCardActions({
     try {
       await api.openEmulator(entry.adapter_id);
     } catch (err) {
-      setOpenError(err instanceof ApiError ? err.message : "Não foi possível abrir o emulador.");
+      setOpenError(err instanceof ApiError ? err.message : t("failedToOpenEmulator"));
     } finally {
       setOpening(false);
     }
@@ -527,16 +535,16 @@ function EmulatorCardActions({
           só volta ao estado normal, o card não some nem desabilita. */}
       {state.kind === "confirm-hardware" && (
         <ConfirmModal
-          title="Hardware abaixo do recomendado"
+          title={t("weakHardware")}
           message={state.message}
           onClose={() => setState({ kind: "idle" })}
           actions={
             <>
               <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                Cancelar
+                {t("cancel")}
               </Button>
               <Button variant="primary" autoFocus onClick={() => install(true)}>
-                Instalar mesmo assim
+                {t("installAnyway")}
               </Button>
             </>
           }
@@ -608,8 +616,8 @@ function EmulatorCardActions({
           // quando instalado — antes, todos os até 6 botões do card eram
           // `secondary`, nenhum se destacava. É o único botão sempre presente
           // (custom ou não) nesse estado, o candidato natural.
-          <Button variant="primary" disabled={opening} onClick={openStandalone} title="Abre o emulador sem nenhum jogo, para configurar dentro dele.">
-            {opening ? "Abrindo…" : "Abrir configurações do emulador"}
+          <Button variant="primary" disabled={opening} onClick={openStandalone} title={t("openEmulatorSettingsTooltip")}>
+            {opening ? t("opening") : t("openEmulatorSettings")}
           </Button>
         )}
 
@@ -624,22 +632,22 @@ function EmulatorCardActions({
                 quando está (um card nunca tem duas). Sem instalação, "Editar"
                 (corrigir o caminho) é a ação óbvia seguinte. */}
             <Button variant={entry.installed ? "secondary" : "primary"} onClick={() => onEditCustom(customDef)}>
-              Editar
+              {t("edit")}
             </Button>
             {confirmingDelete ? (
               // N13 (docs/roadmap.md, Sprint N): irreversível (apaga o
               // cadastro personalizado) — era painel inline, virou modal.
               <ConfirmModal
-                title="Excluir emulador personalizado?"
-                message={`"${customDef.name}" será removido da lista. O binário no disco não é apagado — só o cadastro no ZeuX.`}
+                title={t("deleteCustomEmulator")}
+                message={t("deleteCustomEmulatorMessage", { name: customDef.name })}
                 onClose={() => setConfirmingDelete(false)}
                 actions={
                   <>
                     <Button variant="secondary" onClick={() => setConfirmingDelete(false)}>
-                      Cancelar
+                      {t("cancel")}
                     </Button>
                     <Button variant="danger" autoFocus disabled={deleting} onClick={deleteCustom}>
-                      Excluir mesmo assim
+                      {t("deleteAnyway")}
                     </Button>
                   </>
                 }
@@ -656,16 +664,16 @@ function EmulatorCardActions({
             // N13 (docs/roadmap.md, Sprint N): irreversível (desinstala,
             // toca disco) — era painel inline, virou modal.
             <ConfirmModal
-              title="Remover emulador?"
-              message={`${entry.name} será desinstalado da pasta gerenciada pelo ZeuX.`}
+              title={t("removeEmulator")}
+              message={t("removeEmulatorMessage", { emulatorName: entry.name })}
               onClose={() => setState({ kind: "idle" })}
               actions={
                 <>
                   <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                    Cancelar
+                    {t("cancel")}
                   </Button>
                   <Button variant="danger" autoFocus onClick={remove}>
-                    Remover mesmo assim
+                    {t("removeAnyway")}
                   </Button>
                 </>
               }
@@ -676,16 +684,16 @@ function EmulatorCardActions({
               disabled={state.kind === "removing"}
               onClick={() => setState({ kind: "confirm-remove" })}
             >
-              {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
+              {state.kind === "remove-error" ? t("retryRemove") : t("remove")}
             </Button>
           ))
         ) : source?.kind === "manual" ? (
           <Button variant="primary" onClick={() => openUrl(source.homepage)}>
-            Abrir site oficial
+            {t("openOfficialWebsite")}
           </Button>
         ) : state.kind === "installing" || state.kind === "done" || state.kind === "confirm-hardware" ? null : (
           <Button variant="primary" disabled={state.kind === "starting"} onClick={() => install(false)}>
-            {state.kind === "error" ? "Tentar de novo" : "Instalar"}
+            {state.kind === "error" ? t("retryInstall") : t("install")}
           </Button>
         )}
       </div>
@@ -715,6 +723,7 @@ function EmulatorCard({
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
+  const t = useT(dict);
   const [showCores, setShowCores] = useState(false);
 
   // Só um console = a cor dele vira a identidade do card inteiro (12 dos 13
@@ -735,7 +744,7 @@ function EmulatorCard({
       {entry.adapter_id === "retroarch" && (
         <div>
           <Button type="button" variant="quiet" onClick={() => setShowCores((v) => !v)}>
-            {showCores ? "Ocultar cores" : "Ver cores"}
+            {showCores ? t("hideCores") : t("seeCores")}
           </Button>
           {showCores && (
             <div className="mt-2">
@@ -776,6 +785,7 @@ function EmulatorCard({
 // o filtro lista os ids em vez do nome — a tela continua funcional, só menos
 // legível até existir um parecer.
 export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; report?: Report }) {
+  const t = useT(dict);
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   const [sources, setSources] = useState<Record<string, EmulatorSource>>({});
   const [customs, setCustoms] = useState<CustomDefinition[]>([]);
@@ -798,8 +808,8 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
     api
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os emuladores."));
-  }, [reloadKey]);
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListEmulators")));
+  }, [reloadKey, t]);
 
   // Emuladores personalizados (I1, docs/roadmap.md) — mesma dependência de
   // reloadKey que a lista de emuladores, para as duas ficarem em sincronia
@@ -881,16 +891,16 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
       {onBack && (
         // A11y 2.1.4: `data-nav-back` — alvo do botão B do controle.
         <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
-          Voltar
+          {t("back")}
         </Button>
       )}
-      <h1 className="mb-4 text-2xl font-semibold text-ink">Emuladores</h1>
+      <h1 className="mb-4 text-2xl font-semibold text-ink">{t("emulatorsTitle")}</h1>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {emulators && emulators.length > PAGE_SIZE && (
           <>
             <label htmlFor="emulators-search" className="sr-only">
-              Buscar emulador ou console
+              {t("searchEmulatorLabel")}
             </label>
             <input
               id="emulators-search"
@@ -899,7 +909,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
               autoComplete="off"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Buscar emulador ou console…"
+              placeholder={t("searchEmulatorPlaceholder")}
               className={`${inputClass} max-w-xs`}
             />
           </>
@@ -907,12 +917,12 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
 
         {consoleOptions.length > 0 && (
           <ZSelect
-            ariaLabel="Filtrar por console"
+            ariaLabel={t("filterByConsoleLabel")}
             value={consoleFilter || ALL_CONSOLES}
             onValueChange={(v) => handleConsoleFilter(v === ALL_CONSOLES ? "" : v)}
             className="max-w-xs"
           >
-            <SelectItem value={ALL_CONSOLES}>Todos os consoles</SelectItem>
+            <SelectItem value={ALL_CONSOLES}>{t("allConsoles")}</SelectItem>
             {consoleOptions.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
@@ -930,7 +940,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           inline, de propósito: aparecem dentro do próprio card cuja ação
           falhou, ao lado do botão que a disparou — diferente do erro que
           motivou a troca, que ficava longe da célula que o causou. */}
-      {error && <ErrorModal title="Não foi possível listar os emuladores" message={error} onClose={() => setError(null)} />}
+      {error && <ErrorModal title={t("failedToListEmulators")} message={error} onClose={() => setError(null)} />}
 
       {/* N11 (docs/roadmap.md, Sprint N): antes, `emulators === null` só
           deixava o cabeçalho visível, nada de grade nem sinal de
@@ -938,7 +948,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           abaixo). */}
       {emulators === null && (
         <div role="status" aria-live="polite">
-          <span className="sr-only">Carregando emuladores…</span>
+          <span className="sr-only">{t("loadingEmulators")}</span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
             {Array.from({ length: PAGE_SIZE }, (_, i) => (
               <CardSkeleton key={i} className="h-40" />
@@ -948,7 +958,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
       )}
 
       {emulators && filtered.length === 0 && (
-        <p className="text-base text-muted">Nenhum emulador encontrado para "{search}".</p>
+        <p className="text-base text-muted">{t("noEmulatorsFound", { search })}</p>
       )}
 
       {pageItems.length > 0 && (
@@ -993,11 +1003,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           (GET/POST/DELETE /custom-emulators, internal/emulator/custom.go) —
           esta tela era o único pedaço faltando. */}
       <div className="mt-6">
-        {/* A11y 1.3.1: cabeçalho de seção real — era `<p>`, virou `<h2>` para
-            entrar na navegação por headings (mesmo padrão de LibraryScreen/
-            SettingsScreen). 2026-09-06: `SectionHeading` (`text-lg` Inter) no
-            lugar da pixel font 11px. */}
-        <SectionHeading className="mb-2">Adicionar emulador</SectionHeading>
+        <SectionHeading className="mb-2">{t("addEmulatorSectionTitle")}</SectionHeading>
         {formMode === "closed" ? (
           // B8 (achado do critico-design, 2026-08-18): reescrevia as quatro
           // classes do FOCUS_RING à mão em vez de usar o componente — único
@@ -1006,7 +1012,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           // aqui" (B7); texto em `text-base` normal, não `font-pixel` — é
           // rótulo de ação, não título de seção nem chip.
           <Button type="button" variant="ghost" onClick={() => setFormMode("new")} className="w-full text-center">
-            + Adicionar emulador manualmente
+            {t("addEmulatorManuallyButton")}
           </Button>
         ) : (
           <ManualEmulatorForm

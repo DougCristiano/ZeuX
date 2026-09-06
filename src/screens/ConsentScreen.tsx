@@ -1,5 +1,7 @@
 import logoZeux from "../assets/logo-zeux.png";
+import { useT } from "../i18n/i18n";
 import { Button, Card, OnboardingGlow } from "../components/ui";
+import { dict } from "./ConsentScreen.i18n";
 
 type ConsentScreenProps = {
   /** Vem de GET /consent (`policy_text`) — nunca um texto escrito no front (docs/wireframe.md, tela 01). */
@@ -20,6 +22,8 @@ type ConsentScreenProps = {
  * hover ou clique direito (ADR 0009).
  */
 export function ConsentScreen({ policyText, policyVersion, onAccept, onDecline, busy = false }: ConsentScreenProps) {
+  const t = useT(dict);
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6 py-12">
       <OnboardingGlow />
@@ -30,19 +34,19 @@ export function ConsentScreen({ policyText, policyVersion, onAccept, onDecline, 
           centralizada na viewport inteira, sem sidebar. */}
       <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
         <img src={logoZeux} alt="" aria-hidden="true" className="h-12 w-12" />
-        <h1 className="text-2xl font-semibold text-ink">Antes de começar</h1>
+        <h1 className="text-2xl font-semibold text-ink">{t("heading")}</h1>
 
         <Card>
           <p className="text-base text-ink">{policyText}</p>
-          <p className="mt-2 text-sm text-muted">Você pode revogar essa autorização depois, a qualquer momento.</p>
+          <p className="mt-2 text-sm text-muted">{t("revokeNote")}</p>
         </Card>
 
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" autoFocus disabled={busy} onClick={onAccept}>
-            Autorizar leitura
+            {t("acceptButton")}
           </Button>
           <Button variant="secondary" disabled={busy} onClick={onDecline}>
-            Agora não
+            {t("declineButton")}
           </Button>
         </div>
 
@@ -52,7 +56,7 @@ export function ConsentScreen({ policyText, policyVersion, onAccept, onDecline, 
             versão da política fica: é informação real de versionamento, não
             debug — só o rótulo virou texto corrido, sem moldura de badge, pra
             não competir visualmente com o texto legal acima. */}
-        <p className="text-xs text-muted">Política de dados · versão {policyVersion}</p>
+        <p className="text-xs text-muted">{t("policyLabel")} {policyVersion}</p>
       </div>
     </main>
   );

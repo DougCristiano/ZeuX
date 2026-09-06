@@ -2,8 +2,11 @@ package api_test
 
 import (
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/doufl/zeux/internal/install"
 )
 
 // Vários cores do RetroArch têm espaço no nome amigável ("beetle vb",
@@ -14,8 +17,30 @@ import (
 // "não conhece o core" em vez de "ainda não tem... medido" — as duas
 // mensagens de handleInstallRetroArchCore são bem diferentes, então a
 // resposta por si só denuncia qual das duas aconteceu.
+//
+// Manifesto sintético injetado com generated:false — desde que
+// cmd/generate-retroarch-manifest rodou de verdade contra o buildbot
+// (2026-09-06), o manifesto real embutido tem a maioria dos cores marcada
+// generated:true para linux/amd64 e windows/amd64, então depender do estado
+// real faria este teste (que quer testar a RECUSA) na verdade disparar um
+// download de verdade — 202, não 400.
 func TestInstallRetroArchCoreDecodesSpaceInPath(t *testing.T) {
-	server := newTestServer(t, fakeProbe{})
+	t.Setenv("HOME", t.TempDir())
+	server, installer := newTestServerWithInstaller(t, fakeProbe{})
+	installer.SetRetroArchManifestForTesting(&install.RetroArchCoreManifest{
+		Cores: map[string]install.RetroArchCoreEntry{
+			"beetle vb": {
+				LibretroName: "mednafen_vb_libretro",
+				Platforms: map[string]install.RetroArchCoreAsset{
+					runtime.GOOS + "/" + runtime.GOARCH: {
+						URL:       "https://buildbot.libretro.com/nightly/beetle_vb.zip",
+						Filename:  "mednafen_vb_libretro.so.zip",
+						Generated: false,
+					},
+				},
+			},
+		},
+	})
 
 	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/retroarch/cores/beetle%20vb/install", nil)
 

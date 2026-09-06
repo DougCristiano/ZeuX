@@ -1,6 +1,8 @@
 import type { LibraryGame } from "../api/types";
 import type { GameLaunchability } from "../lib/gameLaunchability";
 import { formatPlaytime } from "../lib/format";
+import { useT } from "../i18n/i18n";
+import { dict } from "./GameListRow.i18n";
 import { Badge, FavoriteToggle, FOCUS_RING, PlayIcon } from "./ui";
 
 /**
@@ -43,6 +45,7 @@ export function GameListRow({
   /** Só relevante quando `launchability.reason === "not_installed"` — dispara a instalação inline (L8) a partir do badge. */
   onInstall?: () => void;
 }) {
+  const t = useT(dict);
   const blocked = launchability !== undefined && !launchability.launchable;
 
   return (
@@ -68,7 +71,7 @@ export function GameListRow({
         aria-label={
           blocked && launchability
             ? `Ver detalhes de ${game.title} — ${launchability.title}`
-            : `Ver detalhes de ${game.title}`
+            : t("seeDetails", { title: game.title })
         }
         onClick={onOpenDetail}
         onKeyDown={(e) => {
@@ -108,7 +111,7 @@ export function GameListRow({
         <button
           type="button"
           tabIndex={-1}
-          aria-label={`Jogar ${game.title}`}
+          aria-label={t("playGame", { title: game.title })}
           onClick={(e) => {
             e.stopPropagation();
             onPlay();

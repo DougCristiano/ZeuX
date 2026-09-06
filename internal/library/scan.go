@@ -70,13 +70,24 @@ func FindROMs(root string, extensions []string) ([]string, error) {
 	return found, nil
 }
 
+// RawBaseName devolve o nome do arquivo sem a pasta nem a extensão, mas
+// preservando etiquetas entre parênteses/colchetes (região, revisão, código
+// de mídia) — ao contrário de TitleFromFilename, que as remove para exibir
+// ao usuário. Extraído para uso em internal/igdb/thumbnails.go: o
+// libretro-thumbnails indexa a capa pelo nome de arquivo completo em
+// convenção No-Intro (ex. "Super Mario Bros. (World)"), etiqueta incluída —
+// removê-la faria a busca por lá nunca bater com nada.
+func RawBaseName(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+}
+
 // TitleFromFilename deriva um título de exibição a partir do nome do
 // arquivo, removendo a extensão e etiquetas comuns entre parênteses/colchetes
 // (região, revisão, código de mídia — ex. "(USA)", "[SLUS-00304]"). É a
 // versão mínima que o MVP precisa (decisão de 2026-08-02: sem scraper); L10
 // é quem deve refinar isto se etiquetas novas aparecerem na prática.
 func TitleFromFilename(path string) string {
-	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	name := RawBaseName(path)
 
 	var cleaned strings.Builder
 	depth := 0

@@ -2,6 +2,8 @@ import type { LibraryGame } from "../api/types";
 import { coverImageURL } from "../api";
 import type { GameLaunchability } from "../lib/gameLaunchability";
 import { formatPlaytime } from "../lib/format";
+import { useT } from "../i18n/i18n";
+import { dict } from "./GameTile.i18n";
 import { Badge, FavoriteToggle, FOCUS_RING, GameCover } from "./ui";
 
 /**
@@ -64,6 +66,7 @@ export function GameTile({
   /** Só relevante quando `launchability.reason === "not_installed"` — dispara a instalação inline (L8) a partir do badge. */
   onInstall?: () => void;
 }) {
+  const t = useT(dict);
   const blocked = launchability !== undefined && !launchability.launchable;
 
   return (
@@ -87,7 +90,7 @@ export function GameTile({
           aria-label={
             blocked && launchability
               ? `Ver detalhes de ${game.title} — ${launchability.title}`
-              : `Ver detalhes de ${game.title}`
+              : t("seeDetails", { title: game.title })
           }
           onClick={onOpenDetail}
           onKeyDown={(e) => {
