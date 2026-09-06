@@ -536,6 +536,7 @@ curl http://127.0.0.1:7777/api/v1/emulators
 |---|---|---|
 | `consoles` | array de string | Ordenado alfabeticamente por `Survey`. |
 | `installed` | bool | `false` é resposta normal, não erro. |
+| `install_kind` | string | O que acontece se a interface pedir a instalação: `"github"` (1-click — o ZeuX resolve a release e instala), `"manual"` (RetroArch e Dolphin: não há como automatizar, `POST /emulators/{id}/install` **recusa**) ou `"none"` (emulador personalizado, sem fonte conhecida). Existe para a interface distinguir "dá para instalar" de "não sei instalar" **antes** do clique — sem isto, os 21 consoles que dependem do RetroArch mostravam o mesmo "instalar emulador" dos outros e o clique terminava em erro (Q5, `docs/roadmap.md`). Vem da mesma fonte de `GET /emulator-sources`, juntada aqui para a tela não precisar cruzar duas rotas por emulador. |
 | `installation` | objeto | **Só presente quando `installed` é `true`.** |
 | `installation.managed` | bool | `true` quando o binário veio da pasta gerenciada pelo ZeuX (`POST /emulators/{id}/install`), organizada por console desde o [ADR 0010](decisoes/0010-estrutura-de-diretorios-por-console.md). |
 | `installation.version` | string | **Nunca preenchido hoje.** Nenhum adapter detecta versão. |

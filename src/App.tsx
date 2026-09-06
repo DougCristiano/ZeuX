@@ -219,6 +219,17 @@ function App() {
     }
   }
 
+  // Q5 (docs/roadmap.md, Sprint Q): abrir o detalhe de um console a partir de
+  // uma tela de jogos, quando o emulador precisa ser instalado por fora. O
+  // nome vem do parecer, que já cobre os 33 consoles do catálogo — nunca um
+  // segundo lugar de onde tirar o nome de um console.
+  function abrirConsolePorID(consoleId: string) {
+    const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
+    if (!verdict) return;
+    setSelectedConsole({ id: consoleId, name: verdict.name, shortName: verdict.short_name });
+    setPhase("console-detail");
+  }
+
   function navigateSidebar(id: NavID) {
     if (id === "library") setPhase("all-games");
     if (id === "verdict") setPhase("verdict");
@@ -294,6 +305,7 @@ function App() {
         <AllGamesScreen
           report={report!}
           onOpenLibrary={() => setPhase("library")}
+          onOpenConsole={abrirConsolePorID}
           view={allGamesView}
           onViewChange={handleAllGamesViewChange}
           scrollElementRef={mainRef}
@@ -401,6 +413,7 @@ function App() {
           consoleId={selectedConsole!.id}
           consoleName={selectedConsole!.name}
           shortName={selectedConsole!.shortName}
+          onOpenConsole={() => setPhase("console-detail")}
           report={report!}
           onBack={() => setPhase(gamesOrigin)}
           onOpenGame={(game, consoleName, shortName) => {

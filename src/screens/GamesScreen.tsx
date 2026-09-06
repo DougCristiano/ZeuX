@@ -11,6 +11,7 @@ import {
   ErrorModal,
   InlineError,
   inputClass,
+  ManualInstallModal,
   ProgressBar,
   ScreenContainer,
   Toast,
@@ -71,6 +72,7 @@ export function GamesScreen({
   report,
   onBack,
   onOpenGame,
+  onOpenConsole,
 }: {
   consoleId: string;
   consoleName: string;
@@ -78,6 +80,9 @@ export function GamesScreen({
   report: Report;
   onBack: () => void;
   onOpenGame: (game: LibraryGame, consoleName: string, shortName: string) => void;
+  /** Q5: leva ao detalhe deste console, onde ficam as instruções de
+   * instalação manual. Ausente se a tela for alcançada sem esse caminho. */
+  onOpenConsole?: () => void;
 }) {
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -292,6 +297,24 @@ export function GamesScreen({
           );
         })()}
 
+      {/* Q5 (docs/roadmap.md, Sprint Q): o clique não dispara mais uma
+          instalação que o servidor recusa. Leva ao detalhe do console, onde as
+          instruções já moram. */}
+      {install.state.kind === "manual-install" && (
+        <ManualInstallModal
+          adapterName={install.state.adapterName}
+          onClose={() => install.setState({ kind: "idle" })}
+          onOpenConsole={
+            onOpenConsole
+              ? () => {
+                  install.setState({ kind: "idle" });
+                  onOpenConsole();
+                }
+              : undefined
+          }
+        />
+      )}
+
       {install.state.kind === "confirm-bios" &&
         (() => {
           const confirmState = install.state;
@@ -445,7 +468,12 @@ export function GamesScreen({
                   onToggleFavorite={() => toggleFavorite(game)}
                   launchability={launchability}
                   onInstall={
-                    verdict?.adapter_id ? () => install.startInstall(verdict.adapter_id!, false, game.path) : undefined
+                    /* Q5 (docs/roadmap.md, Sprint Q): era `startInstall` direto, que
+                       pulava a ramificação por motivo e disparava uma instalação que o
+                       servidor recusa para fonte manual — o badge dizia "instalação
+                       manual" e o clique caía num "Não foi possível instalar o
+                       emulador". `handlePlay` já leva cada motivo ao lugar certo. */
+                    verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntry) : undefined
                   }
                 />
 

@@ -232,6 +232,21 @@ export type EmulatorEntry = {
   /** H3/H4 — diz se GET/POST .../bindings existe de verdade. */
   bindable: boolean;
   /**
+   * O que acontece se a interface pedir a instalação deste emulador (Q5,
+   * docs/roadmap.md, Sprint Q):
+   *
+   * - `"github"` — o ZeuX resolve a release e instala sozinho (1-click).
+   * - `"manual"` — não há como automatizar; o usuário instala pelo site
+   *   oficial ou pelo gerenciador do sistema (RetroArch, Dolphin).
+   * - `"none"` — o ZeuX não conhece fonte nenhuma (emulador personalizado).
+   *
+   * Existe para a interface distinguir "dá para instalar" de "não sei
+   * instalar" **antes** do clique. Sem isto, os 21 consoles que dependem do
+   * RetroArch mostravam o mesmo "instalar emulador" dos outros e o clique
+   * terminava num erro.
+   */
+  install_kind: "github" | "manual" | "none" | (string & {});
+  /**
    * Onde findBinary procura primeiro (internal/emulator/discovery.go) — o
    * lugar que, se o usuário colar o emulador ali, o ZeuX acha sozinho.
    * Ausente para emulador personalizado (custom: true), que não tem "a

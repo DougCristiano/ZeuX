@@ -64,6 +64,10 @@ function EmulatorOptionCard({
   const [openError, setOpenError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [showBindings, setShowBindings] = useState(false);
+  const [verificando, setVerificando] = useState(false);
+  // Só depois de uma verificação que não achou nada — no primeiro carregamento
+  // a ausência é o estado esperado, não um resultado a comentar.
+  const [naoEncontrado, setNaoEncontrado] = useState(false);
 
   const installed = entry?.installed ?? false;
   // Só faz sentido remover o que o ZeuX colocou na pasta gerenciada — o
@@ -79,6 +83,42 @@ function EmulatorOptionCard({
       setOpenError(err instanceof ApiError ? err.message : "Não foi possível abrir o emulador.");
     } finally {
       setOpening(false);
+    }
+  }
+
+  async function abrirPastaGerenciada() {
+    if (!entry?.managed_dir) return;
+    setOpenError(null);
+    try {
+      await openPath(entry.managed_dir);
+    } catch (err) {
+      setOpenError(
+        `Não foi possível abrir a pasta: ${err instanceof Error ? err.message : String(err)}. ` +
+          "Se ela ainda não existe, crie-a no caminho acima.",
+      );
+    }
+  }
+
+  // Reconsulta o disco. `GET /emulators` roda o Survey a cada chamada, então
+  // recarregar já é a verificação — o que faltava era um jeito de pedir isso
+  // sem sair da tela, e um retorno dizendo o que aconteceu.
+  async function verificarInstalacao() {
+    setVerificando(true);
+    setNaoEncontrado(false);
+    try {
+      const res = await api.getEmulators();
+      const achou = res.emulators.find((e) => e.adapter_id === option.adapter_id)?.installed ?? false;
+      if (achou) {
+        onChanged();
+      } else {
+        setNaoEncontrado(true);
+      }
+    } catch {
+      // Falhar em verificar não merece um erro na cara: o botão continua ali
+      // para tentar de novo, e nada do estado da tela mudou.
+      setNaoEncontrado(true);
+    } finally {
+      setVerificando(false);
     }
   }
 
@@ -225,9 +265,39 @@ function EmulatorOptionCard({
             Extraia (ou instale) o {option.name} nesta pasta para o ZeuX encontrar sozinho:
           </p>
           {entry?.managed_dir && (
-            <p className="break-all rounded border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
-              {entry.managed_dir}
-            </p>
+            <>
+              <p className="break-all rounded border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
+                {entry.managed_dir}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {/* A pasta pode não existir ainda — o `openPath` do Tauri
+                    falharia, e "criar" é o que o usuário faria em seguida de
+                    qualquer jeito. Só aparece para instalação manual: nos
+                    outros o ZeuX cria a pasta ele mesmo ao instalar. */}
+                <Button variant="quiet" className="px-2 py-1 text-xs" onClick={abrirPastaGerenciada}>
+                  Abrir pasta
+                </Button>
+                {/* Q5 (docs/roadmap.md, Sprint Q): "o ZeuX confirmando sozinho
+                    quando o binário aparecer". Sem isto, quem acabou de
+                    extrair o RetroArch precisava sair da tela e voltar para o
+                    app perceber — e não tinha como saber que era isso que
+                    faltava fazer. */}
+                <Button
+                  variant="secondary"
+                  className="px-2 py-1 text-xs"
+                  disabled={verificando}
+                  onClick={verificarInstalacao}
+                >
+                  {verificando ? "Verificando…" : "Já instalei — verificar"}
+                </Button>
+              </div>
+              {naoEncontrado && (
+                <p className="text-xs text-muted">
+                  O ZeuX ainda não encontrou o {option.name}. Confira se o executável está dentro da pasta acima (ou
+                  numa subpasta dela) e verifique de novo.
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

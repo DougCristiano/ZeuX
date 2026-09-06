@@ -291,10 +291,45 @@ func (s *Server) handleConsoles(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"consoles": consoles})
 }
 
+// emulatorEntry é um emulator.Status mais o que a camada de API sabe e o
+// pacote emulator não pode saber: se existe uma fonte de download que o ZeuX
+// consegue automatizar.
+//
+// A junção mora aqui, e não em Registry.Survey, por causa da direção das
+// dependências: internal/install importa internal/emulator, então o inverso
+// criaria ciclo. A camada de API é o único lugar onde os dois já estão à mão.
+type emulatorEntry struct {
+	emulator.Status
+
+	// InstallKind diz o que acontece se a interface pedir a instalação:
+	//
+	//   "github"  — o ZeuX resolve a release e instala sozinho (1-click).
+	//   "manual"  — não há como automatizar; o usuário instala pelo site
+	//               oficial ou pelo gerenciador do sistema (RetroArch,
+	//               Dolphin).
+	//   "none"    — o ZeuX não conhece fonte nenhuma (emulador personalizado).
+	//
+	// Existe por causa do Q5 (docs/roadmap.md, Sprint Q): sem isto, a
+	// biblioteca mostrava o mesmo "instalar emulador" nos 33 consoles, e nos
+	// 21 que dependem do RetroArch o clique terminava num 400. O estado
+	// precisava ser distinguível **antes** do clique, não depois.
+	InstallKind string `json:"install_kind"`
+}
+
 func (s *Server) handleEmulators(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"emulators": s.emulators.Survey(r.Context()),
-	})
+	statuses := s.emulators.Survey(r.Context())
+	catalog := s.installs.Catalog()
+
+	entries := make([]emulatorEntry, 0, len(statuses))
+	for _, status := range statuses {
+		kind := "none"
+		if source, ok := catalog.ByAdapter(status.AdapterID); ok {
+			kind = string(source.Kind)
+		}
+		entries = append(entries, emulatorEntry{Status: status, InstallKind: kind})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"emulators": entries})
 }
 
 // handleRetroArchCores lista todo core que o ZeuX conhece, com o estado de

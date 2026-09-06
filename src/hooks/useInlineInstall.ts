@@ -16,6 +16,13 @@ export type InstallState =
   // de deixar clicar "Jogar" e só descobrir depois que falhou.
   | { kind: "confirm-bios"; pendingGamePath: string }
   | { kind: "installing"; job: InstallJob; pendingGamePath: string }
+  // Q5 (docs/roadmap.md, Sprint Q): o emulador é de fonte que o ZeuX não sabe
+  // automatizar (RetroArch, Dolphin). Estado próprio, e não `error`: não
+  // aconteceu falha nenhuma — o app simplesmente não instala este, e o que a
+  // pessoa precisa é saber onde baixar e onde colocar. Antes disto, o clique
+  // disparava uma instalação que o servidor recusava com 400, e a tela
+  // mostrava a recusa como se algo tivesse quebrado.
+  | { kind: "manual-install"; adapterId: string; adapterName: string; consoleId: string }
   | { kind: "error"; message: string };
 
 /**
@@ -98,6 +105,14 @@ export function useInlineInstall({
     switch (launchability.reason) {
       case "not_installed":
         if (verdict?.adapter_id) startInstall(verdict.adapter_id, false, game.path);
+        return;
+      case "install_manual":
+        setState({
+          kind: "manual-install",
+          adapterId: adapterEntry?.adapter_id ?? verdict?.adapter_id ?? "",
+          adapterName: adapterEntry?.name ?? verdict?.emulator ?? "o emulador",
+          consoleId: game.console_id,
+        });
         return;
       case "bios_empty":
         setState({ kind: "confirm-bios", pendingGamePath: game.path });

@@ -13,7 +13,17 @@ import type { ConsoleVerdict, EmulatorEntry, LibraryGame } from "../api/types";
  * emulador instalado se não há preset pra aplicar), depois emulador não
  * instalado, depois BIOS vazia.
  */
-export type LaunchBlockReason = "missing" | "no_preset" | "not_installed" | "bios_empty";
+export type LaunchBlockReason =
+  | "missing"
+  | "no_preset"
+  | "not_installed"
+  // Q5 (docs/roadmap.md, Sprint Q): o emulador não está instalado **e** o ZeuX
+  // não sabe instalá-lo (fonte `manual`: RetroArch e Dolphin). Separado de
+  // "not_installed" porque a ação é outra — não adianta disparar uma
+  // instalação que o servidor vai recusar; o que serve é dizer onde baixar e
+  // onde colocar.
+  | "install_manual"
+  | "bios_empty";
 
 export interface GameLaunchability {
   launchable: boolean;
@@ -78,11 +88,25 @@ export function evaluateGameLaunchability(
   }
 
   if (adapterEntry && !adapterEntry.installed) {
+    const nome = adapterEntry.name || verdict?.emulator || "O emulador";
+
+    // Fonte que o ZeuX não sabe automatizar: o clique não pode disparar uma
+    // instalação que o servidor recusa. O badge diz outra coisa **antes** do
+    // clique, e a ação leva às instruções.
+    if (adapterEntry.install_kind === "manual" || adapterEntry.install_kind === "none") {
+      return {
+        launchable: false,
+        reason: "install_manual",
+        badge: "instalação manual",
+        title: `${nome} precisa ser instalado por fora — o ZeuX não consegue baixá-lo sozinho. Abra o console na tela de Consoles para ver onde baixar e onde colocar.`,
+      };
+    }
+
     return {
       launchable: false,
       reason: "not_installed",
       badge: "instalar emulador",
-      title: `${verdict?.emulator ?? "O emulador"} ainda não está instalado nesta máquina.`,
+      title: `${nome} ainda não está instalado nesta máquina. Clicar em jogar instala e abre o jogo.`,
     };
   }
 

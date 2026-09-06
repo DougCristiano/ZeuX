@@ -235,21 +235,52 @@ aperto (um aperto de 1,5 s consome uma só), nenhum erro HTTP, e o
 reporta é o do mapeamento "standard" do navegador; se ele corresponde ao que o
 RetroArch entende por aquele botão, só um controle na mão confirma.
 
-### Q5 — os 21 consoles que dependem do RetroArch
+### Q5 — os 21 consoles que dependem do RetroArch — **feito em 2026-08-28**
 
 `Manager.Start` recusa fonte `manual` com uma mensagem — então "Jogar" com o
-emulador ausente, que deveria instalar sozinho (L8), morre para RetroArch e
-Dolphin.
+emulador ausente, que deveria instalar sozinho (L8), morria para RetroArch e
+Dolphin. **Escolhido o segundo caminho:** o RetroArch continua sem instalação
+automatizada (o buildbot não publica release resolvível por API — é a razão
+registrada em `sources.json`), e o caminho manual virou explícito.
 
-- [ ] Ou o RetroArch ganha instalação automatizada, ou o caminho manual vira
-      excelente: instruções na tela do console, e o ZeuX confirmando sozinho
-      quando o binário aparecer na pasta gerenciada.
-- [ ] `evaluateGameLaunchability` precisa distinguir "não instalado, dá para
-      instalar" de "não instalado, e o ZeuX não sabe instalar" — hoje o badge
-      é o mesmo e o clique leva a um erro.
+- [x] `GET /emulators` passou a declarar `install_kind`
+      (`"github"` / `"manual"` / `"none"`). A junção mora na camada de API, e
+      não em `Registry.Survey`, por causa da direção das dependências:
+      `internal/install` importa `internal/emulator`, então o inverso criaria
+      ciclo.
+- [x] `evaluateGameLaunchability` distingue `not_installed` de
+      `install_manual`, com badge e frase próprios — o estado é legível
+      **antes** do clique.
+- [x] O detalhe do console ganhou **"Abrir pasta"** e **"Já instalei —
+      verificar"**: o ZeuX reconsulta o disco sem o usuário sair da tela, e diz
+      quando não achou. `GET /emulators` já roda o `Survey` a cada chamada — o
+      que faltava era pedir isso de dentro da tela e ter um retorno.
+- [x] O modal de instalação manual **não repete as instruções**: onde baixar e
+      onde extrair já vivem no detalhe do console, e duas cópias divergiriam na
+      primeira correção. O modal explica o estado e leva até lá.
 
-**Critério de aceite:** em nenhum dos 33 consoles o botão de instalar leva a
-um beco: ou instala, ou explica na hora o que fazer, antes do clique.
+**Dois becos achados dirigindo a tela**, os dois invisíveis em teste de
+unidade:
+
+1. **O badge novo nascia texto morto.** `GameTile` só transformava o badge em
+   botão quando o motivo era `not_installed`; com `install_manual` virava um
+   `Badge` inerte. O usuário lia "instalação manual" e não tinha o que clicar.
+2. **`onInstall` chamava `startInstall` direto**, nas duas telas de jogos,
+   pulando a ramificação por motivo de `handlePlay`. Resultado: o badge dizia
+   "instalação manual" e o clique caía num modal vermelho "Não foi possível
+   instalar o emulador" — exatamente o beco que este item existe para fechar,
+   sobrevivendo por um caminho que ninguém tinha olhado. As duas telas agora
+   passam por `handlePlay`, que é a mesma cadeia de decisão do botão ▶.
+
+**Verificado ao vivo** (Playwright, `zeuxd` real, uma ROM de NES semeada): o
+tile mostra "instalação manual" antes do clique; clicar abre a explicação sem
+nenhuma chamada de instalação; "Ver o console" leva ao NES; e depois de
+colocar o binário na pasta gerenciada, "Já instalei — verificar" faz a
+prontidão avançar sozinha para o passo seguinte ("o core mesen ainda não").
+Zero requisições de instalação com erro no caminho inteiro.
+
+**Critério de aceite atendido:** em nenhum dos 33 consoles o botão leva a um
+beco — ou instala, ou explica antes do clique o que fazer.
 
 ---
 

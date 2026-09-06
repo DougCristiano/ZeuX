@@ -388,6 +388,50 @@ export function ErrorModal({
 }
 
 /**
+ * Q5 (docs/roadmap.md, Sprint Q): o emulador deste jogo é de fonte que o ZeuX
+ * não sabe automatizar (RetroArch, Dolphin — 21 dos 33 consoles dependem do
+ * primeiro). Antes disto, o clique em "Jogar" disparava uma instalação que o
+ * servidor recusava com 400, e a tela mostrava a recusa como se algo tivesse
+ * quebrado. Não quebrou nada: o app simplesmente não instala este.
+ *
+ * **Não repete as instruções aqui.** Onde baixar e onde extrair já vivem no
+ * detalhe do console, com o caminho exato da pasta gerenciada e o botão do
+ * site oficial — duas cópias desse texto divergiriam na primeira correção. O
+ * modal explica o estado e leva até lá.
+ */
+export function ManualInstallModal({
+  adapterName,
+  onClose,
+  onOpenConsole,
+}: {
+  adapterName: string;
+  onClose: () => void;
+  /** Ausente quando a tela não sabe navegar para o console — o modal ainda
+   * explica o estado, só não oferece o atalho. */
+  onOpenConsole?: () => void;
+}) {
+  return (
+    <ConfirmModal
+      title="Este emulador é instalado por fora"
+      message={`O ${adapterName} não é distribuído de um jeito que o ZeuX consiga baixar sozinho. A tela do console mostra onde baixar e em que pasta colocar para o ZeuX encontrar depois.`}
+      onClose={onClose}
+      actions={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Fechar
+          </Button>
+          {onOpenConsole && (
+            <Button variant="primary" autoFocus onClick={onOpenConsole}>
+              Ver o console
+            </Button>
+          )}
+        </>
+      }
+    />
+  );
+}
+
+/**
  * Modal de confirmação: mesmo shell do `ErrorModal` (Dialog do shadcn, sem
  * fechar clicando fora), mas para decisões com mais de um botão de saída —
  * "instalar mesmo assim"/"cancelar", ou "abrir pasta"/"jogar mesmo

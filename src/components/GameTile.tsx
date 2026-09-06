@@ -112,7 +112,12 @@ export function GameTile({
         <p className="text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
         {blocked && (
           <div className="mt-1">
-            {launchability!.reason === "not_installed" && onInstall ? (
+            {/* Q5 (docs/roadmap.md, Sprint Q): "instalação manual" também é
+                acionável. Antes só `not_installed` virava botão, e o badge
+                novo nascia texto morto — o usuário lia "instalação manual" e
+                não tinha o que clicar. Os dois levam ao mesmo `onInstall`,
+                que já ramifica pelo motivo (useInlineInstall.handlePlay). */}
+            {(launchability!.reason === "not_installed" || launchability!.reason === "install_manual") && onInstall ? (
               <button
                 type="button"
                 title={launchability!.title}
