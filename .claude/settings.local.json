@@ -9,7 +9,16 @@
       "Bash(mise --version)",
       "Bash(cargo --version)",
       "Bash(rustc --version)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "WebFetch(domain:www.skills.sh)",
+      "Bash(npx skills *)",
+      "PowerShell(npx skills find architecture design accessibility)",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; mise exec -- npx skills find architecture 2>&1 | Select-Object -First 60)",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; mise exec -- npx skills find \"ui design review critique\" 2>&1 | Select-Object -First 40)",
+      "WebFetch(domain:skills.sh)",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; cd \"c:\\\\Users\\\\doufl\\\\OneDrive\\\\Documentos\\\\Portfólio\\\\ZeuX\"; mise exec -- npx -y skills add \"mattpocock/skills@improve-codebase-architecture\" 2>&1 | Select-Object -Last 20)",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; cd \"c:\\\\Users\\\\doufl\\\\OneDrive\\\\Documentos\\\\Portfólio\\\\ZeuX\"; mise exec -- npx -y skills add \"anthropics/knowledge-work-plugins@design-critique\" 2>&1 | Select-Object -Last 15; mise exec -- npx -y skills add \"mastepanoski/claude-skills@wcag-accessibility-audit\" 2>&1 | Select-Object -Last 15)",
+      "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; cd \"c:\\\\Users\\\\doufl\\\\OneDrive\\\\Documentos\\\\Portfólio\\\\ZeuX\"; git --no-pager diff src/index.css src/components/ui.tsx src/components/Sidebar.tsx src/hooks/useGamepadNavigation.ts)"
     ]
   }
 }
