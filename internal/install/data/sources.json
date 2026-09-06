@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-01",
+  "updated_at": "2026-09-06",
   "_comment": "Fontes oficiais de download por emulador. Os padrões de asset foram derivados dos nomes reais publicados nos repositórios em 2026-08-01. 'exclude' é tão importante quanto 'include': as releases misturam builds de depuração, pacotes de símbolos e instaladores junto do binário que queremos.",
   "sources": [
     {
@@ -180,18 +180,26 @@
     {
       "adapter_id": "retroarch",
       "name": "RetroArch",
-      "kind": "manual",
+      "kind": "github",
+      "repo": "DougCristiano/Retroarch-for-Zeux",
       "homepage": "https://www.retroarch.com/?page=platforms",
       "license": "GPL-3.0",
-      "reason": "O RetroArch é distribuído pelo buildbot.libretro.com, não por releases do GitHub, e sem uma estrutura estável para resolver a versão mais recente por API (mudou de formato sem aviso em 2026-08-04) — precisa ser instalado manualmente a partir do site oficial ou do gerenciador de pacotes do sistema. Os cores, esses sim, o ZeuX baixa sozinho sob demanda ao lançar um jogo (ADR 0015)."
+      "_note": "O buildbot.libretro.com não expõe uma API estável para resolver 'a versão mais recente' (mudou de formato sem aviso em 2026-08-04 — ver ADR 0015). Este repositório é um mirror público mantido pelo Douglas, republicando o build oficial sem modificação (ver README do repositório para a atribuição de licença completa) — exatamente o gatilho de revisão 3 do ADR 0015 ('aparecer um espelho ou release estável com estrutura previsível — nesse caso não se volta ao empacotamento, se troca a origem'). Os cores continuam vindo do download sob demanda (ADR 0015); só o app do RetroArch trocou de origem. Só há asset para windows/amd64 até o Douglas publicar as demais plataformas.",
+      "assets": {
+        "windows/amd64": { "include": "^RetroArch\\.7z$", "archive": "7z" }
+      }
     },
     {
       "adapter_id": "dolphin",
       "name": "Dolphin",
-      "kind": "manual",
+      "kind": "github",
+      "repo": "DougCristiano/Dolphin-For-Zeux",
       "homepage": "https://dolphin-emu.org/download/",
       "license": "GPL-2.0",
-      "reason": "O Dolphin distribui pelo site oficial e não publica os binários como releases do GitHub, então não há como resolver a versão mais recente de forma confiável por API."
+      "_note": "O Dolphin distribui pelo site oficial e não publica os binários como releases do GitHub. Este repositório é um mirror público mantido pelo Douglas, republicando o build oficial sem modificação (ver README do repositório para a atribuição de licença completa). Só há asset para windows/amd64 até o Douglas publicar as demais plataformas.",
+      "assets": {
+        "windows/amd64": { "include": "^dolphin-.*-x64\\.7z$", "archive": "7z" }
+      }
     }
   ]
 }
