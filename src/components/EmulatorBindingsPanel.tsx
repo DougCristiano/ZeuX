@@ -379,8 +379,8 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
                     continua para o espaçamento fino do layout. */}
                 {action}{" "}
                 <span className="ml-2 text-xs text-muted">
-                  {binding?.key ?? "sem tecla"}
-                  {binding?.button ? ` · botão ${binding.button}` : ""}
+                  {binding?.key ?? t("noKeyMapped")}
+                  {binding?.button ? ` · ${t("buttonDisplay", { button: binding.button })}` : ""}
                 </span>
               </span>
               <div className="flex flex-wrap gap-2">
@@ -389,7 +389,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
                   disabled={listeningKeyFor !== null}
                   onClick={() => setListeningKeyFor(action)}
                 >
-                  {listeningKeyFor === action ? "Aperte uma tecla…" : "Mapear tecla"}
+                  {listeningKeyFor === action ? t("listeningForKey") : t("mapKeyButton")}
                 </Button>
                 {gamepadConnected && (
                   <Button
@@ -397,7 +397,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
                     disabled={listeningButtonFor !== null}
                     onClick={() => setListeningButtonFor(action)}
                   >
-                    {listeningButtonFor === action ? "Aperte um botão…" : "Mapear controle"}
+                    {listeningButtonFor === action ? t("listeningForButton") : t("mapGamepadButton")}
                   </Button>
                 )}
               </div>

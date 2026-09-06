@@ -524,16 +524,16 @@ function EmulatorCardActions({
           só volta ao estado normal, o card não some nem desabilita. */}
       {state.kind === "confirm-hardware" && (
         <ConfirmModal
-          title="Hardware abaixo do recomendado"
+          title={t("weakHardware")}
           message={state.message}
           onClose={() => setState({ kind: "idle" })}
           actions={
             <>
               <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                Cancelar
+                {t("cancel")}
               </Button>
               <Button variant="primary" autoFocus onClick={() => install(true)}>
-                Instalar mesmo assim
+                {t("installAnyway")}
               </Button>
             </>
           }
@@ -605,8 +605,8 @@ function EmulatorCardActions({
           // quando instalado — antes, todos os até 6 botões do card eram
           // `secondary`, nenhum se destacava. É o único botão sempre presente
           // (custom ou não) nesse estado, o candidato natural.
-          <Button variant="primary" disabled={opening} onClick={openStandalone} title="Abre o emulador sem nenhum jogo, para configurar dentro dele.">
-            {opening ? "Abrindo…" : "Abrir configurações do emulador"}
+          <Button variant="primary" disabled={opening} onClick={openStandalone} title={t("openEmulatorSettingsTooltip")}>
+            {opening ? t("opening") : t("openEmulatorSettings")}
           </Button>
         )}
 
@@ -621,22 +621,22 @@ function EmulatorCardActions({
                 quando está (um card nunca tem duas). Sem instalação, "Editar"
                 (corrigir o caminho) é a ação óbvia seguinte. */}
             <Button variant={entry.installed ? "secondary" : "primary"} onClick={() => onEditCustom(customDef)}>
-              Editar
+              {t("edit")}
             </Button>
             {confirmingDelete ? (
               // N13 (docs/roadmap.md, Sprint N): irreversível (apaga o
               // cadastro personalizado) — era painel inline, virou modal.
               <ConfirmModal
-                title="Excluir emulador personalizado?"
-                message={`"${customDef.name}" será removido da lista. O binário no disco não é apagado — só o cadastro no ZeuX.`}
+                title={t("deleteCustomEmulator")}
+                message={t("deleteCustomEmulatorMessage", { name: customDef.name })}
                 onClose={() => setConfirmingDelete(false)}
                 actions={
                   <>
                     <Button variant="secondary" onClick={() => setConfirmingDelete(false)}>
-                      Cancelar
+                      {t("cancel")}
                     </Button>
                     <Button variant="danger" autoFocus disabled={deleting} onClick={deleteCustom}>
-                      Excluir mesmo assim
+                      {t("deleteAnyway")}
                     </Button>
                   </>
                 }
@@ -653,16 +653,16 @@ function EmulatorCardActions({
             // N13 (docs/roadmap.md, Sprint N): irreversível (desinstala,
             // toca disco) — era painel inline, virou modal.
             <ConfirmModal
-              title="Remover emulador?"
-              message={`${entry.name} será desinstalado da pasta gerenciada pelo ZeuX.`}
+              title={t("removeEmulator")}
+              message={t("removeEmulatorMessage", { emulatorName: entry.name })}
               onClose={() => setState({ kind: "idle" })}
               actions={
                 <>
                   <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                    Cancelar
+                    {t("cancel")}
                   </Button>
                   <Button variant="danger" autoFocus onClick={remove}>
-                    Remover mesmo assim
+                    {t("removeAnyway")}
                   </Button>
                 </>
               }
@@ -673,16 +673,16 @@ function EmulatorCardActions({
               disabled={state.kind === "removing"}
               onClick={() => setState({ kind: "confirm-remove" })}
             >
-              {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
+              {state.kind === "remove-error" ? t("retryRemove") : t("remove")}
             </Button>
           ))
         ) : source?.kind === "manual" ? (
           <Button variant="primary" onClick={() => openUrl(source.homepage)}>
-            Abrir site oficial
+            {t("openOfficialWebsite")}
           </Button>
         ) : state.kind === "installing" || state.kind === "done" || state.kind === "confirm-hardware" ? null : (
           <Button variant="primary" disabled={state.kind === "starting"} onClick={() => install(false)}>
-            {state.kind === "error" ? "Tentar de novo" : "Instalar"}
+            {state.kind === "error" ? t("retryInstall") : t("install")}
           </Button>
         )}
       </div>
@@ -732,7 +732,7 @@ function EmulatorCard({
       {entry.adapter_id === "retroarch" && (
         <div>
           <Button type="button" variant="quiet" onClick={() => setShowCores((v) => !v)}>
-            {showCores ? "Ocultar cores" : "Ver cores"}
+            {showCores ? t("hideCores") : t("seeCores")}
           </Button>
           {showCores && (
             <div className="mt-2">
@@ -773,6 +773,7 @@ function EmulatorCard({
 // o filtro lista os ids em vez do nome — a tela continua funcional, só menos
 // legível até existir um parecer.
 export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; report?: Report }) {
+  const t = useT(dict);
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   const [sources, setSources] = useState<Record<string, EmulatorSource>>({});
   const [customs, setCustoms] = useState<CustomDefinition[]>([]);
@@ -795,8 +796,8 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
     api
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível listar os emuladores."));
-  }, [reloadKey]);
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListEmulators")));
+  }, [reloadKey, t]);
 
   // Emuladores personalizados (I1, docs/roadmap.md) — mesma dependência de
   // reloadKey que a lista de emuladores, para as duas ficarem em sincronia
@@ -877,16 +878,16 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           (era ao lado do h1, à direita). */}
       {onBack && (
         <Button variant="secondary" onClick={onBack} className="mb-4">
-          Voltar
+          {t("back")}
         </Button>
       )}
-      <h1 className="mb-4 text-2xl font-semibold text-ink">Emuladores</h1>
+      <h1 className="mb-4 text-2xl font-semibold text-ink">{t("emulatorsTitle")}</h1>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {emulators && emulators.length > PAGE_SIZE && (
           <>
             <label htmlFor="emulators-search" className="sr-only">
-              Buscar emulador ou console
+              {t("searchEmulatorLabel")}
             </label>
             <input
               id="emulators-search"
@@ -895,7 +896,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
               autoComplete="off"
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="Buscar emulador ou console…"
+              placeholder={t("searchEmulatorPlaceholder")}
               className={`${inputClass} max-w-xs`}
             />
           </>
@@ -903,12 +904,12 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
 
         {consoleOptions.length > 0 && (
           <ZSelect
-            ariaLabel="Filtrar por console"
+            ariaLabel={t("filterByConsoleLabel")}
             value={consoleFilter || ALL_CONSOLES}
             onValueChange={(v) => handleConsoleFilter(v === ALL_CONSOLES ? "" : v)}
             className="max-w-xs"
           >
-            <SelectItem value={ALL_CONSOLES}>Todos os consoles</SelectItem>
+            <SelectItem value={ALL_CONSOLES}>{t("allConsoles")}</SelectItem>
             {consoleOptions.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
@@ -926,7 +927,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           inline, de propósito: aparecem dentro do próprio card cuja ação
           falhou, ao lado do botão que a disparou — diferente do erro que
           motivou a troca, que ficava longe da célula que o causou. */}
-      {error && <ErrorModal title="Não foi possível listar os emuladores" message={error} onClose={() => setError(null)} />}
+      {error && <ErrorModal title={t("failedToListEmulators")} message={error} onClose={() => setError(null)} />}
 
       {/* N11 (docs/roadmap.md, Sprint N): antes, `emulators === null` só
           deixava o cabeçalho visível, nada de grade nem sinal de
@@ -934,7 +935,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           abaixo). */}
       {emulators === null && (
         <div role="status" aria-live="polite">
-          <span className="sr-only">Carregando emuladores…</span>
+          <span className="sr-only">{t("loadingEmulators")}</span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
             {Array.from({ length: PAGE_SIZE }, (_, i) => (
               <CardSkeleton key={i} className="h-40" />
@@ -944,7 +945,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
       )}
 
       {emulators && filtered.length === 0 && (
-        <p className="text-base text-muted">Nenhum emulador encontrado para "{search}".</p>
+        <p className="text-base text-muted">{t("noEmulatorsFound", { search })}</p>
       )}
 
       {pageItems.length > 0 && (

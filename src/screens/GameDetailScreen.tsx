@@ -21,21 +21,29 @@ import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
+import { useT } from "../i18n/i18n";
+import { dict } from "./GameDetailScreen.i18n";
 
-function formatPlaytime(seconds: number): string {
-  if (seconds <= 0) return "nunca jogado";
+function formatPlaytime(
+  seconds: number,
+  neverPlayedText: string,
+  lessThanOneMinText: string,
+  minUnitText: string,
+  hUnitText: string,
+): string {
+  if (seconds <= 0) return neverPlayedText;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 1) return "menos de 1 min";
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 1) return lessThanOneMinText;
+  if (minutes < 60) return `${minutes} ${minUnitText}`;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
-  return remainder > 0 ? `${hours}h${remainder}min` : `${hours}h`;
+  return remainder > 0 ? `${hours}${hUnitText}${remainder}${minUnitText}` : `${hours}${hUnitText}`;
 }
 
-function formatLastPlayed(iso: string | undefined): string {
-  if (!iso) return "nunca jogado";
+function formatLastPlayed(iso: string | undefined, neverPlayedText: string): string {
+  if (!iso) return neverPlayedText;
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "nunca jogado";
+  if (Number.isNaN(date.getTime())) return neverPlayedText;
   return date.toLocaleString("pt-BR");
 }
 
@@ -83,6 +91,7 @@ export function GameDetailScreen({
   report: Report;
   onBack: () => void;
 }) {
+  const t = useT(dict);
   const [sessionCount, setSessionCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { statusFor, launch, cancelCoreDownload, launchError, clearLaunchError } = useLaunchGame();
@@ -124,10 +133,10 @@ export function GameDetailScreen({
     setFavoriteError(null);
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
     call
-      .then(() => showToast(next ? "Adicionado aos favoritos." : "Removido dos favoritos."))
+      .then(() => showToast(next ? t("addedToFavorites") : t("removedFromFavorites")))
       .catch(() => {
         setFavorite(!next);
-        setFavoriteError("Não foi possível salvar o favorito. Tente de novo.");
+        setFavoriteError(t("errorSavingFavorite"));
       });
   }
 
@@ -139,9 +148,9 @@ export function GameDetailScreen({
           setScrapingCover(false);
           const result = job.results[0];
           if (result?.status === "error") {
-            setCoverError(result.message ?? "Não foi possível buscar a capa deste jogo.");
+            setCoverError(result.message ?? t("errorSearchingCover"));
           } else if (result?.status === "not_found") {
-            setCoverError("O IGDB não tem capa para este jogo.");
+            setCoverError(t("errorCoverNotFound"));
           } else {
             // Encontrada: recarrega este jogo para pegar o cover_url novo —
             // a rota de busca não devolve o caminho da capa, só o status.
@@ -157,14 +166,14 @@ export function GameDetailScreen({
         }
         if (job.phase === "falhou") {
           setScrapingCover(false);
-          setCoverError(job.error ?? "Não foi possível buscar a capa agora.");
+          setCoverError(job.error ?? t("errorSearchingCoverGeneric"));
           return;
         }
         setTimeout(() => pollCoverJob(jobId), 400);
       })
       .catch((err) => {
         setScrapingCover(false);
-        setCoverError(err instanceof ApiError ? err.message : "Não foi possível acompanhar a busca de capa.");
+        setCoverError(err instanceof ApiError ? err.message : t("errorSearchingCoverGeneric"));
       });
   }
 
@@ -176,7 +185,7 @@ export function GameDetailScreen({
       .then((job) => pollCoverJob(job.id))
       .catch((err) => {
         setScrapingCover(false);
-        setCoverError(err instanceof ApiError ? err.message : "Não foi possível iniciar a busca de capa.");
+        setCoverError(err instanceof ApiError ? err.message : t("errorInitiatingCoverSearch"));
       });
   }
 
@@ -191,7 +200,7 @@ export function GameDetailScreen({
     try {
       await revealItemInDir(game.path);
     } catch (err) {
-      setFolderError(`Não foi possível abrir a pasta do jogo: ${err instanceof Error ? err.message : String(err)}`);
+      setFolderError(t("errorOpeningFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
@@ -202,11 +211,11 @@ export function GameDetailScreen({
       setRescanState({ kind: "done", gamesFound: res.games_found });
       // B4 (achado do critico-design, 2026-08-18): o resultado ficava como
       // `<p>` que nunca somia sozinho, preso embaixo do botão.
-      showToast(`${res.games_found} jogo(s) encontrado(s) nesta pasta.`);
+      showToast(t("gamesFoundAfterRescan", { count: res.games_found }));
     } catch (err) {
       setRescanState({
         kind: "error",
-        message: err instanceof ApiError ? err.message : "Não foi possível revarrer esta pasta.",
+        message: err instanceof ApiError ? err.message : t("errorRescanningFolder"),
       });
     }
   }
@@ -217,9 +226,9 @@ export function GameDetailScreen({
       .then((res) => {
         setSessionCount(res.sessions.filter((s) => s.rom_path === game.path).length);
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível ler as sessões."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("errorReadingSessions")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.path]);
+  }, [game.path, t]);
 
   const status = statusFor(game.id);
   const verdict = report.verdicts.find((v) => v.console_id === game.console_id);
@@ -241,7 +250,7 @@ export function GameDetailScreen({
         {igdbConfigured && (
           <div className="mt-2">
             <Button variant="secondary" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full text-xs">
-              {scrapingCover ? "Buscando…" : coverUrl ? "Buscar capa de novo" : "Buscar capa"}
+              {scrapingCover ? t("searching") : coverUrl ? t("searchCoverAgain") : t("searchCover")}
             </Button>
             {coverError && <InlineError className="mt-1">{coverError}</InlineError>}
           </div>
@@ -254,7 +263,7 @@ export function GameDetailScreen({
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Badge accentColor={consoleAccentColor(game.console_id)}>{consoleName}</Badge>
             {year !== undefined && <Badge>{year}</Badge>}
-            {game.missing && <Badge>arquivo ausente</Badge>}
+            {game.missing && <Badge>{t("missingFile")}</Badge>}
           </div>
         </div>
 
@@ -272,19 +281,19 @@ export function GameDetailScreen({
               janela do emulador subir. Mesma técnica de "Salvando…" em
               EmulatorConfigPanel. */}
           {status.kind === "error" ? (
-            "Tentar de novo"
+            t("retryButton")
           ) : status.kind === "launching" ? (
-            "Abrindo…"
+            t("opening")
           ) : status.kind === "downloading-core" ? (
             // R3 (ADR 0015): mesma razão do "Abrindo…" acima — o clique mais
             // importante do produto não pode ficar mudo. Aqui a espera é bem
             // maior (centenas de MB), então o rótulo diz o que está
             // acontecendo, e o progresso detalhado vem logo abaixo.
-            "Baixando o core…"
+            t("downloadingCore")
           ) : (
             <>
               <PlayIcon size={16} />
-              Jogar
+              {t("playButton")}
             </>
           )}
         </Button>
@@ -296,25 +305,27 @@ export function GameDetailScreen({
         {status.kind === "downloading-core" && (
           <div className="w-full max-w-md">
             <p className="text-sm text-muted">
-              O core {status.job.core_name ?? ""} ainda não estava no seu computador. Baixando…
-              {faseExtraDeDownload(status.job.phase)}
-              {percentOf(status.job) !== null && ` · ${percentOf(status.job)}%`}
+              {t("coreDownloadingMessage", {
+                core_name: status.job.core_name ?? "",
+                extra: faseExtraDeDownload(status.job.phase),
+                percent: percentOf(status.job) !== null ? ` · ${percentOf(status.job)}%` : "",
+              })}
             </p>
             <div className="mt-1">
-              <ProgressBar percent={percentOf(status.job)} label={`Baixando o core ${status.job.core_name ?? ""}`} />
+              <ProgressBar percent={percentOf(status.job)} label={t("downloadingCoreLabel", { core_name: status.job.core_name ?? "" })} />
             </div>
             <Button
               className="mt-2"
               variant="secondary"
               onClick={() => cancelCoreDownload(game.id, status.job)}
             >
-              Cancelar download
+              {t("cancelDownload")}
             </Button>
           </div>
         )}
 
         {game.missing && (
-          <InlineError>O arquivo deste jogo não foi encontrado na última varredura da pasta.</InlineError>
+          <InlineError>{t("fileMissingError")}</InlineError>
         )}
 
         {/* M6: nenhum link, nenhuma sugestão de onde obter o arquivo (regra
@@ -322,7 +333,7 @@ export function GameDetailScreen({
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={openGameFolder} className="w-fit">
-              Abrir pasta do jogo
+              {t("openGameFolder")}
             </Button>
             {/* "Revarrer pasta": mesma ação de LibraryScreen, sem precisar
                 voltar até lá. Não bloqueia o resto da tela — erro e
@@ -333,7 +344,7 @@ export function GameDetailScreen({
               onClick={rescanFolder}
               className="w-fit"
             >
-              {rescanState.kind === "rescanning" ? "Revarrendo…" : "Revarrer pasta"}
+              {rescanState.kind === "rescanning" ? t("rescanning") : t("rescanFolder")}
             </Button>
           </div>
           {folderError && <InlineError>{folderError}</InlineError>}
@@ -357,13 +368,13 @@ export function GameDetailScreen({
           não soltos pela tela. */}
       {toastMessage && <Toast message={toastMessage} />}
       {launchError ? (
-        <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={clearLaunchError} />
+        <ErrorModal title={t("errorOpeningGame")} message={launchError} onClose={clearLaunchError} />
       ) : (
-        error && <ErrorModal title="Não foi possível ler as estatísticas" message={error} onClose={() => setError(null)} />
+        error && <ErrorModal title={t("errorReadingStats")} message={error} onClose={() => setError(null)} />
       )}
 
       <Button variant="secondary" onClick={onBack} className="mb-4">
-        Voltar
+        {t("backButton")}
       </Button>
 
       {/* M6: fundo do topo com a própria capa desfocada — só quando existe
@@ -394,18 +405,20 @@ export function GameDetailScreen({
       )}
 
       <Card className="mt-6">
-        <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">Suas estatísticas</h2>
+        <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("yourStats")}</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-xs text-muted">Tempo jogado</p>
-            <p className="text-lg text-ink">{formatPlaytime(game.playtime_seconds)}</p>
+            <p className="text-xs text-muted">{t("playtime")}</p>
+            <p className="text-lg text-ink">
+              {formatPlaytime(game.playtime_seconds, t("neverPlayed"), t("lessThanOneMinute"), t("minuteUnit"), t("hourUnit"))}
+            </p>
           </div>
           <div>
-            <p className="text-xs text-muted">Última vez</p>
-            <p className="text-lg text-ink">{formatLastPlayed(game.last_played_at)}</p>
+            <p className="text-xs text-muted">{t("lastPlayed")}</p>
+            <p className="text-lg text-ink">{formatLastPlayed(game.last_played_at, t("neverPlayed"))}</p>
           </div>
           <div>
-            <p className="text-xs text-muted">Sessões</p>
+            <p className="text-xs text-muted">{t("sessions")}</p>
             <p className="text-lg text-ink">{sessionCount === null ? "…" : sessionCount}</p>
           </div>
         </div>

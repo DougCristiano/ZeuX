@@ -30,6 +30,8 @@ import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { percentOf } from "../lib/format";
 import { buildReadinessIndex, evaluateConsoleReadiness } from "../lib/consoleReadiness";
+import { useT } from "../i18n/i18n";
+import { dict } from "./ConsoleDetailScreen.i18n";
 
 /**
  * Uma forma de rodar este console. Cada opção é um card: o que é, se está
@@ -58,6 +60,7 @@ function EmulatorOptionCard({
   isChosen: boolean;
   onChanged: () => void;
 }) {
+  const t = useT(dict);
   const { state, setState, install, remove } = useEmulatorInstall({ adapterId: option.adapter_id, onChanged });
   const coreInstall = useCoreInstall({ onCoreReady: onChanged });
   const [opening, setOpening] = useState(false);
@@ -80,7 +83,7 @@ function EmulatorOptionCard({
     try {
       await api.openEmulator(option.adapter_id);
     } catch (err) {
-      setOpenError(err instanceof ApiError ? err.message : "Não foi possível abrir o emulador.");
+      setOpenError(err instanceof ApiError ? err.message : t("couldNotOpenEmulator"));
     } finally {
       setOpening(false);
     }
@@ -93,8 +96,8 @@ function EmulatorOptionCard({
       await openPath(entry.managed_dir);
     } catch (err) {
       setOpenError(
-        `Não foi possível abrir a pasta: ${err instanceof Error ? err.message : String(err)}. ` +
-          "Se ela ainda não existe, crie-a no caminho acima.",
+        t("couldNotOpenFolder", { error: err instanceof Error ? err.message : String(err) }) + ". " +
+          t("createFolderIfNotExists"),
       );
     }
   }
@@ -135,13 +138,13 @@ function EmulatorOptionCard({
               para "e se eu tiver os dois instalados?" nos 5 consoles onde
               isso é possível. Só aparece quando há mais de uma opção; num
               console de emulador único seria ruído. */}
-          {isChosen && <p className="text-xs text-accent">É o que o ZeuX usa para abrir os jogos deste console.</p>}
+          {isChosen && <p className="text-xs text-accent">{t("isChosenEmulator")}</p>}
         </div>
         <span className="shrink-0 whitespace-nowrap">
           {installed ? (
-            <Badge variant="solid">{entry?.installation?.managed ? "instalado pelo ZeuX" : "já estava na máquina"}</Badge>
+            <Badge variant="solid">{entry?.installation?.managed ? t("installedByZeuxBadge") : t("alreadyInstalledBadge")}</Badge>
           ) : (
-            <Badge>não instalado</Badge>
+            <Badge>{t("notInstalledBadge")}</Badge>
           )}
         </span>
       </div>
@@ -153,9 +156,9 @@ function EmulatorOptionCard({
       {option.core && (
         <div className="flex flex-col gap-1.5 rounded border border-line bg-fill px-3 py-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted">Core deste console:</span>
+            <span className="text-sm text-muted">{t("coreForConsole")}</span>
             <span className="font-mono text-sm text-ink">{option.core}</span>
-            <Badge variant={core?.installed ? "solid" : undefined}>{core?.installed ? "baixado" : "faltando"}</Badge>
+            <Badge variant={core?.installed ? "solid" : undefined}>{core?.installed ? t("downloadedBadge") : t("missingBadge")}</Badge>
 
             {!core?.installed && coreState.kind === "idle" && (
               <Button
@@ -163,15 +166,15 @@ function EmulatorOptionCard({
                 className="ml-auto shrink-0 px-2 py-1 text-xs"
                 onClick={() => coreInstall.installCore(option.core!)}
               >
-                Baixar core
+                {t("downloadCore")}
               </Button>
             )}
-            {coreState.kind === "starting" && <span className="ml-auto text-xs text-muted">Iniciando…</span>}
+            {coreState.kind === "starting" && <span className="ml-auto text-xs text-muted">{t("starting")}</span>}
           </div>
 
           {(coreState.kind === "installing" || coreState.kind === "canceling") && (
             <div className="flex items-center gap-1.5">
-              <ProgressBar className="flex-1" percent={corePercent} label={`Baixando o core ${option.core}`} />
+              <ProgressBar className="flex-1" percent={corePercent} label={t("downloadCore")} />
               <span className="shrink-0 text-xs text-muted tabular-nums">
                 {corePercent === null ? coreState.job.phase : `${corePercent}%`}
               </span>
@@ -181,7 +184,7 @@ function EmulatorOptionCard({
                 disabled={coreState.kind === "canceling"}
                 onClick={() => coreInstall.cancelCore(option.core!, coreState.job)}
               >
-                {coreState.kind === "canceling" ? "Cancelando…" : "Cancelar"}
+                {coreState.kind === "canceling" ? t("canceling") : t("cancel")}
               </Button>
             </div>
           )}
@@ -193,7 +196,7 @@ function EmulatorOptionCard({
               pendência do usuário — é o comportamento normal. */}
           {!core?.installed && coreState.kind === "idle" && (
             <p className="text-xs text-muted">
-              O ZeuX baixa este core sozinho na primeira vez que você abrir um jogo deste console.
+              {t("coreAutoDownload")}
             </p>
           )}
         </div>
@@ -201,16 +204,16 @@ function EmulatorOptionCard({
 
       {state.kind === "confirm-hardware" && (
         <ConfirmModal
-          title="Hardware abaixo do recomendado"
+          title={t("hardwareBelowRecommended")}
           message={state.message}
           onClose={() => setState({ kind: "idle" })}
           actions={
             <>
               <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                Cancelar
+                {t("cancel")}
               </Button>
               <Button variant="primary" autoFocus onClick={() => install(true)}>
-                Instalar mesmo assim
+                {t("installAnyway")}
               </Button>
             </>
           }
@@ -219,16 +222,16 @@ function EmulatorOptionCard({
 
       {state.kind === "confirm-remove" && (
         <ConfirmModal
-          title="Remover emulador?"
-          message={`${option.name} será desinstalado da pasta gerenciada pelo ZeuX.`}
+          title={t("removeEmulatorTitle")}
+          message={t("removeEmulatorMessage", { emulatorName: option.name })}
           onClose={() => setState({ kind: "idle" })}
           actions={
             <>
               <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
-                Cancelar
+                {t("cancel")}
               </Button>
               <Button variant="danger" autoFocus onClick={remove}>
-                Remover mesmo assim
+                {t("removeAnyway")}
               </Button>
             </>
           }
@@ -262,7 +265,7 @@ function EmulatorOptionCard({
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted">{source.reason}</p>
           <p className="text-sm text-muted">
-            Extraia (ou instale) o {option.name} nesta pasta para o ZeuX encontrar sozinho:
+            {t("extractManualInstall", { emulatorName: option.name })}
           </p>
           {entry?.managed_dir && (
             <>
@@ -275,7 +278,7 @@ function EmulatorOptionCard({
                     qualquer jeito. Só aparece para instalação manual: nos
                     outros o ZeuX cria a pasta ele mesmo ao instalar. */}
                 <Button variant="quiet" className="px-2 py-1 text-xs" onClick={abrirPastaGerenciada}>
-                  Abrir pasta
+                  {t("openFolder")}
                 </Button>
                 {/* Q5 (docs/roadmap.md, Sprint Q): "o ZeuX confirmando sozinho
                     quando o binário aparecer". Sem isto, quem acabou de
@@ -288,13 +291,12 @@ function EmulatorOptionCard({
                   disabled={verificando}
                   onClick={verificarInstalacao}
                 >
-                  {verificando ? "Verificando…" : "Já instalei — verificar"}
+                  {verificando ? t("verifying") : t("alreadyInstalledVerify")}
                 </Button>
               </div>
               {naoEncontrado && (
                 <p className="text-xs text-muted">
-                  O ZeuX ainda não encontrou o {option.name}. Confira se o executável está dentro da pasta acima (ou
-                  numa subpasta dela) e verifique de novo.
+                  {t("notFoundEmulator", { emulatorName: option.name })}
                 </p>
               )}
             </>

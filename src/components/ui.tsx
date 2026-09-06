@@ -2,6 +2,8 @@ import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import { Play, Star, TriangleAlert } from "lucide-react";
 import type { ConsoleVerdict } from "../api/types";
 import { consoleAccentColor } from "../lib/consoleColor";
+import { useT } from "../i18n/i18n";
+import { dict } from "./ui.i18n";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "./ui/select";
 
@@ -353,6 +355,7 @@ export function ErrorModal({
   onClose: () => void;
   onRetry?: () => void;
 }) {
+  const t = useT(dict);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       {/* O1 (docs/roadmap.md, Sprint O): a base do DialogContent (src/components/ui/dialog.tsx)
@@ -375,11 +378,11 @@ export function ErrorModal({
         <div className="mt-4 flex justify-end gap-2">
           {onRetry && (
             <Button variant="secondary" onClick={onClose}>
-              Fechar
+              {t("close")}
             </Button>
           )}
           <Button variant="primary" autoFocus onClick={onRetry ?? onClose}>
-            {onRetry ? "Tentar de novo" : "Entendi"}
+            {onRetry ? t("retryButton") : t("understand")}
           </Button>
         </div>
       </DialogContent>
@@ -410,19 +413,20 @@ export function ManualInstallModal({
    * explica o estado, só não oferece o atalho. */
   onOpenConsole?: () => void;
 }) {
+  const t = useT(dict);
   return (
     <ConfirmModal
-      title="Este emulador é instalado por fora"
-      message={`O ${adapterName} não é distribuído de um jeito que o ZeuX consiga baixar sozinho. A tela do console mostra onde baixar e em que pasta colocar para o ZeuX encontrar depois.`}
+      title={t("manualInstallTitle")}
+      message={t("manualInstallMessage", { adapterName })}
       onClose={onClose}
       actions={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Fechar
+            {t("close")}
           </Button>
           {onOpenConsole && (
             <Button variant="primary" autoFocus onClick={onOpenConsole}>
-              Ver o console
+              {t("seeConsole")}
             </Button>
           )}
         </>
@@ -658,7 +662,7 @@ export function GameCover({
                 <button
                   type="button"
                   tabIndex={-1}
-                  aria-label={`Jogar ${title ?? label}`}
+                  aria-label={`${useT(dict)("playGame", { title: title ?? label })}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     onPlay();
@@ -698,12 +702,13 @@ export function FavoriteToggle({
   onToggle: () => void;
   className?: string;
 }) {
+  const t = useT(dict);
   return (
     <button
       type="button"
       aria-pressed={favorite}
-      aria-label={favorite ? "Remover dos favoritos" : "Favoritar"}
-      title={favorite ? "Remover dos favoritos" : "Favoritar"}
+      aria-label={favorite ? t("removeFavorite") : t("addFavorite")}
+      title={favorite ? t("removeFavorite") : t("addFavorite")}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();
@@ -739,17 +744,18 @@ export function Pagination({
   totalPages: number;
   onChange: (page: number) => void;
 }) {
+  const t = useT(dict);
   if (totalPages <= 1) return null;
   return (
     <div className="mt-6 flex items-center justify-center gap-3">
       <Button variant="secondary" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        Anterior
+        {t("previousPage")}
       </Button>
       <span className="font-mono text-sm text-muted">
-        página {page} de {totalPages}
+        {t("pageIndicator", { page, totalPages })}
       </span>
       <Button variant="secondary" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-        Próxima
+        {t("nextPage")}
       </Button>
     </div>
   );
@@ -873,6 +879,18 @@ export function EmptyState({ message, action }: { message: string; action?: Reac
   );
 }
 
+export function LEVEL_LABEL_FUNCTION(level: ConsoleVerdict["level"]): string {
+  const t = useT(dict);
+  const labels: Record<ConsoleVerdict["level"], string> = {
+    otimo: t("levelOtimo"),
+    bom: t("levelBom"),
+    limitado: t("levelLimitado"),
+    improvavel: t("levelImprovavel"),
+  };
+  return labels[level];
+}
+
+// Para manter compatibilidade com código existente que usa LEVEL_LABEL como objeto
 export const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
   otimo: "ótimo",
   bom: "bom",
@@ -887,6 +905,7 @@ export const LEVEL_LABEL: Record<ConsoleVerdict["level"], string> = {
  * o componente que barra), duas telas diferentes.
  */
 export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
+  const t = useT(dict);
   const isGoodTier = verdict.level === "otimo" || verdict.level === "bom";
   // N12 (docs/roadmap.md, Sprint N): mesmo tratamento que `EmulatorCard`
   // (src/screens/EmulatorsScreen.tsx) já usa — borda esquerda de 3px na cor
@@ -927,12 +946,12 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
 
       {verdict.precision === "parcial" && (
         <PartialNotice>
-          Não foi possível confirmar todos os requisitos deste console — este parecer é uma estimativa.
+          {t("partialPrecisionMessage")}
         </PartialNotice>
       )}
 
       {verdict.bottlenecks && verdict.bottlenecks.length > 0 && (
-        <Callout label="O que separa do patamar acima">
+        <Callout label={t("bottleneckLabel")}>
           <ul className="list-disc space-y-1 pl-4">
             {verdict.bottlenecks.map((line) => (
               <li key={line}>{line}</li>
@@ -1047,6 +1066,7 @@ export function ConsoleInfoModal({
   fallbackName: string;
   onClose: () => void;
 }) {
+  const t = useT(dict);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -1079,14 +1099,13 @@ export function ConsoleInfoModal({
             )}
 
             {verdict.requires_external_file && (
-              <Callout label="Dependência externa">
-                Este console costuma exigir um arquivo externo (BIOS, firmware ou plugin) que o ZeuX não fornece
-                nem verifica.
+              <Callout label={t("externalDependency")}>
+                {t("externalDependencyMessage")}
               </Callout>
             )}
 
             {verdict.bottlenecks && verdict.bottlenecks.length > 0 && (
-              <Callout label="O que separa do patamar acima">
+              <Callout label={t("bottleneckLabel")}>
                 <ul className="list-disc space-y-1 pl-4">
                   {verdict.bottlenecks.map((line) => (
                     <li key={line}>{line}</li>
@@ -1096,12 +1115,12 @@ export function ConsoleInfoModal({
             )}
           </div>
         ) : (
-          <p className="text-sm text-muted">O parecer de compatibilidade para este console ainda não foi lido nesta máquina.</p>
+          <p className="text-sm text-muted">{t("noConsoleVerdictYet")}</p>
         )}
 
         <div className="mt-4 flex justify-end">
           <Button variant="primary" autoFocus onClick={onClose}>
-            Fechar
+            {t("close")}
           </Button>
         </div>
       </DialogContent>
