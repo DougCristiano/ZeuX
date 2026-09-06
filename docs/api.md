@@ -1753,7 +1753,10 @@ só se há credencial configurada. Mesmo instinto de nunca logar uma senha.
 > precisarem configurar nada antes da busca de capa funcionar. Por isso
 > `configured` é **sempre `true`** a partir desta versão; `personal` é o
 > campo que diz se é a conta do próprio usuário ou o padrão compartilhado
-> (cota dividida entre todo mundo que não conectar a própria conta).
+> (cota dividida entre todo mundo que não conectar a própria conta). Desde
+> 2026-09-06, `POST /library/games/scrape-covers` tenta o
+> libretro-thumbnails antes do IGDB (ver seção daquela rota) — reduz quanto
+> essa cota compartilhada é gasta, mas não elimina o IGDB do caminho.
 
 ```bash
 curl http://127.0.0.1:7777/api/v1/igdb/credentials
@@ -1828,10 +1831,22 @@ curl -X DELETE http://127.0.0.1:7777/api/v1/igdb/credentials
 
 ## POST /api/v1/library/games/scrape-covers
 
-Dispara a busca de capas pelo scraper de metadados do IGDB (G1). **Não
-bloqueia**: devolve o `Job` imediatamente (`202 Accepted`) e a interface
-acompanha o progresso por `GET /scrape-jobs/{id}` — mesmo desenho de `POST
-/emulators/{id}/install`.
+Dispara a busca de capas (G1). **Não bloqueia**: devolve o `Job`
+imediatamente (`202 Accepted`) e a interface acompanha o progresso por `GET
+/scrape-jobs/{id}` — mesmo desenho de `POST /emulators/{id}/install`.
+
+**Duas fontes, nesta ordem (2026-09-06):** para cada jogo, o ZeuX tenta
+primeiro o [libretro-thumbnails](https://github.com/libretro-thumbnails)
+(repositório público do projeto Libretro/RetroArch, sem conta nem chave —
+`internal/igdb/thumbnails.go`), casando pelo nome de arquivo da ROM em
+convenção No-Intro/TOSEC; só se essa fonte não tiver a capa (console fora da
+lista coberta, ou nome de arquivo fora do padrão) é que cai para o IGDB.
+Motivo: a credencial de teste embutida do IGDB é compartilhada por todo
+mundo que não conecta a própria conta e sujeita à mesma cota da Twitch —
+resolver a maioria dos casos sem gastar essa cota evita que ela se esgote
+para quem depende dela. `cover_url` na resposta de `GET /library/games` não
+distingue de qual das duas fontes a capa veio — para quem usa o ZeuX, é
+sempre só "achou capa" ou "não achou".
 
 Corpo vazio (ou sem `game_id`) dispara o **lote**: todo jogo que ainda não
 tentou buscar capa (`cover_path` e `cover_status` ambos vazios). `game_id`

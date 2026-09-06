@@ -15,6 +15,10 @@ func TestAllowedHostsOnlyMetadataAndImageEndpoints(t *testing.T) {
 		"api.igdb.com":    true,
 		"images.igdb.com": true,
 		"id.twitch.tv":    true,
+		// Revisado em 2026-09-06: thumbnails.libretro.com é a fonte de capa
+		// alternativa sem conta (thumbnails.go) — mesma natureza dos dois
+		// hosts de imagem acima, nunca serve arquivo de jogo.
+		"thumbnails.libretro.com": true,
 	}
 	if !reflect.DeepEqual(allowedHosts, want) {
 		t.Fatalf("allowedHosts mudou sem revisão explícita deste teste: %v", allowedHosts)

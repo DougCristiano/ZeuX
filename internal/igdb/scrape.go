@@ -221,6 +221,27 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game) {
 // próximo.
 func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root string, game library.Game) GameResult {
 	result := GameResult{GameID: game.ID, Title: game.Title}
+	destDir := emulator.GameCoverDir(root, game.ConsoleID, game.ID)
+	destPath := filepath.Join(destDir, "cover.jpg")
+
+	// Libretro-thumbnails primeiro (thumbnails.go): sem conta, sem cota
+	// compartilhada. Só segue pro IGDB abaixo se esta fonte não achar nada
+	// para este console/nome de arquivo — nunca ao contrário, e uma falha de
+	// rede aqui não impede a tentativa pelo IGDB (mesma regra de "erro de
+	// uma fonte não pode travar a busca do jogo", só vira log).
+	thumbFound, thumbErr := FetchLibretroThumbnail(ctx, game.ConsoleID, library.RawBaseName(game.Path), destPath)
+	if thumbErr != nil {
+		m.logger.Warn("libretro-thumbnails falhou, seguindo pro IGDB", "jogo", game.ID, "erro", thumbErr)
+	}
+	if thumbFound {
+		if err := m.saveResolvedCover(ctx, game.ID, root, destPath); err != nil {
+			result.Status = "error"
+			result.Message = err.Error()
+			return result
+		}
+		result.Status = "found"
+		return result
+	}
 
 	match, found, err := client.SearchGame(ctx, game.Title)
 	if err != nil {
@@ -237,9 +258,6 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 		return result
 	}
 
-	destDir := emulator.GameCoverDir(root, game.ConsoleID, game.ID)
-	destPath := filepath.Join(destDir, "cover.jpg")
-
 	if err := client.DownloadCover(ctx, match.ImageID, destPath); err != nil {
 		m.markError(ctx, game.ID, err)
 		result.Status = "error"
@@ -247,18 +265,7 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 		return result
 	}
 
-	relPath, err := filepath.Rel(root, destPath)
-	if err != nil {
-		// Não deveria acontecer — destPath é sempre construído a partir de
-		// root. Se acontecer, trata como erro deste jogo, não do lote.
-		m.markError(ctx, game.ID, err)
-		result.Status = "error"
-		result.Message = err.Error()
-		return result
-	}
-
-	if err := m.library.SetCover(ctx, game.ID, filepath.ToSlash(relPath)); err != nil {
-		m.logger.Error("gravando a capa resolvida", "jogo", game.ID, "erro", err)
+	if err := m.saveResolvedCover(ctx, game.ID, root, destPath); err != nil {
 		result.Status = "error"
 		result.Message = err.Error()
 		return result
@@ -266,6 +273,27 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 
 	result.Status = "found"
 	return result
+}
+
+// saveResolvedCover grava no banco o caminho (relativo a root) de uma capa
+// já baixada em destPath — passo final comum às duas fontes de capa
+// (libretro-thumbnails e IGDB), extraído para não duplicar o cálculo de
+// caminho relativo nem o tratamento de erro entre as duas.
+func (m *ScrapeManager) saveResolvedCover(ctx context.Context, gameID int64, root, destPath string) error {
+	relPath, err := filepath.Rel(root, destPath)
+	if err != nil {
+		// Não deveria acontecer — destPath é sempre construído a partir de
+		// root. Se acontecer, trata como erro deste jogo, não do lote.
+		m.markError(ctx, gameID, err)
+		return err
+	}
+
+	if err := m.library.SetCover(ctx, gameID, filepath.ToSlash(relPath)); err != nil {
+		m.logger.Error("gravando a capa resolvida", "jogo", gameID, "erro", err)
+		return err
+	}
+
+	return nil
 }
 
 func (m *ScrapeManager) markError(ctx context.Context, gameID int64, cause error) {
