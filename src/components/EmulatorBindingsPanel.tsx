@@ -370,7 +370,13 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
               }`}
             >
               <span className="min-w-0 shrink text-sm break-words text-ink">
-                {action}
+                {/* Espaço de verdade antes do `ml-2` (achado testando com o
+                    Douglas, 2026-09-06): sem um caractere de espaço na árvore
+                    de texto, `{action}` e o span seguinte ficavam colados na
+                    hora de copiar/colar ou para um leitor de tela — só o
+                    CSS separava visualmente para quem usa mouse. `ml-2`
+                    continua para o espaçamento fino do layout. */}
+                {action}{" "}
                 <span className="ml-2 text-xs text-muted">
                   {binding?.key ?? "sem tecla"}
                   {binding?.button ? ` · botão ${binding.button}` : ""}

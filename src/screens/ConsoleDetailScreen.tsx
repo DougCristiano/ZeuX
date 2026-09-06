@@ -473,12 +473,17 @@ function GamesFolderSection({
                 {folder.path}
               </span>
               <span className="flex shrink-0 gap-1">
+                {/* "Revarrer", não "Varrer de novo" (achado testando com o
+                    Douglas, 2026-09-06): mesma ação que LibraryScreen/
+                    GameDetailScreen já chamam de "Revarrer"/"Revarrer
+                    pasta" — duas frases diferentes pra a mesma coisa em
+                    telas diferentes. */}
                 <Button
                   variant="quiet"
                   disabled={busy}
                   onClick={() => runFolderAction(api.rescanLibraryFolder(folder.id), "Não foi possível varrer a pasta.")}
                 >
-                  Varrer de novo
+                  Revarrer
                 </Button>
                 <Button variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
                   Remover

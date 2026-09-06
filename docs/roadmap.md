@@ -3703,6 +3703,36 @@ favorito (`FavoriteToggle`) só tinha `hover:` no estado "não favoritado" — a
 estrela já preenchida não reagia ao mouse. Adicionado `hover:brightness-125`
 ao estado favoritado.
 
+**Revisão de português, mesma sessão (a pedido do Douglas):** rodei
+`hunspell` com dicionário `pt_BR` sobre o texto renderizado de verdade (via
+`document.body.innerText`, Playwright + `zeuxd` real — não sobre o `.tsx`
+cru, que mistura JS/comentário com o texto que o usuário lê). Dois achados
+reais, dois falsos-positivos de tanto ruído:
+
+- **"Todos os jogos· 4" e "up sem tecla"/"down sem tecla" (etc.) coladas —
+  mesmo bug em dois lugares** (`AllGamesScreen.tsx`, `EmulatorBindingsPanel.tsx`):
+  o texto e o `<span className="ml-2 …">` seguinte eram irmãos na árvore JSX
+  sem nenhum caractere de espaço entre os dois — só a margem CSS separava
+  visualmente. Para quem usa mouse, ficava bonito; copiar o texto, ou um
+  leitor de tela, lia "jogos· 4" e "upsem tecla" grudados. Corrigido com
+  `{" "}` explícito nos dois lugares.
+- **"Revarrer" vs "Varrer de novo"**: a mesma ação (rescan de pasta) tinha
+  dois nomes diferentes — `LibraryScreen`/`GameDetailScreen` já diziam
+  "Revarrer"/"Revarrer pasta" (com progressivo "Revarrendo…"), só
+  `ConsoleDetailScreen` dizia "Varrer de novo". Unificado em "Revarrer" (era
+  maioria, e tem progressivo natural).
+- **"suppressando"** (comentário, não UI): híbrido inglês+português inventado
+  em 4 lugares de `internal/install/firstrun.go`/`firstrun_test.go`.
+  Corrigido para "suprimindo".
+- **Não é erro, decisão consciente de não mexer:** os nomes de ação do
+  mapeamento de controle (`up`/`down`/`left`/`right`/`start`/`select`/`l2`/
+  `r2`…) aparecem em inglês cru na tela de mapeamento. São as chaves de
+  config do próprio RetroArch/PCSX2 (`retroArchPadActions`), reaproveitadas
+  como rótulo — traduzir só a exibição exigiria um mapa de tradução novo
+  separado da chave técnica, e nomes de botão de controle (Start, Select,
+  L2, R2) já são universalmente ditos em inglês mesmo em português. Fora de
+  escopo desta revisão.
+
 **Depende de:** M4 (sem o estado preservado, escolher uma ordem e voltar do
 detalhe reseta tudo — a barra pareceria quebrada)
 **Bloqueia:** nada

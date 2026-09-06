@@ -180,7 +180,7 @@ func seedPCSX2(installDir string) error {
 }
 
 // seedDolphin escreve a chave que marca o prompt de analytics como respondido,
-// suppressando o wizard de primeira execução do Dolphin.
+// suprimindo o wizard de primeira execução do Dolphin.
 func seedDolphin(installDir string) error {
 	iniPath := filepath.Join(installDir, "Dolphin.ini")
 	if _, err := os.Stat(iniPath); err == nil {
@@ -197,7 +197,7 @@ func seedDolphin(installDir string) error {
 }
 
 // seedPPSSPP escreve a chave FirstRun=false no arquivo de configuração,
-// suppressando o wizard de primeira execução do PPSSPP.
+// suprimindo o wizard de primeira execução do PPSSPP.
 func seedPPSSPP(installDir string) error {
 	iniPath := filepath.Join(installDir, "ppsspp.ini")
 	if _, err := os.Stat(iniPath); err == nil {

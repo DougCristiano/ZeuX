@@ -209,7 +209,7 @@ func TestSeedPCSX2DoesNotOverwriteExistingSettings(t *testing.T) {
 }
 
 // Trava a regra: instalar Dolphin grava a chave que marca o prompt de
-// analytics como respondido, suppressando o wizard.
+// analytics como respondido, suprimindo o wizard.
 func TestSeedDolphinWritesAnalyticsPermission(t *testing.T) {
 	dir := t.TempDir()
 
@@ -252,7 +252,7 @@ func TestSeedDolphinDoesNotOverwriteExistingSettings(t *testing.T) {
 	}
 }
 
-// Trava a regra: instalar PPSSPP grava a chave FirstRun=false, suppressando
+// Trava a regra: instalar PPSSPP grava a chave FirstRun=false, suprimindo
 // o wizard de primeira execução.
 func TestSeedPPSSPPWritesFirstRunFlag(t *testing.T) {
 	dir := t.TempDir()
