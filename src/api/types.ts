@@ -290,6 +290,18 @@ export type EmulatorBindingsResponse = {
   bindings: InputBinding[];
 };
 
+export type ControllerProfile = {
+  id: string;
+  name: string;
+  vendor: string;
+  updated_at: string;
+};
+
+export type ControllerAssignment = {
+  adapter_id: string;
+  profile_id?: string;
+};
+
 // --- Cores do RetroArch (GET /api/v1/retroarch/cores) ---
 
 export type RetroArchCoreStatus = {

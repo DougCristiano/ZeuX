@@ -86,6 +86,10 @@ func run(addr string, logger *slog.Logger) error {
 	// no arquivo do emulador, mas nunca por cima de configuração que o usuário
 	// salvou à mão — quem responde "ele configurou?" é este store.
 	userConfig := emulator.NewUserConfigStore(db)
+	controllerProfiles := emulator.NewControllerProfileStore(db)
+	if err := controllerProfiles.SeedProfiles(context.Background()); err != nil {
+		return fmt.Errorf("semeando perfis de controle: %w", err)
+	}
 
 	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), userConfig, logger)
 
@@ -106,7 +110,7 @@ func run(addr string, logger *slog.Logger) error {
 	server := api.NewServer(
 		hardware.NewProbe(), catalog, consentStore,
 		registry, customStore, launcher, installer, libraryStore,
-		igdbCreds, igdbJobs, userConfig, logger)
+		igdbCreds, igdbJobs, userConfig, controllerProfiles, logger)
 
 	// Só quem está rodando o front em modo desenvolvimento (`npm run tauri
 	// dev`) define esta variável — o instalador nunca a define, então o

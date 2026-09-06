@@ -45,6 +45,7 @@ type Server struct {
 	// emulador (Q2, docs/roadmap.md) — é o que faz o lançamento respeitar a
 	// escolha dele em vez de reaplicar o preset do catálogo por cima.
 	userConfig *emulator.UserConfigStore
+	controllerProfiles *emulator.ControllerProfileStore
 
 	logger *slog.Logger
 
@@ -70,6 +71,7 @@ func NewServer(
 	igdbCreds *igdb.CredentialsStore,
 	igdbJobs *igdb.ScrapeManager,
 	userConfig *emulator.UserConfigStore,
+	controllerProfiles *emulator.ControllerProfileStore,
 	logger *slog.Logger,
 ) *Server {
 	return &Server{
@@ -84,6 +86,7 @@ func NewServer(
 		igdbCreds:  igdbCreds,
 		igdbJobs:   igdbJobs,
 		userConfig: userConfig,
+		controllerProfiles: controllerProfiles,
 		logger:     logger,
 	}
 }
@@ -142,6 +145,9 @@ func (s *Server) Routes() http.Handler {
 	// emulator.KeyBindableAdapter (ver Status.Bindable).
 	mux.HandleFunc("GET /api/v1/emulators/{id}/bindings", s.handleGetEmulatorBindings)
 	mux.HandleFunc("POST /api/v1/emulators/{id}/bindings", s.handleSetEmulatorBindings)
+	mux.HandleFunc("GET /api/v1/controllers", s.handleListControllerProfiles)
+	mux.HandleFunc("GET /api/v1/emulators/{id}/controller-profile", s.handleGetControllerProfile)
+	mux.HandleFunc("POST /api/v1/emulators/{id}/controller-profile", s.handleSetControllerProfile)
 	mux.HandleFunc("GET /api/v1/installs", s.handleInstalls)
 	mux.HandleFunc("GET /api/v1/installs/{id}", s.handleInstallJob)
 	// R3 (ADR 0015): cancela um download de core em andamento. Só cores
@@ -659,6 +665,91 @@ func (s *Server) handleSetEmulatorBindings(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"unapplied": unapplied})
+}
+
+func (s *Server) handleListControllerProfiles(w http.ResponseWriter, r *http.Request) {
+	if s.controllerProfiles == nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_profiles_unavailable", "O armazenamento de perfis de controle não está disponível.")
+		return
+	}
+
+	profiles, err := s.controllerProfiles.ListProfiles(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_profiles_read_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"profiles": profiles})
+}
+
+func (s *Server) handleGetControllerProfile(w http.ResponseWriter, r *http.Request) {
+	if s.controllerProfiles == nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_profiles_unavailable", "O armazenamento de perfis de controle não está disponível.")
+		return
+	}
+	adapterID := r.PathValue("id")
+	if _, ok := s.emulators.ByID(adapterID); !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("O emulador %q não é conhecido pelo ZeuX.", adapterID))
+		return
+	}
+
+	assignment, err := s.controllerProfiles.GetAssignment(r.Context(), adapterID)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_profile_read_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, assignment)
+}
+
+func (s *Server) handleSetControllerProfile(w http.ResponseWriter, r *http.Request) {
+	if s.controllerProfiles == nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_profiles_unavailable", "O armazenamento de perfis de controle não está disponível.")
+		return
+	}
+	adapterID := r.PathValue("id")
+	if _, ok := s.emulators.ByID(adapterID); !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("O emulador %q não é conhecido pelo ZeuX.", adapterID))
+		return
+	}
+
+	var body struct {
+		ProfileID string `json:"profile_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body", `O corpo deve ser um JSON no formato {"profile_id": "xbox"}.`)
+		return
+	}
+
+	if body.ProfileID == "" {
+		if err := s.controllerProfiles.ClearAssignment(r.Context(), adapterID); err != nil {
+			s.writeError(w, http.StatusInternalServerError, "controller_profile_write_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"adapter_id": adapterID})
+		return
+	}
+
+	profiles, err := s.controllerProfiles.ListProfiles(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_profiles_read_failed", err.Error())
+		return
+	}
+	found := false
+	for _, profile := range profiles {
+		if profile.ID == body.ProfileID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		s.writeError(w, http.StatusBadRequest, "unknown_controller_profile", fmt.Sprintf("O perfil de controle %q não é conhecido pelo ZeuX.", body.ProfileID))
+		return
+	}
+
+	if err := s.controllerProfiles.SetAssignment(r.Context(), adapterID, body.ProfileID); err != nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_profile_write_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"adapter_id": adapterID, "profile_id": body.ProfileID})
 }
 
 func (s *Server) handleInstalls(w http.ResponseWriter, r *http.Request) {

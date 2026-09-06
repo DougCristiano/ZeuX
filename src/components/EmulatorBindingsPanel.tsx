@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { InputBinding } from "../api/types";
+import type { ControllerAssignment, ControllerProfile } from "../api/types";
 import { translateKeyForAdapter } from "../lib/keyMapping";
-import { Button, Callout, InlineError, Toast } from "./ui";
+import { Button, Callout, InlineError, Toast, ZSelect } from "./ui";
+import { SelectItem } from "./ui/select";
 import { useToast } from "../hooks/useToast";
 import { useGamepad } from "../hooks/useGamepad";
 import { useT } from "../i18n/i18n";
@@ -33,6 +35,9 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
   const [bindings, setBindings] = useState<InputBinding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<ControllerProfile[]>([]);
+  const [assignment, setAssignment] = useState<ControllerAssignment | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
   const [listeningKeyFor, setListeningKeyFor] = useState<string | null>(null);
   const [listeningButtonFor, setListeningButtonFor] = useState<string | null>(null);
   // `key` ou `button`, nunca os dois: o conflito é sempre sobre um vínculo
@@ -71,11 +76,12 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
   function load() {
     setLoading(true);
     setError(null);
-    api
-      .getEmulatorBindings(adapterId)
-      .then((res) => {
-        setActions(res.actions ?? []);
-        setBindings(res.bindings ?? []);
+    Promise.all([api.getEmulatorBindings(adapterId), api.getControllerProfiles(), api.getControllerAssignment(adapterId)])
+      .then(([bindingsRes, profilesRes, assignmentRes]) => {
+        setActions(bindingsRes.actions ?? []);
+        setBindings(bindingsRes.bindings ?? []);
+        setProfiles(profilesRes.profiles ?? []);
+        setAssignment(assignmentRes);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : t("errorLoadingBindings")))
       .finally(() => setLoading(false));
@@ -112,6 +118,25 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t("errorSavingBindings"));
       return false;
+    }
+  }
+
+  async function saveControllerProfile(profileId: string | null) {
+    setProfileSaving(true);
+    setError(null);
+    try {
+      await api.setControllerAssignment(adapterId, profileId);
+      await Promise.all([
+        api.getControllerProfiles(),
+        api.getControllerAssignment(adapterId),
+      ]).then(([profilesRes, assignmentRes]) => {
+        setProfiles(profilesRes.profiles ?? []);
+        setAssignment(assignmentRes);
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("errorSavingBindings"));
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -293,6 +318,30 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
           </ul>
         </Callout>
       )}
+
+      <div className="rounded border border-line bg-fill p-3">
+        <div className="flex flex-col gap-2">
+          <div>
+            <p className="text-sm text-ink">Perfil de controle do Zeux</p>
+            <p className="text-xs text-muted">
+              Escolha a família que este emulador vai usar como referência. Isso ainda não altera o arquivo do emulador; guarda a preferência no Zeux para a próxima etapa.
+            </p>
+          </div>
+          <ZSelect
+            ariaLabel="Perfil de controle"
+            value={assignment?.profile_id ?? "__none__"}
+            onValueChange={(value) => void saveControllerProfile(value === "__none__" ? null : value)}
+            disabled={profileSaving || profiles.length === 0}
+          >
+            <SelectItem value="__none__">Nenhum perfil</SelectItem>
+            {profiles.map((profile) => (
+              <SelectItem key={profile.id} value={profile.id}>
+                {profile.name} · {profile.vendor}
+              </SelectItem>
+            ))}
+          </ZSelect>
+        </div>
+      </div>
 
       {/* Q4 (docs/roadmap.md, Sprint Q): o cabeçalho do controle. Antes, esta
           área só existia no estado negativo ("nenhum controle detectado") — com

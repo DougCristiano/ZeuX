@@ -119,6 +119,10 @@ func newTestServerFull(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB
 	t.Cleanup(func() { db.Close() })
 
 	userConfig := emulator.NewUserConfigStore(db)
+	controllerProfiles := emulator.NewControllerProfileStore(db)
+	if err := controllerProfiles.SeedProfiles(context.Background()); err != nil {
+		t.Fatalf("controllerProfiles.SeedProfiles: %v", err)
+	}
 	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), userConfig, silentLogger())
 
 	sources, err := install.LoadCatalog()
@@ -135,7 +139,7 @@ func newTestServerFull(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB
 	}
 	igdbJobs := igdb.NewScrapeManager(libraryStore, igdbCreds, silentLogger())
 
-	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, igdbCreds, igdbJobs, userConfig, silentLogger())
+	server := api.NewServer(probe, catalog, consentStore, registry, customStore, launcher, installer, libraryStore, igdbCreds, igdbJobs, userConfig, controllerProfiles, silentLogger())
 	return server, db, installer
 }
 
