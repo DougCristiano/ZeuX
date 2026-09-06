@@ -119,6 +119,34 @@ observam o que cada camada recebeu (adapter espião sobre `/bin/true`), não o
 arquivo final de um PCSX2 instalado — este ambiente não tem um. O
 `upscale_multiplier` em si já é coberto por `pcsx2_config_test.go` desde o H1.
 
+**Achado de design ao testar com o Douglas em máquina real (2026-09-06):**
+`upscale_multiplier=4` batia certinho no `PCSX2.ini` — o Q2 em si funcionava
+— mas o Douglas não conseguiu achar onde o ZeuX *mostra* esse preset. Não era
+falta de UI: `ConsoleVerdictCard` (`src/components/ui.tsx`) já exibe
+`{emulator} · {preset}` tanto no detalhe do console ("Nesta máquina") quanto
+na tela do próprio jogo (logo abaixo do botão Jogar). Medido com Playwright
+contra o app rodando de verdade: o problema era **hierarquia visual**, não
+ausência de dado. O preset (`verdict.preset`, o único texto que muda por
+console/hardware) e o `headline` (`Level.Headline()`, texto **fixo por
+patamar** — idêntico em todo console "ótimo") tinham exatamente o mesmo
+`text-sm text-muted` — contraste de cor medido em 7.62:1 (acima do mínimo
+WCAG AA/AAA), então não era problema de acessibilidade estrita. O olho tratava
+as duas linhas como a mesma classe de informação, e como a de cima se repete
+em toda tela "Especificações" (33 consoles, 4 patamares possíveis), o padrão
+ensinava a pular o bloco inteiro. Corrigido: `headline` caiu para `text-xs`
+(legenda), preset subiu para `text-sm font-medium text-ink` (o dado que
+carrega decisão real do hardware ganha peso, o texto fixo do catálogo não).
+Mesmo componente serve `ConsoleDetailScreen`, `GameDetailScreen` e
+`VerdictScreen` — a correção vale nas três telas de uma vez.
+
+**Decisão registrada, não tomada:** a cor da borda esquerda de
+`ConsoleVerdictCard` (`consoleAccentColor`, decidida no N12) é identidade
+visual do console, igual usada em `GameTile`/`EmulatorCard`/`ConsoleIcon` —
+**não** codifica o patamar de hardware. Numa parede de cards "ótimo" lado a
+lado isso pode parecer que a cor deveria significar status; recolorir só
+neste card quebraria a identidade cruzada com as outras telas que mostram o
+mesmo console. Fica para o Douglas decidir se vale a pena.
+
 ### Q3 — o ZeuX não sabe qual é a sua tela — **feito em 2026-08-28**
 
 `HardwareInfo` tem `OS`, `CPU`, `GPUs`, `Memory` — **nenhum campo de display**.
@@ -234,6 +262,18 @@ aperto (um aperto de 1,5 s consome uma só), nenhum erro HTTP, e o
 **Não verificado:** controle físico de verdade. O índice que a Gamepad API
 reporta é o do mapeamento "standard" do navegador; se ele corresponde ao que o
 RetroArch entende por aquele botão, só um controle na mão confirma.
+
+**Achado ao testar com controle físico de verdade (2026-09-06):** o Douglas
+conectou um controle antes de abrir a tela e a mensagem negativa
+("Nenhum controle detectado — conecte um") apareceu mesmo com o controle
+plugado — parecia um bug de detecção, mas é o comportamento documentado da
+própria Gamepad API do Chromium/WebView2: `getGamepads()` só populam o
+controle depois do **primeiro botão apertado nele**, não só por estar
+conectado. `useGamepad.ts` já registrava essa armadilha em comentário e já
+cobria o evento `gamepadconnected`, mas a mensagem da tela não avisava a
+pessoa sobre a necessidade do aperto — dizia "conecte um" como se o problema
+fosse a conexão. Corrigido: a mensagem agora explica que é preciso apertar um
+botão no controle já plugado.
 
 ### Q5 — os 21 consoles que dependem do RetroArch — **feito em 2026-08-28**
 
@@ -404,6 +444,25 @@ vale: `GamesScreen.doLaunch` manda só `rom_path`/`console_id`, então
 aplicado**. O detalhe mostra o core certo (o que roda); quem promete errado
 é o parecer. Fechar essa lacuna significa mudar o que o lançamento envia —
 decisão de produto, fora do escopo desta sprint.
+
+**Achado testando com o Douglas (2026-09-06):** as duas colunas ficavam
+visivelmente desbalanceadas quando o console tem 1 emulador só, ainda não
+instalado — a esquerda com só o card "Instalar" (curto), a direita
+empilhando Jogos + BIOS + Nesta máquina (bem mais alta). `BiosSection` foi
+para a coluna esquerda, junto de "Como rodar" — mesmo grupo semântico ("o que
+este console precisa pra rodar": emulador + BIOS), deixando a direita só com
+"sobre a sua biblioteca/máquina" (Jogos + Nesta máquina). Reduz o
+desbalanceamento sem inventar conteúdo de enchimento pra igualar altura.
+
+**Segundo achado, mesma sessão:** o "← Consoles" desta tela usava
+`variant="quiet"` (sem borda, sem fundo — só texto que ganha peso no hover).
+Para uma ação secundária dentro de uma linha (ex.: "Remover" de pasta) isso é
+o comportamento certo; para a navegação de topo de tela, sem borda lê como
+texto solto, não como algo clicável — destoava do "Voltar" que
+`GameDetailScreen`/`LibraryScreen`/`EmulatorsScreen` já mostravam com
+`variant="secondary"` (bordado). Trocado para `secondary`, junto com "Ver por
+emulador" (`ConsolesScreen.tsx`), mesma classe de ação (troca de visão de
+tela inteira).
 
 ### P3 — o que a Sprint P deixou aberto
 
@@ -2536,6 +2595,21 @@ fica descartado, não só adiado.
 
 **Depende de:** nada · **Bloqueia:** nada
 
+**Achado ao testar com o Douglas em máquina real (2026-09-06), fora do que o
+script de 2026-08-07 media:** o script comparava se dois consoles resolviam
+para a **mesma** sigla — nunca mediu se a sigla cabia na própria caixa de
+36px (`h-9 w-9`). Medido ao vivo com Playwright: `label.slice(0, 4)` em Press
+Start 2P 11px renderiza ~41px, 5px maior que a caixa. Sem colisão nenhuma
+entre consoles, "arcade"→"ARCA", "atari2600"→"ATAR" e "dreamcast"→"DREA" (e,
+por extensão, qualquer console cujo `short_name` não caiba em 3 letras e não
+tenha entrada em `ICON_LABEL_OVERRIDES`) vazavam visualmente sobre o ícone
+vizinho — via Playwright, print de `EmulatorsScreen` mostrando
+"ARCAATARDREA" emendado, ilegível. Corrigido: `ConsoleIcon`/
+`ConsoleMoreBadge` foram para `h-12 w-12` (medido até não sobrar overflow
+nenhum) e ganharam `overflow-hidden` como rede de segurança contra um label
+futuro ainda maior. Reconferido com Playwright: 0 chips com
+`scrollWidth > clientWidth` na tela de Emuladores.
+
 **Critério de saída da Sprint G:** abrir a biblioteca numa máquina com rede
 desligada mostra capas reais nos jogos já resolvidos, os favoritos do usuário no
 topo (ou filtráveis), e nenhum jogo desaparecido ou com capa de outro jogo.
@@ -3052,6 +3126,16 @@ inteira — instalar/remover/abrir standalone/editar-excluir personalizado).
 `EmulatorCard` virou orquestrador: monta `Card` + os 5 pedaços + o toggle de
 cores do RetroArch. `RowState` continua union discriminada, comportamento
 idêntico — `npm run build` (`tsc` + `vite build`) passou sem erro.
+
+**Achado testando com o Douglas (2026-09-06), fora de `EmulatorCard` em si:**
+a grade que lista os cards (`EmulatorsScreen.tsx`, `grid grid-cols-1 …`) não
+tinha `items-start`. O Grid CSS por padrão estica cada célula pra altura da
+fileira mais alta (`align-items: stretch`) — o card do RetroArch
+(configurações + mapeamento + "ver cores") é bem mais alto que
+DuckStation/PCSX2 (só um botão "Instalar"); a borda dos três acompanhava a
+fileira (esticava), mas o conteúdo de dentro ficava colado no topo — metade
+do card vazia por dentro, sem nenhum motivo visual. `items-start` faz cada
+card ficar só do tamanho do próprio conteúdo, sem estourar as vizinhas.
 
 **Correção de contagem, 2026-08-07:** o critério abaixo fala em "7 telas", mas
 `src/screens/` tem **10** arquivos. Somando a lista da revisão original com a do
@@ -3606,6 +3690,48 @@ consoles):
 **Precisa do Douglas:** "a lista densa ficou legível" (julgamento de leitura,
 não de contagem) e se a virtualização não introduziu soluço perceptível ao
 rolar rápido — nenhuma sessão de IA sente "jank".
+
+**Achado testando com o Douglas (2026-09-06):** o `<div role="button">` que
+torna a linha inteira clicável (`GameListRow.tsx`) não tinha `cursor-pointer`
+nem `hover:` nenhum — medido ao vivo com Playwright, `cursor: auto` e zero
+mudança de estilo ao passar o mouse. `role="button"` num elemento não nativo
+não ganha cursor de mão sozinho (só `<button>`/`<a href>` têm isso de
+fábrica), e sem `hover:` a linha inteira do modo lista parecia texto solto,
+não algo clicável. Corrigido: `cursor-pointer` + `hover:bg-fill` (mesmo tom
+que `Button` variant="secondary" já usa no hover). Mesma sessão: o botão de
+favorito (`FavoriteToggle`) só tinha `hover:` no estado "não favoritado" — a
+estrela já preenchida não reagia ao mouse. Adicionado `hover:brightness-125`
+ao estado favoritado.
+
+**Revisão de português, mesma sessão (a pedido do Douglas):** rodei
+`hunspell` com dicionário `pt_BR` sobre o texto renderizado de verdade (via
+`document.body.innerText`, Playwright + `zeuxd` real — não sobre o `.tsx`
+cru, que mistura JS/comentário com o texto que o usuário lê). Dois achados
+reais, dois falsos-positivos de tanto ruído:
+
+- **"Todos os jogos· 4" e "up sem tecla"/"down sem tecla" (etc.) coladas —
+  mesmo bug em dois lugares** (`AllGamesScreen.tsx`, `EmulatorBindingsPanel.tsx`):
+  o texto e o `<span className="ml-2 …">` seguinte eram irmãos na árvore JSX
+  sem nenhum caractere de espaço entre os dois — só a margem CSS separava
+  visualmente. Para quem usa mouse, ficava bonito; copiar o texto, ou um
+  leitor de tela, lia "jogos· 4" e "upsem tecla" grudados. Corrigido com
+  `{" "}` explícito nos dois lugares.
+- **"Revarrer" vs "Varrer de novo"**: a mesma ação (rescan de pasta) tinha
+  dois nomes diferentes — `LibraryScreen`/`GameDetailScreen` já diziam
+  "Revarrer"/"Revarrer pasta" (com progressivo "Revarrendo…"), só
+  `ConsoleDetailScreen` dizia "Varrer de novo". Unificado em "Revarrer" (era
+  maioria, e tem progressivo natural).
+- **"suppressando"** (comentário, não UI): híbrido inglês+português inventado
+  em 4 lugares de `internal/install/firstrun.go`/`firstrun_test.go`.
+  Corrigido para "suprimindo".
+- **Não é erro, decisão consciente de não mexer:** os nomes de ação do
+  mapeamento de controle (`up`/`down`/`left`/`right`/`start`/`select`/`l2`/
+  `r2`…) aparecem em inglês cru na tela de mapeamento. São as chaves de
+  config do próprio RetroArch/PCSX2 (`retroArchPadActions`), reaproveitadas
+  como rótulo — traduzir só a exibição exigiria um mapa de tradução novo
+  separado da chave técnica, e nomes de botão de controle (Start, Select,
+  L2, R2) já são universalmente ditos em inglês mesmo em português. Fora de
+  escopo desta revisão.
 
 **Depende de:** M4 (sem o estado preservado, escolher uma ordem e voltar do
 detalhe reseta tudo — a barra pareceria quebrada)
@@ -4359,6 +4485,18 @@ Hoje cada tela escolhe seu próprio teto e seu próprio topo — conferido por
       container/capa crescendo em 2xl) foi desfeito — fazia sentido contra
       um container que ainda crescia; com `reading` fixo, não crescer mais é
       a decisão, não um bug. Documentado no próprio arquivo.
+
+**Revertido de novo em 2026-09-06, a pedido do Douglas:** a variante
+`"reading"` saiu de `ScreenContainer`. O modelo do produto passou a ser
+**wide em toda tela, sem exceção** — inclusive as duas que este item tinha
+posto no teto fixo (`GameDetailScreen`, `SettingsScreen`), que agora usam
+`variant="listing"` como as outras 5. O argumento da régua de leitura
+(65-75 caracteres por linha) que justificou `"reading"` continua válido
+em tese, mas perdeu para a preferência explícita de manter um modelo visual
+único no app — decisão de produto, não coisa que uma sessão de IA deveria
+reabrir sozinha. `variant` continua existindo como parâmetro de
+`ScreenContainer` (todo chamador já escreve `variant="listing"`), só sem mais
+ter uma segunda opção por trás.
 
 **Depende de:** nada · **Bloqueia:** N8, e o fechamento do M1 (fechado acima)
 

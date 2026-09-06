@@ -951,8 +951,17 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
               usar `xl` (proibido pelo K3). O5: `2xl`/`min-[2400px]` acompanham
               o teto do container acima — sem eles, o card ficaria cada vez
               mais largo (e mais vazio) conforme a janela cresce, em vez de
-              ganhar mais uma coluna. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
+              ganhar mais uma coluna.
+
+              `items-start` (achado testando com o Douglas, 2026-09-06): sem
+              isso, o Grid CSS estica cada card pra altura da fileira mais
+              alta (comportamento padrão do `align-items: stretch`) — o
+              RetroArch (configurações + mapeamento + "ver cores") define uma
+              fileira alta, e DuckStation/PCSX2 (só um botão "Instalar")
+              esticavam junto, com a borda acompanhando mas o conteúdo colado
+              no topo — metade do card vazia por dentro. Com `items-start`,
+              cada card fica só do tamanho do próprio conteúdo. */}
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
             {pageItems.map((entry) => (
               <EmulatorCard
                 key={entry.adapter_id}

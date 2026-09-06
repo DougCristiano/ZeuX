@@ -227,11 +227,13 @@ export function GameDetailScreen({
 
   const heroContent = (
     <>
-      {/* O7 media esta capa contra um container que ainda crescia em janela
-          grande — o N3 (docs/roadmap.md, Sprint N) tornou `reading` um teto
-          fixo (`ScreenContainer`, motivo no comentário de lá: tela de
-          leitura não fica mais útil esticada em 4K), então a capa também
-          volta a ser fixa — não há mais "espaço sobrando" para acompanhar. */}
+      {/* Tamanho de capa fixo por design (não acompanha o teto da tela): uma
+          capa maior que isso não fica mais útil, só mais vazia ao redor —
+          mesmo raciocínio de `ConsoleIcon`/badges no CLAUDE.md (elemento de
+          tamanho de design fixo, não área que deveria crescer com a janela).
+          A tela em volta é `variant="listing"` (wide) desde 2026-09-06 — a
+          variante `"reading"` que existia antes foi removida a pedido do
+          Douglas, ver comentário em `ScreenContainer`. */}
       <div className="relative w-full max-w-[220px]">
         <GameCover label={shortName} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
         <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
@@ -345,7 +347,7 @@ export function GameDetailScreen({
   );
 
   return (
-    <ScreenContainer variant="reading">
+    <ScreenContainer variant="listing">
       {/* A contagem de sessões falhar não impede o resto da tela de
           funcionar — mas o texto vermelho solto dentro do card de
           estatísticas era fácil de perder (mesmo achado do Douglas em

@@ -473,12 +473,17 @@ function GamesFolderSection({
                 {folder.path}
               </span>
               <span className="flex shrink-0 gap-1">
+                {/* "Revarrer", não "Varrer de novo" (achado testando com o
+                    Douglas, 2026-09-06): mesma ação que LibraryScreen/
+                    GameDetailScreen já chamam de "Revarrer"/"Revarrer
+                    pasta" — duas frases diferentes pra a mesma coisa em
+                    telas diferentes. */}
                 <Button
                   variant="quiet"
                   disabled={busy}
                   onClick={() => runFolderAction(api.rescanLibraryFolder(folder.id), "Não foi possível varrer a pasta.")}
                 >
-                  Varrer de novo
+                  Revarrer
                 </Button>
                 <Button variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
                   Remover
@@ -662,7 +667,13 @@ export function ConsoleDetailScreen({
   if (error) {
     return (
       <ScreenContainer variant="listing">
-        <Button variant="quiet" onClick={onBack}>
+        {/* `secondary`, não `quiet` (achado testando com o Douglas,
+            2026-09-06): `quiet` é sem borda nenhuma, pensado pra ação
+            secundária dentro de uma linha (ex.: "Remover" de pasta) — numa
+            navegação de topo de tela, sem borda lê como texto solto, não
+            como botão clicável. Mesmo variant que "Voltar" já usa em
+            GameDetailScreen/LibraryScreen/EmulatorsScreen. */}
+        <Button variant="secondary" onClick={onBack}>
           ← Consoles
         </Button>
         <div className="mt-4">
@@ -695,7 +706,9 @@ export function ConsoleDetailScreen({
 
   return (
     <ScreenContainer variant="listing">
-      <Button variant="quiet" onClick={onBack}>
+      {/* `secondary`, não `quiet` — ver comentário no outro `onBack` acima
+          (estado de erro), mesmo raciocínio. */}
+      <Button variant="secondary" onClick={onBack}>
         ← Consoles
       </Button>
 
@@ -718,7 +731,16 @@ export function ConsoleDetailScreen({
 
       {/* O6 (Sprint O) e a regra de layout responsivo do CLAUDE.md: coluna
           lateral com teto, nunca largura fixa; `lg` e não `xl` porque esta
-          área já divide espaço com a sidebar. */}
+          área já divide espaço com a sidebar.
+
+          `BiosSection` mora na coluna esquerda, não na direita (achado
+          testando com o Douglas, 2026-09-06): com um console de emulador só
+          e ainda não instalado, a esquerda tinha só o card "Instalar" e a
+          direita empilhava Jogos + BIOS + Nesta máquina — colunas
+          visivelmente desbalanceadas, a direita bem mais alta que a
+          esquerda. BIOS é requisito pra rodar, no mesmo grupo semântico do
+          card do emulador ("o que este console precisa"); a direita fica
+          só com "sobre a sua biblioteca/máquina" (Jogos + Nesta máquina). */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_minmax(280px,360px)]">
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold text-ink">
@@ -745,6 +767,8 @@ export function ConsoleDetailScreen({
               />
             ))
           )}
+
+          <BiosSection entry={chosenEntry} requiresExternalFile={entry.requires_external_file ?? false} />
         </div>
 
         <aside className="flex flex-col gap-4">
@@ -755,8 +779,6 @@ export function ConsoleDetailScreen({
             onChanged={reload}
             onOpenGames={onOpenGames}
           />
-
-          <BiosSection entry={chosenEntry} requiresExternalFile={entry.requires_external_file ?? false} />
 
           {/* O parecer de hardware é a outra pergunta ("esta máquina
               aguenta?"), respondida pelo mesmo card que a tela de

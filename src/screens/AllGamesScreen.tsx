@@ -644,11 +644,15 @@ export function AllGamesScreen({
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-ink">
-          Todos os jogos
           {/* M12 (docs/sprint-m-plano.md): a partir de `total`, que
               `loadGames` já guarda em estado — sem chamada nova (critério do
               item). Ausente durante o carregamento inicial (`games` ainda
-              `null`): a contagem some junto com o resto, não sobra sozinha. */}
+              `null`): a contagem some junto com o resto, não sobra sozinha.
+              Espaço de verdade antes do span (achado testando com o Douglas,
+              2026-09-06): sem ele, o texto concatenava "Todos os jogos· 4" —
+              só o `ml-2` separava visualmente, não a árvore de texto (mesmo
+              bug corrigido em `EmulatorBindingsPanel`). */}
+          Todos os jogos{" "}
           {games && <span className="ml-2 text-base font-normal text-muted">· {total.toLocaleString("pt-BR")}</span>}
         </h1>
         <div className="flex flex-wrap gap-2">

@@ -166,20 +166,20 @@ export function OnboardingGlow() {
  * de largura e seu próprio espaçamento de topo — conferido por `grep`, eram
  * seis valores diferentes (`max-w-6xl`, `max-w-7xl`, `max-w-5xl`,
  * `max-w-4xl`, `max-w-2xl`) mais um `py-10` isolado — e navegar de uma tela
- * para outra fazia o conteúdo "pular" de largura. Dois tetos só, escolhidos
- * pelo tipo de conteúdo, não por tela:
+ * para outra fazia o conteúdo "pular" de largura. Um teto só, o mesmo teto
+ * escalonado que a Sprint O já validou (O5): `max-w-6xl` até 1536px de
+ * janela, crescendo em telas grandes/4K para não deixar metade da janela
+ * vazia.
  *
- * - `"listing"` — telas de grade/lista (Todos os jogos, Emuladores,
- *   Especificações, Biblioteca, Jogos de um console). Mesmo teto escalonado
- *   que a Sprint O já validou (O5): `max-w-6xl` até 1536px de janela,
- *   crescendo em telas grandes/4K para não deixar metade da janela vazia.
- * - `"reading"` — telas de leitura/formulário (Detalhe do jogo,
- *   Configurações). `max-w-3xl` fixo, **sem** crescer em janela grande — ao
- *   contrário de uma grade, texto e formulário não ficam mais úteis
- *   esticados; a régua de ~65-75 caracteres por linha é o motivo de existir
- *   um teto de leitura para início de conversa. (Isto supersede o ajuste do
- *   O7 em `GameDetailScreen`, feito quando essa tela ainda tinha seu próprio
- *   teto crescente — revertido junto com esta mudança, ver comentário lá.)
+ * **Existiu uma segunda variante ("reading", `max-w-3xl` fixo) para telas de
+ * leitura/formulário** (Detalhe do jogo, Configurações), com a régua de
+ * ~65-75 caracteres por linha como justificativa. **Removida a pedido do
+ * Douglas (2026-09-06):** o modelo do produto é "wide" em toda tela, sem
+ * exceção — inclusive as duas que só liam texto. `variant` continua existindo
+ * como parâmetro (todo chamador já escreve `variant="listing"` explícito) só
+ * para não obrigar uma segunda rodada de edição nos 8 chamadores existentes;
+ * se um dia sobrar variante única de verdade, vale simplificar removendo o
+ * parâmetro também.
  *
  * `pt-16 pb-10` é o único espaçamento de topo/rodapé — inclusive
  * `VerdictScreen`, que antes usava `py-10` sozinha. O checkbox aberto do M1
@@ -195,12 +195,12 @@ export function ScreenContainer({
   className = "",
   children,
 }: {
-  variant?: "listing" | "reading";
+  variant?: "listing";
   className?: string;
   children: ReactNode;
 }) {
-  const width =
-    variant === "listing" ? "max-w-6xl 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]" : "max-w-3xl";
+  void variant; // única variante que resta — ver comentário acima
+  const width = "max-w-6xl 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]";
   return <div className={`mx-auto px-6 pt-16 pb-10 ${width} ${className}`}>{children}</div>;
 }
 
@@ -708,8 +708,14 @@ export function FavoriteToggle({
         e.stopPropagation();
         onToggle();
       }}
+      // `hover:brightness-125` no estado favoritado (achado testando com o
+      // Douglas, 2026-09-06): só o ramo "não favoritado" tinha `hover:` —
+      // passar o mouse sobre uma estrela já preenchida não mudava nada,
+      // parecia ícone decorativo em vez de alternável.
       className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
-        favorite ? "border-amber bg-black/60 text-amber" : "border-line-strong bg-black/60 text-muted hover:text-ink"
+        favorite
+          ? "border-amber bg-black/60 text-amber hover:brightness-125"
+          : "border-line-strong bg-black/60 text-muted hover:text-ink"
       } ${FOCUS_RING} ${className}`}
     >
       <Star size={14} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
@@ -896,10 +902,19 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
         <Badge variant={isGoodTier ? "solid" : "default"}>{LEVEL_LABEL[verdict.level]}</Badge>
       </div>
 
-      <p className="text-sm text-muted">{verdict.headline}</p>
+      {/* `headline` vem de `Level.Headline()` — é o mesmo texto para TODO
+          console do mesmo patamar (33 consoles, 4 patamares possíveis). Numa
+          tela com vários cards "ótimo" lado a lado, essa repetição treinava o
+          olho a pular o bloco inteiro — e o preset, que é a informação que
+          de fato muda por console, tinha exatamente o mesmo peso visual
+          (`text-sm text-muted`) que essa frase fixa. Achado de design ao
+          testar com o Douglas (2026-09-06): reduzido para legenda (`text-xs`)
+          e o preset promovido a `text-ink`/`font-medium`, que é o único dos
+          dois que carrega decisão real do hardware da pessoa. */}
+      <p className="text-xs text-muted">{verdict.headline}</p>
 
       {verdict.preset && (
-        <p className="text-sm text-muted">
+        <p className="text-sm font-medium text-ink">
           {verdict.emulator} · {verdict.preset}
         </p>
       )}
@@ -971,7 +986,20 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       style={{ borderColor: `${accent}66`, color: accent }}
       // M7 (docs/sprint-m-plano.md): 8px violava o piso de 11px da fonte
       // pixel (src/index.css) — mesma regra do badge de GameCover.
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
+      //
+      // `w-12` (não `w-9`, achado ao testar com o Douglas, 2026-09-06):
+      // medido ao vivo com Playwright, `label.slice(0, 4)` em Press Start 2P
+      // 11px renderiza ~41px de largura — a caixa de 36px que existia antes
+      // ficava 5px curta, e um `w-10` (40px) intermediário ainda cortava a
+      // primeira/última letra. O G5 (docs/roadmap.md) só travou colisão de
+      // SIGLA IGUAL entre dois consoles diferentes (script comparando
+      // strings), nunca mediu se o texto cabia na própria caixa —
+      // "arcade"/"atari2600"/"dreamcast" (e qualquer outro console cujo
+      // `short_name` não caiba em 3 letras e não tenha entrada em
+      // `ICON_LABEL_OVERRIDES`) vazava sobre o ícone vizinho, sem colidir em
+      // sigla nenhuma. `overflow-hidden` fica como rede de segurança: um
+      // label futuro ainda maior corta em vez de vazar.
+      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
       {(ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase()}
     </button>
@@ -987,8 +1015,11 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
  */
 export function ConsoleMoreBadge({ count }: { count: number }) {
   return (
+    // `h-12 w-12` acompanha o `ConsoleIcon` acima (2026-09-06, ver comentário
+    // lá) — os dois convivem na mesma fileira, tamanhos diferentes
+    // desalinhariam a grade.
     <span
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-dashed border-line-strong text-sm text-muted"
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-dashed border-line-strong text-sm text-muted"
       title={`mais ${count} console(s)`}
       aria-hidden="true"
     >

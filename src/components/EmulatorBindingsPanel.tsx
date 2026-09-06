@@ -317,8 +317,9 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </div>
       ) : (
         <p className="text-xs text-muted">
-          Nenhum controle detectado — conecte um para mapear botões. O mapeamento de teclado funciona sem controle
-          nenhum.
+          Nenhum controle detectado ainda. Se já conectou um, aperte um botão nele — a Gamepad API do navegador só
+          percebe a conexão depois do primeiro aperto, mesmo com o controle já plugado antes de abrir esta tela. O
+          mapeamento de teclado funciona sem controle nenhum.
         </p>
       )}
 
@@ -369,7 +370,13 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
               }`}
             >
               <span className="min-w-0 shrink text-sm break-words text-ink">
-                {action}
+                {/* Espaço de verdade antes do `ml-2` (achado testando com o
+                    Douglas, 2026-09-06): sem um caractere de espaço na árvore
+                    de texto, `{action}` e o span seguinte ficavam colados na
+                    hora de copiar/colar ou para um leitor de tela — só o
+                    CSS separava visualmente para quem usa mouse. `ml-2`
+                    continua para o espaçamento fino do layout. */}
+                {action}{" "}
                 <span className="ml-2 text-xs text-muted">
                   {binding?.key ?? "sem tecla"}
                   {binding?.button ? ` · botão ${binding.button}` : ""}
