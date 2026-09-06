@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../api";
 import type { InstallJob } from "../api/types";
+import { pollJob, pollJobUntilSettled, type PollJobHandlers } from "../lib/pollJob";
 
 /**
  * Estado de download de UM core (ADR 0015, R2/R3) — por nome, não um único
@@ -42,36 +43,29 @@ export function useCoreInstall({ onCoreReady }: { onCoreReady?: () => void } = {
     setState((prev) => ({ ...prev, [name]: next }));
   }
 
+  // O que fazer em cada fase do job de um core — igual para o polling comum
+  // (`pollCoreJob`) e para o que devolve Promise (`waitForCore`); só o "e
+  // então resolve" muda entre os dois.
+  function coreHandlers(name: string): PollJobHandlers {
+    return {
+      onProgress: (job) => setCoreState(name, { kind: "installing", job }),
+      onDone: () => {
+        setCoreState(name, { kind: "idle" });
+        onCoreReady?.();
+      },
+      // "cancelado" (fase própria do R3) volta ao estado ocioso sem erro:
+      // desistir não é falha.
+      onCanceled: () => setCoreState(name, { kind: "idle" }),
+      // job.error já vem do servidor nomeando o core e o que aconteceu
+      // (docs/api.md) — exibido como veio, sem reescrita.
+      onFailed: (job) => setCoreState(name, { kind: "error", message: job.error ?? "O download não foi concluído." }),
+      onError: (message) => setCoreState(name, { kind: "error", message }),
+      networkErrorFallback: "Não foi possível acompanhar o download.",
+    };
+  }
+
   function pollCoreJob(name: string, jobId: string) {
-    api
-      .getInstallJob(jobId)
-      .then((job) => {
-        if (job.phase === "concluido") {
-          setCoreState(name, { kind: "idle" });
-          onCoreReady?.();
-          return;
-        }
-        // "cancelado" (fase própria do R3) volta ao estado ocioso sem erro:
-        // desistir não é falha.
-        if (job.phase === "cancelado") {
-          setCoreState(name, { kind: "idle" });
-          return;
-        }
-        if (job.phase === "falhou") {
-          // job.error já vem do servidor nomeando o core e o que aconteceu
-          // (docs/api.md) — exibido como veio, sem reescrita.
-          setCoreState(name, { kind: "error", message: job.error ?? "O download não foi concluído." });
-          return;
-        }
-        setCoreState(name, { kind: "installing", job });
-        setTimeout(() => pollCoreJob(name, jobId), 400);
-      })
-      .catch((err) => {
-        setCoreState(name, {
-          kind: "error",
-          message: err instanceof ApiError ? err.message : "Não foi possível acompanhar o download.",
-        });
-      });
+    pollJob(jobId, coreHandlers(name));
   }
 
   /**
@@ -81,38 +75,7 @@ export function useCoreInstall({ onCoreReady }: { onCoreReady?: () => void } = {
    * buildbot sem nenhum ganho.
    */
   function waitForCore(name: string, jobId: string): Promise<void> {
-    return new Promise((resolve) => {
-      const tick = async () => {
-        try {
-          const job = await api.getInstallJob(jobId);
-          if (job.phase === "concluido") {
-            setCoreState(name, { kind: "idle" });
-            onCoreReady?.();
-            resolve();
-            return;
-          }
-          if (job.phase === "cancelado") {
-            setCoreState(name, { kind: "idle" });
-            resolve();
-            return;
-          }
-          if (job.phase === "falhou") {
-            setCoreState(name, { kind: "error", message: job.error ?? "O download não foi concluído." });
-            resolve();
-            return;
-          }
-          setCoreState(name, { kind: "installing", job });
-          setTimeout(tick, 400);
-        } catch (err) {
-          setCoreState(name, {
-            kind: "error",
-            message: err instanceof ApiError ? err.message : "Não foi possível acompanhar o download.",
-          });
-          resolve();
-        }
-      };
-      tick();
-    });
+    return pollJobUntilSettled(jobId, coreHandlers(name));
   }
 
   async function installCore(name: string) {

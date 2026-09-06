@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, InstallJob, LibraryGame } from "../api/types";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
+import { pollJob } from "../lib/pollJob";
 
 // Estado da instalação inline (L8): um só por tela, não por jogo — jogos do
 // mesmo console compartilham o mesmo adapter, então uma instalação em
@@ -50,28 +51,19 @@ export function useInlineInstall({
   const [state, setState] = useState<InstallState>({ kind: "idle" });
 
   function pollInstallJob(jobId: string, pendingGamePath: string) {
-    api
-      .getInstallJob(jobId)
-      .then((job) => {
-        if (job.phase === "concluido") {
-          setState({ kind: "idle" });
-          onEmulatorInstalled(job.adapter_id);
-          onLaunch(pendingGamePath);
-          return;
-        }
-        if (job.phase === "falhou") {
-          setState({ kind: "error", message: job.error ?? "A instalação falhou." });
-          return;
-        }
-        setState({ kind: "installing", job, pendingGamePath });
-        setTimeout(() => pollInstallJob(jobId, pendingGamePath), 400);
-      })
-      .catch((err) => {
-        setState({
-          kind: "error",
-          message: err instanceof ApiError ? err.message : "Não foi possível acompanhar a instalação.",
-        });
-      });
+    pollJob(jobId, {
+      onProgress: (job) => setState({ kind: "installing", job, pendingGamePath }),
+      // Instalação terminou: lança o jogo que disparou o clique, para o
+      // usuário não precisar clicar de novo.
+      onDone: (job) => {
+        setState({ kind: "idle" });
+        onEmulatorInstalled(job.adapter_id);
+        onLaunch(pendingGamePath);
+      },
+      onFailed: (job) => setState({ kind: "error", message: job.error ?? "A instalação falhou." }),
+      onError: (message) => setState({ kind: "error", message }),
+      networkErrorFallback: "Não foi possível acompanhar a instalação.",
+    });
   }
 
   function startInstall(adapterId: string, force: boolean, pendingGamePath: string) {
