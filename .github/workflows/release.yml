@@ -62,7 +62,19 @@ jobs:
           set -euo pipefail
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG já existe — reaproveitando o commit dela."
+            TAG_SHA="$(git rev-parse --short "refs/tags/$TAG")"
+            HEAD_SHA="$(git rev-parse --short HEAD)"
+            echo "Tag $TAG já existe — reaproveitando o commit dela ($TAG_SHA)."
+            # Achado em 2026-09-06 (run #17): quem digita no workflow_dispatch o
+            # nome de uma tag que já existe de uma tentativa anterior builda o
+            # commit ANTIGO dela em silêncio — nenhuma falha, nenhum aviso, só
+            # um resultado que parece "o código atual ainda está quebrado"
+            # quando na verdade o CI nem olhou o commit atual. Este `::warning`
+            # aparece destacado no resumo do run, then o próximo a repetir esse
+            # engano vê o aviso antes de investigar código que não mudou.
+            if [ "$TAG_SHA" != "$HEAD_SHA" ]; then
+              echo "::warning::A tag '$TAG' já existia e aponta para $TAG_SHA, NÃO para o commit atual ($HEAD_SHA). Este build vai usar o código de $TAG_SHA. Se a intenção era buildar o código de agora, dispare de novo com uma tag nova."
+            fi
           else
             echo "Tag $TAG não existe — criando em cima de $(git rev-parse --short HEAD)."
             git tag "$TAG"
