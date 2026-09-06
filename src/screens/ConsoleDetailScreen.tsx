@@ -662,7 +662,13 @@ export function ConsoleDetailScreen({
   if (error) {
     return (
       <ScreenContainer variant="listing">
-        <Button variant="quiet" onClick={onBack}>
+        {/* `secondary`, não `quiet` (achado testando com o Douglas,
+            2026-09-06): `quiet` é sem borda nenhuma, pensado pra ação
+            secundária dentro de uma linha (ex.: "Remover" de pasta) — numa
+            navegação de topo de tela, sem borda lê como texto solto, não
+            como botão clicável. Mesmo variant que "Voltar" já usa em
+            GameDetailScreen/LibraryScreen/EmulatorsScreen. */}
+        <Button variant="secondary" onClick={onBack}>
           ← Consoles
         </Button>
         <div className="mt-4">
@@ -695,7 +701,9 @@ export function ConsoleDetailScreen({
 
   return (
     <ScreenContainer variant="listing">
-      <Button variant="quiet" onClick={onBack}>
+      {/* `secondary`, não `quiet` — ver comentário no outro `onBack` acima
+          (estado de erro), mesmo raciocínio. */}
+      <Button variant="secondary" onClick={onBack}>
         ← Consoles
       </Button>
 

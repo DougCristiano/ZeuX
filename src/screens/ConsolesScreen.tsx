@@ -251,8 +251,13 @@ export function ConsolesScreen({
         {/* A tela de emuladores continua existindo — é onde moram os
             emuladores personalizados, a lista completa dos cores do RetroArch
             e os painéis de configuração/mapeamento, que não pertencem a um
-            console só. Deixou de ser a entrada principal, não de existir. */}
-        <Button variant="quiet" onClick={onOpenEmulators}>
+            console só. Deixou de ser a entrada principal, não de existir.
+
+            `secondary`, não `quiet` (achado testando com o Douglas,
+            2026-09-06): é uma troca de visão de tela inteira, mesma classe
+            de ação que "← Consoles"/"Voltar" nas outras telas — `quiet` (sem
+            borda) lê como texto solto, não como algo clicável. */}
+        <Button variant="secondary" onClick={onOpenEmulators}>
           Ver por emulador
         </Button>
       </div>

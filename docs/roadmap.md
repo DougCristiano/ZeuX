@@ -454,6 +454,16 @@ este console precisa pra rodar": emulador + BIOS), deixando a direita só com
 "sobre a sua biblioteca/máquina" (Jogos + Nesta máquina). Reduz o
 desbalanceamento sem inventar conteúdo de enchimento pra igualar altura.
 
+**Segundo achado, mesma sessão:** o "← Consoles" desta tela usava
+`variant="quiet"` (sem borda, sem fundo — só texto que ganha peso no hover).
+Para uma ação secundária dentro de uma linha (ex.: "Remover" de pasta) isso é
+o comportamento certo; para a navegação de topo de tela, sem borda lê como
+texto solto, não como algo clicável — destoava do "Voltar" que
+`GameDetailScreen`/`LibraryScreen`/`EmulatorsScreen` já mostravam com
+`variant="secondary"` (bordado). Trocado para `secondary`, junto com "Ver por
+emulador" (`ConsolesScreen.tsx`), mesma classe de ação (troca de visão de
+tela inteira).
+
 ### P3 — o que a Sprint P deixou aberto
 
 - [ ] O parecer promete um core que o lançamento não usa (achado acima).
