@@ -980,7 +980,20 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       style={{ borderColor: `${accent}66`, color: accent }}
       // M7 (docs/sprint-m-plano.md): 8px violava o piso de 11px da fonte
       // pixel (src/index.css) — mesma regra do badge de GameCover.
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
+      //
+      // `w-12` (não `w-9`, achado ao testar com o Douglas, 2026-09-06):
+      // medido ao vivo com Playwright, `label.slice(0, 4)` em Press Start 2P
+      // 11px renderiza ~41px de largura — a caixa de 36px que existia antes
+      // ficava 5px curta, e um `w-10` (40px) intermediário ainda cortava a
+      // primeira/última letra. O G5 (docs/roadmap.md) só travou colisão de
+      // SIGLA IGUAL entre dois consoles diferentes (script comparando
+      // strings), nunca mediu se o texto cabia na própria caixa —
+      // "arcade"/"atari2600"/"dreamcast" (e qualquer outro console cujo
+      // `short_name` não caiba em 3 letras e não tenha entrada em
+      // `ICON_LABEL_OVERRIDES`) vazava sobre o ícone vizinho, sem colidir em
+      // sigla nenhuma. `overflow-hidden` fica como rede de segurança: um
+      // label futuro ainda maior corta em vez de vazar.
+      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
       {(ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase()}
     </button>
@@ -996,8 +1009,11 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
  */
 export function ConsoleMoreBadge({ count }: { count: number }) {
   return (
+    // `h-12 w-12` acompanha o `ConsoleIcon` acima (2026-09-06, ver comentário
+    // lá) — os dois convivem na mesma fileira, tamanhos diferentes
+    // desalinhariam a grade.
     <span
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-dashed border-line-strong text-sm text-muted"
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-dashed border-line-strong text-sm text-muted"
       title={`mais ${count} console(s)`}
       aria-hidden="true"
     >

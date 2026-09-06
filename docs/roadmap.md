@@ -2576,6 +2576,21 @@ fica descartado, não só adiado.
 
 **Depende de:** nada · **Bloqueia:** nada
 
+**Achado ao testar com o Douglas em máquina real (2026-09-06), fora do que o
+script de 2026-08-07 media:** o script comparava se dois consoles resolviam
+para a **mesma** sigla — nunca mediu se a sigla cabia na própria caixa de
+36px (`h-9 w-9`). Medido ao vivo com Playwright: `label.slice(0, 4)` em Press
+Start 2P 11px renderiza ~41px, 5px maior que a caixa. Sem colisão nenhuma
+entre consoles, "arcade"→"ARCA", "atari2600"→"ATAR" e "dreamcast"→"DREA" (e,
+por extensão, qualquer console cujo `short_name` não caiba em 3 letras e não
+tenha entrada em `ICON_LABEL_OVERRIDES`) vazavam visualmente sobre o ícone
+vizinho — via Playwright, print de `EmulatorsScreen` mostrando
+"ARCAATARDREA" emendado, ilegível. Corrigido: `ConsoleIcon`/
+`ConsoleMoreBadge` foram para `h-12 w-12` (medido até não sobrar overflow
+nenhum) e ganharam `overflow-hidden` como rede de segurança contra um label
+futuro ainda maior. Reconferido com Playwright: 0 chips com
+`scrollWidth > clientWidth` na tela de Emuladores.
+
 **Critério de saída da Sprint G:** abrir a biblioteca numa máquina com rede
 desligada mostra capas reais nos jogos já resolvidos, os favoritos do usuário no
 topo (ou filtráveis), e nenhum jogo desaparecido ou com capa de outro jogo.
