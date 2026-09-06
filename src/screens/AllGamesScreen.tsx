@@ -4,6 +4,7 @@ import { Star } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
+import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
   Button,
   ConfirmModal,
@@ -321,6 +322,16 @@ export function AllGamesScreen({
   }
 
   useEffect(loadGames, [page, debouncedSearch, favoriteOnly, platformFilter, sort]);
+
+  // Auto-rescan (2026-09-06): "Todos os jogos" é a tela de entrada mais
+  // comum do app (ver comentário de App.tsx sobre a fase "all-games") — é
+  // aqui que um jogo copiado recentemente teria mais chance de aparecer sem
+  // o usuário precisar saber que existe um botão "Revarrer" escondido em
+  // "Gerenciar pastas" (ver src/lib/autoRescan.ts).
+  useEffect(() => {
+    rescanAllFoldersIfStale().then(loadGames);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Toggle otimista (G4): atualiza a lista na hora, sem esperar a resposta
   // nem recarregar a página inteira. Se a chamada falhar, desfaz.

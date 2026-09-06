@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError, isDownloadingCore } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
+import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
   Button,
   Callout,
@@ -127,6 +128,11 @@ export function GamesScreen({
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
       .catch(() => setEmulators([]));
+    // Auto-rescan (2026-09-06): revarre as pastas configuradas sozinho ao
+    // abrir a tela, e recarrega a lista se algo novo apareceu — sem isto, um
+    // jogo copiado pra pasta só aparecia depois de um clique manual em
+    // "Revarrer" (ver src/lib/autoRescan.ts).
+    rescanAllFoldersIfStale().then(loadGames);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consoleId]);
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { api, ApiError } from "../api";
 import type { BulkMatchedFolder, LibraryFolder, LibraryGame, Report } from "../api/types";
+import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
   Button,
   Callout,
@@ -364,6 +365,23 @@ export function LibraryScreen({
       .then((res) => setFolders(res.folders))
       .catch((err) => setError(err instanceof ApiError ? err.message : t("couldNotListFolders")));
   }, [reloadKey, t]);
+
+  // Auto-rescan (2026-09-06): quem abre a tela de pastas está justamente
+  // olhando pra contagem de jogos por console — revarrer sozinho ao entrar
+  // evita a contagem ficar visivelmente desatualizada até alguém lembrar de
+  // apertar "Revarrer" linha por linha (ver src/lib/autoRescan.ts).
+  useEffect(() => {
+    rescanAllFoldersIfStale().then(() => {
+      setReloadKey((k) => k + 1);
+      // Limpa a contagem já buscada — sem isto, o efeito abaixo (que só
+      // busca contagem de console ainda ausente de `gamesByConsole`) não
+      // repetiria a busca pra quem já estava configurado antes do rescan, e
+      // um jogo novo copiado pra uma pasta existente não apareceria na
+      // contagem mesmo depois de revarrer o disco de verdade.
+      setGamesByConsole({});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // report.verdicts já cobre os 33 consoles do catálogo (Evaluate nunca
   // filtra nenhum, mesmo "improvavel").
