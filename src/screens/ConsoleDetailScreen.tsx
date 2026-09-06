@@ -678,7 +678,7 @@ export function ConsoleDetailScreen({
             como botão clicável. Mesmo variant que "Voltar" já usa em
             GameDetailScreen/LibraryScreen/EmulatorsScreen. */}
         <Button variant="secondary" onClick={onBack}>
-          ← Consoles
+          {t("backConsoles")}
         </Button>
         <div className="mt-4">
           <InlineError>{error}</InlineError>
@@ -691,7 +691,7 @@ export function ConsoleDetailScreen({
     return (
       <ScreenContainer variant="listing">
         <div role="status" aria-live="polite" className="flex flex-col gap-4">
-          <span className="sr-only">Carregando console…</span>
+          <span className="sr-only">{t("loadingConsole")}</span>
           <CardSkeleton className="h-24" />
           <CardSkeleton className="h-48" />
         </div>
