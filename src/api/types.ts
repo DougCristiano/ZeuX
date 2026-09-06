@@ -64,6 +64,12 @@ export type HardwareInfo = {
   /** Pode vir vazio ou `null` — é o caminho normal quando a detecção falha. */
   gpus: GPUInfo[] | null;
   memory: MemoryInfo;
+  /**
+   * Monitores conectados (Q3). Pode vir vazio ou `null` pelo mesmo motivo que
+   * `gpus`: nem todo sistema expõe isso de forma confiável, e lista vazia é
+   * estado honesto — nunca um monitor inventado.
+   */
+  displays?: DisplayInfo[] | null;
   warnings: string[];
 };
 
@@ -78,6 +84,21 @@ export type LaunchOptions = {
   renderer?: string;
   exit_on_close?: boolean;
   extra?: string[];
+};
+
+/**
+ * Um monitor conectado (Q3, docs/roadmap.md, Sprint Q). `refresh_hz` ausente
+ * significa que o sistema não reportou — nunca um valor presumido (no Linux
+ * fora do X11, o caminho pelo sysfs só informa resolução).
+ */
+export type DisplayInfo = {
+  name?: string;
+  width: number;
+  height: number;
+  refresh_hz?: number;
+  primary?: boolean;
+  /** Como o dado foi obtido: "user32", "xrandr", "drm", "system_profiler". */
+  source: string;
 };
 
 export type ConsoleVerdict = {
@@ -95,6 +116,12 @@ export type ConsoleVerdict = {
   core?: string;
   preset?: string;
   options?: LaunchOptions;
+  /**
+   * Presente só quando a resolução interna do preset foi reduzida para
+   * acompanhar a tela do usuário (Q3). Ausente no caso normal — não há nota a
+   * dar quando nada foi ajustado.
+   */
+  display_note?: string;
   /** Ausente quando o console já está no melhor patamar alcançável. */
   next_level?: string;
   /**
@@ -146,6 +173,44 @@ export type Installation = {
   managed: boolean;
 };
 
+/**
+ * Uma forma de rodar um console, vinda de `GET /api/v1/consoles`. A ordem
+ * dentro de `ConsoleEntry.emulators` é regra de produto (standalone antes do
+ * RetroArch, ver Registry.ForConsole) — **nunca reordene no cliente**.
+ */
+export type ConsoleEmulatorOption = {
+  adapter_id: string;
+  name: string;
+  /**
+   * O core que este console pede no RetroArch, no mesmo vocabulário que
+   * `RetroArchCoreStatus.name` usa — as duas listas casam por este campo.
+   * Ausente para emulador standalone, que não carrega core nenhum: ausente
+   * é "não tem core", nunca "core ainda não escolhido".
+   */
+  core?: string;
+};
+
+/**
+ * Console do catálogo com as formas conhecidas de rodá-lo. Diferente de
+ * `ConsoleVerdict`, **não** exige consentimento nem scan — é catálogo
+ * embutido no binário, não leitura da máquina do usuário.
+ *
+ * Não traz estado de instalação de propósito: quem responde "está
+ * instalado?" continua sendo `GET /emulators`, e a tela cruza os dois por
+ * `adapter_id`. Duas rotas dizendo o mesmo sobre o mesmo disco poderiam
+ * discordar entre si.
+ */
+export type ConsoleEntry = {
+  console_id: string;
+  name: string;
+  short_name: string;
+  year: number;
+  /** Console amplamente conhecido por exigir BIOS/firmware (L3). */
+  requires_external_file?: boolean;
+  /** Pode vir vazia: console do catálogo que nenhum adapter atende ainda. */
+  emulators: ConsoleEmulatorOption[];
+};
+
 export type EmulatorEntry = {
   adapter_id: string;
   name: string;
@@ -166,6 +231,21 @@ export type EmulatorEntry = {
   configurable: boolean;
   /** H3/H4 — diz se GET/POST .../bindings existe de verdade. */
   bindable: boolean;
+  /**
+   * O que acontece se a interface pedir a instalação deste emulador (Q5,
+   * docs/roadmap.md, Sprint Q):
+   *
+   * - `"github"` — o ZeuX resolve a release e instala sozinho (1-click).
+   * - `"manual"` — não há como automatizar; o usuário instala pelo site
+   *   oficial ou pelo gerenciador do sistema (RetroArch, Dolphin).
+   * - `"none"` — o ZeuX não conhece fonte nenhuma (emulador personalizado).
+   *
+   * Existe para a interface distinguir "dá para instalar" de "não sei
+   * instalar" **antes** do clique. Sem isto, os 21 consoles que dependem do
+   * RetroArch mostravam o mesmo "instalar emulador" dos outros e o clique
+   * terminava num erro.
+   */
+  install_kind: "github" | "manual" | "none" | (string & {});
   /**
    * Onde findBinary procura primeiro (internal/emulator/discovery.go) — o
    * lugar que, se o usuário colar o emulador ali, o ZeuX acha sozinho.
@@ -256,14 +336,24 @@ export type InstallPhase =
   | "extraindo"
   | "finalizando"
   | "concluido"
-  | "falhou";
+  | "falhou"
+  /** Só existe para download de core do RetroArch (ADR 0015, R3) — via
+   *  `DELETE /installs/{id}`. Diferente de "falhou": é o usuário desistindo,
+   *  não um erro. */
+  | "cancelado";
 
 export type InstallJob = {
   id: string;
   adapter_id: string;
+  /** Só presente num job de download de core do RetroArch (ADR 0015, R2) —
+   *  ausente num job de instalação de emulador. */
+  core_name?: string;
   name: string;
   phase: InstallPhase;
   message: string;
+  /** Identificador estável de falha (ex.: `"core_hash_mismatch"`), quando
+   *  `phase` é `"falhou"`. Vazio para falhas sem code próprio ainda. */
+  code?: string;
   version?: string;
   asset_name?: string;
   downloaded_bytes: number;
@@ -278,6 +368,24 @@ export type InstallJob = {
 };
 
 // --- Jogos e sessões ---
+
+/**
+ * Resposta de `POST /games/launch`. Desde o ADR 0015 (R3) ela tem **duas
+ * formas**: o lançamento normal (`Session`, HTTP 200) e o caso em que o core
+ * do RetroArch ainda não está no computador (HTTP 202) — aí o servidor
+ * dispara o download e devolve o job, e o jogo abre sozinho quando terminar.
+ *
+ * Existe como união (e não como campos opcionais no `Session`) porque tratar
+ * as duas como a mesma coisa foi exatamente o bug de 2026-08-27: a tela dizia
+ * "sessão iniciada" enquanto o ZeuX ainda baixava 400 MB de core, e o jogo só
+ * abria minutos depois. Use `isDownloadingCore()` (src/api/client.ts) para ramificar.
+ */
+export type LaunchResult = Session | LaunchDownloadingCore;
+
+export type LaunchDownloadingCore = {
+  downloading_core: true;
+  install_job: InstallJob;
+};
 
 export type LaunchBody = {
   rom_path: string;

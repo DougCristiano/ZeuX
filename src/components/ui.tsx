@@ -388,6 +388,50 @@ export function ErrorModal({
 }
 
 /**
+ * Q5 (docs/roadmap.md, Sprint Q): o emulador deste jogo é de fonte que o ZeuX
+ * não sabe automatizar (RetroArch, Dolphin — 21 dos 33 consoles dependem do
+ * primeiro). Antes disto, o clique em "Jogar" disparava uma instalação que o
+ * servidor recusava com 400, e a tela mostrava a recusa como se algo tivesse
+ * quebrado. Não quebrou nada: o app simplesmente não instala este.
+ *
+ * **Não repete as instruções aqui.** Onde baixar e onde extrair já vivem no
+ * detalhe do console, com o caminho exato da pasta gerenciada e o botão do
+ * site oficial — duas cópias desse texto divergiriam na primeira correção. O
+ * modal explica o estado e leva até lá.
+ */
+export function ManualInstallModal({
+  adapterName,
+  onClose,
+  onOpenConsole,
+}: {
+  adapterName: string;
+  onClose: () => void;
+  /** Ausente quando a tela não sabe navegar para o console — o modal ainda
+   * explica o estado, só não oferece o atalho. */
+  onOpenConsole?: () => void;
+}) {
+  return (
+    <ConfirmModal
+      title="Este emulador é instalado por fora"
+      message={`O ${adapterName} não é distribuído de um jeito que o ZeuX consiga baixar sozinho. A tela do console mostra onde baixar e em que pasta colocar para o ZeuX encontrar depois.`}
+      onClose={onClose}
+      actions={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Fechar
+          </Button>
+          {onOpenConsole && (
+            <Button variant="primary" autoFocus onClick={onOpenConsole}>
+              Ver o console
+            </Button>
+          )}
+        </>
+      }
+    />
+  );
+}
+
+/**
  * Modal de confirmação: mesmo shell do `ErrorModal` (Dialog do shadcn, sem
  * fechar clicando fora), mas para decisões com mais de um botão de saída —
  * "instalar mesmo assim"/"cancelar", ou "abrir pasta"/"jogar mesmo
@@ -710,9 +754,27 @@ export function Pagination({
  * `percent` ausente (tamanho total desconhecido, `Job.total_bytes === 0`)
  * mostra a barra indeterminada em vez de fingir 0% ou 100%.
  */
-export function ProgressBar({ percent }: { percent: number | null }) {
+export function ProgressBar({
+  percent,
+  label,
+  className = "",
+}: {
+  percent: number | null;
+  /** O que esta barra mede. Sem isto, várias barras na mesma tela são
+   *  indistinguíveis para quem usa leitor de tela — o caso concreto é a
+   *  grade de cores do RetroArch, com uma barra por core baixando. */
+  label?: string;
+  className?: string;
+}) {
   return (
-    <div className="h-1.5 overflow-hidden rounded-sm border border-line" role="progressbar" aria-valuenow={percent ?? undefined}>
+    <div
+      className={`h-1.5 overflow-hidden rounded-sm border border-line ${className}`}
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={percent ?? undefined}
+      aria-valuemin={percent === null ? undefined : 0}
+      aria-valuemax={percent === null ? undefined : 100}
+    >
       <div
         className="h-full bg-accent transition-[width]"
         style={{ width: percent === null ? "100%" : `${percent}%`, opacity: percent === null ? 0.4 : 1 }}
@@ -841,6 +903,12 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
           {verdict.emulator} · {verdict.preset}
         </p>
       )}
+
+      {/* Q3 (docs/roadmap.md, Sprint Q): o preset do catálogo é calibrado para
+          1080p, e numa tela menor a resolução interna cai junto. A nota
+          aparece porque, sem ela, o texto do preset ("Resolução interna 4x")
+          contradiria o que o ZeuX vai realmente aplicar. */}
+      {verdict.display_note && <p className="text-xs text-muted">{verdict.display_note}</p>}
 
       {verdict.precision === "parcial" && (
         <PartialNotice>

@@ -140,6 +140,54 @@ function SpecsPanel() {
         </Card>
       )}
 
+      {/* Q3 (docs/roadmap.md, Sprint Q): o monitor entra ao lado de CPU/GPU/
+          memória porque é a quarta peça que decide a configuração do jogo — o
+          preset de resolução interna é ajustado por ela. Cai no mesmo padrão
+          dos outros: quando não pôde ser lido, diz isso em vez de sumir. */}
+      {hardware.displays && hardware.displays.length > 0 ? (
+        hardware.displays.map((display, i) => (
+          <Card filled key={`${display.name ?? "tela"}-${i}`}>
+            <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">
+              Tela{hardware.displays!.length > 1 ? ` ${i + 1}` : ""}
+            </p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+              <dt className="text-muted">Resolução</dt>
+              <dd className="text-ink">
+                {display.width}×{display.height}
+              </dd>
+              {/* Ausente quando o sistema não reportou — no Linux fora do
+                  X11 o caminho pelo sysfs só informa resolução. Some em vez
+                  de mostrar um zero que pareceria medição. */}
+              {display.refresh_hz ? (
+                <>
+                  <dt className="text-muted">Taxa</dt>
+                  <dd className="text-ink">{display.refresh_hz} Hz</dd>
+                </>
+              ) : null}
+              {display.name && (
+                <>
+                  <dt className="text-muted">Saída</dt>
+                  <dd className="text-ink">{display.name}</dd>
+                </>
+              )}
+              {display.primary && (
+                <>
+                  <dt className="text-muted">Principal</dt>
+                  <dd className="text-ink">sim</dd>
+                </>
+              )}
+              <dt className="text-muted">Fonte da leitura</dt>
+              <dd className="text-ink">{display.source}</dd>
+            </dl>
+          </Card>
+        ))
+      ) : (
+        <Card filled>
+          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">Tela</p>
+          <p className="text-sm text-muted">Nenhum monitor foi identificado nesta leitura.</p>
+        </Card>
+      )}
+
       {hardware.warnings.length > 0 && (
         <Callout label="Avisos da leitura de hardware">
           <ul className="list-disc space-y-1 pl-4">

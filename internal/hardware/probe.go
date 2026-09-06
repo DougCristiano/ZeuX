@@ -24,8 +24,9 @@ type systemProbe struct{}
 func NewProbe() Probe { return systemProbe{} }
 
 // Detect monta o retrato do hardware. CPU e memória vêm do gopsutil, que já é
-// multiplataforma; a GPU depende de ferramentas específicas de cada sistema e
-// é resolvida por detectGPUs, implementada por arquivo de plataforma.
+// multiplataforma; GPU e monitor dependem de ferramentas específicas de cada
+// sistema e são resolvidos por detectGPUs/detectDisplays, implementados por
+// arquivo de plataforma.
 //
 // Falha ao ler CPU ou memória é erro fatal — sem esses dados não há veredito
 // possível. Falha ao ler GPU não é: vira um aviso, porque um veredito baseado
@@ -67,6 +68,14 @@ func (systemProbe) Detect(ctx context.Context) (HardwareInfo, error) {
 		info.Warnings = append(info.Warnings,
 			"Não foi possível identificar a placa de vídeo. O veredito abaixo considera apenas processador e memória, e por isso é menos preciso.")
 	}
+
+	// Q3 (docs/roadmap.md, Sprint Q): o monitor entra na mesma categoria da
+	// GPU — falhar em lê-lo vira aviso, nunca erro. Sem ele o parecer continua
+	// valendo; o que se perde é ajustar a resolução interna à tela, e o
+	// catálogo tem um padrão para esse caso.
+	displays, displayWarnings := detectDisplays(ctx)
+	info.Displays = displays
+	info.Warnings = append(info.Warnings, displayWarnings...)
 
 	return info, nil
 }

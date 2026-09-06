@@ -13,13 +13,6 @@ use tauri::{Manager, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
-#[allow(dead_code)]
-#[cfg(target_os = "windows")]
-const BUNDLED_CORES_RELATIVE_PATH: &str = r"retroarch\cores";
-#[allow(dead_code)]
-#[cfg(not(target_os = "windows"))]
-const BUNDLED_CORES_RELATIVE_PATH: &str = "retroarch/cores";
-
 const ZEUXD_ADDR: &str = "127.0.0.1:7777";
 
 /// Guarda o processo do zeuxd que este app subiu, para poder derrubá-lo junto
@@ -109,60 +102,19 @@ pub fn run() {
                     *app.state::<PortConflict>().0.lock().unwrap() = true;
                 }
                 PortState::Free => {
-                    // Calcular caminho de cores bundled para o daemon (ADR 0012).
-                    // Se não existir, daemon silenciosamente ignora (cores podem vir
-                    // do Online Updater do RetroArch).
-                    //
-                    // O prefixo "resources/" é necessário: resource_dir() devolve a
-                    // raiz de instalação do app (ex.: /usr/lib/zeux no .deb), e
-                    // "resources": ["resources/"] em tauri.conf.json preserva esse
-                    // nome de pasta no destino — os arquivos ficam em
-                    // <resource_dir>/resources/retroarch/..., não
-                    // <resource_dir>/retroarch/... Bug real, presente desde a
-                    // implementação original do ADR 0012: sem o prefixo, a env var
-                    // sempre apontava para um caminho inexistente, e
-                    // ensureBundledCoresAvailable() falhava silenciosamente (só
-                    // logava, nunca travava o daemon) — nunca foi percebido porque
-                    // só roda de verdade na hora de lançar um jogo (D11, ainda
-                    // pendente). Achado e corrigido em 2026-08-04 verificando a env
-                    // var de um processo real (/proc/<pid>/environ) contra o
-                    // caminho real dos arquivos instalados.
-                    //
-                    // Só passa a env var se o diretório existir de verdade —
-                    // apontar para um caminho fantasma fazia o daemon logar
-                    // aviso em toda abertura de `tauri dev` sem resources/.
-                    let bundled_cores_dir = app.path().resource_dir().ok().and_then(|p| {
-                        let dir = p.join("resources/retroarch/cores");
-                        dir.is_dir()
-                            .then(|| dir.to_str().map(String::from))
-                            .flatten()
-                    });
-
-                    // Idem para o app do RetroArch em si (extensão do ADR 0012 —
-                    // o ADR original só cobria os cores; o executável ficou de
-                    // fora até 2026-08-04, quando a tela de emuladores mostrou
-                    // "não instalado" mesmo com os cores presentes). Ausente em
-                    // macOS por enquanto (cmd/download-retroarch-app ainda não
-                    // sabe empacotar o .dmg do RetroArch para lá).
-                    let bundled_retroarch_dir = app.path().resource_dir().ok().and_then(|p| {
-                        let dir = p.join("resources/retroarch/bin");
-                        dir.is_dir()
-                            .then(|| dir.to_str().map(String::from))
-                            .flatten()
-                    });
-
                     let mut sidecar = app
                         .shell()
                         .sidecar("zeuxd")
                         .expect("binário zeuxd não foi encontrado no pacote — rode `npm run build:daemon` antes de `tauri dev`/`tauri build`");
 
-                    // Passar ZEUX_BUNDLED_CORES_DIR se cores empacotados existem
-                    if let Some(cores_dir) = bundled_cores_dir {
-                        sidecar = sidecar.env("ZEUX_BUNDLED_CORES_DIR", cores_dir);
-                    }
-                    if let Some(retroarch_dir) = bundled_retroarch_dir {
-                        sidecar = sidecar.env("ZEUX_BUNDLED_RETROARCH_DIR", retroarch_dir);
-                    }
+                    // Até o ADR 0015 (R4), este bloco calculava
+                    // ZEUX_BUNDLED_CORES_DIR/ZEUX_BUNDLED_RETROARCH_DIR a partir de
+                    // resources/retroarch/{cores,bin} e passava para o sidecar — o
+                    // RetroArch e os cores vinham empacotados no instalador (ADR
+                    // 0012). Isso foi retirado: os cores agora são baixados sob
+                    // demanda pelo próprio zeuxd (internal/install.Manager.StartCore),
+                    // e o RetroArch voltou a ser instalação manual do usuário — nada
+                    // aqui precisa mais saber onde ficam recursos empacotados.
 
                     // Em `tauri dev` o WebView vem de http://localhost:1420
                     // (devUrl). Sem ZEUX_DEV_ORIGIN o CORS recusa o fetch e a

@@ -105,3 +105,48 @@ func TestPCSX2ConfigurableAdapterWriteAndRestore(t *testing.T) {
 		t.Fatalf("RestoreConfig não devolveu o conteúdo original:\nquer: %q\nveio: %q", original, string(restored))
 	}
 }
+
+// Emulador recém-instalado que o usuário nunca abriu não tem pasta de
+// configuração nenhuma. Antes desta correção, a PRIMEIRA tentativa de gravar
+// configuração ou mapeamento morria no backup, com um erro de sistema de
+// arquivos cru chegando à tela como 500 — achado mapeando um controle num
+// RetroArch que nunca tinha rodado (2026-08-28). É o caminho de quem acabou de
+// instalar pelo ZeuX e vai configurar antes de jogar.
+func TestBackupCriaAPastaQuandoOEmuladorNuncaRodou(t *testing.T) {
+	// Dois níveis inexistentes de propósito: MkdirAll precisa criar a árvore
+	// toda, não só o último diretório.
+	path := filepath.Join(t.TempDir(), "retroarch", "config", "retroarch.cfg")
+
+	if err := backupBeforeFirstWrite(path); err != nil {
+		t.Fatalf("backupBeforeFirstWrite numa pasta inexistente: %v", err)
+	}
+
+	data, err := os.ReadFile(path + configBackupSuffix)
+	if err != nil {
+		t.Fatalf("o backup não foi criado: %v", err)
+	}
+	// 0 bytes é a sentinela de "o original não existia" — restoreFromBackup
+	// depende disso para apagar o arquivo em vez de gravar conteúdo vazio.
+	if len(data) != 0 {
+		t.Errorf("backup tem %d bytes, esperava 0 (sentinela de original ausente)", len(data))
+	}
+}
+
+// E o ciclo fecha: restaurar depois disso apaga o arquivo, devolvendo o estado
+// "não existia" em vez de deixar um arquivo vazio para trás.
+func TestRestauraParaAusenciaDepoisDeBackupEmPastaNova(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "novo", "retroarch.cfg")
+
+	if err := backupBeforeFirstWrite(path); err != nil {
+		t.Fatalf("backupBeforeFirstWrite: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("input_player1_a_btn = \"0\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := restoreFromBackup(path); err != nil {
+		t.Fatalf("restoreFromBackup: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("o arquivo deveria ter sido apagado — o original não existia")
+	}
+}

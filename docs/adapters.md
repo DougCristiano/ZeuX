@@ -155,52 +155,94 @@ Consoles do catálogo com **um único** adapter: `ps2`, `gamecube`, `wii`, `wiiu
 
 ### Cores do RetroArch
 
-`retroArchCores` mapeia nome amigável → nome do arquivo (sem extensão):
+`retroArchCores` mapeia nome amigável → nome do arquivo (sem extensão). São
+**25**, todos abaixo — a lista completa, não uma amostra:
 
 | Nome no catálogo | Arquivo |
 |---|---|
-| `mesen` | `mesen_libretro` |
-| `bsnes` | `bsnes_libretro` |
-| `snes9x` | `snes9x_libretro` |
-| `genesis plus gx` | `genesis_plus_gx_libretro` |
-| `mgba` | `mgba_libretro` |
-| `parallel n64` | `parallel_n64_libretro` |
-| `mupen64plus-next` | `mupen64plus_next_libretro` |
+| `beetle cygne` | `mednafen_wswan_libretro` |
+| `beetle ngp` | `mednafen_ngp_libretro` |
+| `beetle pce` | `mednafen_pce_libretro` |
 | `beetle psx hw` | `mednafen_psx_hw_libretro` |
+| `beetle saturn` | `mednafen_saturn_libretro` |
+| `beetle vb` | `mednafen_vb_libretro` |
+| `bsnes` | `bsnes_libretro` |
+| `fbneo` | `fbneo_libretro` |
 | `flycast` | `flycast_libretro` |
 | `gambatte` | `gambatte_libretro` |
+| `genesis plus gx` | `genesis_plus_gx_libretro` |
+| `mame` | `mame_libretro` |
+| `melonds` | `melonds_libretro` |
+| `mesen` | `mesen_libretro` |
+| `mgba` | `mgba_libretro` |
+| `mupen64plus-next` | `mupen64plus_next_libretro` |
+| `opera` | `opera_libretro` |
+| `parallel n64` | `parallel_n64_libretro` |
+| `picodrive` | `picodrive_libretro` |
+| `ppsspp` | `ppsspp_libretro` |
+| `sameboy` | `sameboy_libretro` |
+| `snes9x` | `snes9x_libretro` |
+| `stella` | `stella_libretro` |
+| `swanstation` | `swanstation_libretro` |
+| `yabause` | `yabause_libretro` |
 
-`defaultCoreByConsole` decide o core quando a requisição não especifica um:
+`defaultCoreByConsole` decide o core quando a requisição não especifica um.
+Cobre **24 consoles**, agrupados aqui pelo core que cada um usa:
 
-| Console | Core padrão |
+| Core padrão | Consoles |
 |---|---|
-| `nes` | `mesen` |
-| `snes` | `snes9x` |
-| `megadrive` | `genesis plus gx` |
-| `gba` | `mgba` |
-| `n64` | `mupen64plus-next` |
-| `ps1` | `beetle psx hw` |
-| `dreamcast` | `flycast` |
+| `beetle cygne` | `wonderswan` |
+| `beetle ngp` | `ngpc` |
+| `beetle pce` | `pcengine` |
+| `beetle psx hw` | `ps1` |
+| `beetle saturn` | `saturn` |
+| `beetle vb` | `virtualboy` |
+| `fbneo` | `neogeo` |
+| `flycast` | `dreamcast` |
+| `gambatte` | `gb`, `gbc` |
+| `genesis plus gx` | `gamegear`, `mastersystem`, `megadrive`, `segacd` |
+| `mame` | `arcade` |
+| `melonds` | `nds` |
+| `mesen` | `nes` |
+| `mgba` | `gba` |
+| `mupen64plus-next` | `n64` |
+| `opera` | `3do` |
+| `picodrive` | `sega32x` |
+| `ppsspp` | `psp` |
+| `snes9x` | `snes` |
+| `stella` | `atari2600` |
 
-> `gambatte` está mapeado mas **nenhum console do catálogo o usa** — não há
-> entrada de Game Boy / Game Boy Color. Idem `bsnes`, que é usado no tier
-> "otimo" do SNES no catálogo mas não é o padrão. Nada quebra: são cores
-> disponíveis via campo `core` explícito.
+Os 5 cores que **não são padrão de nenhum console**
+(`bsnes`, `parallel n64`, `sameboy`, `swanstation`, `yabause`) continuam alcançáveis pelo campo
+`core` explícito — vários deles são o que o catálogo
+(`internal/verdict/data/consoles.json`) recomenda no tier "otimo", onde a
+precisão vale mais que a compatibilidade.
 
 A extensão do arquivo é escolhida por `runtime.GOOS`: `.dll` (Windows),
-`.dylib` (macOS), `.so` (demais). Os diretórios procurados:
+`.dylib` (macOS), `.so` (demais). Os diretórios procurados, **nesta ordem**:
 
-- Sempre: `<dir do executável>/cores`
-- macOS: `~/Library/Application Support/RetroArch/cores`
-- Linux: `~/.config/retroarch/cores`,
-  `~/.var/app/org.libretro.RetroArch/config/retroarch/cores`,
-  `/usr/lib/libretro`, `/usr/lib/x86_64-linux-gnu/libretro`,
-  `/usr/local/lib/libretro`
-- Windows: nada além do diretório do executável
+1. O diretório gerenciado pelo ZeuX — `%APPDATA%\ZeuX\RetroArch\cores`
+   (Windows), `~/Library/Application Support/ZeuX/RetroArch/cores` (macOS),
+   `~/.local/share/zeux/retroarch/cores` (Linux). É onde o download sob
+   demanda ([ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md))
+   promove o que baixa, e por isso vem primeiro.
+2. `<dir do executável>/cores`
+3. macOS: `~/Library/Application Support/RetroArch/cores`
+4. Linux: `~/.config/retroarch/cores`,
+   `~/.var/app/org.libretro.RetroArch/config/retroarch/cores`,
+   `/usr/lib/libretro`, `/usr/lib/x86_64-linux-gnu/libretro`,
+   `/usr/local/lib/libretro`
+5. Windows: nada além dos dois primeiros
 
-Core ausente → `BuildCommand` falha nomeando o core que falta e mandando o
-usuário ao Online Updater do próprio RetroArch. Abrir o RetroArch no menu vazio
-deixaria o usuário adivinhando.
+Um core que o usuário baixou pelo Online Updater do próprio RetroArch cai em
+(2)–(4) e é encontrado igual — o ZeuX não exige que o core tenha vindo dele.
+
+**Core ausente não é mais um beco sem saída.** `BuildCommand` continua
+falhando nomeando o core que falta (ele é puro, não baixa nada — ver a
+exceção de leitura de disco na seção 1), mas quem chama `POST /games/launch`
+não chega a ver esse erro: a rota detecta o core ausente antes, dispara o
+download e responde `202` com o job (R3 do ADR 0015). Ver
+[`api.md`](api.md), `POST /games/launch`.
 
 ---
 

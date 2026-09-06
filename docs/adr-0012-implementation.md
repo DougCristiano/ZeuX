@@ -1,5 +1,15 @@
 # ADR 0012 — Notas de implementação
 
+> **Superado em 2026-08-27 (R4, [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md)).**
+> O mecanismo descrito abaixo foi retirado do código: nada em
+> `src-tauri/resources/`, nenhum `ZEUX_BUNDLED_*`, nenhum
+> `scripts/download-retroarch-cores.mjs` ou `cmd/download-retroarch-app`. Os
+> cores agora são baixados sob demanda pelo próprio `zeuxd`
+> (`internal/install.Manager.StartCore`), e o RetroArch voltou a ser
+> `"kind": "manual"` em `internal/install/data/sources.json`. Este arquivo
+> fica como registro histórico de como o empacotamento funcionou entre
+> 2026-08-01 e 2026-08-27 — não descreve o estado atual do código.
+
 Este arquivo registra as decisões técnicas do empacotamento de RetroArch + cores.
 
 ## Etapa 1: Mecanismo de Tauri bundling (COMPLETA)

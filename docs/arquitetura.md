@@ -30,10 +30,11 @@ publicada) já funcionam de ponta a ponta.
 | `cmd/zeuxd` | Entrypoint. Flags, logger, montagem das dependências, shutdown limpo. |
 | `internal/api` | Roteamento HTTP, decodificação de corpo, formato de erro estável. |
 | `internal/consent` | Registro persistido do consentimento, versionado por política. |
-| `internal/hardware` | Detecção de CPU, RAM (gopsutil) e GPU (por SO, com build tags). |
+| `internal/hardware` | Detecção de CPU, RAM (gopsutil), GPU e **monitor** (os dois últimos por SO, com build tags). O monitor entrou na Sprint Q (Q3) para a resolução interna do preset acompanhar a tela: `user32` por syscall no Windows, `xrandr` com reserva no sysfs no Linux, `system_profiler` no macOS. |
 | `internal/verdict` | Catálogo de consoles embutido + motor que produz o parecer. |
-| `internal/emulator` | Adapters de emulador, descoberta de binários, launcher e sessões. |
-| `internal/install` | Instalação 1-click: manifesto, download verificado, extração, promoção atômica e supressão do assistente de primeira execução. |
+| `internal/emulator` | Adapters de emulador, descoberta de binários, launcher e sessões. Desde a Sprint Q (Q2), o launcher também **aplica o preset do catálogo** no arquivo de configuração do emulador antes de abrir o jogo — nunca por cima do que o usuário salvou à mão (`UserConfigStore`). |
+| `internal/install` | Instalação 1-click: manifesto, download verificado, extração, promoção atômica e supressão do assistente de primeira execução. Desde o [ADR 0015](decisoes/0015-baixar-retroarch-e-cores-sob-demanda.md) também baixa **cores do RetroArch sob demanda**, pelo mesmo mecanismo de job (`StartCore`, hash SHA256 fixado num manifesto embutido). |
+| `internal/igdb` | Busca de capas (G1): credencial **do próprio usuário** (ADR do G1 no roadmap — evita estourar cota compartilhada), download do arquivo para cache local e job de acompanhamento. |
 | `internal/store` | Abre e migra o SQLite local ([ADR 0011](decisoes/0011-sqlite-local-para-biblioteca.md)). |
 | `internal/library` | Pastas de ROM apontadas, jogos encontrados na varredura, referência de caminho (nunca cópia). Rotas HTTP (`/api/v1/library/*`, `internal/api`) e telas (`LibraryScreen`, `AllGamesScreen`, `GamesScreen`, `GameDetailScreen`) prontas desde a Sprint D (fechada em 2026-08-03). |
 

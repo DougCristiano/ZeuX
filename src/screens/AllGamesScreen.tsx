@@ -15,6 +15,7 @@ import {
   ProgressBar,
   ScreenContainer,
   InlineError,
+  ManualInstallModal,
   Toast,
   ZSelect,
 } from "../components/ui";
@@ -26,7 +27,7 @@ import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
-import { percentOf } from "../lib/format";
+import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 
 // M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24 nunca
@@ -197,6 +198,7 @@ export function AllGamesScreen({
   report,
   onOpenLibrary,
   onOpenGame,
+  onOpenConsole,
   view,
   onViewChange,
   scrollElementRef,
@@ -205,6 +207,9 @@ export function AllGamesScreen({
   report: Report;
   onOpenLibrary: () => void;
   onOpenGame: (game: LibraryGame, consoleName: string, shortName: string) => void;
+  /** Q5: leva ao detalhe do console do jogo, onde ficam as instruções de
+   * instalação manual. */
+  onOpenConsole?: (consoleId: string) => void;
   /** Página/busca/filtro/ordem/modo atuais — controlados por App.tsx (M4). */
   view: AllGamesViewState;
   /** Patch parcial — só os campos que mudaram, como o `setState` de objeto. */
@@ -237,7 +242,8 @@ export function AllGamesScreen({
   // esperar os 300ms de debounce de novo.
   const [debouncedSearch, setDebouncedSearch] = useState(search.trim());
   const [error, setError] = useState<string | null>(null);
-  const { statusFor, launch, launchError, clearLaunchError, retryLaunch } = useLaunchGame();
+  const { statusFor, launch, activeCoreDownload, cancelCoreDownload, launchError, clearLaunchError, retryLaunch } =
+    useLaunchGame();
   const { toastMessage, showToast } = useToast();
   const igdbConfigured = useIGDBStatus();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
@@ -463,7 +469,8 @@ export function AllGamesScreen({
   // (deixa o erro real do servidor aparecer, em vez de esconder o botão) —
   // mesma escolha de GamesScreen.
   function playHandlerFor(game: LibraryGame): (() => void) | undefined {
-    if (statusFor(game.id).kind === "launching") return undefined;
+    const launchStatus = statusFor(game.id).kind;
+    if (launchStatus === "launching" || launchStatus === "downloading-core") return undefined;
     if (isPendingInstallFor(game.path)) return undefined;
     const verdict = verdictFor(game.console_id);
     return () => install.handlePlay(game, verdict, adapterEntryFor(verdict));
@@ -506,6 +513,26 @@ export function AllGamesScreen({
        * inteira), então não precisa de prioridade entre os dois como o
        * bloco de erro acima.
        */}
+      {/* Q5 (docs/roadmap.md, Sprint Q): fonte que o ZeuX não sabe automatizar
+          (RetroArch, Dolphin). O clique não dispara mais uma instalação que o
+          servidor recusa — leva ao detalhe do console, onde as instruções já
+          moram. */}
+      {install.state.kind === "manual-install" && (
+        <ManualInstallModal
+          adapterName={install.state.adapterName}
+          onClose={() => install.setState({ kind: "idle" })}
+          onOpenConsole={
+            onOpenConsole
+              ? () => {
+                  const { consoleId } = install.state as { consoleId: string };
+                  install.setState({ kind: "idle" });
+                  onOpenConsole(consoleId);
+                }
+              : undefined
+          }
+        />
+      )}
+
       {install.state.kind === "confirm-hardware" &&
         (() => {
           const confirmState = install.state;
@@ -581,6 +608,30 @@ export function AllGamesScreen({
           <div className="mt-2">
             <ProgressBar percent={percentOf(install.state.job)} />
           </div>
+        </div>
+      ) : activeCoreDownload ? (
+        // R3 (ADR 0015): terceiro competidor pelo mesmo canto — encadeado no
+        // ternário pelo mesmo motivo que o N9 registra abaixo, não como um
+        // `&&` solto que se sobreporia ao painel de instalação.
+        <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
+          <p className="text-sm text-ink">
+            Baixando o core {activeCoreDownload.job.core_name ?? ""}…
+            {faseExtraDeDownload(activeCoreDownload.job.phase)}
+            {percentOf(activeCoreDownload.job) !== null && ` · ${percentOf(activeCoreDownload.job)}%`}
+          </p>
+          <div className="mt-2">
+            <ProgressBar
+              percent={percentOf(activeCoreDownload.job)}
+              label={`Baixando o core ${activeCoreDownload.job.core_name ?? ""}`}
+            />
+          </div>
+          <Button
+            className="mt-2 w-full text-xs"
+            variant="secondary"
+            onClick={() => cancelCoreDownload(activeCoreDownload.gameId, activeCoreDownload.job)}
+          >
+            Cancelar download
+          </Button>
         </div>
       ) : (
         // N9 (docs/roadmap.md, Sprint N): mesmo canto que o painel de
@@ -832,7 +883,15 @@ export function AllGamesScreen({
                       onPlay={playHandlerFor(game)}
                       onToggleFavorite={() => toggleFavorite(game)}
                       launchability={launchability}
-                      onInstall={verdict?.adapter_id ? () => install.startInstall(verdict.adapter_id!, false, game.path) : undefined}
+                      onInstall={
+                        /* Q5 (docs/roadmap.md, Sprint Q): era `startInstall` direto, que pulava a
+                         ramificação por motivo e disparava uma instalação que o servidor
+                         recusa para fonte manual (RetroArch, Dolphin) — o badge dizia
+                         "instalação manual" e o clique caía num "Não foi possível instalar
+                         o emulador". `handlePlay` é a mesma cadeia de decisão do botão ▶ e
+                         já leva cada motivo ao lugar certo. */
+                        verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict)) : undefined
+                      }
                     />
                   </div>
                 );
@@ -867,7 +926,15 @@ export function AllGamesScreen({
                         onPlay={playHandlerFor(game)}
                         onToggleFavorite={() => toggleFavorite(game)}
                         launchability={launchability}
-                        onInstall={verdict?.adapter_id ? () => install.startInstall(verdict.adapter_id!, false, game.path) : undefined}
+                        onInstall={
+                        /* Q5 (docs/roadmap.md, Sprint Q): era `startInstall` direto, que pulava a
+                         ramificação por motivo e disparava uma instalação que o servidor
+                         recusa para fonte manual (RetroArch, Dolphin) — o badge dizia
+                         "instalação manual" e o clique caía num "Não foi possível instalar
+                         o emulador". `handlePlay` é a mesma cadeia de decisão do botão ▶ e
+                         já leva cada motivo ao lugar certo. */
+                        verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict)) : undefined
+                      }
                       />
                     );
                   })}

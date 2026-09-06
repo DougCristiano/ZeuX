@@ -3,6 +3,7 @@ package emulator
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // configBackupSuffix marca o backup do arquivo de configuração original —
@@ -33,6 +34,16 @@ func backupBeforeFirstWrite(path string) error {
 		original = nil // sentinela: 0 bytes = "não existia"
 	} else if err != nil {
 		return fmt.Errorf("lendo configuração original para backup: %w", err)
+	}
+
+	// A pasta de configuração pode não existir ainda: um emulador recém
+	// instalado que o usuário nunca abriu não criou nada em disco. Sem isto,
+	// a primeira tentativa de gravar configuração ou mapeamento falhava com
+	// um erro de sistema de arquivos cru — achado ao mapear um controle num
+	// RetroArch que nunca tinha rodado (2026-08-28). É exatamente o caminho
+	// de quem acabou de instalar pelo ZeuX e vai configurar antes de jogar.
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("criando a pasta de configuração: %w", err)
 	}
 
 	if err := os.WriteFile(path+configBackupSuffix, original, 0o644); err != nil {

@@ -93,6 +93,51 @@ func (r *Registry) ForConsole(consoleID string) []Adapter {
 	return matches
 }
 
+// ConsoleOption é uma forma de rodar um console: qual adapter, e — quando ele
+// carrega cores plugáveis — qual core esse console pede.
+//
+// Existe para a tela de consoles (GET /api/v1/consoles) não precisar inverter
+// o `consoles[]` de cada Status por conta própria. A inversão em si seria
+// trivial; o que ela perderia é a **ordem**, que é regra de produto e mora em
+// ForConsole: standalone antes do RetroArch, porque um emulador dedicado
+// costuma ter compatibilidade e desempenho melhores no console dele. Uma
+// segunda cópia dessa regra no front divergiria calada.
+type ConsoleOption struct {
+	AdapterID string `json:"adapter_id"`
+	Name      string `json:"name"`
+
+	// Core vem preenchido só quando o adapter satisfaz CoreAdapter (hoje só
+	// o RetroArch). Ausente para standalone — não é "sem core ainda", é um
+	// emulador que não tem core nenhum por natureza.
+	Core string `json:"core,omitempty"`
+}
+
+// OptionsForConsole lista as formas de rodar um console, na ordem de
+// preferência de ForConsole.
+//
+// Não consulta o disco: dizer *o que existe* para um console é catálogo, não
+// estado de instalação. Quem quer saber o que está instalado cruza isto com
+// Survey — que é O(n) nos adapters e roda uma vez para a tela inteira, em vez
+// de uma vez por console.
+func (r *Registry) OptionsForConsole(consoleID string) []ConsoleOption {
+	adapters := r.ForConsole(consoleID)
+	options := make([]ConsoleOption, 0, len(adapters))
+
+	for _, adapter := range adapters {
+		option := ConsoleOption{AdapterID: adapter.ID(), Name: adapter.Name()}
+		if withCores, ok := adapter.(CoreAdapter); ok {
+			// O segundo retorno é descartado de propósito: ForConsole já
+			// garantiu que este adapter atende o console. Um CoreAdapter que
+			// dissesse "não atendo" aqui seria incoerência interna do próprio
+			// adapter, não um caso que a tela precise exibir.
+			option.Core, _ = withCores.DefaultCore(consoleID)
+		}
+		options = append(options, option)
+	}
+
+	return options
+}
+
 // Status descreve a situação de instalação de um emulador.
 type Status struct {
 	AdapterID string   `json:"adapter_id"`

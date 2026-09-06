@@ -1,8 +1,15 @@
 # 0011 — SQLite local para biblioteca, sessões e BIOS
 
 **Status:** Aceito · substitui [0002](0002-adiar-banco-de-dados.md) ·
-implementação parcial (infraestrutura + sessões prontas em 2026-08-02;
-pastas/jogos/BIOS da biblioteca ainda não têm tabela nem código)
+implementação quase completa (reconferido em 2026-08-28): infraestrutura e
+sessões desde 2026-08-02; **pastas e jogos da biblioteca prontos** —
+`library_folders` e `library_games`, migrações `0002`–`0005` (as três últimas
+somando `missing`, `cover` e `favorite`), com `internal/library` em uso pelas
+rotas `/api/v1/library/*`. **Só o caminho do BIOS continua fora do banco:**
+não há tabela nem coluna para ele, e o que existe hoje é
+`emulator.BiosDir` (pasta onde colocar, só para os emuladores em que isso
+foi verificado ao vivo) mais `requires_external_file` no catálogo de
+consoles.
 
 ## Contexto
 

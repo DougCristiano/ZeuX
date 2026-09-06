@@ -141,6 +141,28 @@ type ConfigurableAdapter interface {
 	RestoreConfig(install Installation) error
 }
 
+// CoreAdapter é a capacidade opcional de carregar bibliotecas de emulação
+// plugáveis — hoje só o RetroArch. Existe porque "qual core este console
+// pede" é a diferença entre um emulador estar instalado e o console
+// realmente abrir: o RetroArch pode estar no lugar e o core do Game Boy
+// não, e nenhuma rota dizia isso até a tela de consoles precisar.
+//
+// Mesma disciplina de ConfigurableAdapter/KeyBindableAdapter: verificar com
+// asserção de tipo (`if c, ok := adapter.(CoreAdapter); ok { ... }`), nunca
+// presumir que um adapter tem cores. Um standalone (DuckStation, PCSX2)
+// **não** implementa isto de propósito — não tem core nenhum, e devolver ""
+// para eles obrigaria quem chama a distinguir "sem core" de "core vazio".
+type CoreAdapter interface {
+	// DefaultCore devolve o core que este adapter usa para o console quando
+	// a requisição não escolhe um, no mesmo vocabulário amigável de
+	// KnownCores ("beetle psx hw", não "mednafen_psx_hw_libretro") — que é
+	// o que GET /retroarch/cores devolve em `name`, para as duas listas
+	// casarem sem tradução no meio.
+	//
+	// false para um console que este adapter não atende. Nunca ("", true).
+	DefaultCore(consoleID string) (string, bool)
+}
+
 // InputBinding é o mapeamento de uma ação para uma tecla e/ou botão de
 // controle, sempre na **vocabulário do próprio emulador** — nunca traduzido
 // para um layout genérico do ZeuX. "Cross" no PCSX2 não é necessariamente o

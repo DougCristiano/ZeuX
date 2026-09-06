@@ -18,6 +18,12 @@ type HardwareInfo struct {
 	GPUs      []GPUInfo  `json:"gpus"`
 	Memory    MemoryInfo `json:"memory"`
 
+	// Displays são os monitores conectados (Q3, docs/roadmap.md, Sprint Q).
+	// Lista vazia é estado honesto: nem todo sistema expõe isso de forma
+	// confiável (ver detectDisplays em cada display_<so>.go), e um palpite
+	// aqui vira resolução interna errada no jogo.
+	Displays []DisplayInfo `json:"displays"`
+
 	// Warnings descreve, em linguagem de usuário, o que não pôde ser detectado.
 	// Alimenta diretamente o aviso de "veredito menos preciso" na interface.
 	Warnings []string `json:"warnings"`
@@ -51,6 +57,36 @@ type GPUInfo struct {
 
 	// Source registra como o dado foi obtido ("wmi", "nvidia-smi", "lspci",
 	// "system_profiler"), para que a confiabilidade possa ser ponderada.
+	Source string `json:"source"`
+}
+
+// DisplayInfo descreve um monitor conectado.
+//
+// Existe porque "otimizar para a sua tela" era impossível sem ele: o
+// `internal_scale` do catálogo era uma constante escrita à mão, igual num
+// 1080p e num 4K. Ver PrimaryDisplay e o uso em internal/verdict.
+//
+// RefreshHz é 0 quando o sistema não reportou — dado ausente, nunca um
+// palpite (princípio 4 do CLAUDE.md). O mesmo vale para Width/Height: um
+// monitor que não pôde ser medido não entra na lista.
+type DisplayInfo struct {
+	// Name é como o sistema identifica a saída ("DP-1", `\\.\DISPLAY1`).
+	// Vazio quando não há um identificador legível — é rótulo, não chave.
+	Name string `json:"name,omitempty"`
+
+	Width  int `json:"width"`
+	Height int `json:"height"`
+
+	// RefreshHz é a taxa de atualização em Hz. 0 = não reportado.
+	RefreshHz int `json:"refresh_hz,omitempty"`
+
+	// Primary marca o monitor principal do sistema. Quando nenhum vem
+	// marcado (comum no Linux fora do X), o primeiro da lista é usado.
+	Primary bool `json:"primary,omitempty"`
+
+	// Source registra como o dado foi obtido ("user32", "xrandr", "drm",
+	// "system_profiler"), no mesmo espírito de GPUInfo.Source: a
+	// confiabilidade varia entre eles e isso precisa ser auditável.
 	Source string `json:"source"`
 }
 
@@ -101,4 +137,32 @@ func (h HardwareInfo) TotalRAMGiB() float64 {
 // VRAMGiB devolve a VRAM da GPU em GiB.
 func (g GPUInfo) VRAMGiB() float64 {
 	return float64(g.VRAMBytes) / (1024 * 1024 * 1024)
+}
+
+// PrimaryDisplay devolve o monitor que deve guiar a configuração do emulador:
+// o marcado como principal, ou — quando nenhum vem marcado, o que é comum fora
+// do Windows — o de maior área.
+//
+// "Maior área" e não "o primeiro" porque a ordem em que o sistema lista os
+// monitores não significa nada: num notebook ligado a um monitor externo, quem
+// manda na decisão de resolução interna é a tela em que a pessoa vai jogar, e
+// a maior é o palpite menos ruim entre os disponíveis. Ainda é um palpite —
+// por isso Primary é preenchido de verdade onde o sistema informa.
+func (h HardwareInfo) PrimaryDisplay() (DisplayInfo, bool) {
+	var best DisplayInfo
+	var found bool
+
+	for _, display := range h.Displays {
+		if display.Width <= 0 || display.Height <= 0 {
+			continue
+		}
+		if display.Primary {
+			return display, true
+		}
+		if !found || display.Width*display.Height > best.Width*best.Height {
+			best, found = display, true
+		}
+	}
+
+	return best, found
 }

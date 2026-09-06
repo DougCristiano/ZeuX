@@ -3,6 +3,7 @@
 // Sprint B: "React, Tailwind e mais nada" sem justificativa escrita).
 import type {
   ConsentStatus,
+  ConsoleEntry,
   CustomDefinition,
   CustomEmulatorsResponse,
   EmulatorBindingsResponse,
@@ -18,13 +19,14 @@ import type {
   InstallJob,
   BulkMatchedFolder,
   LaunchBody,
+  LaunchDownloadingCore,
+  LaunchResult,
   LibraryFolder,
   LibraryGame,
   PreviewResult,
   Report,
   RetroArchCoreStatus,
   ScrapeJob,
-  Session,
   SessionsResponse,
   SystemInfo,
 } from "./types";
@@ -57,6 +59,15 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.code = code;
   }
+}
+
+/**
+ * Distingue as duas formas de `LaunchResult` (ver o tipo em ./types). Fica
+ * aqui, e não no arquivo de tipos, porque `types.ts` é declaradamente só
+ * declaração — nenhuma linha de runtime.
+ */
+export function isDownloadingCore(result: LaunchResult): result is LaunchDownloadingCore {
+  return (result as LaunchDownloadingCore).downloading_core === true;
 }
 
 function isErrorBody(value: unknown): value is ErrorBody {
@@ -116,8 +127,18 @@ export const api = {
 
   getVerdicts: () => request<Report>("/consoles/verdicts"),
 
+  // Catálogo de consoles + como rodar cada um. Rota irmã de getVerdicts, mas
+  // sem exigir consentimento nem scan — dá pra chamar antes do onboarding
+  // (e depois de recusar), diferente do parecer.
+  getConsoles: () => request<{ consoles: ConsoleEntry[] }>("/consoles"),
+
   getEmulators: () => request<{ emulators: EmulatorEntry[] }>("/emulators"),
   getRetroArchCores: () => request<{ cores: RetroArchCoreStatus[] }>("/retroarch/cores"),
+  // Download sob demanda de um core (ADR 0015, R2/R3). Nomes com espaço
+  // ("beetle vb", "parallel n64") precisam ir percent-encoded no path —
+  // encodeURIComponent já cuida disso.
+  installRetroArchCore: (core: string) =>
+    request<InstallJob>(`/retroarch/cores/${encodeURIComponent(core)}/install`, { method: "POST" }),
 
   getCustomEmulators: () => request<CustomEmulatorsResponse>("/custom-emulators"),
   upsertCustomEmulator: (def: CustomDefinition) =>
@@ -155,9 +176,18 @@ export const api = {
     postJSON<EmulatorConfigWriteResult>(`/emulators/${encodeURIComponent(id)}/bindings`, { bindings }),
   getInstalls: () => request<{ installs: InstallJob[] }>("/installs"),
   getInstallJob: (id: string) => request<InstallJob>(`/installs/${encodeURIComponent(id)}`),
+  // Só cancela download de core em andamento (R3) — instalação de emulador
+  // devolve cancel_failed, sem suporte a isso.
+  cancelInstall: (id: string) =>
+    request<{ canceled: string }>(`/installs/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   previewLaunch: (body: LaunchBody) => postJSON<PreviewResult>("/games/preview", body),
-  launch: (body: LaunchBody) => postJSON<Session>("/games/launch", body),
+  // Duas formas de sucesso desde o ADR 0015 (R3): 200 com a Session, ou 202
+  // com o job de download do core que faltava (o jogo abre sozinho quando
+  // terminar). Quem chama PRECISA ramificar com isDownloadingCore() — tratar
+  // as duas como Session foi o bug de 2026-08-27, em que a tela dizia
+  // "sessão iniciada" durante um download de centenas de MB.
+  launch: (body: LaunchBody) => postJSON<LaunchResult>("/games/launch", body),
 
   getSessions: () => request<SessionsResponse>("/sessions"),
 

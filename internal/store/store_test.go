@@ -74,3 +74,53 @@ func TestOpenAtAppliesSchema(t *testing.T) {
 		t.Fatalf("tabela sessions não existe após a migração: %v", err)
 	}
 }
+
+// Trava a atualização de um banco que JÁ EXISTE — o caso de quem já usava o
+// ZeuX e instala uma versão nova, não o do primeiro uso. Simula isso removendo
+// a migração mais recente (tabela e registro) de um banco já migrado e
+// reabrindo: é exatamente o que acontece na máquina de quem atualiza.
+//
+// Escrito ao preparar a instalação da Sprint Q (2026-08-28), que trouxe a
+// migração 0006: um banco que não aceitasse a migração nova deixaria o app
+// sem subir, e isso não aparece em nenhum teste que só abre banco novo.
+func TestOpenAtAplicaMigracaoNovaEmBancoExistente(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "zeux.db")
+
+	db, err := OpenAt(path)
+	if err != nil {
+		t.Fatalf("primeira abertura: %v", err)
+	}
+
+	// Volta o banco ao estado anterior à última migração.
+	const ultima = "0006_emulator_user_config.sql"
+	if _, err := db.Exec(`DROP TABLE emulator_user_config`); err != nil {
+		t.Fatalf("removendo a tabela da última migração: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE name = ?`, ultima); err != nil {
+		t.Fatalf("removendo o registro da migração: %v", err)
+	}
+	db.Close()
+
+	// Reabrir precisa reaplicar só o que falta, sem tropeçar no que já existe.
+	db, err = OpenAt(path)
+	if err != nil {
+		t.Fatalf("reabertura do banco existente: %v", err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec(`INSERT INTO emulator_user_config (adapter_id, set_at) VALUES ('pcsx2', '2026-08-28')`); err != nil {
+		t.Fatalf("a tabela da migração nova não voltou: %v", err)
+	}
+
+	// E os dados das migrações antigas continuam de pé — reaplicar não pode
+	// recriar tabela que já tinha conteúdo.
+	var tabelas int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('sessions', 'library_folders', 'library_games')`,
+	).Scan(&tabelas); err != nil {
+		t.Fatalf("conferindo as tabelas antigas: %v", err)
+	}
+	if tabelas != 3 {
+		t.Errorf("tabelas antigas presentes = %d, esperava 3", tabelas)
+	}
+}

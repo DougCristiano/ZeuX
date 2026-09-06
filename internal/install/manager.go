@@ -25,6 +25,12 @@ const (
 	PhaseFinishing   Phase = "finalizando"
 	PhaseDone        Phase = "concluido"
 	PhaseFailed      Phase = "falhou"
+
+	// PhaseCanceled é o job interrompido por CancelJob (ADR 0015, R3) — só
+	// existe para o download de core, hoje. Separado de PhaseFailed porque a
+	// interface precisa distinguir "o usuário desistiu" de "deu errado", e o
+	// critério de aceite de R3 pede exatamente essa distinção.
+	PhaseCanceled Phase = "cancelado"
 )
 
 // Job é uma instalação em andamento ou terminada.
@@ -33,8 +39,20 @@ type Job struct {
 	AdapterID string `json:"adapter_id"`
 	Name      string `json:"name"`
 
+	// CoreName só é preenchido para um job de download de core do RetroArch
+	// (ADR 0015, R2, StartCore) — vazio para instalação de emulador. AdapterID
+	// continua "retroarch" nos dois casos, para que a interface agrupe por
+	// emulador; CoreName é o que distingue qual core está sendo baixado.
+	CoreName string `json:"core_name,omitempty"`
+
 	Phase   Phase  `json:"phase"`
 	Message string `json:"message"`
+
+	// Code é um identificador estável de falha (ex.: "core_hash_mismatch"),
+	// para a interface decidir o que mostrar sem parsear Error. Vazio quando
+	// Phase != PhaseFailed, ou para falhas que ainda não ganharam um code
+	// próprio.
+	Code string `json:"code,omitempty"`
 
 	Version    string `json:"version,omitempty"`
 	AssetName  string `json:"asset_name,omitempty"`
@@ -73,6 +91,23 @@ type Manager struct {
 	jobs     map[string]*Job
 	active   map[string]bool // adapterID -> instalando agora
 	sequence int
+
+	// activeCores dedup a download de cores do RetroArch (ADR 0015, R2) —
+	// mapa próprio, não reaproveita `active`, porque a chave ali é adapterID
+	// ("retroarch") e um único adapter pode ter vários cores baixando ao
+	// mesmo tempo.
+	activeCores map[string]bool
+
+	// retroArchManifest, quando não-nil, substitui o manifesto embutido
+	// (sharedRetroArchManifest) — usado só por teste, no mesmo pacote, para
+	// apontar StartCore a um servidor de mentira sem precisar de rede.
+	retroArchManifest *RetroArchCoreManifest
+
+	// cancels guarda a função de cancelamento de cada job que suporta ser
+	// interrompido (hoje, só download de core — ver runCore). Um job ausente
+	// aqui (instalação de emulador, ou job de core já terminado) não pode ser
+	// cancelado; CancelJob diz isso em vez de fingir sucesso.
+	cancels map[string]context.CancelFunc
 }
 
 // NewManager cria o gerenciador de instalações.
@@ -102,17 +137,6 @@ func (m *Manager) Start(adapterID string) (*Job, error) {
 		return nil, fmt.Errorf(
 			"o %s precisa ser instalado manualmente a partir de %s. %s",
 			source.Name, source.Homepage, source.Reason)
-	}
-
-	if source.Kind == KindBundled {
-		// Não deveria aparecer um botão de instalar para isto — Locate()
-		// já encontra a cópia empacotada (ver EnsureBundledRetroArchAvailable).
-		// Chegar aqui mesmo assim significa que a cópia falhou ou ainda não
-		// rodou; a mensagem diz a verdade em vez de repetir instruções de
-		// download que não fazem mais sentido para este emulador.
-		return nil, fmt.Errorf(
-			"o %s já vem empacotado com o ZeuX; não há nada para baixar. %s",
-			source.Name, source.Reason)
 	}
 
 	if _, ok := source.PatternForHost(); !ok {
@@ -323,25 +347,17 @@ func (m *Manager) promote(stagingDir, adapterID string) error {
 
 // Uninstall remove uma instalação gerenciada pelo ZeuX.
 //
-// Fontes "bundled" (hoje só o RetroArch, ver KindBundled) nunca podem ser
-// removidas por aqui: o binário vem dentro do próprio instalador do ZeuX, não
-// foi baixado por Start(), e apagá-lo quebraria os 24 consoles que dependem
-// dele sem nenhuma forma simples de reinstalar (não é "clique em Instalar de
-// novo" como os outros — precisaria reinstalar o ZeuX inteiro). O guard fica
-// no Manager, não só escondendo o botão na interface, para valer mesmo se
-// alguém chamar a rota direto.
+// Até o ADR 0015 (R4), o RetroArch tinha uma recusa própria aqui: vinha
+// empacotado no instalador (ADR 0012), então apagá-lo não tinha como se
+// recuperar sem reinstalar o ZeuX inteiro. Isso deixou de valer — o RetroArch
+// voltou a ser `KindManual` (sources.json), sem instalação gerenciada nenhuma
+// para remover por aqui (o `os.Stat` abaixo já recusa naturalmente).
 //
 // Os cores do RetroArch nunca passam por Uninstall — eles vivem em
-// bundledCoreDirsForWrite() (internal/emulator/bundled_cores.go), fora da
-// árvore que managedDirFor resolve, então já são naturalmente intocáveis por
-// esta função.
+// bundledCoreDirsForWrite() (internal/emulator/retroarch_cores_dir.go), fora
+// da árvore que managedDirFor resolve, então já são naturalmente intocáveis
+// por esta função.
 func (m *Manager) Uninstall(adapterID string) error {
-	if source, ok := m.catalog.ByAdapter(adapterID); ok && source.Kind == KindBundled {
-		return fmt.Errorf(
-			"o %s vem empacotado com o ZeuX e não pode ser removido por aqui — faz parte do próprio instalador do app, não uma instalação separada",
-			source.Name)
-	}
-
 	root, err := emulator.ManagedRoot()
 	if err != nil {
 		return err
@@ -387,6 +403,30 @@ func (m *Manager) snapshot(id string) *Job {
 
 	copied := *job
 	return &copied
+}
+
+// CancelJob interrompe um download de core em andamento (ADR 0015, R3).
+//
+// A interrupção é real, não cosmética: cancela o context.Context que
+// download()/Extract() usam, então a chamada de rede em andamento aborta e
+// installCore devolve erro antes de chegar no os.Rename que promoveria o
+// core — nada fica pela metade em ManagedRoot() (na verdade, no diretório de
+// cores gerenciado; ver RetroArchManagedCoresDir), porque a promoção só
+// acontece depois que tudo deu certo.
+//
+// Instalação de emulador (Start) não suporta cancelamento ainda — não estava
+// no critério de aceite de R3, e adicionar seria escopo por conta própria.
+func (m *Manager) CancelJob(id string) error {
+	m.mu.Lock()
+	cancel, ok := m.cancels[id]
+	m.mu.Unlock()
+
+	if !ok {
+		return fmt.Errorf("esta instalação não está em andamento ou não pode ser cancelada")
+	}
+
+	cancel()
+	return nil
 }
 
 // Job devolve o andamento de uma instalação.

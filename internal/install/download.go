@@ -20,12 +20,18 @@ import (
 // inesperado, não consiga apontar o download para outro lugar. Ela cobre a API
 // do GitHub e os domínios por onde os anexos de release são realmente
 // entregues.
+// buildbot.libretro.com foi adicionado pelo ADR 0015 (download sob demanda de
+// cores do RetroArch, R1) — único host fora do GitHub que o ZeuX baixa. Uma
+// URL do manifesto embutido (internal/install/data/retroarch_cores_manifest.json)
+// que apontasse para outro lugar seria recusada aqui do mesmo jeito que uma
+// release de GitHub comprometida seria.
 var allowedHosts = map[string]bool{
 	"api.github.com":                       true,
 	"github.com":                           true,
 	"objects.githubusercontent.com":        true,
 	"release-assets.githubusercontent.com": true,
 	"codeload.github.com":                  true,
+	"buildbot.libretro.com":                true,
 }
 
 // maxDownloadBytes limita o tamanho do pacote. Emuladores ficam na casa das

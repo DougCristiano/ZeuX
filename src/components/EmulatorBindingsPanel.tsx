@@ -4,6 +4,7 @@ import type { InputBinding } from "../api/types";
 import { translateKeyForAdapter } from "../lib/keyMapping";
 import { Button, Callout, InlineError, Toast } from "./ui";
 import { useToast } from "../hooks/useToast";
+import { useGamepad } from "../hooks/useGamepad";
 
 /**
  * Tela de mapeamento de teclado/controle (H3/H4, docs/roadmap.md) — só
@@ -31,8 +32,22 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
   const [error, setError] = useState<string | null>(null);
   const [listeningKeyFor, setListeningKeyFor] = useState<string | null>(null);
   const [listeningButtonFor, setListeningButtonFor] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<{ action: string; key: string; withAction: string } | null>(null);
-  const [gamepadConnected, setGamepadConnected] = useState(false);
+  // `key` ou `button`, nunca os dois: o conflito é sempre sobre um vínculo
+  // específico, e saber qual deles decide o texto e o que gravar ao confirmar.
+  const [conflict, setConflict] = useState<
+    { action: string; withAction: string; key?: string; button?: string } | null
+  >(null);
+  // Q4 (docs/roadmap.md, Sprint Q): a detecção saiu daqui para `useGamepad`,
+  // que também devolve o NOME do controle — antes a tela só sabia dizer
+  // "conectado sim/não", e quem tem dois controles não tinha como confirmar
+  // qual deles está sendo lido.
+  const gamepad = useGamepad();
+  const gamepadConnected = gamepad.connected;
+  // Mapeamento em sequência (Q4): percorre todas as ações de uma vez, uma
+  // por aperto de botão, em vez de exigir um clique em "Mapear controle"
+  // antes de cada uma. Com 14+ ações, o caminho de um clique por ação era o
+  // que fazia ninguém terminar de mapear.
+  const [sequence, setSequence] = useState<{ actions: string[]; index: number } | null>(null);
   // B2 (achado do critico-design, 2026-08-18): `unapplied` (ADR 0006) estava
   // sendo jogado dentro de `error` — o mesmo `InlineError` vermelho que
   // erro de verdade usa, transformando uma ressalva ("essa opção não coube")
@@ -69,41 +84,45 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapterId]);
 
-  // Detecção de controle conectado — só isso (listar), não captura de
-  // botão. A captura de botão (abaixo) só entra quando o usuário clica
-  // "Mapear controle" para uma ação específica.
-  useEffect(() => {
-    function refresh() {
-      const pads = navigator.getGamepads?.() ?? [];
-      setGamepadConnected(Array.from(pads).some((p) => p !== null));
-    }
-    refresh();
-    window.addEventListener("gamepadconnected", refresh);
-    window.addEventListener("gamepaddisconnected", refresh);
-    return () => {
-      window.removeEventListener("gamepadconnected", refresh);
-      window.removeEventListener("gamepaddisconnected", refresh);
-    };
-  }, []);
-
-  async function saveBinding(action: string, patch: Partial<Pick<InputBinding, "key" | "button">>) {
+  // Devolve se gravou. A sequência (Q4) depende disso: avançar depois de uma
+  // falha faria a fila correr inteira gravando nada — foi o que aconteceu ao
+  // testar com um RetroArch cuja pasta de configuração não existia
+  // (2026-08-28), 16 ações consumidas e nenhum vínculo salvo.
+  async function saveBinding(
+    action: string,
+    patch: Partial<Pick<InputBinding, "key" | "button">>,
+  ): Promise<boolean> {
     setError(null);
     setUnapplied([]);
     try {
       const result = await api.setEmulatorBindings(adapterId, [{ action, ...patch }]);
       if ((result.unapplied ?? []).length > 0) {
         setUnapplied(result.unapplied);
-      } else {
+      } else if (!sequenceRef.current) {
+        // Durante a sequência o toast por ação seria um piscar constante — o
+        // progresso já aparece no cabeçalho, e o "Controle mapeado." do fim
+        // fecha a conversa.
         showToast("Mapeamento salvo.");
       }
       load();
+      return true;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível salvar o mapeamento.");
+      return false;
     }
   }
 
   function currentKeyOwner(key: string, exceptAction: string): string | null {
     const owner = bindings.find((b) => b.key === key && b.action !== exceptAction);
+    return owner ? owner.action : null;
+  }
+
+  // Q4: o mesmo aviso que a tecla já tinha, agora para botão. Sem isto, dois
+  // botões iguais em ações diferentes passavam batido — e no controle o
+  // sintoma é pior que no teclado: a pessoa aperta um botão no jogo e duas
+  // coisas acontecem.
+  function currentButtonOwner(button: string, exceptAction: string): string | null {
+    const owner = bindings.find((b) => b.button === button && b.action !== exceptAction);
     return owner ? owner.action : null;
   }
 
@@ -135,6 +154,51 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listeningKeyFor]);
 
+  // Ref espelhando `sequence`: o laço de captura (requestAnimationFrame,
+  // abaixo) tem `listeningButtonFor` nas dependências e leria um `sequence`
+  // congelado no fechamento.
+  const sequenceRef = useRef<{ actions: string[]; index: number } | null>(null);
+  sequenceRef.current = sequence;
+
+  // Quem liga a escuta do próximo botão é este efeito, e não `avancarSequencia`
+  // direto. **Achado dirigindo a tela com um controle simulado (Playwright,
+  // 2026-08-28):** a primeira versão chamava `setListeningButtonFor` de dentro
+  // do updater de `setSequence`. Updater de estado precisa ser função pura — o
+  // React pode invocá-lo duas vezes (é o que o modo estrito faz em
+  // desenvolvimento), e o efeito colateral lá dentro se perdia: a sequência
+  // travava na primeira ação, gravando o vínculo e nunca andando.
+  useEffect(() => {
+    if (!sequence) return;
+    setListeningButtonFor(sequence.actions[sequence.index]);
+  }, [sequence]);
+
+  // Avança para a próxima ação, ou encerra quando acabam. Só mexe em estado
+  // com valores já calculados aqui fora.
+  function avancarSequencia(action: string) {
+    const atual = sequenceRef.current;
+    if (!atual || atual.actions[atual.index] !== action) return;
+
+    const proximo = atual.index + 1;
+    if (proximo >= atual.actions.length) {
+      setSequence(null);
+      showToast("Controle mapeado.");
+      return;
+    }
+    setSequence({ ...atual, index: proximo });
+  }
+
+  function iniciarSequencia() {
+    if (actions.length === 0) return;
+    // `listeningButtonFor` fica para o efeito acima — definir aqui também
+    // faria a escuta ligar duas vezes para a mesma ação.
+    setSequence({ actions, index: 0 });
+  }
+
+  function pararSequencia() {
+    setSequence(null);
+    setListeningButtonFor(null);
+  }
+
   // Captura de botão: poll via requestAnimationFrame comparando o estado
   // anterior de cada botão do primeiro controle conectado, para achar uma
   // transição solto→pressionado (não o estado já pressionado ao entrar no
@@ -146,7 +210,15 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
     let frame: number;
     let cancelled = false;
 
-    prevButtonsRef.current = [];
+    // **Semeado com o estado ATUAL do controle, não vazio.** Achado dirigindo
+    // a tela com um controle simulado (2026-08-28): zerar aqui fazia um botão
+    // ainda segurado contar como transição solto→pressionado no primeiro
+    // quadro da próxima ação — um único aperto consumia a sequência inteira,
+    // gravando o mesmo botão em todas as ações. Semeando com o que está
+    // pressionado agora, a captura só reage a um aperto NOVO.
+    prevButtonsRef.current = Array.from(navigator.getGamepads?.() ?? [])
+      .find((pad) => pad !== null)
+      ?.buttons.map((b) => b.pressed) ?? [];
 
     function poll() {
       const pads = navigator.getGamepads?.() ?? [];
@@ -157,7 +229,27 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
           if (b.pressed && !wasPressed && !cancelled) {
             cancelled = true;
             setListeningButtonFor(null);
-            saveBinding(action, { button: String(i) });
+
+            const button = String(i);
+            const owner = currentButtonOwner(button, action);
+            if (owner) {
+              // Durante a sequência, um conflito PARA a fila: continuar
+              // gravaria as ações seguintes por cima enquanto o usuário ainda
+              // decide o que fazer com esta.
+              setSequence(null);
+              setConflict({ action, button, withAction: owner });
+              return;
+            }
+
+            void saveBinding(action, { button }).then((salvou) => {
+              if (salvou) {
+                avancarSequencia(action);
+                return;
+              }
+              // Falhou: a fila para aqui, com o erro na tela. Continuar
+              // pediria os 15 botões seguintes para gravar nada.
+              setSequence(null);
+            });
             return;
           }
           prevButtonsRef.current[i] = b.pressed;
@@ -189,7 +281,41 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </Callout>
       )}
 
-      {!gamepadConnected && (
+      {/* Q4 (docs/roadmap.md, Sprint Q): o cabeçalho do controle. Antes, esta
+          área só existia no estado negativo ("nenhum controle detectado") — com
+          um controle plugado, a tela não confirmava nada, e quem tem dois não
+          tinha como saber qual está sendo lido. */}
+      {gamepadConnected ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-line bg-fill px-3 py-2">
+          <p className="text-sm text-ink">
+            Controle detectado
+            {gamepad.name && <span className="text-muted"> · {gamepad.name}</span>}
+          </p>
+          {sequence ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted tabular-nums">
+                {sequence.index + 1} de {sequence.actions.length} · aperte o botão para "{sequence.actions[sequence.index]}"
+              </span>
+              <Button variant="quiet" className="px-2 py-1 text-xs" onClick={pararSequencia}>
+                Parar
+              </Button>
+            </div>
+          ) : (
+            /* Mapear tudo de uma vez: com 14+ ações, exigir um clique em
+               "Mapear controle" antes de cada aperto é o que fazia ninguém
+               terminar. A ação por ação continua disponível abaixo, para
+               corrigir um vínculo só sem refazer o resto. */
+            <Button
+              variant="secondary"
+              className="px-2 py-1 text-xs"
+              disabled={listeningButtonFor !== null || actions.length === 0}
+              onClick={iniciarSequencia}
+            >
+              Mapear o controle inteiro
+            </Button>
+          )}
+        </div>
+      ) : (
         <p className="text-xs text-muted">
           Nenhum controle detectado — conecte um para mapear botões. O mapeamento de teclado funciona sem controle
           nenhum.
@@ -199,16 +325,19 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       {conflict && (
         <div className="rounded border border-dashed border-line-strong p-3">
           <p className="text-sm text-ink">
-            A tecla já está em "{conflict.withAction}". Trocar para "{conflict.action}" também?
+            {conflict.key
+              ? `A tecla já está em "${conflict.withAction}".`
+              : `O botão ${conflict.button} já está em "${conflict.withAction}".`}{" "}
+            Trocar para "{conflict.action}" também?
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
               variant="primary"
               autoFocus
               onClick={() => {
-                const { action, key } = conflict;
+                const { action, key, button } = conflict;
                 setConflict(null);
-                saveBinding(action, { key });
+                saveBinding(action, key ? { key } : { button });
               }}
             >
               Trocar mesmo assim
@@ -228,8 +357,17 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       <div className="flex flex-col gap-2">
         {actions.map((action) => {
           const binding = bindings.find((b) => b.action === action);
+          const naVez = sequence?.actions[sequence.index] === action;
           return (
-            <div key={action} className="flex flex-wrap items-center justify-between gap-2">
+            <div
+              key={action}
+              // A ação da vez precisa se destacar sem mover nada: durante a
+              // sequência o usuário está olhando o controle, não a tela, e
+              // volta o olho para conferir onde parou.
+              className={`flex flex-wrap items-center justify-between gap-2 ${
+                naVez ? "-mx-2 rounded border border-accent px-2 py-1" : ""
+              }`}
+            >
               <span className="min-w-0 shrink text-sm break-words text-ink">
                 {action}
                 <span className="ml-2 text-xs text-muted">
