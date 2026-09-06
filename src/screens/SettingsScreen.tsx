@@ -145,7 +145,7 @@ export function SettingsScreen() {
   }
 
   return (
-    <ScreenContainer variant="reading">
+    <ScreenContainer variant="listing">
       {toastMessage && <Toast message={toastMessage} />}
       <h1 className="mb-5 text-2xl font-semibold text-ink">Configurações</h1>
 

@@ -166,20 +166,20 @@ export function OnboardingGlow() {
  * de largura e seu próprio espaçamento de topo — conferido por `grep`, eram
  * seis valores diferentes (`max-w-6xl`, `max-w-7xl`, `max-w-5xl`,
  * `max-w-4xl`, `max-w-2xl`) mais um `py-10` isolado — e navegar de uma tela
- * para outra fazia o conteúdo "pular" de largura. Dois tetos só, escolhidos
- * pelo tipo de conteúdo, não por tela:
+ * para outra fazia o conteúdo "pular" de largura. Um teto só, o mesmo teto
+ * escalonado que a Sprint O já validou (O5): `max-w-6xl` até 1536px de
+ * janela, crescendo em telas grandes/4K para não deixar metade da janela
+ * vazia.
  *
- * - `"listing"` — telas de grade/lista (Todos os jogos, Emuladores,
- *   Especificações, Biblioteca, Jogos de um console). Mesmo teto escalonado
- *   que a Sprint O já validou (O5): `max-w-6xl` até 1536px de janela,
- *   crescendo em telas grandes/4K para não deixar metade da janela vazia.
- * - `"reading"` — telas de leitura/formulário (Detalhe do jogo,
- *   Configurações). `max-w-3xl` fixo, **sem** crescer em janela grande — ao
- *   contrário de uma grade, texto e formulário não ficam mais úteis
- *   esticados; a régua de ~65-75 caracteres por linha é o motivo de existir
- *   um teto de leitura para início de conversa. (Isto supersede o ajuste do
- *   O7 em `GameDetailScreen`, feito quando essa tela ainda tinha seu próprio
- *   teto crescente — revertido junto com esta mudança, ver comentário lá.)
+ * **Existiu uma segunda variante ("reading", `max-w-3xl` fixo) para telas de
+ * leitura/formulário** (Detalhe do jogo, Configurações), com a régua de
+ * ~65-75 caracteres por linha como justificativa. **Removida a pedido do
+ * Douglas (2026-09-06):** o modelo do produto é "wide" em toda tela, sem
+ * exceção — inclusive as duas que só liam texto. `variant` continua existindo
+ * como parâmetro (todo chamador já escreve `variant="listing"` explícito) só
+ * para não obrigar uma segunda rodada de edição nos 8 chamadores existentes;
+ * se um dia sobrar variante única de verdade, vale simplificar removendo o
+ * parâmetro também.
  *
  * `pt-16 pb-10` é o único espaçamento de topo/rodapé — inclusive
  * `VerdictScreen`, que antes usava `py-10` sozinha. O checkbox aberto do M1
@@ -195,12 +195,12 @@ export function ScreenContainer({
   className = "",
   children,
 }: {
-  variant?: "listing" | "reading";
+  variant?: "listing";
   className?: string;
   children: ReactNode;
 }) {
-  const width =
-    variant === "listing" ? "max-w-6xl 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]" : "max-w-3xl";
+  void variant; // única variante que resta — ver comentário acima
+  const width = "max-w-6xl 2xl:max-w-[1600px] min-[2400px]:max-w-[2000px]";
   return <div className={`mx-auto px-6 pt-16 pb-10 ${width} ${className}`}>{children}</div>;
 }
 

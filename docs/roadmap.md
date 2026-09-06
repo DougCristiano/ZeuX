@@ -4400,6 +4400,18 @@ Hoje cada tela escolhe seu próprio teto e seu próprio topo — conferido por
       um container que ainda crescia; com `reading` fixo, não crescer mais é
       a decisão, não um bug. Documentado no próprio arquivo.
 
+**Revertido de novo em 2026-09-06, a pedido do Douglas:** a variante
+`"reading"` saiu de `ScreenContainer`. O modelo do produto passou a ser
+**wide em toda tela, sem exceção** — inclusive as duas que este item tinha
+posto no teto fixo (`GameDetailScreen`, `SettingsScreen`), que agora usam
+`variant="listing"` como as outras 5. O argumento da régua de leitura
+(65-75 caracteres por linha) que justificou `"reading"` continua válido
+em tese, mas perdeu para a preferência explícita de manter um modelo visual
+único no app — decisão de produto, não coisa que uma sessão de IA deveria
+reabrir sozinha. `variant` continua existindo como parâmetro de
+`ScreenContainer` (todo chamador já escreve `variant="listing"`), só sem mais
+ter uma segunda opção por trás.
+
 **Depende de:** nada · **Bloqueia:** N8, e o fechamento do M1 (fechado acima)
 
 ### N4 — Uma só linha de controle (M)
