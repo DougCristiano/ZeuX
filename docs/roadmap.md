@@ -3691,6 +3691,18 @@ consoles):
 não de contagem) e se a virtualização não introduziu soluço perceptível ao
 rolar rápido — nenhuma sessão de IA sente "jank".
 
+**Achado testando com o Douglas (2026-09-06):** o `<div role="button">` que
+torna a linha inteira clicável (`GameListRow.tsx`) não tinha `cursor-pointer`
+nem `hover:` nenhum — medido ao vivo com Playwright, `cursor: auto` e zero
+mudança de estilo ao passar o mouse. `role="button"` num elemento não nativo
+não ganha cursor de mão sozinho (só `<button>`/`<a href>` têm isso de
+fábrica), e sem `hover:` a linha inteira do modo lista parecia texto solto,
+não algo clicável. Corrigido: `cursor-pointer` + `hover:bg-fill` (mesmo tom
+que `Button` variant="secondary" já usa no hover). Mesma sessão: o botão de
+favorito (`FavoriteToggle`) só tinha `hover:` no estado "não favoritado" — a
+estrela já preenchida não reagia ao mouse. Adicionado `hover:brightness-125`
+ao estado favoritado.
+
 **Depende de:** M4 (sem o estado preservado, escolher uma ordem e voltar do
 detalhe reseta tudo — a barra pareceria quebrada)
 **Bloqueia:** nada

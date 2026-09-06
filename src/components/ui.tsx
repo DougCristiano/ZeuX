@@ -708,8 +708,14 @@ export function FavoriteToggle({
         e.stopPropagation();
         onToggle();
       }}
+      // `hover:brightness-125` no estado favoritado (achado testando com o
+      // Douglas, 2026-09-06): só o ramo "não favoritado" tinha `hover:` —
+      // passar o mouse sobre uma estrela já preenchida não mudava nada,
+      // parecia ícone decorativo em vez de alternável.
       className={`flex h-7 w-7 items-center justify-center rounded-full border transition-colors ${
-        favorite ? "border-amber bg-black/60 text-amber" : "border-line-strong bg-black/60 text-muted hover:text-ink"
+        favorite
+          ? "border-amber bg-black/60 text-amber hover:brightness-125"
+          : "border-line-strong bg-black/60 text-muted hover:text-ink"
       } ${FOCUS_RING} ${className}`}
     >
       <Star size={14} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />

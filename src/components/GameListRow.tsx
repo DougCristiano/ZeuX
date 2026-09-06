@@ -50,7 +50,14 @@ export function GameListRow({
       <div
         role="button"
         tabIndex={0}
-        className={`flex min-w-0 flex-1 items-center gap-3 rounded px-1 py-1 text-left ${FOCUS_RING}`}
+        // `cursor-pointer`/`hover:bg-fill` (achado testando com o Douglas,
+        // 2026-09-06): faltavam os dois. `role="button"` num `<div>` não
+        // ganha cursor de mão sozinho — só `<button>`/`<a href>` nativos têm
+        // esse estilo de fábrica do navegador — e sem `hover:` nenhum, passar
+        // o mouse pela linha inteira não mudava nada, nem cursor nem cor.
+        // `hover:bg-fill` é o mesmo tom que `Button` variant="secondary" já
+        // usa no hover — reaproveita o vocabulário em vez de inventar um novo.
+        className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded px-1 py-1 text-left transition-colors hover:bg-fill ${FOCUS_RING}`}
         title={game.title}
         aria-label={`Ver detalhes de ${game.title}`}
         onClick={onOpenDetail}
