@@ -6,6 +6,8 @@ import type {
   ConsoleEntry,
   CustomDefinition,
   CustomEmulatorsResponse,
+  ControllerAssignment,
+  ControllerProfile,
   EmulatorBindingsResponse,
   EmulatorConfigWriteResult,
   EmulatorEntry,
@@ -174,6 +176,13 @@ export const api = {
     request<EmulatorBindingsResponse>(`/emulators/${encodeURIComponent(id)}/bindings`),
   setEmulatorBindings: (id: string, bindings: InputBinding[]) =>
     postJSON<EmulatorConfigWriteResult>(`/emulators/${encodeURIComponent(id)}/bindings`, { bindings }),
+  getControllerProfiles: () => request<{ profiles: ControllerProfile[] }>("/controllers"),
+  getControllerAssignment: (id: string) =>
+    request<ControllerAssignment>(`/emulators/${encodeURIComponent(id)}/controller-profile`),
+  setControllerAssignment: (id: string, profileId: string | null) =>
+    postJSON<{ adapter_id: string; profile_id?: string }>(`/emulators/${encodeURIComponent(id)}/controller-profile`, {
+      profile_id: profileId ?? "",
+    }),
   getInstalls: () => request<{ installs: InstallJob[] }>("/installs"),
   getInstallJob: (id: string) => request<InstallJob>(`/installs/${encodeURIComponent(id)}`),
   // Só cancela download de core em andamento (R3) — instalação de emulador

@@ -195,7 +195,7 @@ function RetroArchCoresList() {
           <div className="flex shrink-0 items-center gap-2">
             <span className="text-xs text-muted tabular-nums">
               {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
-            {/* A11y 4.1.3: progresso da fila que avança sozinho — anunciado
+            </span>{/* A11y 4.1.3: progresso da fila que avança sozinho — anunciado
                 por `aria-live` para quem usa leitor de tela. */}
             <span className="text-xs text-muted tabular-nums" aria-live="polite">
               {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
