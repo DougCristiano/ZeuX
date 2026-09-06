@@ -445,6 +445,15 @@ aplicado**. O detalhe mostra o core certo (o que roda); quem promete errado
 é o parecer. Fechar essa lacuna significa mudar o que o lançamento envia —
 decisão de produto, fora do escopo desta sprint.
 
+**Achado testando com o Douglas (2026-09-06):** as duas colunas ficavam
+visivelmente desbalanceadas quando o console tem 1 emulador só, ainda não
+instalado — a esquerda com só o card "Instalar" (curto), a direita
+empilhando Jogos + BIOS + Nesta máquina (bem mais alta). `BiosSection` foi
+para a coluna esquerda, junto de "Como rodar" — mesmo grupo semântico ("o que
+este console precisa pra rodar": emulador + BIOS), deixando a direita só com
+"sobre a sua biblioteca/máquina" (Jogos + Nesta máquina). Reduz o
+desbalanceamento sem inventar conteúdo de enchimento pra igualar altura.
+
 ### P3 — o que a Sprint P deixou aberto
 
 - [ ] O parecer promete um core que o lançamento não usa (achado acima).
@@ -3107,6 +3116,16 @@ inteira — instalar/remover/abrir standalone/editar-excluir personalizado).
 `EmulatorCard` virou orquestrador: monta `Card` + os 5 pedaços + o toggle de
 cores do RetroArch. `RowState` continua union discriminada, comportamento
 idêntico — `npm run build` (`tsc` + `vite build`) passou sem erro.
+
+**Achado testando com o Douglas (2026-09-06), fora de `EmulatorCard` em si:**
+a grade que lista os cards (`EmulatorsScreen.tsx`, `grid grid-cols-1 …`) não
+tinha `items-start`. O Grid CSS por padrão estica cada célula pra altura da
+fileira mais alta (`align-items: stretch`) — o card do RetroArch
+(configurações + mapeamento + "ver cores") é bem mais alto que
+DuckStation/PCSX2 (só um botão "Instalar"); a borda dos três acompanhava a
+fileira (esticava), mas o conteúdo de dentro ficava colado no topo — metade
+do card vazia por dentro, sem nenhum motivo visual. `items-start` faz cada
+card ficar só do tamanho do próprio conteúdo, sem estourar as vizinhas.
 
 **Correção de contagem, 2026-08-07:** o critério abaixo fala em "7 telas", mas
 `src/screens/` tem **10** arquivos. Somando a lista da revisão original com a do
