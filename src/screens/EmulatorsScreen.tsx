@@ -712,6 +712,7 @@ function EmulatorCard({
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
+  const t = useT(dict);
   const [showCores, setShowCores] = useState(false);
 
   // Só um console = a cor dele vira a identidade do card inteiro (12 dos 13

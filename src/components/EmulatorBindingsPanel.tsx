@@ -329,7 +329,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
           <p className="text-sm text-ink">
             {conflict.key
               ? t("keyConflictMessage", { action: conflict.withAction })
-              : t("buttonConflictMessage", { button: conflict.button, action: conflict.withAction })}{" "}
+              : t("buttonConflictMessage", { button: conflict.button ?? "", action: conflict.withAction })}{" "}
             {t("switchConfirmationSuffix", { action: conflict.action })}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">

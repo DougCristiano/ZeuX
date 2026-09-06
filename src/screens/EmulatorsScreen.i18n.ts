@@ -217,4 +217,12 @@ export const dict = {
     "pt-BR": "Buscar emulador ou console",
     en: "Search emulator or console",
   },
+  weakHardware: {
+    "pt-BR": "Hardware abaixo do recomendado",
+    en: "Hardware below recommended",
+  },
+  installAnyway: {
+    "pt-BR": "Instalar mesmo assim",
+    en: "Install anyway",
+  },
 } satisfies Dict;

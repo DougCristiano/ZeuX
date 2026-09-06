@@ -316,12 +316,12 @@ function EmulatorOptionCard({
           <div className="flex flex-wrap gap-2">
             {entry.configurable && (
               <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
-                {showConfig ? "Ocultar configurações" : "Configurações"}
+                {showConfig ? t("hideConfig") : t("config")}
               </Button>
             )}
             {entry.bindable && (
               <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
-                {showBindings ? "Ocultar mapeamento" : "Mapear controles"}
+                {showBindings ? t("hideBindings") : t("mapControls")}
               </Button>
             )}
           </div>
@@ -339,7 +339,7 @@ function EmulatorOptionCard({
           fora, não ficar procurando um botão que nunca existiu. */}
       {installed && !entry?.configurable && !entry?.bindable && (
         <p className="text-xs text-muted">
-          Configuração e controles deste emulador ainda só dentro do próprio {option.name}.
+          {t("configureElsewhereMessage", { emulatorName: option.name })}
         </p>
       )}
 
@@ -350,9 +350,9 @@ function EmulatorOptionCard({
               variant="primary"
               disabled={opening}
               onClick={openStandalone}
-              title="Abre o emulador sem nenhum jogo, para configurar dentro dele."
+              title={t("openEmulatorTooltip")}
             >
-              {opening ? "Abrindo…" : "Abrir configurações do emulador"}
+              {opening ? t("opening") : t("openEmulatorSettings")}
             </Button>
             {canRemove && (
               <Button
@@ -360,17 +360,17 @@ function EmulatorOptionCard({
                 disabled={state.kind === "removing"}
                 onClick={() => setState({ kind: "confirm-remove" })}
               >
-                {state.kind === "remove-error" ? "Tentar remover de novo" : "Remover"}
+                {state.kind === "remove-error" ? t("retryRemove") : t("remove")}
               </Button>
             )}
           </>
         ) : source?.kind === "manual" ? (
           <Button variant="primary" onClick={() => openUrl(source.homepage)}>
-            Abrir site oficial
+            {t("openOfficialSite")}
           </Button>
         ) : state.kind === "installing" || state.kind === "done" || state.kind === "confirm-hardware" ? null : (
           <Button variant="primary" disabled={state.kind === "starting"} onClick={() => install(false)}>
-            {state.kind === "error" ? "Tentar de novo" : "Instalar"}
+            {state.kind === "error" ? t("retryInstall") : t("install")}
           </Button>
         )}
       </div>
@@ -401,6 +401,7 @@ function GamesFolderSection({
   onChanged: () => void;
   onOpenGames?: () => void;
 }) {
+  const t = useT(dict);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [count, setCount] = useState<number | null>(null);
@@ -429,7 +430,7 @@ function GamesFolderSection({
       await api.addLibraryFolder(consoleId, picked);
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível apontar esta pasta.");
+      setError(err instanceof ApiError ? err.message : t("couldNotPointFolder"));
     } finally {
       setBusy(false);
     }
@@ -452,10 +453,10 @@ function GamesFolderSection({
   return (
     <Card filled className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-semibold text-ink">Jogos de {shortName}</p>
+        <p className="font-semibold text-ink">{t("gamesForConsole", { shortName })}</p>
         {count !== null && (
           <span className="text-sm text-muted">
-            {count} {count === 1 ? "jogo encontrado" : "jogos encontrados"}
+            {count === 1 ? t("gameCountSingular") : t("gameCountPlural", { count })}
           </span>
         )}
       </div>
@@ -464,8 +465,7 @@ function GamesFolderSection({
 
       {folders.length === 0 ? (
         <p className="text-sm text-muted">
-          Nenhuma pasta apontada ainda. O ZeuX lê os jogos direto de onde eles já estão no seu disco — nada é
-          copiado nem movido.
+          {t("noFoldersAssigned")}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -483,12 +483,12 @@ function GamesFolderSection({
                 <Button
                   variant="quiet"
                   disabled={busy}
-                  onClick={() => runFolderAction(api.rescanLibraryFolder(folder.id), "Não foi possível varrer a pasta.")}
+                  onClick={() => runFolderAction(api.rescanLibraryFolder(folder.id), t("couldNotScanFolder"))}
                 >
-                  Revarrer
+                  {t("rescan")}
                 </Button>
                 <Button variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
-                  Remover
+                  {t("remove")}
                 </Button>
               </span>
             </li>
@@ -498,22 +498,22 @@ function GamesFolderSection({
 
       {confirmingRemove !== null && (
         <ConfirmModal
-          title="Remover esta pasta?"
-          message="Os jogos dela saem da biblioteca do ZeuX. Nenhum arquivo é apagado do seu disco."
+          title={t("removeFolderTitle")}
+          message={t("removeFolderMessage")}
           onClose={() => setConfirmingRemove(null)}
           actions={
             <>
               <Button variant="secondary" onClick={() => setConfirmingRemove(null)}>
-                Cancelar
+                {t("cancel")}
               </Button>
               <Button
                 variant="danger"
                 autoFocus
                 onClick={() =>
-                  runFolderAction(api.removeLibraryFolder(confirmingRemove), "Não foi possível remover a pasta.")
+                  runFolderAction(api.removeLibraryFolder(confirmingRemove), t("couldNotRemoveFolder"))
                 }
               >
-                Remover mesmo assim
+                {t("removeAnyway")}
               </Button>
             </>
           }
@@ -522,11 +522,11 @@ function GamesFolderSection({
 
       <div className="flex flex-wrap gap-2">
         <Button variant={folders.length === 0 ? "primary" : "secondary"} disabled={busy} onClick={pickFolder}>
-          {folders.length === 0 ? "Escolher pasta" : "Apontar outra pasta"}
+          {folders.length === 0 ? t("chooseFolder") : t("assignAnotherFolder")}
         </Button>
         {onOpenGames && folders.length > 0 && (
           <Button variant="secondary" onClick={onOpenGames}>
-            Ver jogos
+            {t("seeGames")}
           </Button>
         )}
       </div>
@@ -550,15 +550,16 @@ function GamesFolderSection({
  * O ZeuX também nunca sugere onde obter o arquivo. Ver o princípio 6.
  */
 function BiosSection({ entry, requiresExternalFile }: { entry?: EmulatorEntry; requiresExternalFile: boolean }) {
+  const t = useT(dict);
   const [error, setError] = useState<string | null>(null);
 
   if (!entry?.bios_dir) {
     if (!requiresExternalFile) return null;
     return (
       <Card filled className="flex flex-col gap-2">
-        <p className="font-semibold text-ink">BIOS / firmware</p>
+        <p className="font-semibold text-ink">{t("biosFireware")}</p>
         <p className="text-sm text-muted">
-          Este console costuma exigir um arquivo de BIOS ou firmware do próprio aparelho.
+          {t("biosRequired")}
         </p>
         {/* Dois motivos diferentes para não haver pasta, e dizer "o ZeuX não
             sabe" nos dois seria impreciso no primeiro: sem emulador instalado
@@ -567,8 +568,8 @@ function BiosSection({ entry, requiresExternalFile }: { entry?: EmulatorEntry; r
             (2026-08-28), que caía no texto de "não sabe" com nada instalado. */}
         <p className="text-sm text-muted">
           {entry
-            ? `O ZeuX ainda não sabe em que pasta o ${entry.name} lê esse arquivo — a configuração fica dentro do próprio emulador.`
-            : "A pasta depende do emulador. Instale um acima e ela aparece aqui, se o ZeuX souber onde aquele emulador lê o arquivo."}
+            ? t("biosPathUnknown", { emulatorName: entry.name })
+            : t("biosDependsOnEmulator")}
         </p>
       </Card>
     );
@@ -579,16 +580,16 @@ function BiosSection({ entry, requiresExternalFile }: { entry?: EmulatorEntry; r
     try {
       await openPath(entry!.bios_dir!);
     } catch (err) {
-      setError(`Não foi possível abrir a pasta do BIOS: ${err instanceof Error ? err.message : String(err)}`);
+      setError(t("couldNotOpenBiosFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
 
   return (
     <Card filled className="flex flex-col gap-2">
-      <p className="font-semibold text-ink">BIOS / firmware</p>
+      <p className="font-semibold text-ink">{t("biosFireware")}</p>
       {entry.bios_dir_empty && (
-        <Callout label="BIOS ausente">
-          A pasta de BIOS do {entry.name} está vazia. Sem o arquivo, os jogos deste console não devem abrir.
+        <Callout label={t("biosAbsent")}>
+          {t("biosAbsentMessage", { emulatorName: entry.name })}
         </Callout>
       )}
       <p className="break-all rounded border border-line bg-panel px-3 py-2 font-mono text-xs text-ink select-all">
@@ -596,7 +597,7 @@ function BiosSection({ entry, requiresExternalFile }: { entry?: EmulatorEntry; r
       </p>
       {error && <InlineError>{error}</InlineError>}
       <Button type="button" variant="secondary" onClick={openBiosFolder}>
-        Abrir pasta do BIOS
+        {t("openBiosFolder")}
       </Button>
     </Card>
   );
@@ -629,6 +630,7 @@ export function ConsoleDetailScreen({
   /** Ausente sem parecer carregado — `GamesScreen` exige o preset. */
   onOpenGames?: () => void;
 }) {
+  const t = useT(dict);
   const [entry, setEntry] = useState<ConsoleEntry | null>(null);
   const [emulators, setEmulators] = useState<EmulatorEntry[]>([]);
   const [sources, setSources] = useState<Record<string, EmulatorSource>>({});
@@ -642,12 +644,12 @@ export function ConsoleDetailScreen({
       .then((res) => {
         const found = res.consoles.find((c) => c.console_id === consoleId);
         if (!found) {
-          setError(`O console "${consoleId}" não está no catálogo do ZeuX.`);
+          setError(t("consoleNotInCatalog", { consoleId }));
           return;
         }
         setEntry(found);
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível carregar este console."));
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("couldNotLoadConsole")));
 
     // As três abaixo só enriquecem a tela: falhar numa delas degrada o que
     // ela mostra, nunca troca a tela inteira por um erro.

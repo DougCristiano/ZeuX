@@ -530,6 +530,7 @@ export function GameCover({
   coverUrl?: string;
   className?: string;
 }) {
+  const t = useT(dict);
   const accent = consoleId ? consoleAccentColor(consoleId) : undefined;
   const accentVars = accent ? ({ "--console-accent": accent } as CSSProperties) : undefined;
 
@@ -662,7 +663,7 @@ export function GameCover({
                 <button
                   type="button"
                   tabIndex={-1}
-                  aria-label={`${useT(dict)("playGame", { title: title ?? label })}`}
+                  aria-label={t("playGame", { title: title ?? label })}
                   onClick={(e) => {
                     e.stopPropagation();
                     onPlay();
