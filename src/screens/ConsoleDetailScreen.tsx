@@ -713,13 +713,13 @@ export function ConsoleDetailScreen({
       {/* `secondary`, não `quiet` — ver comentário no outro `onBack` acima
           (estado de erro), mesmo raciocínio. */}
       <Button variant="secondary" onClick={onBack}>
-        ← Consoles
+        {t("backConsoles")}
       </Button>
 
       <div className="mt-3 mb-6 border-l-[3px] pl-4" style={{ borderLeftColor: accent }}>
         <h1 className="text-2xl font-semibold text-ink">{entry.name}</h1>
         <p className="mt-1 text-sm text-muted">
-          {entry.year} · {entry.short_name}
+          {t("consoleYearShortName", { year: entry.year, shortName: entry.short_name })}
         </p>
       </div>
 
@@ -748,14 +748,13 @@ export function ConsoleDetailScreen({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_minmax(280px,360px)]">
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold text-ink">
-            {entry.emulators.length === 1 ? "Como rodar" : `Como rodar — ${entry.emulators.length} opções`}
+            {entry.emulators.length === 1 ? t("howToRun") : t("howToRunOptions", { count: entry.emulators.length })}
           </h2>
 
           {entry.emulators.length === 0 ? (
             <Card filled>
               <p className="text-sm text-muted">
-                O ZeuX ainda não conhece nenhum emulador para {entry.name}. Nada a instalar por aqui — quando um
-                adapter para este console existir, ele aparece nesta tela sozinho.
+                {t("noEmulatorKnown", { consoleName: entry.name })}
               </p>
             </Card>
           ) : (
@@ -790,7 +789,7 @@ export function ConsoleDetailScreen({
               informação. Ausente sem consentimento/scan. */}
           {verdict && (
             <div className="flex flex-col gap-2">
-              <h2 className="text-lg font-semibold text-ink">Nesta máquina</h2>
+              <h2 className="text-lg font-semibold text-ink">{t("onThisMachine")}</h2>
               <ConsoleVerdictCard verdict={verdict} />
             </div>
           )}
