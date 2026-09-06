@@ -46,7 +46,10 @@ export function GameListRow({
   const blocked = launchability !== undefined && !launchability.launchable;
 
   return (
-    <div className="flex h-full items-center gap-3 border-b border-line px-2">
+    // A11y 1.4.11: `border-control-border` (≥3:1) — no modo lista esta borda
+    // inferior é o único separador entre um jogo e o seguinte, então carrega
+    // informação; `border-line` (1.44:1) era imperceptível para baixa visão.
+    <div className="flex h-full items-center gap-3 border-b border-control-border px-2">
       <div
         role="button"
         tabIndex={0}
@@ -59,7 +62,14 @@ export function GameListRow({
         // usa no hover — reaproveita o vocabulário em vez de inventar um novo.
         className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded px-1 py-1 text-left transition-colors hover:bg-fill ${FOCUS_RING}`}
         title={game.title}
-        aria-label={`Ver detalhes de ${game.title}`}
+        // A11y 4.1.2: quando bloqueado, o motivo (`launchability.title`) entra
+        // no nome acessível — senão o leitor de tela anuncia só "Ver detalhes
+        // de X" sem pista de que o jogo não abre.
+        aria-label={
+          blocked && launchability
+            ? `Ver detalhes de ${game.title} — ${launchability.title}`
+            : `Ver detalhes de ${game.title}`
+        }
         onClick={onOpenDetail}
         onKeyDown={(e) => {
           if (e.key !== "Enter" && e.key !== " ") return;

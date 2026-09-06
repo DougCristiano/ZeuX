@@ -19,6 +19,9 @@ export function LoadingScreen({ message }: { message: string }) {
     >
       <OnboardingGlow />
       <img src={logoZeux} alt="" aria-hidden="true" className="relative z-10 h-12 w-12" />
+      {/* A11y 1.3.1: heading da tela — visualmente a mensagem já basta, então
+          fica `sr-only`; sem ele, quem navega por headings não acha esta tela. */}
+      <h1 className="sr-only">Carregando</h1>
       <p className="relative z-10 font-mono text-sm text-muted">{message}</p>
       <div
         aria-hidden="true"
@@ -41,6 +44,10 @@ export function ErrorScreen({ message, onRetry }: { message: string; onRetry: ()
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6">
       <OnboardingGlow />
       <div className="relative z-10 flex w-full max-w-3xl flex-col items-start gap-4">
+        {/* A11y 1.3.1: uma tela de erro sem heading é difícil de localizar por
+            leitor de tela. `sr-only` — a mensagem em vermelho já é o rótulo
+            visual. */}
+        <h1 className="sr-only">Erro ao conectar</h1>
         <p className="text-base text-danger">{message}</p>
         <Button variant="primary" autoFocus onClick={onRetry}>
           Tentar de novo

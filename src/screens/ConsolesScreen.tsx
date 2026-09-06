@@ -290,6 +290,10 @@ export function ConsolesScreen({
                 key={item.id}
                 type="button"
                 onClick={() => handleFilter(item.id)}
+                // A11y 4.1.2: filtros de prontidão alternáveis e mutuamente
+                // exclusivos — `aria-pressed` expõe o estado ativo (o estilo
+                // `border-accent`/`text-accent` só comunicava a quem vê).
+                aria-pressed={filter === item.id}
                 className={`rounded-sm border px-2.5 py-1 font-pixel text-[11px] transition-colors ${FOCUS_RING} ${
                   filter === item.id ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
                 }`}

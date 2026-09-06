@@ -32,6 +32,17 @@ function slugify(name: string): string {
  * linha, evita a ambiguidade de dividir uma string por espaço (um caminho
  * com espaço quebraria).
  */
+/** A11y 3.3.2: marca visual de campo obrigatório, consistente entre os
+ *  rótulos. `aria-hidden` porque o `required` no input já é o que o leitor
+ *  de tela anuncia — o "*" aqui é só para quem enxerga. */
+function RequiredMark() {
+  return (
+    <span className="text-xs font-normal text-muted" aria-hidden="true">
+      (obrigatório)
+    </span>
+  );
+}
+
 export function ManualEmulatorForm({
   existing,
   existingIds,
@@ -105,13 +116,18 @@ export function ManualEmulatorForm({
     // virar `<Card>` de verdade (precisa da semântica nativa de submit),
     // então alinhado à mão aos mesmos tokens que o componente usa.
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded border border-line bg-fill p-4">
+      {/* A11y 3.3.2 (auditoria de acessibilidade, 2026-09-06): o atributo
+          `required` já faz o leitor de tela anunciar "obrigatório", mas quem
+          enxerga não tinha marca nenhuma até tentar submeter — paridade
+          invertida. `RequiredMark` põe a mesma indicação visual em todos os
+          campos obrigatórios; "Notas (opcional)" continua marcando o inverso. */}
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Nome
+        Nome <RequiredMark />
         <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Consoles atendidos (ids separados por vírgula, ex.: ps1, ps2)
+        Consoles atendidos (ids separados por vírgula, ex.: ps1, ps2) <RequiredMark />
         <input
           type="text"
           required
@@ -122,7 +138,7 @@ export function ManualEmulatorForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Caminho do executável
+        Caminho do executável <RequiredMark />
         <div className="flex gap-2">
           <input
             type="text"
@@ -138,7 +154,7 @@ export function ManualEmulatorForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">
-        Argumentos (um por linha — precisa incluir {"{rom}"} em algum deles)
+        Argumentos (um por linha — precisa incluir {"{rom}"} em algum deles) <RequiredMark />
         <textarea
           required
           rows={4}

@@ -6,19 +6,23 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmModal,
   ConsoleVerdictCard,
   ErrorModal,
   FavoriteToggle,
   GameCover,
   InlineError,
+  ManualInstallModal,
   PlayIcon,
   ProgressBar,
   ScreenContainer,
   Toast,
 } from "../components/ui";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
+import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
+import type { EmulatorEntry } from "../api/types";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 
@@ -86,6 +90,20 @@ export function GameDetailScreen({
   const [sessionCount, setSessionCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { statusFor, launch, cancelCoreDownload, launchError, clearLaunchError } = useLaunchGame();
+  // M6/A11y 2.1.1 (auditoria de acessibilidade, 2026-09-06): quem navega só
+  // por teclado/controle não alcança o ▶ da grade (`tabIndex={-1}`, ADR 0014)
+  // — o único caminho é abrir este detalhe e usar o "Jogar" daqui. Até esta
+  // sessão esse "Jogar" lançava direto, pulando a checagem de emulador
+  // instalado / BIOS / instalação inline que `GamesScreen`/`AllGamesScreen`
+  // fazem pelo `useInlineInstall`. Agora passa pela MESMA cadeia — teclado
+  // tem o fluxo completo, não a versão degradada.
+  const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
+  useEffect(() => {
+    api
+      .getEmulators()
+      .then((res) => setEmulators(res.emulators))
+      .catch(() => setEmulators([]));
+  }, []);
   const { toastMessage, showToast } = useToast();
   const igdbConfigured = useIGDBStatus();
   // Estado próprio, não `game.cover_url` direto: o prop `game` vem de um
@@ -223,7 +241,29 @@ export function GameDetailScreen({
 
   const status = statusFor(game.id);
   const verdict = report.verdicts.find((v) => v.console_id === game.console_id);
+  const adapterEntry = verdict?.adapter_id
+    ? (emulators ?? []).find((e) => e.adapter_id === verdict.adapter_id)
+    : undefined;
   const heroCoverUrl = coverImageURL(coverUrl);
+
+  // A11y 2.1.1: mesma cadeia de decisão de `GamesScreen`/`AllGamesScreen` —
+  // instala o emulador inline, confirma hardware fraco/BIOS vazio, ou lança.
+  const install = useInlineInstall({
+    onEmulatorInstalled: (adapterId) =>
+      setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
+    onLaunch: () => launch(game),
+  });
+
+  // O botão fica desabilitado até `emulators` responder: sem essa lista a
+  // checagem não sabe se o emulador está instalado, e lançar às cegas
+  // recriaria o fluxo degradado que este item corrige.
+  function handlePlayClick() {
+    if (status.kind === "error") {
+      launch(game);
+      return;
+    }
+    install.handlePlay(game, verdict, adapterEntry);
+  }
 
   const heroContent = (
     <>
@@ -261,8 +301,14 @@ export function GameDetailScreen({
         <Button
           variant="primary"
           autoFocus
-          disabled={game.missing || status.kind === "launching" || status.kind === "downloading-core"}
-          onClick={() => launch(game)}
+          disabled={
+            game.missing ||
+            status.kind === "launching" ||
+            status.kind === "downloading-core" ||
+            emulators === null ||
+            install.state.kind === "installing"
+          }
+          onClick={handlePlayClick}
           className="flex w-fit items-center gap-2 px-8 py-3 text-lg"
         >
           {/* N14 (docs/roadmap.md, Sprint N): era o caractere "▶".
@@ -358,11 +404,89 @@ export function GameDetailScreen({
       {toastMessage && <Toast message={toastMessage} />}
       {launchError ? (
         <ErrorModal title="Não foi possível abrir o jogo" message={launchError} onClose={clearLaunchError} />
+      ) : install.state.kind === "error" ? (
+        <ErrorModal
+          title="Não foi possível instalar o emulador"
+          message={install.state.message}
+          onClose={() => install.setState({ kind: "idle" })}
+        />
       ) : (
         error && <ErrorModal title="Não foi possível ler as estatísticas" message={error} onClose={() => setError(null)} />
       )}
 
-      <Button variant="secondary" onClick={onBack} className="mb-4">
+      {/* A11y 2.1.1: as mesmas confirmações/modais que `GamesScreen` mostra —
+          o fluxo por teclado (botão "Jogar" acima) passa pela cadeia inteira. */}
+      {install.state.kind === "manual-install" && (
+        <ManualInstallModal
+          adapterName={install.state.adapterName}
+          onClose={() => install.setState({ kind: "idle" })}
+        />
+      )}
+
+      {install.state.kind === "confirm-hardware" &&
+        (() => {
+          const confirmState = install.state;
+          return (
+            <ConfirmModal
+              title="Hardware abaixo do recomendado"
+              message={confirmState.message}
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => install.startInstall(confirmState.adapterId, true, confirmState.pendingGamePath)}
+                  >
+                    Instalar mesmo assim
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
+      {install.state.kind === "confirm-bios" && (
+        <ConfirmModal
+          title="BIOS ausente"
+          message="A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir."
+          onClose={() => install.setState({ kind: "idle" })}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  install.setState({ kind: "idle" });
+                  launch(game);
+                }}
+              >
+                Jogar mesmo assim
+              </Button>
+            </>
+          }
+        />
+      )}
+
+      {install.state.kind === "installing" && (
+        <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
+          {/* A11y 4.1.3: fase da instalação muda sozinha — anunciada por aria-live. */}
+          <p className="text-sm text-ink" aria-live="polite">
+            Instalando {install.state.job.name}… {install.state.job.phase}
+          </p>
+          <div className="mt-2">
+            <ProgressBar percent={percentOf(install.state.job)} />
+          </div>
+        </div>
+      )}
+
+      {/* A11y 2.1.4: `data-nav-back` marca este como o botão de voltar
+          canônico da tela — o botão B do controle procura por ele. */}
+      <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
         Voltar
       </Button>
 

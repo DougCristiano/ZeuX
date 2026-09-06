@@ -135,7 +135,10 @@ function EmulatorOptionCard({
               para "e se eu tiver os dois instalados?" nos 5 consoles onde
               isso é possível. Só aparece quando há mais de uma opção; num
               console de emulador único seria ruído. */}
-          {isChosen && <p className="text-xs text-accent">É o que o ZeuX usa para abrir os jogos deste console.</p>}
+          {/* A11y 1.4.3: `text-accent-hover` em vez de `text-accent` — mesma
+              troca da aba ativa da sidebar. Este texto é indicação de estado
+              ("é a opção escolhida") e precisa passar contraste com folga. */}
+          {isChosen && <p className="text-xs text-accent-hover">É o que o ZeuX usa para abrir os jogos deste console.</p>}
         </div>
         <span className="shrink-0 whitespace-nowrap">
           {installed ? (
@@ -673,7 +676,8 @@ export function ConsoleDetailScreen({
             navegação de topo de tela, sem borda lê como texto solto, não
             como botão clicável. Mesmo variant que "Voltar" já usa em
             GameDetailScreen/LibraryScreen/EmulatorsScreen. */}
-        <Button variant="secondary" onClick={onBack}>
+        {/* A11y 2.1.4: `data-nav-back` — alvo do botão B do controle. */}
+        <Button variant="secondary" data-nav-back onClick={onBack}>
           ← Consoles
         </Button>
         <div className="mt-4">
@@ -708,7 +712,8 @@ export function ConsoleDetailScreen({
     <ScreenContainer variant="listing">
       {/* `secondary`, não `quiet` — ver comentário no outro `onBack` acima
           (estado de erro), mesmo raciocínio. */}
-      <Button variant="secondary" onClick={onBack}>
+      {/* A11y 2.1.4: `data-nav-back` — alvo do botão B do controle. */}
+      <Button variant="secondary" data-nav-back onClick={onBack}>
         ← Consoles
       </Button>
 

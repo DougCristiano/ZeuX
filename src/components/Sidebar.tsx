@@ -134,7 +134,12 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
                 aria-current={isActive ? "page" : undefined}
                 className={`flex h-[52px] w-full items-center border-l-2 transition-colors ${FOCUS_RING} ${
                   isActive
-                    ? "border-accent bg-fill text-accent"
+                    ? // A11y 1.4.3: `text-accent` (#9d4eff) sobre `bg-fill`
+                      // mede 4.34:1 — abaixo do 4.5:1 da WCAG AA para texto
+                      // normal, e é justamente a indicação de estado (aba
+                      // ativa). `text-accent-hover` (#b174ff) sobre `bg-fill`
+                      // mede ~5.9:1 e mantém a identidade roxa.
+                      "border-accent bg-fill text-accent-hover"
                     : "border-transparent text-muted hover:text-ink"
                 }`}
               >

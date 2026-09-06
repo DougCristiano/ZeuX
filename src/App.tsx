@@ -58,6 +58,14 @@ function App() {
   useGamepadNavigation();
 
   const [phase, setPhase] = useState<Phase>("checking-port");
+
+  // A11y 2.4.2 (auditoria de acessibilidade, 2026-09-06): `index.html` traz um
+  // `<title>ZeuX</title>` estático que nunca muda de fase. Numa janela desktop
+  // o título aparece na barra da janela e no Alt+Tab — quem usa leitor de tela
+  // para se orientar recebia sempre "ZeuX". Este efeito reflete a fase atual.
+  useEffect(() => {
+    document.title = PHASE_TITLES[phase] ? `ZeuX — ${PHASE_TITLES[phase]}` : "ZeuX";
+  }, [phase]);
   const [policy, setPolicy] = useState<{ text: string; version: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -461,6 +469,26 @@ function App() {
 
   return screen;
 }
+
+// A11y 2.4.2: título de janela por fase, em pt-BR. Fases sem entrada (as de
+// transição — checando porta, conectando) caem no "ZeuX" puro.
+const PHASE_TITLES: Partial<Record<Phase, string>> = {
+  "port-conflict": "Porta em conflito",
+  "daemon-unreachable": "Sem conexão com o serviço",
+  consent: "Consentimento",
+  declined: "Consentimento recusado",
+  scanning: "Lendo o computador",
+  "scan-error": "Erro na leitura do computador",
+  "all-games": "Todos os jogos",
+  "game-detail": "Detalhe do jogo",
+  verdict: "Especificações",
+  consoles: "Consoles",
+  "console-detail": "Detalhe do console",
+  emulators: "Emuladores",
+  library: "Gerenciar pastas",
+  games: "Jogos do console",
+  settings: "Configurações",
+};
 
 const SIDEBAR_PHASES: Phase[] = [
   "all-games",

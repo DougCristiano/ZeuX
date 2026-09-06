@@ -88,18 +88,19 @@ function findNextFocus(direction: Direction): HTMLElement | null {
 
 // Botão B ("voltar"): fecha um modal do shadcn se houver um aberto (Radix já
 // escuta Esc — sintético cobre isso sem o hook saber se há modal). Sem
-// modal, tenta o botão "Voltar"/"Voltar à biblioteca" da tela atual —
-// convenção de texto já usada em GameDetailScreen/EmulatorsScreen/
-// LibraryScreen/GamesScreen. Nenhuma tela registra um callback central de
-// "voltar" hoje (cada uma recebe seu próprio onBack via prop de App.tsx),
-// então clicar no botão visível é o caminho sem adicionar esse registro —
-// documentado como limitação real em docs/roadmap.md, Sprint L.
+// modal, clica o botão "voltar" canônico da tela atual.
+//
+// A11y 2.1.4 (auditoria de acessibilidade, 2026-09-06): antes o seletor era
+// `button` cujo `textContent` começa com "Voltar" — frágil (quebra se a cópia
+// mudar, e acertaria um "Voltar à configuração padrão" que não é navegação).
+// Agora cada tela marca o seu botão de voltar com `data-nav-back`; o texto
+// deixou de ser contrato. Nenhuma tela registra um callback central de
+// "voltar" (cada uma recebe seu `onBack` via prop de App.tsx), então clicar
+// no botão visível continua sendo o caminho — só a forma de achá-lo mudou.
 function pressBack() {
   document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
-  const backButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find((btn) =>
-    btn.textContent?.trim().startsWith("Voltar"),
-  );
+  const backButton = document.querySelector<HTMLButtonElement>("[data-nav-back]");
   backButton?.click();
 }
 

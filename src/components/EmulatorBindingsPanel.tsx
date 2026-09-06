@@ -135,6 +135,16 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
 
     function onKeyDown(e: KeyboardEvent) {
       e.preventDefault();
+      // A11y 2.1.2 (auditoria de acessibilidade, 2026-09-06): enquanto a
+      // captura está ativa este listener `preventDefault()`-a toda tecla —
+      // sem tratar `Escape` primeiro, apertar Esc para desistir gravaria
+      // "Escape" como o novo vínculo (ou um erro). Esc aqui = cancelar a
+      // captura sem gravar nada. O botão "Cancelar" no JSX faz o mesmo para
+      // quem usa mouse.
+      if (e.key === "Escape") {
+        setListeningKeyFor(null);
+        return;
+      }
       const translated = translateKeyForAdapter(adapterId, e);
       setListeningKeyFor(null);
       if (!translated) {
@@ -385,11 +395,19 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
-                  disabled={listeningKeyFor !== null}
+                  disabled={listeningKeyFor !== null && listeningKeyFor !== action}
                   onClick={() => setListeningKeyFor(action)}
                 >
                   {listeningKeyFor === action ? "Aperte uma tecla…" : "Mapear tecla"}
                 </Button>
+                {/* A11y 2.1.2: saída visível da captura sem efeito colateral —
+                    Esc também cancela (ver o listener acima), este botão é o
+                    caminho para mouse/toque. */}
+                {listeningKeyFor === action && (
+                  <Button variant="secondary" onClick={() => setListeningKeyFor(null)}>
+                    Cancelar
+                  </Button>
+                )}
                 {gamepadConnected && (
                   <Button
                     variant="secondary"

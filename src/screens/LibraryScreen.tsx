@@ -448,7 +448,8 @@ export function LibraryScreen({
           Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
           (all-games), não pro Parecer/Especificações — ficou desatualizado
           desde a reestruturação da sidebar (Sprint 1). */}
-      <Button variant="secondary" onClick={onBack} className="mb-4">
+      {/* A11y 2.1.4: `data-nav-back` — alvo do botão B do controle. */}
+      <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
         Voltar
       </Button>
       <h1 className="mb-4 text-2xl font-semibold text-ink">Biblioteca</h1>
