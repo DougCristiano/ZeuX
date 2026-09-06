@@ -1,6 +1,18 @@
 {
   "version": 1,
   "skills": {
+    "accessibility-catalogue": {
+      "source": "podo/design-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/accessibility-catalogue/SKILL.md",
+      "computedHash": "cc038cdae3892c306c2d5cab5caa9123ce1e45beb189d4ddd9c9f615caa8c50a"
+    },
+    "design-critique": {
+      "source": "anthropics/knowledge-work-plugins",
+      "sourceType": "github",
+      "skillPath": "design/skills/design-critique/SKILL.md",
+      "computedHash": "ef158c069ebac6747cfb9cefabdd3daaedbffd1cff1c359c46bcf303358cbb1e"
+    },
     "design-review": {
       "source": "jezweb/claude-skills",
       "sourceType": "github",
@@ -19,6 +31,12 @@
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
     },
+    "improve-codebase-architecture": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "016f12709bff30a27419e8add978a9be70f5ca1fb6738b3be6793038e0aba631"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",
@@ -30,6 +48,18 @@
       "sourceType": "github",
       "skillPath": "skills/composition-patterns/SKILL.md",
       "computedHash": "575757e3e25761c8c562d6e395d29f0b76c98b1273c0bd72d88e6ab1bc9c7d42"
+    },
+    "wcag-accessibility-audit": {
+      "source": "mastepanoski/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/wcag-accessibility-audit/SKILL.md",
+      "computedHash": "8a64fda5213720bcfe16bca7716f32aea1d1c6aee34f1a46df79ecc989f01ea8"
+    },
+    "wcag-audit-patterns": {
+      "source": "podo/design-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/wcag-audit-patterns/SKILL.md",
+      "computedHash": "82a80f7e1a6f8d4e96b815baf56186b01742a2ed6d6a97ba12552aaa6afef880"
     },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
