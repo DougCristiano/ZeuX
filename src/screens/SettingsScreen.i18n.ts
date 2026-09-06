@@ -6,6 +6,22 @@ export const dict = {
   // Language section
   languageLabel: { "pt-BR": "Idioma", en: "Language" },
 
+  // Updates section
+  updatesHeading: { "pt-BR": "Atualizações", en: "Updates" },
+  updatesDescription: {
+    "pt-BR": "Confira as releases oficiais do ZeuX no GitHub e instale uma versão nova diretamente pelo aplicativo.",
+    en: "Check the official ZeuX releases on GitHub and install a new version directly from the app.",
+  },
+  checkUpdates: { "pt-BR": "Procurar atualização", en: "Check for updates" },
+  checkingUpdates: { "pt-BR": "Procurando…", en: "Checking…" },
+  updateAvailable: { "pt-BR": "Atualização disponível: v{{version}}", en: "Update available: v{{version}}" },
+  installUpdate: { "pt-BR": "Baixar e instalar", en: "Download and install" },
+  downloadingUpdate: { "pt-BR": "Baixando e instalando…", en: "Downloading and installing…" },
+  downloadingUpdateProgress: { "pt-BR": "Baixando e instalando… {{progress}}%", en: "Downloading and installing… {{progress}}%" },
+  upToDate: { "pt-BR": "O ZeuX já está atualizado.", en: "ZeuX is up to date." },
+  updateCheckError: { "pt-BR": "Não foi possível procurar atualizações.", en: "Could not check for updates." },
+  updateInstallError: { "pt-BR": "Não foi possível instalar a atualização.", en: "Could not install the update." },
+
   // Installation section
   installationHeading: { "pt-BR": "Instalação", en: "Installation" },
   installationDescription: {

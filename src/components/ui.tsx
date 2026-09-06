@@ -80,6 +80,7 @@ export function ZSelect({
   placeholder,
   ariaLabel,
   className = "",
+  disabled,
   children,
 }: {
   // `| undefined`: LibraryScreen ainda não escolheu console num primeiro
@@ -91,10 +92,11 @@ export function ZSelect({
   placeholder?: string;
   ariaLabel: string;
   className?: string;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         aria-label={ariaLabel}
         className={`h-[38px] w-full rounded border-control-border bg-fill px-3 text-sm text-ink data-[size=default]:h-[38px] focus-visible:border-control-border focus-visible:ring-0 ${FOCUS_RING} ${className}`}

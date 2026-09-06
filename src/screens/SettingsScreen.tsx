@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check } from "@tauri-apps/plugin-updater";
 import { api, ApiError } from "../api";
 import type { SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
@@ -18,6 +20,14 @@ type LoadState = { kind: "loading" } | { kind: "loaded"; personal: boolean } | {
 type SystemInfoState =
   | { kind: "loading" }
   | { kind: "loaded"; info: SystemInfo }
+  | { kind: "error"; message: string };
+
+type UpdateState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "available"; version: string; notes?: string }
+  | { kind: "upToDate" }
+  | { kind: "installing"; progress: number | null }
   | { kind: "error"; message: string };
 
 /**
@@ -44,6 +54,7 @@ export function SettingsScreen() {
   const [systemInfo, setSystemInfo] = useState<SystemInfoState>({ kind: "loading" });
   const [pathError, setPathError] = useState<string | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
+  const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
 
   useEffect(() => {
     api
@@ -114,6 +125,54 @@ export function SettingsScreen() {
 
   useEffect(loadStatus, []);
 
+  async function checkForUpdates() {
+    setUpdateState({ kind: "checking" });
+    try {
+      const update = await check();
+      if (!update) {
+        setUpdateState({ kind: "upToDate" });
+        return;
+      }
+      setUpdateState({ kind: "available", version: update.version, notes: update.body ?? undefined });
+    } catch (err) {
+      setUpdateState({
+        kind: "error",
+        message: err instanceof Error ? err.message : t("updateCheckError"),
+      });
+    }
+  }
+
+  async function installUpdate() {
+    setUpdateState({ kind: "installing", progress: 0 });
+    try {
+      const update = await check();
+      if (!update) {
+        setUpdateState({ kind: "upToDate" });
+        return;
+      }
+
+      let downloaded = 0;
+      let total = 0;
+      await update.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          total = event.data.contentLength ?? 0;
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          setUpdateState({
+            kind: "installing",
+            progress: total > 0 ? Math.round((downloaded / total) * 100) : null,
+          });
+        }
+      });
+      await relaunch();
+    } catch (err) {
+      setUpdateState({
+        kind: "error",
+        message: err instanceof Error ? err.message : t("updateInstallError"),
+      });
+    }
+  }
+
   // B4 (achado do critico-design, 2026-08-18): conectar/desconectar não
   // dava nenhum retorno próprio — a tela troca de conteúdo (formulário ↔
   // "Conta conectada.") por causa do `loadStatus()`, mas isso é sutil o
@@ -156,6 +215,38 @@ export function SettingsScreen() {
       <Card className="mb-6">
         <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("languageLabel")}</h2>
         <LanguageSelector />
+      </Card>
+
+      <Card className="mb-6">
+        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("updatesHeading")}</h2>
+        <p className="mb-4 text-sm text-muted">{t("updatesDescription")}</p>
+
+        {updateState.kind === "available" && (
+          <div className="mb-3 rounded border border-accent bg-fill p-3">
+            <p className="font-semibold text-ink">{t("updateAvailable", { version: updateState.version })}</p>
+            {updateState.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted">{updateState.notes}</p>}
+          </div>
+        )}
+        {updateState.kind === "installing" && (
+          <p className="mb-3 text-sm text-muted">
+            {updateState.progress === null
+              ? t("downloadingUpdate")
+              : t("downloadingUpdateProgress", { progress: updateState.progress })}
+          </p>
+        )}
+        {updateState.kind === "upToDate" && <p className="mb-3 text-sm text-ink">{t("upToDate")}</p>}
+        {updateState.kind === "error" && <InlineError className="mb-3">{updateState.message}</InlineError>}
+
+        <div className="flex flex-wrap gap-3">
+          <Button variant="secondary" disabled={updateState.kind === "checking" || updateState.kind === "installing"} onClick={checkForUpdates}>
+            {updateState.kind === "checking" ? t("checkingUpdates") : t("checkUpdates")}
+          </Button>
+          {updateState.kind === "available" && (
+            <Button variant="primary" onClick={installUpdate}>
+              {t("installUpdate")}
+            </Button>
+          )}
+        </div>
       </Card>
 
       <Card className="mb-6">

@@ -25,6 +25,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -56,6 +57,14 @@
           "librsvg2"
         ]
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFDNEFGQTNERUE1OTU0OTgKUldTWVZGbnFQZnBLckpVM2xpU0JRS1EyejN4a3JPYmpZTCtsNGtZRzhlOTVZaEp5QWVhVEtSeUwK",
+      "endpoints": [
+        "https://github.com/DougCristiano/ZeuX/releases/latest/download/latest.json"
+      ]
     }
   }
 }
