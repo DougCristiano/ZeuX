@@ -257,9 +257,17 @@ export function GameDetailScreen({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-3">
+      {/* Achado #5 do critico-layout-biblioteca (2026-09-06): o hero lia como
+          "card ampliado", não como página — título do mesmo tamanho de uma
+          seção qualquer, e "Jogar" competindo em peso visual com "Abrir
+          pasta"/"Revarrer" logo abaixo. `justify-center` dá presença vertical
+          ao bloco de texto sem depender de esticar a capa (que já é
+          `aspect-[3/4]` fixa por design, comentário acima); as ações de
+          arquivo saíram para a seção "Arquivo" mais abaixo — "Jogar" agora é
+          a única ação primária aqui. */}
+      <div className="flex flex-1 flex-col justify-center gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">{game.title}</h1>
+          <h1 className="text-3xl font-semibold text-ink sm:text-4xl">{game.title}</h1>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Badge accentColor={consoleAccentColor(game.console_id)}>{consoleName}</Badge>
             {year !== undefined && <Badge>{year}</Badge>}
@@ -327,32 +335,6 @@ export function GameDetailScreen({
         {game.missing && (
           <InlineError>{t("fileMissingError")}</InlineError>
         )}
-
-        {/* M6: nenhum link, nenhuma sugestão de onde obter o arquivo (regra
-            6 do CLAUDE.md) — só revela o que já está no disco do usuário. */}
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={openGameFolder} className="w-fit">
-              {t("openGameFolder")}
-            </Button>
-            {/* "Revarrer pasta": mesma ação de LibraryScreen, sem precisar
-                voltar até lá. Não bloqueia o resto da tela — erro e
-                resultado ficam colados no botão. */}
-            <Button
-              variant="secondary"
-              disabled={rescanState.kind === "rescanning"}
-              onClick={rescanFolder}
-              className="w-fit"
-            >
-              {rescanState.kind === "rescanning" ? t("rescanning") : t("rescanFolder")}
-            </Button>
-          </div>
-          {folderError && <InlineError>{folderError}</InlineError>}
-          {rescanState.kind === "error" && <InlineError>{rescanState.message}</InlineError>}
-          <p className="truncate text-xs text-muted" title={game.path}>
-            {game.path}
-          </p>
-        </div>
       </div>
     </>
   );
@@ -403,6 +385,36 @@ export function GameDetailScreen({
           <ConsoleVerdictCard verdict={verdict} />
         </div>
       )}
+
+      {/* Achado #5 do critico-layout-biblioteca: "Abrir pasta"/"Revarrer"
+          moraram no hero até esta sessão, competindo em peso visual com
+          "Jogar" — a única ação primária que um hero deveria ter. Viraram
+          seção própria, mesmo texto/comportamento de antes (M6: nenhum
+          link, nenhuma sugestão de onde obter o arquivo, regra 6 do
+          CLAUDE.md — só revela o que já está no disco do usuário). */}
+      <Card className="mt-6">
+        <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("fileHeading")}</h2>
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={openGameFolder} className="w-fit">
+              {t("openGameFolder")}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={rescanState.kind === "rescanning"}
+              onClick={rescanFolder}
+              className="w-fit"
+            >
+              {rescanState.kind === "rescanning" ? t("rescanning") : t("rescanFolder")}
+            </Button>
+          </div>
+          {folderError && <InlineError>{folderError}</InlineError>}
+          {rescanState.kind === "error" && <InlineError>{rescanState.message}</InlineError>}
+          <p className="truncate text-xs text-muted" title={game.path}>
+            {game.path}
+          </p>
+        </div>
+      </Card>
 
       <Card className="mt-6">
         <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("yourStats")}</h2>

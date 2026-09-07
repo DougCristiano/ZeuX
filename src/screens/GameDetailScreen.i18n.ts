@@ -82,6 +82,7 @@ export const dict = {
     en: "Could not read statistics",
   },
   backButton: { "pt-BR": "Voltar", en: "Back" },
+  fileHeading: { "pt-BR": "Arquivo", en: "File" },
   yourStats: { "pt-BR": "Suas estatísticas", en: "Your stats" },
   playtime: { "pt-BR": "Tempo jogado", en: "Playtime" },
   lastPlayed: { "pt-BR": "Última vez", en: "Last played" },
