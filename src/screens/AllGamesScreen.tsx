@@ -15,6 +15,7 @@ import {
   Pagination,
   ProgressBar,
   ScreenContainer,
+  SectionHeading,
   InlineError,
   ManualInstallModal,
   Toast,
@@ -257,12 +258,31 @@ export function AllGamesScreen({
   // (um console por vez), aqui os jogos abrangem qualquer console, então o
   // lookup de adapter é por jogo (`adapterEntryFor` abaixo), não fixo.
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
+  // Achado do critico-layout-biblioteca (2026-09-06): a tela era uma grade
+  // única sem hierarquia nenhuma — toda a biblioteca com o mesmo peso
+  // visual, do jogo jogado ontem ao nunca aberto. Faixa própria, independente
+  // dos filtros/ordenação da grade principal (sempre "recentes", sempre sem
+  // busca/plataforma) — o padrão que Steam/Epic/GOG adotaram em 2019 para dar
+  // à biblioteca "um lugar a que pertencer" em vez de só um catálogo.
+  // `?sort=` nem precisa ser passado: é o padrão do servidor para
+  // `console_id` vazio (handleListLibraryGames, internal/api/server.go) —
+  // jogado mais recentemente primeiro, nunca jogado no fim. O filtro
+  // `playtime_seconds > 0` corta esse fim: a faixa só existe para quem já
+  // jogou algo, nunca aparece com jogos aleatórios só para preencher espaço.
+  const [recentGames, setRecentGames] = useState<LibraryGame[] | null>(null);
 
   useEffect(() => {
     api
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
       .catch(() => setEmulators([]));
+  }, []);
+
+  useEffect(() => {
+    api
+      .getAllLibraryGames(1, 8)
+      .then((res) => setRecentGames(res.games.filter((g) => g.playtime_seconds > 0)))
+      .catch(() => setRecentGames([]));
   }, []);
 
   useEffect(() => {
@@ -338,6 +358,7 @@ export function AllGamesScreen({
   function toggleFavorite(game: LibraryGame) {
     const next = !game.favorite;
     setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: next } : g)) : prev));
+    setRecentGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: next } : g)) : prev));
     // N9 (docs/roadmap.md, Sprint N): a estrela já muda na hora (otimista,
     // acima) — o toast aqui é sutil de propósito, só reforça pra quem não
     // olhou o ícone no instante do clique. Só no sucesso: um "desfeito"
@@ -347,6 +368,7 @@ export function AllGamesScreen({
       .then(() => showToast(next ? t("addedToFavorites") : t("removedFromFavorites")))
       .catch(() => {
         setGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
+        setRecentGames((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
         setError(t("failedToSaveFavorite"));
       });
   }
@@ -715,6 +737,44 @@ export function AllGamesScreen({
             {t("retryButton")}
           </button>
         </InlineError>
+      )}
+
+      {recentGames && recentGames.length > 0 && (
+        <div className="mb-6">
+          <SectionHeading className="mb-2">{t("continuePlaying")}</SectionHeading>
+          {/* Faixa horizontal, não grade: é a mesma técnica que Steam/Epic/GOG
+              usam para "recentes" — cada capa maior que na grade abaixo
+              (w-40/w-48 vs. as ~208px que a grade divide em colunas), largura
+              própria de propósito (`shrink-0`) para não encolher junto com a
+              janela como a grade faz. `overflow-x-auto` só nesta faixa: a
+              regra de "nunca scroll horizontal na página inteira" (CLAUDE.md)
+              é sobre o body, não sobre um carrossel que existe justamente
+              para rolar de lado. */}
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {recentGames.map((game) => {
+              const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+              const verdict = verdictFor(game.console_id);
+              const launchability = emulators
+                ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
+                : undefined;
+              return (
+                <div key={game.id} className="w-40 shrink-0 sm:w-48">
+                  <GameTile
+                    game={game}
+                    shortName={shortNameFor(game.console_id)}
+                    onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                    onPlay={playHandlerFor(game)}
+                    onToggleFavorite={() => toggleFavorite(game)}
+                    launchability={launchability}
+                    onInstall={
+                      verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict)) : undefined
+                    }
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* M3: uma barra só, com busca, ordenação, alternância grade/lista,

@@ -1,6 +1,10 @@
 import type { Dict } from "../i18n/i18n";
 
 export const dict = {
+  continuePlaying: {
+    "pt-BR": "Continue jogando",
+    en: "Continue playing",
+  },
   searchPlaceholder: {
     "pt-BR": "Buscar jogos…",
     en: "Search games…",
