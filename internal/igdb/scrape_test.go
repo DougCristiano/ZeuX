@@ -192,6 +192,62 @@ func TestScrapeStartWithoutPersonalCredentialsFallsBackToDefault(t *testing.T) {
 	}
 }
 
+// Achado real, 2026-09-06: com a credencial do IGDB suspensa (403 do
+// Twitch), o lote inteiro falhava antes de processar qualquer jogo — mesmo
+// para jogos que o libretro-thumbnails (thumbnails.go) resolveria sem
+// nenhuma credencial. A causa era scrape.go autenticar uma vez, fora do
+// laço, antes de sequer tentar a fonte gratuita por jogo. Trava que agora um
+// console mapeado no libretro-thumbnails ganha capa mesmo com o IGDB fora do
+// ar, e o job termina "concluido", não "falhou".
+func TestScrapeFallsBackToLibretroThumbnailWhenIGDBAuthFails(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	credsStore := newTestCredentialsStore(t)
+	if err := credsStore.Save(testCredentials()); err != nil {
+		t.Fatalf("Save credenciais: %v", err)
+	}
+
+	game := seedGame(t, lib, "nes", "Super Mario Bros")
+
+	// IGDB fora do ar: autenticar sempre devolve 403 (suspensão de app, o
+	// mesmo caso real de 2026-08-18).
+	igdbMux := http.NewServeMux()
+	igdbMux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	})
+	fakeIGDBServer(t, igdbMux)
+
+	// libretro-thumbnails tem a capa deste jogo, sem credencial nenhuma.
+	thumbMux := http.NewServeMux()
+	thumbMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/Nintendo - Nintendo Entertainment System/Named_Boxarts/Super Mario Bros.png" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write([]byte("capa-de-mentira"))
+	})
+	fakeLibretroThumbnailsServer(t, thumbMux)
+
+	manager := NewScrapeManager(lib, credsStore, silentLogger())
+	job, err := manager.Start(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	done := waitJobDone(t, manager, job.ID)
+	if done.Phase != PhaseDone {
+		t.Fatalf("Phase = %q, esperado %q (IGDB fora do ar não deveria derrubar o lote) — erro: %s", done.Phase, PhaseDone, done.Error)
+	}
+
+	reloaded, ok, err := lib.GameByID(context.Background(), game.ID)
+	if err != nil || !ok {
+		t.Fatalf("GameByID: ok=%v err=%v", ok, err)
+	}
+	if reloaded.CoverPath == "" {
+		t.Fatal("jogo deveria ter ganhado capa via libretro-thumbnails mesmo com o IGDB suspenso")
+	}
+}
+
 // Trava que só um lote roda por vez — uma segunda chamada enquanto a
 // primeira está em andamento é recusada, não enfileirada silenciosamente.
 func TestScrapeStartWhileRunningRefuses(t *testing.T) {

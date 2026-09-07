@@ -5209,6 +5209,26 @@ Forbidden ao autenticar".
 trocar a estratégia (nunca embutir, pedir conta pessoal de todo mundo) ou
 aceitar o risco de novo com uma chave nova.
 
+**Atualização 2026-09-06 — confirmado que segue suspensa, e achado um bug
+real por trás disso.** Testando ao vivo (`POST id.twitch.tv/oauth2/token`
+com `defaultCredentials`): `403` confirmado, a suspensão é real, não
+provisória. Mas investigando por que a busca de capa não achava **nada**,
+nem os jogos de consoles cobertos pelo `libretro-thumbnails` (thumbnails.go,
+decisão do mesmo dia — fonte sem credencial, tentada primeiro por jogo),
+achei a causa: `scrape.go` autenticava contra o IGDB **uma vez, fora do laço
+por jogo**, antes de processar qualquer um — com a credencial suspensa, isso
+abortava o lote inteiro (`PhaseFailed`) antes de sequer tentar a fonte
+gratuita para um único jogo. Corrigido: a autenticação virou preguiçosa (só
+acontece dentro de `SearchGame`, quando um jogo específico realmente precisa
+do IGDB porque o libretro-thumbnails não tem capa dele), e uma falha fica
+cacheada no `Client` (`authErr`) para não bater no Twitch de novo a cada
+jogo do resto do lote. Teste de regressão:
+`TestScrapeFallsBackToLibretroThumbnailWhenIGDBAuthFails`
+(`internal/igdb/scrape_test.go`). **A decisão de fundo do Douglas (linha
+acima) continua em aberto** — mas agora só afeta jogos de consoles fora do
+`libretroSystemFolders` (thumbnails.go) ou com nome de arquivo fora do
+padrão No-Intro/TOSEC, não a biblioteca inteira.
+
 ---
 
 ## Sprint P — RetroAchievements (**pós-v1.0, mas NÃO depende do backend do ZeuX**)

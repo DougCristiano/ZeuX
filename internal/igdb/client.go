@@ -109,6 +109,14 @@ type Client struct {
 	mu          sync.Mutex
 	token       string
 	tokenExpiry time.Time
+	// authErr guarda uma falha de autenticação já vista por este Client, para
+	// não bater no Twitch de novo a cada jogo do lote que precisar do IGDB
+	// (achado de 2026-09-06: com a credencial suspensa, um lote de 200 jogos
+	// sem capa no libretro-thumbnails tentava autenticar 200 vezes, uma por
+	// jogo, todas fadadas ao mesmo 403). Um Client novo (Start de um lote
+	// novo) começa sem isto — vale a pena tentar de novo, a credencial pode
+	// ter sido trocada nas Configurações entre um lote e outro.
+	authErr error
 }
 
 // NewClient cria um cliente para uma credencial já carregada
@@ -203,23 +211,29 @@ func (c *Client) authenticate(ctx context.Context) error {
 	return nil
 }
 
-// Authenticate garante que o cliente tem um token válido, autenticando de
-// novo se preciso. Exportado para o job de busca (scrape.go) chamar uma vez
-// no início do lote: uma credencial errada falha aqui, antes de processar
-// qualquer jogo, em vez de repetir o mesmo erro de autenticação por jogo.
-func (c *Client) Authenticate(ctx context.Context) error {
-	return c.ensureToken(ctx)
-}
-
 // ensureToken autentica de novo só se ainda não há token ou se ele expirou.
+// Uma falha fica guardada em authErr e é devolvida direto nas chamadas
+// seguintes deste mesmo Client, sem repetir a requisição ao Twitch (ver
+// comentário de authErr, acima).
 func (c *Client) ensureToken(ctx context.Context) error {
 	c.mu.Lock()
 	valid := c.token != "" && time.Now().Before(c.tokenExpiry)
+	cachedErr := c.authErr
 	c.mu.Unlock()
 	if valid {
 		return nil
 	}
-	return c.authenticate(ctx)
+	if cachedErr != nil {
+		return cachedErr
+	}
+
+	if err := c.authenticate(ctx); err != nil {
+		c.mu.Lock()
+		c.authErr = err
+		c.mu.Unlock()
+		return err
+	}
+	return nil
 }
 
 type coverField struct {

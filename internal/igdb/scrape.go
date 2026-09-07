@@ -179,15 +179,6 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game) {
 
 	client := NewClient(creds)
 
-	// Autentica uma vez, fora do laço por jogo: uma credencial errada falha
-	// aqui, antes de processar qualquer jogo (aborta o job inteiro), em vez
-	// de repetir o mesmo erro de autenticação por jogo como se fosse uma
-	// falha individual de cada um.
-	if err := client.Authenticate(ctx); err != nil {
-		m.fail(job, err)
-		return
-	}
-
 	root, err := emulator.ManagedRoot()
 	if err != nil {
 		m.fail(job, fmt.Errorf("localizando a pasta gerenciada do ZeuX: %w", err))
