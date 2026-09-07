@@ -56,7 +56,7 @@ export const FOCUS_RING =
 // exige para o limite visual de um controle de formulário. `border-control-border`
 // é o token dedicado calibrado ≥3:1 nos dois fundos (ver src/index.css).
 export const inputClass =
-  `h-[38px] w-full rounded border border-control-border bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
+  `h-[38px] w-full rounded-lg border border-control-border bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
 
 /**
  * N4 (docs/roadmap.md, Sprint N): wrapper sobre o `Select` do shadcn (J3)
@@ -100,7 +100,7 @@ export function ZSelect({
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         aria-label={ariaLabel}
-        className={`h-[38px] w-full rounded border-control-border bg-fill px-3 text-sm text-ink data-[size=default]:h-[38px] focus-visible:border-control-border focus-visible:ring-0 ${FOCUS_RING} ${className}`}
+        className={`h-[38px] w-full rounded-lg border-control-border bg-fill px-3 text-sm text-ink data-[size=default]:h-[38px] focus-visible:border-control-border focus-visible:ring-0 ${FOCUS_RING} ${className}`}
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -145,7 +145,7 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
       // `className` (lista de cores do RetroArch, painel de mapeamento) — esses
       // ficavam em ~20px. `inline-flex`/`items-center` mantém o rótulo centrado
       // quando o `min-h` passa a mandar na altura.
-      className={`inline-flex min-h-[24px] items-center justify-center rounded px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
+      className={`inline-flex min-h-[24px] items-center justify-center rounded-lg px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
       {...props}
     />
   );
@@ -248,7 +248,7 @@ export function Card({
   return (
     <div
       style={style}
-      className={`rounded border border-line ${dense ? "p-3" : "p-4"} ${filled ? "bg-fill" : "bg-transparent"} ${className}`}
+      className={`rounded-lg border border-line ${dense ? "p-3" : "p-4"} ${filled ? "bg-fill" : "bg-transparent"} ${className}`}
     >
       {children}
     </div>
@@ -332,8 +332,8 @@ export function Callout({
     <div
       className={
         tone === "amber"
-          ? "rounded border border-amber-line bg-amber-bg p-3"
-          : "rounded border border-dashed border-line-strong p-3"
+          ? "rounded-lg border border-amber-line bg-amber-bg p-3"
+          : "rounded-lg border border-dashed border-line-strong p-3"
       }
     >
       <p className="mb-1 font-mono text-xs tracking-wide text-muted uppercase">{label}</p>
@@ -345,7 +345,7 @@ export function Callout({
 /** Card com borda âmbar — reservado para o aviso de precisão "parcial" (regra: nunca escondido). */
 export function PartialNotice({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded border border-amber-line bg-amber-bg p-3 text-base text-ink">
+    <div className="rounded-lg border border-amber-line bg-amber-bg p-3 text-base text-ink">
       <Badge>parcial</Badge>
       <p className="mt-2">{children}</p>
     </div>
@@ -473,7 +473,7 @@ export function ErrorModal({
           na prática, ignorando o teto que cada tela pedia. Por isso o teto aqui também
           precisa do prefixo "sm:", para sobrescrever de verdade. */}
       <DialogContent
-        className="sm:max-w-md rounded border border-line bg-fill p-5 ring-0"
+        className="sm:max-w-md rounded-lg border border-line bg-fill p-5 ring-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-danger">{title}</DialogTitle>
@@ -572,7 +572,7 @@ export function ConfirmModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="sm:max-w-md rounded border border-line bg-fill p-5 ring-0"
+        className="sm:max-w-md rounded-lg border border-line bg-fill p-5 ring-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="mb-2 text-lg font-semibold text-ink">{title}</DialogTitle>
@@ -666,7 +666,7 @@ export function GameCover({
       // AllGamesScreen.tsx), nunca esta div; `group-focus-visible` cascateia
       // por qualquer ancestral `.group` com foco visível, `focus-within`
       // olharia só para dentro desta div e nunca dispararia.
-      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded border border-line-strong bg-fill transition-[border-color,box-shadow] duration-150 ease-in-out hover:border-[var(--console-accent,var(--accent))] group-focus-visible:border-[var(--console-accent,var(--accent))] hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] ${className}`}
+      className={`game-cover group relative aspect-[3/4] overflow-hidden rounded-lg border border-line-strong bg-fill transition-[border-color,box-shadow] duration-150 ease-in-out hover:border-[var(--console-accent,var(--accent))] group-focus-visible:border-[var(--console-accent,var(--accent))] hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent,var(--accent))_45%,transparent)] ${className}`}
     >
       {coverUrl ? (
         <>
@@ -966,7 +966,7 @@ export function Toast({ message }: { message: string }) {
     <div
       role="status"
       aria-live="polite"
-      className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg"
+      className="fixed right-4 bottom-4 z-40 w-72 rounded-lg border border-line bg-fill p-3 shadow-lg"
     >
       <p className="text-sm text-ink">{message}</p>
     </div>
@@ -1017,7 +1017,7 @@ export function CardSkeleton({ className = "" }: { className?: string }) {
   // A11y 2.3.3: sob `prefers-reduced-motion: reduce`, o bloco global em
   // src/index.css troca o pulso do `animate-pulse` por `opacity: 0.6` fixo —
   // o skeleton continua perceptível como "carregando", só não pisca.
-  return <div aria-hidden="true" className={`animate-pulse rounded border border-line-strong bg-fill ${className}`} />;
+  return <div aria-hidden="true" className={`animate-pulse rounded-lg border border-line-strong bg-fill ${className}`} />;
 }
 
 /**
@@ -1037,7 +1037,7 @@ export function CardSkeleton({ className = "" }: { className?: string }) {
  */
 export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded border border-dashed border-line-strong px-6 py-16 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong px-6 py-16 text-center">
       <img src={logoZeux} alt="" aria-hidden="true" width={64} height={64} className="object-contain opacity-15" />
       <p className="text-base text-muted">{message}</p>
       {action}
@@ -1182,7 +1182,7 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       // `ICON_LABEL_OVERRIDES`) vazava sobre o ícone vizinho, sem colidir em
       // sigla nenhuma. `overflow-hidden` fica como rede de segurança: um
       // label futuro ainda maior corta em vez de vazar.
-      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
+      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
       {(ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase()}
     </button>
@@ -1202,7 +1202,7 @@ export function ConsoleMoreBadge({ count }: { count: number }) {
     // lá) — os dois convivem na mesma fileira, tamanhos diferentes
     // desalinhariam a grade.
     <span
-      className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-dashed border-line-strong text-sm text-muted"
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-line-strong text-sm text-muted"
       title={`mais ${count} console(s)`}
       aria-hidden="true"
     >
@@ -1235,7 +1235,7 @@ export function ConsoleInfoModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="sm:max-w-md rounded border border-line bg-fill p-5 ring-0"
+        className="sm:max-w-md rounded-lg border border-line bg-fill p-5 ring-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <div className="mb-3 flex items-start justify-between gap-2">

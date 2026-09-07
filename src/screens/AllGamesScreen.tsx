@@ -6,6 +6,7 @@ import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
+  Badge,
   Button,
   ConfirmModal,
   EmptyState,
@@ -670,7 +671,7 @@ export function AllGamesScreen({
        * por que um indicador por tile não sobrevive à virtualização.
        */}
       {install.state.kind === "installing" ? (
-        <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
+        <div className="fixed right-4 bottom-4 z-40 w-72 rounded-lg border border-line bg-fill p-3 shadow-lg">
           {/* A11y 4.1.3: o texto de fase da instalação muda sozinho — sem
               `aria-live` o leitor de tela não anuncia o progresso a menos que
               o usuário volte o foco ao elemento. */}
@@ -685,7 +686,7 @@ export function AllGamesScreen({
         // R3 (ADR 0015): terceiro competidor pelo mesmo canto — encadeado no
         // ternário pelo mesmo motivo que o N9 registra abaixo, não como um
         // `&&` solto que se sobreporia ao painel de instalação.
-        <div className="fixed right-4 bottom-4 z-40 w-72 rounded border border-line bg-fill p-3 shadow-lg">
+        <div className="fixed right-4 bottom-4 z-40 w-72 rounded-lg border border-line bg-fill p-3 shadow-lg">
           {/* A11y 4.1.3: progresso que muda sozinho — anunciado por `aria-live`. */}
           <p className="text-sm text-ink" aria-live="polite">
             {t("downloadingCore", { coreName: activeCoreDownload.job.core_name ?? "" })}
@@ -722,12 +723,21 @@ export function AllGamesScreen({
                 `loadGames` já guarda em estado — sem chamada nova (critério
                 do item). Ausente durante o carregamento inicial (`games`
                 ainda `null`): a contagem some junto com o resto, não sobra
-                sozinha. Espaço de verdade antes do span (achado testando com
-                o Douglas, 2026-09-06): sem ele, o texto concatenava "Todos os
-                jogos· 4" — só o `ml-2` separava visualmente, não a árvore de
-                texto (mesmo bug corrigido em `EmulatorBindingsPanel`). */}
+                sozinha.
+                Achado do Douglas (2026-09-07): texto solto do mesmo tamanho
+                do corpo, grudado no `<h1>` por um simples `· `, lia como
+                "mal feito" — nenhum peso próprio ao lado de um título de
+                28px. Virou `Badge` (mesmo componente que já mostra contagem
+                em outras telas, ex.: "instalado pelo ZeuX"), com respiro de
+                verdade (`ml-3`) em vez de colado no texto. */}
             Todos os jogos{" "}
-            {games && <span className="ml-2 text-base font-normal text-muted">· {total.toLocaleString("pt-BR")}</span>}
+            {games && (
+              <span className="ml-3 inline-flex align-middle">
+                <Badge title={t("gamesCountTitle", { count: total.toLocaleString("pt-BR") })}>
+                  {total.toLocaleString("pt-BR")}
+                </Badge>
+              </span>
+            )}
           </>
         }
         actions={

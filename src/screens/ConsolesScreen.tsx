@@ -99,7 +99,7 @@ function ConsoleCard({
             return (
               <li
                 key={option.adapter_id}
-                className={`rounded border px-2 py-1 text-xs ${
+                className={`rounded-lg border px-2 py-1 text-xs ${
                   isChosen ? "border-accent text-accent" : "border-line text-muted"
                 }`}
                 title={option.core ? `${option.name} · core ${option.core}` : option.name}

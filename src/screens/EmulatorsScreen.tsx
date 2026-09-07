@@ -592,7 +592,7 @@ function EmulatorCardActions({
             Extraia (ou instale) o {entry.name} nesta pasta para o ZeuX encontrar sozinho:
           </p>
           {entry.managed_dir && (
-            <p className="break-all rounded border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
+            <p className="break-all rounded-lg border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
               {entry.managed_dir}
             </p>
           )}

@@ -118,7 +118,7 @@ export function ManualEmulatorForm({
     // divergente do token que `Card` usa (`border-line`) — `<form>` não pode
     // virar `<Card>` de verdade (precisa da semântica nativa de submit),
     // então alinhado à mão aos mesmos tokens que o componente usa.
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded border border-line bg-fill p-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-line bg-fill p-4">
       {/* A11y 3.3.2 (auditoria de acessibilidade, 2026-09-06): o atributo
           `required` já faz o leitor de tela anunciar "obrigatório", mas quem
           enxerga não tinha marca nenhuma até tentar submeter — paridade

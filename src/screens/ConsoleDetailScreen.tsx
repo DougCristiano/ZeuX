@@ -154,7 +154,7 @@ function EmulatorOptionCard({
           Fica no card da opção, e não numa seção separada, porque é
           propriedade dela — um standalone não tem core nenhum. */}
       {option.core && (
-        <div className="flex flex-col gap-1.5 rounded border border-line bg-fill px-3 py-2">
+        <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-fill px-3 py-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted">{t("coreForConsole")}</span>
             <span className="font-mono text-sm text-ink">{option.core}</span>
@@ -269,7 +269,7 @@ function EmulatorOptionCard({
           </p>
           {entry?.managed_dir && (
             <>
-              <p className="break-all rounded border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
+              <p className="break-all rounded-lg border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
                 {entry.managed_dir}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -592,7 +592,7 @@ function BiosSection({ entry, requiresExternalFile }: { entry?: EmulatorEntry; r
           {t("biosAbsentMessage", { emulatorName: entry.name })}
         </Callout>
       )}
-      <p className="break-all rounded border border-line bg-panel px-3 py-2 font-mono text-xs text-ink select-all">
+      <p className="break-all rounded-lg border border-line bg-panel px-3 py-2 font-mono text-xs text-ink select-all">
         {entry.bios_dir}
       </p>
       {error && <InlineError>{error}</InlineError>}
@@ -727,7 +727,7 @@ export function ConsoleDetailScreen({
           novo: o "ícone" ao lado do título é a mesma caixa/sigla que
           `ConsoleIcon` desenha em outras telas, só sem o `<button>` (não há
           o que abrir clicando no ícone da própria tela que já é dele). */}
-      <div className="relative mt-3 mb-6 overflow-hidden rounded p-5">
+      <div className="relative mt-3 mb-6 overflow-hidden rounded-lg p-5">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
@@ -739,7 +739,7 @@ export function ConsoleDetailScreen({
           <span
             aria-hidden="true"
             style={{ borderColor: `${accent}66`, color: accent }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border bg-fill font-pixel text-[11px] leading-none"
+            className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
           >
             {entry.short_name.slice(0, 4).toUpperCase()}
           </span>

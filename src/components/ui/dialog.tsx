@@ -86,7 +86,7 @@ function DialogContent({
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <button
               type="button"
-              className={`absolute top-2 right-2 flex size-7 items-center justify-center rounded border border-transparent text-muted transition-colors hover:border-line-strong hover:bg-fill hover:text-ink ${CLOSE_BUTTON_FOCUS_RING}`}
+              className={`absolute top-2 right-2 flex size-7 items-center justify-center rounded-lg border border-transparent text-muted transition-colors hover:border-line-strong hover:bg-fill hover:text-ink ${CLOSE_BUTTON_FOCUS_RING}`}
             >
               <XIcon className="size-4" />
               <span className="sr-only">{t("closeButton")}</span>
@@ -131,7 +131,7 @@ function DialogFooter({
         <DialogPrimitive.Close asChild>
           <button
             type="button"
-            className={`rounded border border-line-strong bg-transparent px-4 py-2 text-sm text-ink transition-colors hover:bg-fill ${CLOSE_BUTTON_FOCUS_RING}`}
+            className={`rounded-lg border border-line-strong bg-transparent px-4 py-2 text-sm text-ink transition-colors hover:bg-fill ${CLOSE_BUTTON_FOCUS_RING}`}
           >
             {t("closeButton")}
           </button>

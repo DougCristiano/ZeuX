@@ -239,7 +239,7 @@ export function SettingsScreen() {
         <p className="mb-4 text-sm text-muted">{t("updatesDescription")}</p>
 
         {updateState.kind === "available" && (
-          <div className="mb-3 rounded border border-accent bg-fill p-3">
+          <div className="mb-3 rounded-lg border border-accent bg-fill p-3">
             <p className="font-semibold text-ink">{t("updateAvailable", { version: updateState.version })}</p>
             {updateState.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted">{updateState.notes}</p>}
           </div>
@@ -314,7 +314,7 @@ export function SettingsScreen() {
 
         {systemInfo.kind === "loaded" && (
           <div className="flex flex-col gap-3">
-            <p className="break-all rounded border border-line bg-fill px-3 py-2 font-mono text-xs text-ink">
+            <p className="break-all rounded-lg border border-line bg-fill px-3 py-2 font-mono text-xs text-ink">
               {systemInfo.info.app_data_dir}
             </p>
             {pathError && <InlineError>{pathError}</InlineError>}

@@ -1,6 +1,10 @@
 import type { Dict } from "../i18n/i18n";
 
 export const dict = {
+  gamesCountTitle: {
+    "pt-BR": "{{count}} jogos na biblioteca",
+    en: "{{count}} games in the library",
+  },
   continuePlaying: {
     "pt-BR": "Continue jogando",
     en: "Continue playing",

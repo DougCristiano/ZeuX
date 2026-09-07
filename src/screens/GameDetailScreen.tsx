@@ -364,7 +364,7 @@ export function GameDetailScreen({
           capa real. Sem capa, o topo fica exatamente como estava (nada de
           padding/fundo novo por cima do placeholder de sigla). */}
       {heroCoverUrl ? (
-        <div className="relative overflow-hidden rounded">
+        <div className="relative overflow-hidden rounded-lg">
           <img
             src={heroCoverUrl}
             alt=""

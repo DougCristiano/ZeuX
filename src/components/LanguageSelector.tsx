@@ -36,7 +36,7 @@ export function LanguageSelector({
         value={locale}
         onChange={(e) => setLocale(e.target.value as typeof locale)}
         aria-label="Idioma / Language"
-        className={`rounded border border-line bg-fill px-2 py-1 text-sm text-ink ${FOCUS_RING} ${
+        className={`rounded-lg border border-line bg-fill px-2 py-1 text-sm text-ink ${FOCUS_RING} ${
           collapsible
             ? "max-w-0 overflow-hidden opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[144px] group-hover:opacity-100 group-focus-within:max-w-[144px] group-focus-within:opacity-100"
             : ""

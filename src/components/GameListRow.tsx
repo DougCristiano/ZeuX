@@ -63,7 +63,7 @@ export function GameListRow({
         // o mouse pela linha inteira não mudava nada, nem cursor nem cor.
         // `hover:bg-fill` é o mesmo tom que `Button` variant="secondary" já
         // usa no hover — reaproveita o vocabulário em vez de inventar um novo.
-        className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded px-1 py-1 text-left transition-colors hover:bg-fill ${FOCUS_RING}`}
+        className={`flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg px-1 py-1 text-left transition-colors hover:bg-fill ${FOCUS_RING}`}
         title={game.title}
         // A11y 4.1.2: quando bloqueado, o motivo (`launchability.title`) entra
         // no nome acessível — senão o leitor de tela anuncia só "Ver detalhes

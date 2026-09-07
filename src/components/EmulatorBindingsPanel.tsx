@@ -319,7 +319,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </Callout>
       )}
 
-      <div className="rounded border border-line bg-fill p-3">
+      <div className="rounded-lg border border-line bg-fill p-3">
         <div className="flex flex-col gap-2">
           <div>
             <p className="text-sm text-ink">Perfil de controle do Zeux</p>
@@ -348,7 +348,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
           um controle plugado, a tela não confirmava nada, e quem tem dois não
           tinha como saber qual está sendo lido. */}
       {gamepadConnected ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-line bg-fill px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-fill px-3 py-2">
           <p className="text-sm text-ink">
             {t("gamepadDetected")}
             {gamepad.name && <span className="text-muted"> · {gamepad.name}</span>}
@@ -384,7 +384,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
       )}
 
       {conflict && (
-        <div className="rounded border border-dashed border-line-strong p-3">
+        <div className="rounded-lg border border-dashed border-line-strong p-3">
           <p className="text-sm text-ink">
             {conflict.key
               ? t("keyConflictMessage", { action: conflict.withAction })
@@ -426,7 +426,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
               // sequência o usuário está olhando o controle, não a tela, e
               // volta o olho para conferir onde parou.
               className={`flex flex-wrap items-center justify-between gap-2 ${
-                naVez ? "-mx-2 rounded border border-accent px-2 py-1" : ""
+                naVez ? "-mx-2 rounded-lg border border-accent px-2 py-1" : ""
               }`}
             >
               <span className="min-w-0 shrink text-sm break-words text-ink">

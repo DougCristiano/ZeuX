@@ -88,7 +88,7 @@ export function GameTile({
         <div
           role="button"
           tabIndex={0}
-          className={`group block w-full cursor-pointer rounded text-left ${FOCUS_RING}`}
+          className={`group block w-full cursor-pointer rounded-lg text-left ${FOCUS_RING}`}
           title={game.title}
           // A11y 4.1.2: quando bloqueado, o motivo (`launchability.title`)
           // entra no nome acessível — senão o leitor de tela anuncia só "Ver
@@ -174,7 +174,7 @@ export function GameTileSkeleton() {
     // src/index.css troca o pulso destes `animate-pulse` por `opacity: 0.6`
     // fixo — o placeholder continua visível, só para de piscar.
     <div className="flex flex-col gap-2" aria-hidden="true">
-      <div className="aspect-[3/4] animate-pulse rounded border border-line-strong bg-fill" />
+      <div className="aspect-[3/4] animate-pulse rounded-lg border border-line-strong bg-fill" />
       <div className="flex flex-col gap-1.5">
         <div className="h-3.5 w-4/5 animate-pulse rounded-sm bg-fill" />
         <div className="h-3 w-2/5 animate-pulse rounded-sm bg-fill" />

@@ -293,7 +293,7 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
       {/* O1 (docs/roadmap.md, Sprint O): precisa do prefixo "sm:" para vencer o
           "sm:max-w-sm" da base do DialogContent — sem ele o modal renderiza em
           384px, cortando a lista de 33 consoles em vez de usar a largura pedida. */}
-      <DialogContent className="max-h-[85vh] sm:max-w-lg overflow-y-auto rounded border border-line bg-fill p-5 ring-0">
+      <DialogContent className="max-h-[85vh] sm:max-w-lg overflow-y-auto rounded-lg border border-line bg-fill p-5 ring-0">
         <DialogTitle className="mb-1 text-lg font-semibold text-ink">{t("acceptedFolderNames")}</DialogTitle>
         <p className="mb-4 text-sm text-muted">
           {t("folderNamesGuideText")}
@@ -304,7 +304,7 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
             // gba) — mostrar o mesmo valor duas vezes só confundiria.
             const names = [...new Set([c.name, c.short_name, c.console_id])];
             return (
-              <li key={c.console_id} className="rounded border border-line bg-fill px-3 py-2">
+              <li key={c.console_id} className="rounded-lg border border-line bg-fill px-3 py-2">
                 <p className="text-xs text-muted">{c.name}</p>
                 <p className="select-all font-mono text-sm text-ink">{names.join(" · ")}</p>
               </li>
