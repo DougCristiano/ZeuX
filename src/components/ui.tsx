@@ -607,6 +607,25 @@ export function GameCover({
         </>
       ) : (
         <>
+          {/* Achado do critico-layout-biblioteca (2026-09-06): com a
+              credencial do IGDB suspensa (docs/roadmap.md), este placeholder
+              deixou de ser exceção rara e virou o estado padrão de boa parte
+              da biblioteca — trinta retângulos cinza idênticos lado a lado
+              liam como "biblioteca quebrada", não "sem capa ainda". Um
+              gradiente com a cor de identidade do console (mesma variável
+              que o badge/glow já usam) dá variedade sem asset novo nenhum;
+              30% de opacidade que se dissolve a partir de um canto, não um
+              tingimento parelho — some antes de competir com a sigla ou
+              reprovar contraste, porque só o fundo muda, o texto continua
+              `text-muted`/branco como já era. */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(circle at 25% 15%, color-mix(in srgb, var(--console-accent, var(--accent)) 30%, transparent), transparent 70%)",
+            }}
+            aria-hidden="true"
+          />
           <div
             className={`absolute inset-0 flex items-center justify-center font-pixel text-muted opacity-25 ${
               size === "lg" ? "text-4xl" : "text-lg"
