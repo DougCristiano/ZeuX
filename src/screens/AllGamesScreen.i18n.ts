@@ -13,6 +13,24 @@ export const dict = {
     "pt-BR": "Ordenar por",
     en: "Sort by",
   },
+  // Achado #7 do critico-layout-biblioteca (2026-09-06): estava em
+  // `SORT_LABELS`, uma constante de módulo pt-BR fixa (não passava por
+  // `useT`) — em inglês a barra misturava idioma ("Sort by" + "Jogados por
+  // último"). Movido pro dicionário; o valor em si (`recentes`/`titulo`/
+  // `tempo_jogado`) continua em português de propósito, exceção registrada
+  // no CLAUDE.md — só o RÓTULO visível precisa acompanhar o idioma.
+  sortRecentes: {
+    "pt-BR": "Jogados por último",
+    en: "Last played",
+  },
+  sortTitulo: {
+    "pt-BR": "Título (A–Z)",
+    en: "Title (A–Z)",
+  },
+  sortTempoJogado: {
+    "pt-BR": "Mais jogados",
+    en: "Most played",
+  },
   viewModeLabel: {
     "pt-BR": "Modo de exibição",
     en: "View mode",

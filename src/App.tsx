@@ -54,9 +54,19 @@ type Phase =
   | "settings";
 
 function App() {
-  // Sprint L / ADR 0014 (docs/roadmap.md, docs/decisoes/): D-pad/analógico ≈
-  // Tab, A ≈ clique, B ≈ Esc. Um lugar só, não por tela — o hook opera sobre
-  // document.activeElement, não precisa saber a phase atual.
+  // Sprint L / ADR 0014 (docs/roadmap.md, docs/decisoes/): D-pad/analógico
+  // move o foco pro vizinho mais próximo NA DIREÇÃO PRESSIONADA — busca
+  // espacial por posição de tela (findNextFocus, useGamepadNavigation.ts),
+  // não ordem do DOM/Tab. Correção de comentário (2026-09-06): a versão
+  // anterior ("D-pad ≈ Tab") descrevia mal a própria implementação e já
+  // levou uma revisão externa a diagnosticar errado que descer uma linha
+  // custaria `columns` pressões — o ADR 0014 é explícito de que o objetivo
+  // era justamente evitar isso ("grids 2D não navegam bem com um
+  // próximo/anterior linear"). A ressalva real do ADR continua de pé: é
+  // heurística, nunca testada com controle físico (nenhuma sessão de IA tem
+  // hardware para isso). Botão A ≈ clique, B ≈ Esc. Um lugar só, não por
+  // tela — o hook opera sobre document.activeElement, não precisa saber a
+  // phase atual.
   useGamepadNavigation();
 
   const t = useT(dict);

@@ -14,6 +14,7 @@ import {
   PlayIcon,
   ProgressBar,
   ScreenContainer,
+  SectionHeading,
   Toast,
 } from "../components/ui";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
@@ -393,7 +394,7 @@ export function GameDetailScreen({
           link, nenhuma sugestão de onde obter o arquivo, regra 6 do
           CLAUDE.md — só revela o que já está no disco do usuário). */}
       <Card className="mt-6">
-        <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("fileHeading")}</h2>
+        <SectionHeading className="mb-3">{t("fileHeading")}</SectionHeading>
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={openGameFolder} className="w-fit">
@@ -417,7 +418,7 @@ export function GameDetailScreen({
       </Card>
 
       <Card className="mt-6">
-        <h2 className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("yourStats")}</h2>
+        <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs text-muted">{t("playtime")}</p>

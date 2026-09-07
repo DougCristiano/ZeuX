@@ -82,13 +82,6 @@ export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
 
 const SORT_VALUES: readonly SortValue[] = ["recentes", "titulo", "tempo_jogado"];
 const VIEW_MODES: readonly ViewMode[] = ["grade", "lista"];
-// M3: rótulo dizendo o que cada ordem é, em vez de deixar o usuário
-// adivinhar por que a lista está naquela sequência (critério do item).
-const SORT_LABELS: Record<SortValue, string> = {
-  recentes: "Jogados por último",
-  titulo: "Título (A–Z)",
-  tempo_jogado: "Mais jogados",
-};
 
 const SORT_STORAGE_KEY = "zeux.allGames.sort";
 const VIEW_MODE_STORAGE_KEY = "zeux.allGames.viewMode";
@@ -855,7 +848,7 @@ export function AllGamesScreen({
         >
           {SORT_VALUES.map((value) => (
             <SelectItem key={value} value={value}>
-              {SORT_LABELS[value]}
+              {t(value === "recentes" ? "sortRecentes" : value === "titulo" ? "sortTitulo" : "sortTempoJogado")}
             </SelectItem>
           ))}
         </ZSelect>

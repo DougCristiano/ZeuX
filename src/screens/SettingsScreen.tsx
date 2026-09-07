@@ -6,7 +6,7 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
-import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, Toast } from "../components/ui";
+import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
@@ -230,12 +230,12 @@ export function SettingsScreen() {
       <h1 className="mb-5 text-2xl font-semibold text-ink">{t("title")}</h1>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("languageLabel")}</h2>
+        <SectionHeading className="mb-2">{t("languageLabel")}</SectionHeading>
         <LanguageSelector />
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("updatesHeading")}</h2>
+        <SectionHeading className="mb-2">{t("updatesHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">{t("updatesDescription")}</p>
 
         {updateState.kind === "available" && (
@@ -267,7 +267,7 @@ export function SettingsScreen() {
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("controllersHeading")}</h2>
+        <SectionHeading className="mb-2">{t("controllersHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">{t("controllersDescription")}</p>
 
         {emulators === null && <p className="text-sm text-muted">{t("loadingEmulatorsForControllers")}</p>}
@@ -304,7 +304,7 @@ export function SettingsScreen() {
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("installationHeading")}</h2>
+        <SectionHeading className="mb-2">{t("installationHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">
           {t("installationDescription")}
         </p>
@@ -326,7 +326,7 @@ export function SettingsScreen() {
       </Card>
 
       <Card className="mb-6">
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("uninstallHeading")}</h2>
+        <SectionHeading className="mb-2">{t("uninstallHeading")}</SectionHeading>
 
         {systemInfo.kind === "loaded" && systemInfo.info.os === "windows" && (
           <div className="flex flex-col gap-3">
@@ -355,7 +355,7 @@ export function SettingsScreen() {
       </Card>
 
       <Card>
-        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("igdbHeading")}</h2>
+        <SectionHeading className="mb-2">{t("igdbHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">
           {t("igdbDescription")}
         </p>
