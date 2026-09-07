@@ -18,6 +18,7 @@ import {
 import { ConsentScreen } from "./screens/ConsentScreen";
 import { ConsoleDetailScreen } from "./screens/ConsoleDetailScreen";
 import { ConsolesScreen } from "./screens/ConsolesScreen";
+import { ControllerTestScreen } from "./screens/ControllerTestScreen";
 import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
@@ -54,10 +55,11 @@ type Phase =
   | "library"
   | "games"
   | "game-detail"
-  | "settings";
+  | "settings"
+  | "controller-test";
 
 function App() {
-  // Sprint L / ADR 0014 (docs/roadmap.md, docs/decisoes/): D-pad/analógico
+  // Navegação por controle (Sprint L): D-pad/analógico
   // move o foco pro vizinho mais próximo NA DIREÇÃO PRESSIONADA — busca
   // espacial por posição de tela (findNextFocus, useGamepadNavigation.ts),
   // não ordem do DOM/Tab. Correção de comentário (2026-09-06): a versão
@@ -478,7 +480,11 @@ function App() {
       break;
 
     case "settings":
-      screen = <SettingsScreen />;
+      screen = <SettingsScreen onOpenControllerTest={() => setPhase("controller-test")} />;
+      break;
+
+    case "controller-test":
+      screen = <ControllerTestScreen onBack={() => setPhase("settings")} />;
       break;
   }
 
@@ -494,7 +500,10 @@ function App() {
           // não um destino de sidebar próprio.
           phase === "consoles" || phase === "console-detail" || phase === "emulators"
           ? "consoles"
-          : phase === "settings"
+          : // "controller-test" é sub-visão de Configurações, mesmo padrão de
+            // "emulators" acima — alcançada de dentro da tela, não item
+            // próprio da sidebar.
+            phase === "settings" || phase === "controller-test"
             ? "settings"
             : "library";
     return (
@@ -542,6 +551,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
   library: "Pastas de jogos",
   games: "Jogos do console",
   settings: "Configurações",
+  "controller-test": "Testar controle",
 };
 
 const SIDEBAR_PHASES: Phase[] = [
@@ -554,6 +564,7 @@ const SIDEBAR_PHASES: Phase[] = [
   "games",
   "game-detail",
   "settings",
+  "controller-test",
 ];
 
 export default App;

@@ -38,6 +38,7 @@ export const dict = {
     "pt-BR": "Escolha o perfil de controle e mapeie botões para cada emulador que suporta isso. Sem emuladores instalados que suportem mapeamento, esta lista fica vazia.",
     en: "Choose the controller profile and map buttons for each emulator that supports it. With no installed emulator that supports mapping, this list stays empty.",
   },
+  testControllerButton: { "pt-BR": "Testar controle", en: "Test controller" },
   loadingEmulatorsForControllers: { "pt-BR": "Carregando emuladores…", en: "Loading emulators…" },
   noBindableEmulators: {
     "pt-BR": "Nenhum emulador instalado suporta mapeamento de controle ainda (hoje: PCSX2 e RetroArch).",

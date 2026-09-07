@@ -43,7 +43,7 @@ type UpdateState =
  * credencial errada só aparece na primeira busca de capa, onde já é
  * acionável ("confira o client_id/client_secret").
  */
-export function SettingsScreen() {
+export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest: () => void }) {
   const t = useT(dict);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [clientId, setClientId] = useState("");
@@ -269,6 +269,10 @@ export function SettingsScreen() {
       <Card className="mb-6">
         <SectionHeading className="mb-2">{t("controllersHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">{t("controllersDescription")}</p>
+
+        <Button variant="secondary" className="mb-4 w-fit" onClick={onOpenControllerTest}>
+          {t("testControllerButton")}
+        </Button>
 
         {emulators === null && <p className="text-sm text-muted">{t("loadingEmulatorsForControllers")}</p>}
 
