@@ -1,7 +1,7 @@
 import type { LibraryGame } from "../api/types";
 import { coverImageURL } from "../api";
 import type { GameLaunchability } from "../lib/gameLaunchability";
-import { formatPlaytime } from "../lib/format";
+import { formatLastPlayedShort, formatPlaytime } from "../lib/format";
 import { useT } from "../i18n/i18n";
 import { dict } from "./GameTile.i18n";
 import { Badge, FavoriteToggle, FOCUS_RING, GameCover } from "./ui";
@@ -68,6 +68,12 @@ export function GameTile({
 }) {
   const t = useT(dict);
   const blocked = launchability !== undefined && !launchability.launchable;
+  // Achado do critico-layout-biblioteca (2026-09-06): sem data de última
+  // sessão, não há nada que a faixa de hover diga que o rodapé do tile já
+  // não diga (playtime, sempre visível) — a faixa simplesmente não aparece
+  // (GameCover trata `hoverInfo` ausente como "sem faixa", não como vazia).
+  const lastPlayed = formatLastPlayedShort(game.last_played_at);
+  const hoverInfo = lastPlayed ? t("lastPlayedOn", { console: shortName, date: lastPlayed }) : undefined;
 
   return (
     <div className="flex flex-col gap-2">
@@ -109,6 +115,7 @@ export function GameTile({
             showPlayOverlay
             onPlay={onPlay}
             className={blocked ? "opacity-50" : ""}
+            hoverInfo={hoverInfo}
           />
         </div>
         <FavoriteToggle favorite={game.favorite} onToggle={onToggleFavorite} className="absolute top-1.5 right-1.5" />

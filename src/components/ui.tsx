@@ -544,6 +544,7 @@ export function GameCover({
   onPlay,
   coverUrl,
   className = "",
+  hoverInfo,
 }: {
   /** Sigla do console — único dado real disponível hoje como "capa". */
   label: string;
@@ -563,6 +564,16 @@ export function GameCover({
   /** Preparado para o futuro — nenhuma tela passa isto ainda. */
   coverUrl?: string;
   className?: string;
+  /**
+   * Achado do critico-layout-biblioteca (2026-09-06): metadado que hoje só
+   * aparece abrindo o detalhe do jogo — console/última vez jogado — some
+   * numa faixa que sobe do rodapé no hover/foco, sobre a capa real. Ausente
+   * = nenhuma faixa (ex.: jogo nunca jogado, sem dado extra que valha
+   * antecipar). Só entra com `coverUrl`: sem capa real, a sigla + o título em
+   * pixel font já ocupam o rodapé (ver ramo `!coverUrl` abaixo) — duas faixas
+   * disputando o mesmo espaço.
+   */
+  hoverInfo?: ReactNode;
 }) {
   const t = useT(dict);
   const accent = consoleId ? consoleAccentColor(consoleId) : undefined;
@@ -604,6 +615,21 @@ export function GameCover({
               do item), mas a arte agora aparece inteira, sem cortar os lados
               de uma capa quadrada nem o topo/base de uma capa alta. */}
           <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+          {/* Achado do critico-layout-biblioteca (2026-09-06): faixa que sobe
+              do rodapé no hover/foco, com o metadado que hoje só aparece
+              abrindo o detalhe. `translate-y-full` → `translate-y-0`: some
+              fora da célula em vez de só ficar transparente, então não
+              atrapalha o `object-contain` da capa por cima quando escondida.
+              `pointer-events-none`: é informação, não abre nada sozinha — o
+              clique continua indo para o wrapper `role="button"` por baixo. */}
+          {hoverInfo && (
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black/85 via-black/70 to-transparent px-2 pt-5 pb-1.5 opacity-0 transition-[transform,opacity] duration-150 ease-in-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
+              aria-hidden="true"
+            >
+              <p className="line-clamp-2 text-[11px] leading-tight text-white/90">{hoverInfo}</p>
+            </div>
+          )}
         </>
       ) : (
         <>

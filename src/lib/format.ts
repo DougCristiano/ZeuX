@@ -14,6 +14,20 @@ export function formatPlaytime(seconds: number): string {
   return remainder > 0 ? `${hours}h${remainder}min jogados` : `${hours}h jogados`;
 }
 
+// Achado do critico-layout-biblioteca (2026-09-06): o hover do tile não
+// mostrava nada além do que já aparecia sempre embaixo da capa — cada card
+// exigia abrir o detalhe para saber quando foi jogado pela última vez.
+// Formato curto (só data, sem hora) de propósito: é texto que aparece sobre
+// a própria capa, num espaço de uma linha só; a versão com hora que
+// GameDetailScreen usa (`formatLastPlayed`, local aquele arquivo) cabe numa
+// tela cheia, não numa faixa de hover.
+export function formatLastPlayedShort(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("pt-BR");
+}
+
 // M8 (docs/sprint-m-plano.md): extraído de GamesScreen para ser reaproveitado
 // também por AllGamesScreen — as duas mostram progresso do mesmo InstallJob.
 // `total_bytes` pode vir 0 (tamanho desconhecido) — nesse caso o percentual
