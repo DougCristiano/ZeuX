@@ -53,6 +53,10 @@ export const dict = {
     "pt-BR": "Carregando jogos…",
     en: "Loading games…",
   },
+  loadingMoreGames: {
+    "pt-BR": "Carregando mais jogos…",
+    en: "Loading more games…",
+  },
   allGames: {
     "pt-BR": "Todos os jogos",
     en: "All games",

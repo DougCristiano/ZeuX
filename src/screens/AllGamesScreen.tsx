@@ -12,7 +12,6 @@ import {
   ErrorModal,
   FOCUS_RING,
   inputClass,
-  Pagination,
   ProgressBar,
   ScreenContainer,
   SectionHeading,
@@ -318,27 +317,50 @@ export function AllGamesScreen({
     restoredScrollRef.current = true;
   }, [games, initialScrollTop, scrollElementRef]);
 
+  // Achado #3 do critico-layout-biblioteca (2026-09-06): paginação numerada
+  // numa grade que já é virtualizada (`useVirtualizer`, abaixo) é o sinal
+  // clássico de "isso parece um formulário de admin" — nenhum launcher de
+  // referência (Steam, GOG, Epic, Playnite, ES-DE) pagina biblioteca.
+  //
+  // `page` continua existindo no estado hoisted de App.tsx, mas muda de
+  // sentido: não é mais "qual página está na tela", é "quantas páginas de
+  // PAGE_SIZE itens já foram carregadas" — começa em 1, sobe quando o
+  // usuário chega perto do fim da lista (efeito `loadingMore` abaixo). Por
+  // isso `loadGames` busca da página 1 até `page` (em paralelo) e concatena,
+  // em vez de substituir: refazer as páginas já vistas custa pouco (consulta
+  // local ao SQLite) e mantém a reconstrução do M4 funcionando de graça — ao
+  // voltar do detalhe com `page=3` já hoisted, a tela busca as 3 páginas de
+  // uma vez, só então `games` fica não-nulo, e só então a rolagem salva
+  // (`restoredScrollRef`, abaixo) encontra altura suficiente pra se aplicar.
+  const [loadingMore, setLoadingMore] = useState(false);
+
   function loadGames() {
-    api
-      .getAllLibraryGames(page, PAGE_SIZE, {
-        query: debouncedSearch || undefined,
-        favoriteOnly,
-        platform: platformFilter ?? undefined,
-        sort,
-      })
-      .then((res) => {
-        setGames(res.games);
-        setTotal(res.total);
-        setConsoles(res.consoles);
+    const pagesToFetch = Array.from({ length: page }, (_, i) => i + 1);
+    Promise.all(
+      pagesToFetch.map((p) =>
+        api.getAllLibraryGames(p, PAGE_SIZE, {
+          query: debouncedSearch || undefined,
+          favoriteOnly,
+          platform: platformFilter ?? undefined,
+          sort,
+        }),
+      ),
+    )
+      .then((responses) => {
+        const last = responses[responses.length - 1];
+        setGames(responses.flatMap((r) => r.games));
+        setTotal(last.total);
+        setConsoles(last.consoles);
         // A plataforma escolhida pode ter deixado de existir no resultado
         // (busca/favoritos mudaram e não sobrou jogo daquele console) — cai
         // pra "todos" em vez de continuar filtrando por algo que já não
         // aparece nem nos próprios chips.
-        if (platformFilter && !res.consoles.includes(platformFilter)) {
+        if (platformFilter && !last.consoles.includes(platformFilter)) {
           onViewChange({ platformFilter: null });
         }
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListGames")));
+      .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListGames")))
+      .finally(() => setLoadingMore(false));
   }
 
   useEffect(loadGames, [page, debouncedSearch, favoriteOnly, platformFilter, sort]);
@@ -420,8 +442,6 @@ export function AllGamesScreen({
       .catch((err) => setScrapeError(err instanceof ApiError ? err.message : t("failedToInitiateCoverScrape")));
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   function shortNameFor(consoleId: string): string {
     return report.verdicts.find((v) => v.console_id === consoleId)?.short_name ?? consoleId;
   }
@@ -498,6 +518,25 @@ export function AllGamesScreen({
     // ao arrastar a janela para um monitor de tamanho diferente).
     getItemKey: (index) => `${viewMode}-${columns}-${index}`,
   });
+
+  // Gatilho do scroll infinito (achado #3, acima): dispara a próxima página
+  // quando a última linha renderizada pelo virtualizer chega perto do fim da
+  // lista já carregada — 3 linhas de folga, não a última exata, pra buscar
+  // antes do usuário ver o chão da lista. `loadingMore` evita empilhar um
+  // `onViewChange` por re-render de scroll enquanto a busca anterior ainda
+  // não voltou; `games.length >= total` para de vez quando não sobra mais
+  // página (server já devolveu tudo).
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const lastVirtualItem = virtualItems[virtualItems.length - 1];
+  useEffect(() => {
+    if (!lastVirtualItem || !games) return;
+    if (loadingMore) return;
+    if (games.length >= total) return;
+    if (lastVirtualItem.index < rowCount - 3) return;
+    setLoadingMore(true);
+    onViewChange({ page: page + 1 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastVirtualItem?.index, rowCount, games, total, loadingMore]);
 
   // M8: mesma cadeia de decisão de GamesScreen — só varia o que cada tela
   // tem à mão (aqui, verdict/adapterEntry são resolvidos por jogo, não
@@ -1047,7 +1086,15 @@ export function AllGamesScreen({
             })}
           </div>
 
-          <Pagination page={page} totalPages={totalPages} onChange={(next) => onViewChange({ page: next })} />
+          {/* Substitui a paginação numerada (achado #3, comentário perto de
+              `loadGames`) — só aparece enquanto uma próxima página está a
+              caminho; some sozinho quando não sobra mais jogo, sem "página X
+              de Y" nem botão nenhum pra clicar. */}
+          {loadingMore && (
+            <p className="py-4 text-center text-sm text-muted" aria-live="polite">
+              {t("loadingMoreGames")}
+            </p>
+          )}
         </>
       )}
     </ScreenContainer>
