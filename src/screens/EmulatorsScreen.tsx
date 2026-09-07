@@ -27,6 +27,7 @@ import {
   Pagination,
   ProgressBar,
   ScreenContainer,
+  ScreenHeader,
   SectionHeading,
   ZSelect,
 } from "../components/ui";
@@ -193,9 +194,12 @@ function RetroArchCoresList() {
 
         {bulk && (
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-xs text-muted tabular-nums">
-              {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
-            </span>{/* A11y 4.1.3: progresso da fila que avança sozinho — anunciado
+            {/* Achado do critico-design (2026-09-06): existia um segundo
+                `<span>` idêntico logo acima deste, sem `aria-live` — sobra de
+                quando o A11y 4.1.3 (abaixo) trocou o span original por um
+                anunciado, sem apagar o que ficou pra trás. Resultado real:
+                "Baixando 3 de 25 · mame Baixando 3 de 25 · mame" lado a lado.
+                A11y 4.1.3: progresso da fila que avança sozinho — anunciado
                 por `aria-live` para quem usa leitor de tela. */}
             <span className="text-xs text-muted tabular-nums" aria-live="polite">
               {t("downloadingBulk", { current: bulk.total - bulk.remaining + 1, total: bulk.total, name: bulk.current })}
@@ -888,13 +892,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
       {/* B9 (achado do critico-design, 2026-08-18): mesma posição que
           GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
           (era ao lado do h1, à direita). */}
-      {onBack && (
-        // A11y 2.1.4: `data-nav-back` — alvo do botão B do controle.
-        <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
-          {t("back")}
-        </Button>
-      )}
-      <h1 className="mb-4 text-2xl font-semibold text-ink">{t("emulatorsTitle")}</h1>
+      <ScreenHeader back={onBack ? { label: t("back"), onClick: onBack } : undefined} title={t("emulatorsTitle")} />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {emulators && emulators.length > PAGE_SIZE && (

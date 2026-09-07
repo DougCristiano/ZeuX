@@ -13,6 +13,8 @@ import {
   Pagination,
   PartialNotice,
   ScreenContainer,
+  ScreenHeader,
+  SectionHeading,
 } from "../components/ui";
 import { useT } from "../i18n/i18n";
 import { dict } from "./VerdictScreen.i18n";
@@ -262,19 +264,18 @@ export function VerdictScreen({ report }: { report: Report }) {
           ia deixar o texto de spec — nomes de CPU/GPU — perdido num espaço
           vazio), mas encolhe de verdade em janela pequena; o `max-w` do
           `<aside>` some porque a coluna do grid já é o teto, era redundante. */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(260px,340px)_1fr]">
+      <ScreenHeader title={t("specifications")} />
+
+      {/* Achado do critico-design (2026-09-06): 4.1 (ritmo vertical) — o
+          `gap-8` era o único espaçamento de seção fora dos dois valores que
+          o resto do app usa (`gap-6`/`gap-3`); desceu pra ficar consistente. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(260px,340px)_1fr]">
         <aside className="flex flex-col gap-4">
-          <h1 className="text-2xl font-semibold text-ink">{t("specifications")}</h1>
+          <SectionHeading>{t("thisMachine")}</SectionHeading>
           <SpecsPanel />
         </aside>
 
         <div>
-          {!THRESHOLDS_CALIBRATED && (
-            <p className="mb-4 text-sm text-muted">
-              {t("thresholdsNotCalibrated")}
-            </p>
-          )}
-
           {report.precision === "parcial" && (
             <div className="mb-4">
               <PartialNotice>{t("partialPrecision")}</PartialNotice>
@@ -325,6 +326,18 @@ export function VerdictScreen({ report }: { report: Report }) {
               ))}
             </div>
           </div>
+
+          {/* Achado do critico-design (2026-09-06), 3.2: esta ressalva
+              morava ANTES dos filtros, então era a primeira coisa que o
+              olho encontrava na coluna — antes até do título. Um aviso de
+              precisão de dado não deveria competir com o conteúdo real da
+              tela por essa posição; desceu pra abaixo dos filtros, como
+              `Callout`, igual ao resto dos avisos secundários do app. */}
+          {!THRESHOLDS_CALIBRATED && (
+            <div className="mt-4">
+              <Callout label={t("estimateLabel")}>{t("thresholdsNotCalibrated")}</Callout>
+            </div>
+          )}
 
           {filtered.length === 0 && (
             <p className="mt-4 text-base text-muted">{t("noConsolesFound", { search })}</p>

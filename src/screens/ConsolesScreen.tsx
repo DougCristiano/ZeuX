@@ -19,6 +19,7 @@ import {
   inputClass,
   Pagination,
   ScreenContainer,
+  ScreenHeader,
   useLevelLabel,
 } from "../components/ui";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -246,26 +247,25 @@ export function ConsolesScreen({
 
   return (
     <ScreenContainer variant="listing">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">{t("consoles")}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {t("consolesDescription")}
-          </p>
-        </div>
-        {/* A tela de emuladores continua existindo — é onde moram os
-            emuladores personalizados, a lista completa dos cores do RetroArch
-            e os painéis de configuração/mapeamento, que não pertencem a um
-            console só. Deixou de ser a entrada principal, não de existir.
-
-            `secondary`, não `quiet` (achado testando com o Douglas,
-            2026-09-06): é uma troca de visão de tela inteira, mesma classe
-            de ação que "← Consoles"/"Voltar" nas outras telas — `quiet` (sem
-            borda) lê como texto solto, não como algo clicável. */}
-        <Button variant="secondary" onClick={onOpenEmulators}>
-          {t("seeByEmulator")}
-        </Button>
-      </div>
+      <ScreenHeader
+        title={t("consoles")}
+        subtitle={t("consolesDescription")}
+        actions={
+          // A tela de emuladores continua existindo — é onde moram os
+          // emuladores personalizados, a lista completa dos cores do
+          // RetroArch e os painéis de configuração/mapeamento, que não
+          // pertencem a um console só. Deixou de ser a entrada principal,
+          // não de existir.
+          //
+          // `secondary`, não `quiet` (achado testando com o Douglas,
+          // 2026-09-06): é uma troca de visão de tela inteira, mesma classe
+          // de ação que "← Consoles"/"Voltar" nas outras telas — `quiet`
+          // (sem borda) lê como texto solto, não como algo clicável.
+          <Button variant="secondary" onClick={onOpenEmulators}>
+            {t("seeByEmulator")}
+          </Button>
+        }
+      />
 
       {error && <InlineError>{error}</InlineError>}
 

@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
 import { Play, Star, TriangleAlert } from "lucide-react";
 import type { ConsoleVerdict } from "../api/types";
+import logoZeux from "../assets/logo-zeux.png";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { useT } from "../i18n/i18n";
 import { dict } from "./ui.i18n";
@@ -159,18 +160,24 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
  * (`color-mix` sobre `--accent`), não uma linguagem nova. `pointer-events-none`
  * e `aria-hidden`: puramente decorativo, nunca compete com o texto por trás
  * (contraste do texto de consentimento continua medido e sem interferência,
- * porque o glow fica a 14% de opacidade e o texto não fica sobre ele — a tela
+ * porque o glow fica a baixa opacidade e o texto não fica sobre ele — a tela
  * inteira que ganha o clima, não uma faixa atrás da frase). Uso: `<main
- * className="relative ...">` + `<OnboardingGlow />` como primeiro filho.
+ * className="relative ...">` + `<AmbientGlow />` como primeiro filho.
+ *
+ * Renomeado de `OnboardingGlow` (achado do critico-design, 2026-09-06): a
+ * identidade neon do ADR 0013 só existia nas telas de onboarding —
+ * exatamente as que o usuário vê uma vez — e desligava sozinha assim que o
+ * app de verdade começava (`App.tsx`, shell com `Sidebar`). Mesmo componente,
+ * usado também no shell principal, só com `opacity` mais baixa (a versão
+ * "quente" de 14% competiria com grades densas de jogos/consoles).
  */
-export function OnboardingGlow() {
+export function AmbientGlow({ opacity = 14 }: { opacity?: number }) {
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 overflow-hidden"
       style={{
-        background:
-          "radial-gradient(60% 50% at 50% 30%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%)",
+        background: `radial-gradient(60% 50% at 50% 30%, color-mix(in srgb, var(--accent) ${opacity}%, transparent), transparent 70%)`,
       }}
     />
   );
@@ -268,8 +275,18 @@ export function Badge({
   /** M8 (docs/sprint-m-plano.md): tooltip nativo com a frase completa, quando o texto do badge é um resumo curto. */
   title?: string;
 }) {
+  // `variant="solid"` é sempre estado passivo do sistema — "instalado",
+  // "conectado" — nunca uma ação; achado do critico-design (2026-09-06)
+  // deu esse papel ao ciano em vez do roxo (`--accent`, comentário em
+  // index.css), pra "pronto" parar de competir visualmente com "Instalar",
+  // que é a ação de verdade e continua roxa. `text-accent-ink`, não um
+  // "-ink" próprio do ciano: o mesmo quase-preto passa contraste alto contra
+  // qualquer um dos dois fundos claros (medido: 4.62:1 do roxo, 12.7:1 do
+  // ciano — ambos folgados o bastante pra não precisar de um segundo tom).
   const styles =
-    variant === "solid" ? "border-accent bg-accent text-accent-ink" : "border-line-strong text-muted";
+    variant === "solid"
+      ? "border-accent-secondary bg-accent-secondary text-accent-ink"
+      : "border-line-strong text-muted";
   return (
     <span
       title={title}
@@ -336,6 +353,56 @@ export function PartialNotice({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Cabeçalho de tela — achado do critico-design (2026-09-06): seis telas
+ * (`ConsolesScreen`, `EmulatorsScreen`, `SettingsScreen`, `AllGamesScreen`,
+ * `ConsoleDetailScreen`, `VerdictScreen`) tinham seis anatomias de cabeçalho
+ * diferentes — layout, margem inferior do título (4 valores: `mb-4`, `mb-5`,
+ * `mb-6`, nenhum) e posição das ações mudavam tela a tela, sem motivo além
+ * de "foi assim que essa tela foi pedida". Causa mecânica direta da queixa
+ * "a composição parece blocos empilhados, não desenhada com intenção".
+ *
+ * `back` é `{ label, onClick }`, não um texto fixo "Voltar": os rótulos já
+ * existentes variam por tela de propósito (`ConsoleDetailScreen` usa
+ * "← Consoles", mais específico que um "Voltar" genérico) — o componente
+ * não deveria ser mais rígido que o que já existia. `data-nav-back` (A11y
+ * 2.1.4, alvo do botão B do controle) fica embutido aqui, não repetido em
+ * cada chamador.
+ *
+ * `actions` alinhado pela mesma linha de base do título (`items-start`, não
+ * o `items-end`/`items-center` que cada tela escolhia à mão) — é o ajuste
+ * que a proposta original do agente pedia: ação nunca deveria "flutuar"
+ * conforme a altura do bloco de título/subtítulo ao lado.
+ */
+export function ScreenHeader({
+  back,
+  title,
+  subtitle,
+  actions,
+}: {
+  back?: { label: string; onClick: () => void };
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="mb-6">
+      {back && (
+        <Button variant="secondary" data-nav-back onClick={back.onClick} className="mb-4">
+          {back.label}
+        </Button>
+      )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">{title}</h1>
+          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Título de seção dentro de uma tela (`<h2>`). Papel intermediário da
  * hierarquia entre o `<h1>` de 28px e o corpo de 15px (achado do
  * critico-design, 2026-09-06 — "o app salta de 28px para 15px sem degrau no
@@ -349,10 +416,17 @@ export function PartialNotice({ children }: { children: ReactNode }) {
  * "PROCESSADOR" no SpecsPanel) e em badge/contador — ali é tempero, não
  * estrutura de página. Mantém `uppercase tracking-wide text-muted` para não
  * romper o vocabulário visual do app; só o tamanho sobe.
+ *
+ * `text-accent-secondary` (ciano), não `text-muted` (achado do
+ * critico-design, 2026-09-06): é o papel que o token ganhou nesta sessão —
+ * "aqui o sistema informa", ver comentário de `--accent-secondary` em
+ * `index.css`. Contraste medido a 12.7:1 contra `--paper`, folga maior que
+ * o `text-muted` que saiu daqui (7.62:1) — troca de identidade, não de
+ * legibilidade.
  */
 export function SectionHeading({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <h2 className={`text-lg font-semibold tracking-wide text-muted uppercase ${className}`}>{children}</h2>
+    <h2 className={`text-lg font-semibold tracking-wide text-accent-secondary uppercase ${className}`}>{children}</h2>
   );
 }
 
@@ -953,9 +1027,18 @@ export function CardSkeleton({ className = "" }: { className?: string }) {
  * `action` fica de fora quando a tela já tem a ação em outro lugar visível
  * (ex.: `GamesScreen` sempre mostra "Voltar à biblioteca" no cabeçalho).
  */
+/**
+ * Achado do critico-design (2026-09-06): fora do onboarding, o logo só
+ * aparecia a 36px na sidebar — a tela vazia é o lugar com mais espaço
+ * sobrando e menos conteúdo competindo, e não tinha nenhuma marca. O logo
+ * a baixa opacidade acima da mensagem é o retorno de identidade mais barato
+ * do app: nenhum asset novo, `aria-hidden` (é decoração, a mensagem de texto
+ * já carrega o significado pra leitor de tela).
+ */
 export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded border border-dashed border-line-strong px-6 py-16 text-center">
+      <img src={logoZeux} alt="" aria-hidden="true" width={64} height={64} className="object-contain opacity-15" />
       <p className="text-base text-muted">{message}</p>
       {action}
     </div>

@@ -172,7 +172,7 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
         </nav>
 
         <div className="mt-auto w-full px-2">
-          <LanguageSelector className="justify-center" />
+          <LanguageSelector className="justify-center" collapsible />
         </div>
       </div>
     </aside>

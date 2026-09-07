@@ -6,7 +6,7 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
-import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, SectionHeading, Toast } from "../components/ui";
+import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
@@ -227,7 +227,7 @@ export function SettingsScreen() {
   return (
     <ScreenContainer variant="listing">
       {toastMessage && <Toast message={toastMessage} />}
-      <h1 className="mb-5 text-2xl font-semibold text-ink">{t("title")}</h1>
+      <ScreenHeader title={t("title")} />
 
       <Card className="mb-6">
         <SectionHeading className="mb-2">{t("languageLabel")}</SectionHeading>

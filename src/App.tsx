@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
+import { AmbientGlow } from "./components/ui";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import { useT } from "./i18n/i18n";
 import type { LibraryGame } from "./api/types";
@@ -472,7 +473,15 @@ function App() {
             ? "settings"
             : "library";
     return (
-      <div className="flex h-screen">
+      // Achado do critico-design (2026-09-06): o glow de identidade (ADR
+      // 0013) só existia nas 3 telas de onboarding — a única vez que o
+      // usuário via clima neon era antes do app "de verdade" começar.
+      // `relative` + `AmbientGlow` aqui é o mesmo componente, opacidade mais
+      // baixa (a versão de 14% do onboarding competiria com grade densa de
+      // jogos/consoles). Fixo no shell, não por tela: sobrevive à troca de
+      // fase sem precisar repetir em cada uma das nove telas pós-onboarding.
+      <div className="relative flex h-screen overflow-hidden">
+        <AmbientGlow opacity={9} />
         <Sidebar active={active} onNav={navigateSidebar} />
         <main ref={mainRef} className="flex-1 overflow-y-auto">
           {screen}

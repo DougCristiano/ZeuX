@@ -2,6 +2,13 @@ import type { Dict } from "../i18n/i18n";
 
 export const dict = {
   specifications: { "pt-BR": "Especificações", en: "Specifications" },
+  // Achado do critico-design (2026-09-06): a tela não tinha ScreenHeader —
+  // o <h1> "Especificações" morava dentro da coluna esquerda, e a coluna
+  // abria com um parágrafo de ressalva antes de qualquer título. `thisMachine`
+  // é o novo SectionHeading da coluna, "Especificações" sobe pro cabeçalho
+  // de tela cheia.
+  thisMachine: { "pt-BR": "Esta máquina", en: "This machine" },
+  estimateLabel: { "pt-BR": "estimativa", en: "estimate" },
   system: { "pt-BR": "Sistema", en: "System" },
   processor: { "pt-BR": "Processador", en: "Processor" },
   memory: { "pt-BR": "Memória", en: "Memory" },

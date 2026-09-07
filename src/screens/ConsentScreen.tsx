@@ -1,6 +1,6 @@
 import logoZeux from "../assets/logo-zeux.png";
 import { useT } from "../i18n/i18n";
-import { Button, Card, OnboardingGlow } from "../components/ui";
+import { Button, Card, AmbientGlow } from "../components/ui";
 import { dict } from "./ConsentScreen.i18n";
 
 type ConsentScreenProps = {
@@ -26,7 +26,7 @@ export function ConsentScreen({ policyText, policyVersion, onAccept, onDecline, 
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6 py-12">
-      <OnboardingGlow />
+      <AmbientGlow />
       {/* N3 (docs/roadmap.md, Sprint N): max-w-3xl é o mesmo teto de leitura
           que `ScreenContainer` usa no resto do app (era `max-w-xl`, isolado)
           — o `ScreenContainer` em si não serve aqui: seu `pt-16 pb-10` é

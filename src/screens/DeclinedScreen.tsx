@@ -1,5 +1,5 @@
 import { useT } from "../i18n/i18n";
-import { Button, OnboardingGlow } from "../components/ui";
+import { Button, AmbientGlow } from "../components/ui";
 import { dict } from "./DeclinedScreen.i18n";
 
 /**
@@ -24,9 +24,9 @@ export function DeclinedScreen({
   return (
     // N3/N8 (docs/roadmap.md, Sprint N): max-w-3xl é o mesmo teto de leitura
     // do resto do app (era max-w-md); glow de identidade (N8) — mesmo motivo
-    // do comentário em OnboardingGlow (src/components/ui.tsx).
+    // do comentário em AmbientGlow (src/components/ui.tsx).
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6">
-      <OnboardingGlow />
+      <AmbientGlow />
       <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
         <h1 className="text-2xl font-semibold text-ink">{t("heading")}</h1>
         <p className="text-base text-ink">

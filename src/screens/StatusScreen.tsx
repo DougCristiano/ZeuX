@@ -1,6 +1,6 @@
 import logoZeux from "../assets/logo-zeux.png";
 import { useT } from "../i18n/i18n";
-import { Button, OnboardingGlow } from "../components/ui";
+import { Button, AmbientGlow } from "../components/ui";
 import { dict } from "./StatusScreen.i18n";
 
 /**
@@ -19,7 +19,7 @@ export function LoadingScreen({ message }: { message: string }) {
       className="relative flex min-h-screen flex-col items-center justify-center gap-4 overflow-hidden bg-paper"
       role="status"
     >
-      <OnboardingGlow />
+      <AmbientGlow />
       <img src={logoZeux} alt="" aria-hidden="true" className="relative z-10 h-12 w-12" />
       {/* A11y 1.3.1: heading da tela — visualmente a mensagem já basta, então
           fica `sr-only`; sem ele, quem navega por headings não acha esta tela. */}
@@ -46,7 +46,7 @@ export function ErrorScreen({ message, onRetry }: { message: string; onRetry: ()
     // N3/N8 (docs/roadmap.md, Sprint N): max-w-3xl é o teto de leitura do
     // resto do app (era max-w-sm, isolado); glow de identidade (N8).
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6">
-      <OnboardingGlow />
+      <AmbientGlow />
       <div className="relative z-10 flex w-full max-w-3xl flex-col items-start gap-4">
         {/* A11y 1.3.1: uma tela de erro sem heading é difícil de localizar por
             leitor de tela. `sr-only` — a mensagem em vermelho já é o rótulo

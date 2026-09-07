@@ -10,7 +10,24 @@ import { FOCUS_RING } from "./ui";
  * hoje; `LOCALES` é a lista única de verdade, então um terceiro idioma
  * futuro aparece aqui sem tocar este componente.
  */
-export function LanguageSelector({ className = "" }: { className?: string }) {
+export function LanguageSelector({
+  className = "",
+  collapsible = false,
+}: {
+  className?: string;
+  /**
+   * Achado do critico-design (2026-09-06): a sidebar recolhida (`w-16`,
+   * `overflow-hidden`) montava este componente do mesmo jeito que a versão
+   * expandida — um `<select>` com o texto "Português (Brasil)" inteiro —
+   * cortado no meio pelo container estreito, em vez de reduzir a só o ícone
+   * como os itens de navegação ao lado já fazem. Mesma técnica de
+   * `max-w`/`opacity` do rótulo de nav (Sidebar.tsx): "chuta" um teto maior
+   * que qualquer rótulo real porque `width: auto` não anima em CSS. Some por
+   * completo no estado recolhido — só o ícone `Languages` fica, e `.group`
+   * (a `<aside>` de Sidebar.tsx) é quem dispara a expansão no hover/foco.
+   */
+  collapsible?: boolean;
+}) {
   const { locale, setLocale } = useLocale();
   return (
     <label className={`flex items-center gap-2 text-sm text-ink ${className}`}>
@@ -19,7 +36,11 @@ export function LanguageSelector({ className = "" }: { className?: string }) {
         value={locale}
         onChange={(e) => setLocale(e.target.value as typeof locale)}
         aria-label="Idioma / Language"
-        className={`rounded border border-line bg-fill px-2 py-1 text-sm text-ink ${FOCUS_RING}`}
+        className={`rounded border border-line bg-fill px-2 py-1 text-sm text-ink ${FOCUS_RING} ${
+          collapsible
+            ? "max-w-0 overflow-hidden opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[144px] group-hover:opacity-100 group-focus-within:max-w-[144px] group-focus-within:opacity-100"
+            : ""
+        }`}
       >
         {LOCALES.map((l) => (
           <option key={l.id} value={l.id}>

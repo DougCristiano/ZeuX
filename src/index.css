@@ -31,11 +31,15 @@
  * paleta só, inspirada no mockup em layout/ (Figma Make): fundo quase-preto
  * azulado, acento roxo neon.
  *
- * `--accent-secondary` (ciano) é decorativo — nunca reaproveitado para foco
- * ou interação primária. Documentado aqui de propósito: o próprio mockup em
- * layout/ define um `--secondary` e quase não usa, um sinal de que a
- * distinção "cor de interação" vs. "cor decorativa" precisa ficar explícita,
- * não implícita.
+ * `--accent-secondary` (ciano): papel fixado no achado do critico-design
+ * (2026-09-06) — antes disso era "decorativo", declarado e usado num único
+ * lugar visível do app inteiro (a borda do spinner de carregamento), o
+ * mesmo destino do `--secondary` do mockup original em layout/ que motivou
+ * o aviso abaixo por escrito. Regra agora: **roxo é "aqui você age", ciano é
+ * "aqui o sistema informa"** — rótulo de seção (`SectionHeading`) e estado
+ * passivo tipo "instalado"/"conectado" (`Badge variant="solid"`). Nunca em
+ * foco, hover ou botão primário — essas continuam roxas, de propósito, para
+ * a ação de verdade nunca competir visualmente com um rótulo informativo.
  *
  * Contraste verificado (WCAG, fórmula de luminância relativa) contra
  * `--paper` (#080C17): roxo `--accent` 4.62:1 (passa AA para texto normal,

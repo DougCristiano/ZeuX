@@ -14,6 +14,7 @@ import {
   inputClass,
   ProgressBar,
   ScreenContainer,
+  ScreenHeader,
   SectionHeading,
   InlineError,
   ManualInstallModal,
@@ -714,53 +715,57 @@ export function AllGamesScreen({
         toastMessage && <Toast message={toastMessage} />
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold text-ink">
-          {/* M12 (docs/sprint-m-plano.md): a partir de `total`, que
-              `loadGames` já guarda em estado — sem chamada nova (critério do
-              item). Ausente durante o carregamento inicial (`games` ainda
-              `null`): a contagem some junto com o resto, não sobra sozinha.
-              Espaço de verdade antes do span (achado testando com o Douglas,
-              2026-09-06): sem ele, o texto concatenava "Todos os jogos· 4" —
-              só o `ml-2` separava visualmente, não a árvore de texto (mesmo
-              bug corrigido em `EmulatorBindingsPanel`). */}
-          Todos os jogos{" "}
-          {games && <span className="ml-2 text-base font-normal text-muted">· {total.toLocaleString("pt-BR")}</span>}
-        </h1>
-        <div className="flex flex-wrap gap-2">
-          {/* Só aparece com conta do IGDB conectada (G1) — sem credencial,
-              a biblioteca fica exatamente como hoje, sem botão nenhum aqui
-              (docs/roadmap.md: "nunca uma tela vazia ou travada"). */}
-          {igdbConfigured && (
-            <div className="flex flex-col items-stretch gap-1">
-              {/* M15 (docs/sprint-m-plano.md, 2026-08-07): o progresso saiu
-                  do rótulo do botão (`Buscando capas… 7/30` crescia e
-                  encolhia a cada jogo, empurrando o botão vizinho) e foi pra
-                  `ProgressBar`, abaixo — mesmo componente que a instalação
-                  inline já usa. Rótulo do botão agora é fixo. */}
-              <Button variant="secondary" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
-                {scrapeJob ? t("fetchingCovers") : t("fetchCoversButton")}
-              </Button>
-              {scrapeJob && (
-                <>
-                  <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
-                  {/* A11y 4.1.3: contador que muda sozinho — anunciado por aria-live. */}
-                  <p className="text-center text-xs text-muted" aria-live="polite">
-                    {scrapeJob.processed}/{scrapeJob.total}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-          {/* Navegação de topo (Emuladores/Parecer) mudou para a sidebar
-              (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui porque é
-              sub-navegação da própria Biblioteca, não um destino de primeiro
-              nível. */}
-          <Button variant="secondary" onClick={onOpenLibrary}>
-            {t("manageFolders")}
-          </Button>
-        </div>
-      </div>
+      <ScreenHeader
+        title={
+          <>
+            {/* M12 (docs/sprint-m-plano.md): a partir de `total`, que
+                `loadGames` já guarda em estado — sem chamada nova (critério
+                do item). Ausente durante o carregamento inicial (`games`
+                ainda `null`): a contagem some junto com o resto, não sobra
+                sozinha. Espaço de verdade antes do span (achado testando com
+                o Douglas, 2026-09-06): sem ele, o texto concatenava "Todos os
+                jogos· 4" — só o `ml-2` separava visualmente, não a árvore de
+                texto (mesmo bug corrigido em `EmulatorBindingsPanel`). */}
+            Todos os jogos{" "}
+            {games && <span className="ml-2 text-base font-normal text-muted">· {total.toLocaleString("pt-BR")}</span>}
+          </>
+        }
+        actions={
+          <>
+            {/* Só aparece com conta do IGDB conectada (G1) — sem credencial,
+                a biblioteca fica exatamente como hoje, sem botão nenhum aqui
+                (docs/roadmap.md: "nunca uma tela vazia ou travada"). */}
+            {igdbConfigured && (
+              <div className="flex flex-col items-stretch gap-1">
+                {/* M15 (docs/sprint-m-plano.md, 2026-08-07): o progresso saiu
+                    do rótulo do botão (`Buscando capas… 7/30` crescia e
+                    encolhia a cada jogo, empurrando o botão vizinho) e foi
+                    pra `ProgressBar`, abaixo — mesmo componente que a
+                    instalação inline já usa. Rótulo do botão agora é fixo. */}
+                <Button variant="secondary" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
+                  {scrapeJob ? t("fetchingCovers") : t("fetchCoversButton")}
+                </Button>
+                {scrapeJob && (
+                  <>
+                    <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
+                    {/* A11y 4.1.3: contador que muda sozinho — anunciado por aria-live. */}
+                    <p className="text-center text-xs text-muted" aria-live="polite">
+                      {scrapeJob.processed}/{scrapeJob.total}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Navegação de topo (Emuladores/Parecer) mudou para a sidebar
+                (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui
+                porque é sub-navegação da própria Biblioteca, não um destino
+                de primeiro nível. */}
+            <Button variant="secondary" onClick={onOpenLibrary}>
+              {t("manageFolders")}
+            </Button>
+          </>
+        }
+      />
 
       {scrapeError && (
         <InlineError className="mb-3">

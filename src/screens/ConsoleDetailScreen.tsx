@@ -716,11 +716,40 @@ export function ConsoleDetailScreen({
         {t("backConsoles")}
       </Button>
 
-      <div className="mt-3 mb-6 border-l-[3px] pl-4" style={{ borderLeftColor: accent }}>
-        <h1 className="text-2xl font-semibold text-ink">{entry.name}</h1>
-        <p className="mt-1 text-sm text-muted">
-          {t("consoleYearShortName", { year: entry.year, shortName: entry.short_name })}
-        </p>
+      {/* Achado do critico-design (2026-09-06): a cor de identidade por
+          console — o ativo de marca mais distintivo do projeto
+          (`consoleColor.ts`, 33 entradas por fabricante) — só aparecia como
+          uma borda de 3px em quatro telas. Esta é a única tela do produto
+          com direito legítimo a uma cor própria dominando o espaço (é a
+          página DESTE console); o gradiente usa o mesmo vocabulário do
+          `AmbientGlow` do shell, só trocando `--accent` por `--console-accent`
+          — vocabulário reaproveitado, não uma linguagem nova. Nenhum asset
+          novo: o "ícone" ao lado do título é a mesma caixa/sigla que
+          `ConsoleIcon` desenha em outras telas, só sem o `<button>` (não há
+          o que abrir clicando no ícone da própria tela que já é dele). */}
+      <div className="relative mt-3 mb-6 overflow-hidden rounded p-5">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `radial-gradient(65% 90% at 12% 25%, color-mix(in srgb, ${accent} 22%, transparent), transparent 70%)`,
+          }}
+        />
+        <div className="relative flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            style={{ borderColor: `${accent}66`, color: accent }}
+            className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded border bg-fill font-pixel text-[11px] leading-none"
+          >
+            {entry.short_name.slice(0, 4).toUpperCase()}
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold text-ink">{entry.name}</h1>
+            <p className="mt-1 text-sm text-muted">
+              {t("consoleYearShortName", { year: entry.year, shortName: entry.short_name })}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* A prontidão abre a tela porque é a resposta à pergunta que trouxe o
