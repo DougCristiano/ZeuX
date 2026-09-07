@@ -170,6 +170,35 @@ antes do build do Tauri. Validado na release v0.1.12 — instaladores e
 **O que quebra se desfizer:** volta a acontecer exatamente este bug — o
 updater relata "já está atualizado" pra sempre, silenciosamente.
 
+### Teste de controle: SVG desenhado do zero, não vendorizado de terceiro
+
+Pedido do Douglas (2026-09-07): toast de conectado/desconectado (referência:
+Steam) e uma tela que mostra o controle e realça ao vivo o que está sendo
+apertado (referência: XOutput). O toast reaproveitou peças que já existiam
+(`useGamepad`, `useToast`/`Toast`) — decisão pequena. A tela de teste exigiu
+escolher entre usar um SVG pronto de terceiro ou desenhar um novo.
+
+Pesquisado antes de decidir: bancos de ícone (freesvg.org, svgrepo, uxwing,
+svgsilh) só tinham silhueta única — sem elemento separado por botão, não dá
+pra realçar individualmente. `controllercons` é webfont de glifo único,
+mesmo problema. O candidato mais próximo do que precisava,
+`KW-M/virtual-gamepad-lib` (MIT, feito exatamente para isto — cada
+botão/analógico como elemento SVG separado), usa os glifos ✕/○/□/△ do
+PlayStation nos botões de face — vocabulário de fabricante, a mesma
+restrição que já tira logo de console do `ConsoleIcon` e o Switch do
+catálogo. Um exemplo minimalista sem símbolo de marca
+(`CodingWith-Adam/gamepad-tester-simple-just-controller`) não declarava
+licença nenhuma no repositório — sem isso, vendorizar é risco legal mesmo
+sendo pouco código.
+
+**Decisão:** desenhar um controle genérico do zero (`ControllerTestScreen.tsx`),
+formas geométricas neutras, cada botão rotulado só pelo índice que a Gamepad
+API reporta (0-16) — nunca A/B/X/Y nem os símbolos do PlayStation. Sem
+dependência nova, sem asset externo a rastrear licença.
+
+**O que quebra se desfizer:** trocar por um asset de terceiro sem repetir
+essa checagem de marca/licença reabre o mesmo risco que motivou a busca.
+
 ---
 
 ## O que fica fora deste log, de propósito
