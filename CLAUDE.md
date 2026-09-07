@@ -15,14 +15,16 @@ Front-end de emulação multiplataforma para desktop, com camada social. O
 diferencial é **eliminar a complexidade de configuração**: o app lê o hardware,
 diz honestamente o que a máquina alcança, e autoconfigura o emulador.
 
-Documentação de referência (leia conforme a tarefa):
+Documentação de referência (leia conforme a tarefa). Reescrita do zero em
+2026-09-07 — o conjunto anterior (arquitetura.md, adapters.md, roadmap.md,
+15 ADRs separadas) foi apagado por ter ficado defasado do código real; este
+é o conjunto atual:
 
-- [`docs/arquitetura.md`](docs/arquitetura.md) — componentes, fluxo de onboarding, decisões
-- [`docs/arquitetura-a-preservar.md`](docs/arquitetura-a-preservar.md) — o que **não** desfazer, e o que quebra se desfizer; orçamento de complexidade (alvo: O(n) ou melhor)
-- [`docs/api.md`](docs/api.md) — todas as rotas HTTP, campos e códigos de erro
-- [`docs/adapters.md`](docs/adapters.md) — como funciona o `Adapter` e como adicionar um emulador
-- [`docs/decisoes/`](docs/decisoes/) — ADRs; leia antes de propor mudar uma decisão
-- [`docs/roadmap.md`](docs/roadmap.md) — backlog e dívida honesta
+- [`docs/visao-do-produto.md`](docs/visao-do-produto.md) — o que o ZeuX é, pra quem, princípios inegociáveis, histórias de uso. A "lei" do produto — nada de código aqui.
+- [`docs/arquitetura-do-codigo.md`](docs/arquitetura-do-codigo.md) — pastas, pacotes, fronteiras de dependência, convenções de código, orçamento de simplicidade.
+- [`docs/api.md`](docs/api.md) — todas as rotas HTTP, agrupadas por domínio, com a tabela de códigos de erro.
+- [`docs/decisoes.md`](docs/decisoes.md) — log cronológico de decisões técnicas não-óbvias: o quê, por quê, o que quebra se desfizer.
+- [`docs/pendencias.md`](docs/pendencias.md) — trabalho planejado mas ainda não implementado (backlog honesto, não aspiracional).
 
 ---
 
@@ -265,7 +267,7 @@ controle e lobby de netplay**. Nunca o jogo.
 
 O Nintendo Switch está **fora do catálogo de propósito** — Yuzu e Ryujinx foram
 descontinuados após ação judicial. Ver
-[ADR 0008](docs/decisoes/0008-excluir-switch-do-catalogo.md).
+[decisoes.md](docs/decisoes.md#nintendo-switch-fora-do-catálogo-de-propósito-não-esquecimento).
 
 ---
 
@@ -278,7 +280,7 @@ descontinuados após ação judicial. Ver
   Ryujinx.
 - ❌ **Não introduza ORM nem uma segunda camada de persistência.** O SQLite
   local já é a persistência oficial desde o
-  [ADR 0011](docs/decisoes/0011-sqlite-local-para-biblioteca.md) (que
+  [decisoes.md](docs/decisoes.md#banco-de-dados-adiado-depois-revertido-para-sqlite-local) (que
   substituiu o 0002, o qual adiava qualquer banco) — `internal/store` abre a
   conexão e aplica migrações `.sql` embutidas, e é por ali que passa dado
   novo que precise sobreviver a um reinício. O que continua fora sem reabrir
@@ -289,7 +291,7 @@ descontinuados após ação judicial. Ver
 - ❌ **Não invente flags de linha de comando** que a documentação do emulador não
   descreve. Uma flag inexistente faz o emulador recusar a abrir. Se a opção não
   cabe, declare em `Command.Unapplied`. Ver
-  [ADR 0006](docs/decisoes/0006-campo-unapplied.md).
+  [decisoes.md](docs/decisoes.md#campo-unapplied-em-vez-de-inventar-flag-de-linha-de-comando).
 - ❌ **Não afirme que as flags dos adapters funcionam.** Elas nunca foram
   validadas contra binários reais. Ao documentar ou comentar, mantenha essa
   ressalva visível.
@@ -297,7 +299,7 @@ descontinuados após ação judicial. Ver
 - ❌ **Não faça `BuildCommand` executar nada** nem tocar o sistema de arquivos
   (com a exceção já existente do RetroArch, que precisa localizar o core).
 - ❌ **Não instale Rust, MSVC Build Tools nem dependências de Node** sem pedir.
-  O adiamento é deliberado ([ADR 0004](docs/decisoes/0004-adiar-rust-e-tauri.md)).
+  O adiamento é deliberado (decisão registrada informalmente; não há mais ADR numerada para isto — perguntar ao Douglas antes de instalar).
 - ❌ **Não presuma que uma funcionalidade do PRD existe.** A maior parte não
   existe. Confira no código antes de afirmar.
 

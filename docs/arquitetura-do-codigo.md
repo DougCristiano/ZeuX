@@ -121,7 +121,18 @@ v0.1.10 também o plugin de auto-update assinado.
   preview (`POST /games/preview`) existir de graça — ela é `BuildCommand`
   sem o `Launch`.
 
-## 6. O que este documento não cobre
+## 6. O critério de desempate: simples e leve
+
+Quando duas soluções resolvem o mesmo problema, ganha a menor. Uma camada de
+abstração a mais, um cache a mais, uma interface "para o futuro" — tudo isso
+é peso, e peso é regressão. **Não introduza abstração para um segundo caso
+que ainda não existe.** Espere o segundo caso aparecer.
+
+O ZeuX roda em um processo Go só (mais a casca Tauri), sem serviço externo
+além do que o próprio usuário conecta (IGDB). Isso é uma qualidade a
+defender, não um estágio a superar rumo a "arquitetura de verdade".
+
+## 7. O que este documento não cobre
 
 - **Por que** cada decisão acima foi tomada daquele jeito e não de outro —
   isso é `decisoes.md`.
