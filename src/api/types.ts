@@ -209,6 +209,14 @@ export type ConsoleEntry = {
   requires_external_file?: boolean;
   /** Pode vir vazia: console do catálogo que nenhum adapter atende ainda. */
   emulators: ConsoleEmulatorOption[];
+  /**
+   * Se `true`, `GET /consoles/{id}/image` devolve a logo oficial do
+   * console (gerada por cmd/generate-console-images, embutida no binário —
+   * ver docs/decisoes.md, "Identidade visual por console"). `false` é o
+   * estado normal antes de rodar o gerador, ou quando o IGDB não tem a
+   * plataforma — a interface cai para `ConsoleIcon` (sigla) nesse caso.
+   */
+  has_image: boolean;
 };
 
 export type EmulatorEntry = {

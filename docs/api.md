@@ -58,7 +58,8 @@ JSON (isso desatualiza rápido e o compilador já garante que bate).
 
 | Rota | Propósito |
 |---|---|
-| `GET /consoles` | Lista os consoles do catálogo embutido — usada pela tela de Consoles como entrada principal. |
+| `GET /consoles` | Lista os consoles do catálogo embutido — usada pela tela de Consoles como entrada principal. Cada entrada traz `has_image` (ver rota abaixo). |
+| `GET /consoles/{id}/image` | Logo oficial do console, embutida no binário (`cmd/generate-console-images`, gerado uma vez — não é scraping em runtime). `404` quando `has_image` da rota acima é `false`; a interface trata isso como estado normal, nunca chama sem checar `has_image` primeiro. Ver `docs/decisoes.md`, "Identidade visual por console". |
 | `GET /consoles/verdicts` | Roda `verdict.Evaluate` sobre o último scan: nível de compatibilidade por console, gargalos nomeados, `precision` (`"completo"` ou `"parcial"`). Sem scan: `400 no_scan_yet`. |
 
 ## 4. Emuladores: descoberta, instalação e cadastro manual

@@ -85,7 +85,7 @@ cmd/zeuxd/           entrypoint do daemon
 internal/api/        rotas HTTP e formato de erro
 internal/consent/    consentimento persistido e versionado
 internal/hardware/   detecção de CPU/RAM (gopsutil) e GPU (um arquivo por SO)
-internal/verdict/    catálogo embutido + motor de parecer
+internal/verdict/    catálogo embutido + motor de parecer + logos de console embutidas
 internal/emulator/   adapters, descoberta de binários, launcher
 internal/install/    instalação de emuladores + download de cores do RetroArch
 internal/library/    catálogo de ROMs do usuário (pastas, jogos, favoritos)
@@ -94,6 +94,10 @@ internal/store/      persistência local (SQLite, ADR 0011): migrações e conex
 cmd/generate-retroarch-manifest/
                      mede URL/tamanho/SHA256 dos cores e escreve o manifesto
                      embutido (ADR 0015, R1). Roda à mão, nunca no build.
+cmd/generate-console-images/
+                     busca no IGDB a logo de cada console e escreve
+                     internal/verdict/data/console-images/. Roda à mão,
+                     nunca no build (ver docs/decisoes.md).
 docs/                esta documentação
 ```
 

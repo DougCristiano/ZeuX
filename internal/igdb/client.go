@@ -264,7 +264,7 @@ func (c *Client) SearchGame(ctx context.Context, title string) (Match, bool, err
 		return Match{}, false, err
 	}
 
-	results, err := c.postApicalypse(ctx, reqURL, body)
+	results, err := postApicalypse[gameResult](ctx, c, reqURL, body)
 	if err != nil {
 		return Match{}, false, err
 	}
@@ -284,12 +284,67 @@ func (c *Client) SearchGame(ctx context.Context, title string) (Match, bool, err
 	return match, true, nil
 }
 
-// postApicalypse envia uma consulta no formato Apicalypse do IGDB e devolve
-// a lista de jogos encontrados. Uma resposta que não é um array JSON válido
-// vira erro explícito, nunca um resultado vazio silencioso — isso
-// esconderia uma credencial errada ou uma mudança na API atrás de "não
-// encontrado".
-func (c *Client) postApicalypse(ctx context.Context, reqURL, body string) ([]gameResult, error) {
+type platformLogoField struct {
+	ImageID string `json:"image_id"`
+}
+
+type platformResult struct {
+	Name         string             `json:"name"`
+	PlatformLogo *platformLogoField `json:"platform_logo"`
+}
+
+// PlatformMatch é o resultado de buscar uma plataforma no IGDB — usado só
+// por cmd/generate-console-images (ferramenta de manutenção que gera as
+// imagens dos consoles uma vez, embutidas no binário; não roda em runtime
+// pelo zeuxd, mesmo padrão de cmd/generate-retroarch-manifest).
+type PlatformMatch struct {
+	Name    string
+	ImageID string
+}
+
+// SearchPlatform procura uma plataforma pelo nome. Nenhum resultado não é
+// erro — mesma regra de SearchGame: quem chama decide o que fazer, nunca
+// inventa uma logo parecida.
+func (c *Client) SearchPlatform(ctx context.Context, name string) (PlatformMatch, bool, error) {
+	if err := c.ensureToken(ctx); err != nil {
+		return PlatformMatch{}, false, err
+	}
+	if err := waitRateLimit(ctx); err != nil {
+		return PlatformMatch{}, false, err
+	}
+
+	body := fmt.Sprintf("search %q; fields name,platform_logo.image_id; limit 1;", name)
+
+	reqURL := igdbAPIBase + "/platforms"
+	if err := checkHost(reqURL); err != nil {
+		return PlatformMatch{}, false, err
+	}
+
+	results, err := postApicalypse[platformResult](ctx, c, reqURL, body)
+	if err != nil {
+		return PlatformMatch{}, false, err
+	}
+	if len(results) == 0 {
+		return PlatformMatch{}, false, nil
+	}
+
+	platform := results[0]
+	match := PlatformMatch{Name: platform.Name}
+	if platform.PlatformLogo != nil {
+		match.ImageID = platform.PlatformLogo.ImageID
+	}
+
+	return match, true, nil
+}
+
+// postApicalypse envia uma consulta no formato Apicalypse do IGDB e decodifica
+// a lista de resultados no tipo T (gameResult para /games, platformResult
+// para /platforms — mesmo mecanismo de autenticação/rate-limit/erro para os
+// dois, só o corpo da resposta muda de forma). Uma resposta que não é um
+// array JSON válido vira erro explícito, nunca um resultado vazio silencioso
+// — isso esconderia uma credencial errada ou uma mudança na API atrás de
+// "não encontrado".
+func postApicalypse[T any](ctx context.Context, c *Client, reqURL, body string) ([]T, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -312,7 +367,7 @@ func (c *Client) postApicalypse(ctx context.Context, reqURL, body string) ([]gam
 		if err := waitRetryAfter(ctx, response); err != nil {
 			return nil, err
 		}
-		return c.postApicalypse(ctx, reqURL, body)
+		return postApicalypse[T](ctx, c, reqURL, body)
 	}
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
 		return nil, fmt.Errorf("o IGDB recusou a credencial informada — confira o client_id/client_secret nas Configurações")
@@ -321,7 +376,7 @@ func (c *Client) postApicalypse(ctx context.Context, reqURL, body string) ([]gam
 		return nil, fmt.Errorf("o IGDB respondeu %s", response.Status)
 	}
 
-	var results []gameResult
+	var results []T
 	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&results); err != nil {
 		return nil, fmt.Errorf("lendo a resposta do IGDB: %w", err)
 	}
@@ -358,6 +413,27 @@ func (c *Client) DownloadCover(ctx context.Context, imageID, destPath string) er
 	}
 
 	reqURL := igdbImageBase + "/t_cover_big/" + imageID + ".jpg"
+	status, err := downloadImage(ctx, reqURL, destPath)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("o servidor de imagens do IGDB respondeu %d", status)
+	}
+	return nil
+}
+
+// DownloadPlatformLogo baixa a logo de uma plataforma (tamanho "logo_med" —
+// o maior disponível para platform_logos na IGDB; capas de jogo usam
+// "cover_big", uma nomenclatura de tamanho diferente porque é um tipo de
+// imagem diferente na API deles) para destPath. Usado só por
+// cmd/generate-console-images.
+func (c *Client) DownloadPlatformLogo(ctx context.Context, imageID, destPath string) error {
+	if err := waitRateLimit(ctx); err != nil {
+		return err
+	}
+
+	reqURL := igdbImageBase + "/t_logo_med/" + imageID + ".png"
 	status, err := downloadImage(ctx, reqURL, destPath)
 	if err != nil {
 		return err

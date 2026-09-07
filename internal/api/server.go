@@ -107,6 +107,12 @@ func (s *Server) Routes() http.Handler {
 	// /consoles/verdicts precisa do scan de hardware, esta só lê o catálogo
 	// embutido e a lista de adapters. Ver handleConsoles.
 	mux.HandleFunc("GET /api/v1/consoles", s.handleConsoles)
+	// Logo oficial do console, embutida no binário (verdict.ConsoleImage) —
+	// nunca a mesma pasta de /covers/ (aquela é capa de JOGO, escrita em
+	// disco em runtime pelo scraper do IGDB; esta é gerada uma vez por
+	// cmd/generate-console-images e viaja dentro do executável). Ver
+	// docs/decisoes.md, "Identidade visual por console".
+	mux.HandleFunc("GET /api/v1/consoles/{id}/image", s.handleConsoleImage)
 	mux.HandleFunc("GET /api/v1/emulators", s.handleEmulators)
 	// Rota própria em vez de embutir em /emulators: cores só existem para o
 	// RetroArch (nenhum outro adapter carrega bibliotecas plugáveis), e
@@ -268,6 +274,13 @@ type consoleEntry struct {
 	// o atenda é um estado real e honesto ("o ZeuX ainda não sabe rodar
 	// isto"), não um erro a esconder.
 	Emulators []emulator.ConsoleOption `json:"emulators"`
+
+	// HasImage diz se GET /consoles/{id}/image tem o que servir — logo
+	// oficial gerada por cmd/generate-console-images (ver
+	// docs/decisoes.md, "Identidade visual por console"). A interface
+	// decide por conta própria cair para o ícone de sigla (ConsoleIcon)
+	// quando isto vier falso, sem precisar tentar a imagem e tratar 404.
+	HasImage bool `json:"has_image"`
 }
 
 // handleConsoles lista o catálogo de consoles com as formas de rodar cada um.
@@ -291,10 +304,34 @@ func (s *Server) handleConsoles(w http.ResponseWriter, _ *http.Request) {
 			Year:                 console.Year,
 			RequiresExternalFile: console.RequiresExternalFile,
 			Emulators:            s.emulators.OptionsForConsole(console.ID),
+			HasImage:             verdict.HasConsoleImage(console.ID),
 		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"consoles": consoles})
+}
+
+// handleConsoleImage serve a logo embutida de um console. 404 é o estado
+// esperado (nem todo console tem uma — GET /consoles já anuncia isso via
+// has_image, então a interface só chama esta rota quando espera 200), não
+// um erro de servidor: nada aqui lê disco nem rede, só o binário já
+// compilado.
+func (s *Server) handleConsoleImage(w http.ResponseWriter, r *http.Request) {
+	data, ok := verdict.ConsoleImage(r.PathValue("id"))
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", "Este console não tem imagem gerada.")
+		return
+	}
+
+	// Imutável: o binário só muda numa atualização do app, e uma atualização
+	// já é uma URL diferente do ponto de vista de um cache HTTP normal só
+	// pela troca de conteúdo — mas como este servidor é sempre localhost,
+	// sem CDN entre o pedido e a resposta, o cache aqui só evita reservir a
+	// mesma imagem repetidas vezes dentro da MESMA sessão do app.
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
 }
 
 // emulatorEntry é um emulator.Status mais o que a camada de API sabe e o

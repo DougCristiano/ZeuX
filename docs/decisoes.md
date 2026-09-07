@@ -91,12 +91,24 @@ e mantido, um console no catálogo sem adapter real seria promessa vazia.
 **O que quebra se desfizer:** reabrir essa porta significa reavaliar risco
 legal, não só "adicionar um adapter".
 
-### Identidade visual por console: sigla estilizada, não logo de fabricante
+### Identidade visual por console: sigla estilizada — revertido em 2026-09-07
 
-`ConsoleIcon` (sigla + gradiente de cor) é a solução definitiva, não um
-placeholder esperando a logo real de cada fabricante. Mesmo raciocínio do
-Switch: risco de marca registrada de terceiro, decisão de não usar, não
-adiamento.
+Até 2026-09-07, `ConsoleIcon` (sigla + gradiente de cor) era tratado como
+solução definitiva, não placeholder — mesmo raciocínio do Switch: risco de
+marca registrada de terceiro, decisão de não usar, não adiamento.
+
+**Revertido nesta data, decisão explícita do Douglas**, ciente do risco de
+marca (perguntado e confirmado antes de implementar): a tela de Consoles
+passa a mostrar a imagem real de cada console — capa/embalagem oficial,
+logo incluído — em vez da sigla genérica. `ConsoleIcon` não foi removido;
+continua como reserva para quando a imagem real não existir em cache (sem
+IGDB configurado, plataforma sem asset no IGDB, falha de rede).
+
+**Risco aceito, não eliminado:** usar logo/embalagem oficial de
+Sony/Nintendo/Sega/etc. é uso de marca registrada de terceiro. O Douglas
+decidiu seguir mesmo assim. Se isso precisar ser revisto no futuro (ex.:
+notificação de remoção, mudança de escopo do produto), a saída existente é
+`ConsoleIcon`, que nunca foi apagado.
 
 ### Configuração de emulador dentro do ZeuX, não overlay in-game
 

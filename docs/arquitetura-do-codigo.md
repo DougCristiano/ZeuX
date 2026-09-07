@@ -38,7 +38,7 @@ não é dona de nenhuma regra; ela só chama a API e mostra o que volta.
 | `internal/api` | Roteamento HTTP (`http.ServeMux` do Go 1.22+), decodificação de corpo, formato de erro estável (`code` + `message`), CORS de lista fechada. Todo handler mora em `server.go`. | Não — delega para os pacotes abaixo. |
 | `internal/consent` | Consentimento do usuário para ler hardware: registro persistido e **versionado** por política (`PolicyVersion`). | `consent.json` |
 | `internal/hardware` | Detecção de CPU/RAM (via `gopsutil`, multiplataforma de graça) e GPU/monitor (um arquivo por SO, com build tags — `gpu_windows.go`, `gpu_linux.go`, `gpu_darwin.go`, e o par `display_*.go`). | Não — só lê o sistema. |
-| `internal/verdict` | O catálogo de consoles embutido (`go:embed data/consoles.json`) e o motor que cruza `HardwareInfo` contra os requisitos de cada patamar, produzindo o parecer (`Report`). | Não — dado embutido no binário, é leitura. |
+| `internal/verdict` | O catálogo de consoles embutido (`go:embed data/consoles.json`) e o motor que cruza `HardwareInfo` contra os requisitos de cada patamar, produzindo o parecer (`Report`). Também embute a logo oficial de cada console (`go:embed data/console-images/*`, `images.go`) — gerada por `cmd/generate-console-images`, servida via `GET /consoles/{id}/image`. | Não — tudo embutido no binário, é leitura. |
 | `internal/emulator` | Os *adapters* de emulador (contrato `Adapter`), descoberta de binário no disco, montagem de linha de comando (`BuildCommand`), lançamento de processo (`Launcher`), sessões, perfis de controle, backup/restauração de config de emulador. É o pacote mais grosso do repositório — concentra tudo que fala com o mundo externo (emuladores). | `custom_emulators.json`, sessões no SQLite, configs de emulador que o ZeuX escreve. |
 | `internal/install` | Instalação 1-click: manifesto de fontes (`data/sources.json`), download verificado por hash, extração, promoção atômica, supressão do assistente de primeira execução. Também baixa cores do RetroArch sob demanda pelo mesmo mecanismo de job. | Binários de emulador, dentro da raiz gerenciada (`ManagedRoot()`, em `internal/emulator/discovery.go`). |
 | `internal/igdb` | Busca de capa de jogo no IGDB. Credencial é **do próprio usuário** (nunca uma chave do ZeuX compartilhada — evita estourar cota de todo mundo de uma vez). | Credencial local, arquivo de capa em cache. |
@@ -82,6 +82,12 @@ não do adapter.
   `internal/install/data/retroarch_cores_manifest.json`. Precisa rodar à mão
   numa máquina com acesso à internet quando o manifesto ficar obsoleto
   (hash mismatch é o sintoma — o buildbot reconstrói `latest` periodicamente).
+- **`cmd/generate-console-images`** — mesma natureza (ferramenta de
+  manutenção, roda à mão). Busca no IGDB a logo oficial de cada console do
+  catálogo e escreve `internal/verdict/data/console-images/<id>.png`, que
+  `internal/verdict/images.go` embute no binário. Precisa de credencial IGDB
+  (`-client-id`/`-client-secret`) e rede real. Ver `docs/decisoes.md`,
+  "Identidade visual por console".
 
 ## 4. `src/` — a interface
 

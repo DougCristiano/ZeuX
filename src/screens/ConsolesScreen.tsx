@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, ApiError } from "../api";
+import { api, ApiError, consoleImageURL } from "../api";
 import type { ConsoleEntry, EmulatorEntry, LibraryFolder, Report, RetroArchCoreStatus } from "../api/types";
 import {
   Button,
@@ -54,6 +54,15 @@ function ConsoleTile({
 }) {
   const accent = consoleAccentColor(entry.console_id);
   const ready = readiness.step === "pronto";
+  // Achado do Douglas (2026-09-07): a imagem real do console, quando o
+  // gerador já a trouxe (ver docs/decisoes.md, "Identidade visual por
+  // console" — reversão explícita, risco de marca aceito). `has_image`
+  // falso é o estado padrão até alguém rodar cmd/generate-console-images;
+  // `imageFailed` cobre o caso raro do arquivo embutido existir mas o
+  // <img> falhar em runtime — os dois caem no mesmo `ConsoleIcon` de
+  // sempre, nunca um espaço quebrado.
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = entry.has_image && !imageFailed;
 
   return (
     <button
@@ -64,18 +73,33 @@ function ConsoleTile({
     >
       <div
         className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border font-pixel text-[11px] leading-none transition-[filter] group-hover:brightness-125"
-        style={{ borderColor: ready ? accent : `${accent}66` }}
+        style={{ borderColor: ready ? accent : `${accent}66`, backgroundColor: showImage ? "var(--fill)" : undefined }}
       >
-        <div
-          aria-hidden="true"
-          className="absolute inset-0"
-          style={{
-            background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, ${accent} ${ready ? 40 : 20}%, transparent), transparent 70%)`,
-          }}
-        />
-        <span className="relative" style={{ color: accent }}>
-          {consoleIconLabel(entry.console_id, entry.short_name)}
-        </span>
+        {showImage ? (
+          <img
+            src={consoleImageURL(entry.console_id)}
+            alt=""
+            // Decorativo: o nome do console já está no `title` do botão e
+            // no texto abaixo do ícone — um alt redundante duplicaria a
+            // mesma informação pro leitor de tela.
+            aria-hidden="true"
+            className="relative h-10 w-10 object-contain"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <>
+            <div
+              aria-hidden="true"
+              className="absolute inset-0"
+              style={{
+                background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, ${accent} ${ready ? 40 : 20}%, transparent), transparent 70%)`,
+              }}
+            />
+            <span className="relative" style={{ color: accent }}>
+              {consoleIconLabel(entry.console_id, entry.short_name)}
+            </span>
+          </>
+        )}
         {/* O único sinal que a grade dá antes do clique: já dá pra jogar,
             ou não. O que falta (emulador, core, BIOS, pasta) só aparece
             depois, no detalhe — é lá que vale a pena nomear a peça exata

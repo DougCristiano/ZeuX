@@ -47,6 +47,13 @@ export function coverImageURL(coverUrl: string | undefined): string | undefined 
   return coverUrl ? `${API_ORIGIN}${coverUrl}` : undefined;
 }
 
+// Mesmo motivo de coverImageURL acima: a rota é relativa, precisa da origem
+// do zeuxd. Só monta a URL quando `has_image` já confirmou que existe algo
+// pra buscar — quem chama nunca precisa tratar 404 no <img>.
+export function consoleImageURL(consoleId: string): string {
+  return `${API_ORIGIN}/api/v1/consoles/${encodeURIComponent(consoleId)}/image`;
+}
+
 /**
  * Erro de API com o `code` estável do servidor. `message` já vem em
  * português, pronta para ser exibida ao usuário exatamente como veio — regra
