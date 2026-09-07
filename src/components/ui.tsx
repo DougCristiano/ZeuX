@@ -1152,13 +1152,19 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
 // Corrigido aqui, não em `short_name` (usado como texto **completo** em
 // badge/chip por toda a biblioteca) — trocar `short_name` pra abreviar
 // resolveria a colisão do ícone mas quebraria o texto legível nas outras
-// telas. Mapa pequeno, só pros 4 casos que colidem de verdade; o resto
-// continua caindo no `slice(0, 4)` de sempre.
+// telas. Mapa pequeno, pros casos que colidem de verdade ou que o
+// `slice(0, 4)` deixa ambíguo sem colidir com ninguém; o resto continua
+// caindo no `slice(0, 4)` de sempre.
 const ICON_LABEL_OVERRIDES: Readonly<Record<string, string>> = {
   gb: "GB", // short_name é "Game Boy" por inconsistência com gba/gbc (já abreviados) — "GB" também resolve isso
   gamegear: "GG", // abreviação comum em comunidade retro
   gamecube: "GC", // idem
   xbox360: "X360", // `xbox` sozinho continua "XBOX" (slice normal, sem entrada aqui)
+  // Sem override, "Sega CD".slice(0, 4) daria "SEGA" — não colide com
+  // ninguém, mas parece sigla genérica da Sega (poderia ser Master
+  // System, 32X, Saturn). "SCD" é a abreviação usada pela própria
+  // comunidade retro para esse console, sem PNG de logo do IGDB.
+  segacd: "SCD",
 };
 
 /**

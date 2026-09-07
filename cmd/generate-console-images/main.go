@@ -72,10 +72,15 @@ func main() {
 			}
 		}
 
+		searchName := console.Name
+		if alt, ok := igdbNameOverrides[console.ID]; ok {
+			searchName = alt
+		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-		if err := fetchConsoleImage(ctx, client, console.Name, dest); err != nil {
+		if err := fetchConsoleImage(ctx, client, searchName, dest); err != nil {
 			cancel()
-			fmt.Fprintf(os.Stderr, "%s (%q): %v\n", console.ID, console.Name, err)
+			fmt.Fprintf(os.Stderr, "%s (%q): %v\n", console.ID, searchName, err)
 			failed = append(failed, console.ID)
 			continue
 		}
@@ -90,6 +95,26 @@ func main() {
 			strings.Join(failed, ", "))
 		fmt.Println("não é erro fatal — esses consoles continuam mostrando o ícone de sigla na interface.")
 	}
+}
+
+// igdbNameOverrides existe porque consoles.json usa nomes em português (ou
+// com apelidos como "Mega Drive / Genesis") pensados para a interface, e a
+// busca do IGDB é por nome de plataforma cadastrado lá, em inglês. Sem isto,
+// a busca dá "não encontrado" mesmo quando a plataforma existe no IGDB —
+// mapeamento feito à mão conferindo o nome oficial em igdb.com/platforms.
+var igdbNameOverrides = map[string]string{
+	"arcade":       "Arcade",
+	"mastersystem": "Sega Master System/Mark III",
+	"pcengine":     "TurboGrafx-16/PC Engine",
+	"megadrive":    "Sega Mega Drive/Genesis",
+	"ps1":          "PlayStation",
+	"virtualboy":   "Virtual Boy",
+	"dreamcast":    "Dreamcast",
+	"wonderswan":   "WonderSwan",
+	"xbox":         "Xbox",
+	"xbox360":      "Xbox 360",
+	"wii":          "Wii",
+	"wiiu":         "Wii U",
 }
 
 // fetchConsoleImage busca a plataforma pelo nome e baixa a logo, se existir.
