@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
-import { AmbientGlow } from "./components/ui";
+import { AmbientGlow, Toast } from "./components/ui";
+import { useGamepad } from "./hooks/useGamepad";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
+import { useToast } from "./hooks/useToast";
 import { useT } from "./i18n/i18n";
 import type { LibraryGame } from "./api/types";
 import { dict } from "./App.i18n";
@@ -71,6 +73,29 @@ function App() {
   useGamepadNavigation();
 
   const t = useT(dict);
+
+  // Toast de conectado/desconectado (pedido do Douglas, 2026-09-07,
+  // referência: o toggle da Steam quando um controle é plugado). `useGamepad`
+  // já existia (Q4) e só reage a `gamepadconnected`/`gamepaddisconnected` —
+  // aqui só falta comparar com o estado anterior pra saber qual toast mostrar.
+  // Um lugar só, no shell do app, não por tela — igual `useGamepadNavigation`
+  // acima: o controle pode ser plugado em qualquer fase, não só dentro do
+  // app pós-onboarding.
+  const gamepad = useGamepad();
+  const { toastMessage: gamepadToast, showToast: showGamepadToast } = useToast();
+  const wasGamepadConnected = useRef(false);
+  useEffect(() => {
+    if (gamepad.connected && !wasGamepadConnected.current) {
+      showGamepadToast(t("gamepadConnected", { name: gamepad.name ?? "" }));
+    } else if (!gamepad.connected && wasGamepadConnected.current) {
+      showGamepadToast(t("gamepadDisconnected"));
+    }
+    wasGamepadConnected.current = gamepad.connected;
+    // Um controle já plugado antes de abrir o ZeuX também dispara o toast de
+    // "conectado" no primeiro render (wasGamepadConnected começa false) — de
+    // propósito: é a mesma informação que a Steam mostra ao abrir com o
+    // controle já ligado, não um bug de disparo duplicado.
+  }, [gamepad.connected, gamepad.name, showGamepadToast, t]);
 
   const [phase, setPhase] = useState<Phase>("checking-port");
 
@@ -486,11 +511,17 @@ function App() {
         <main ref={mainRef} className="flex-1 overflow-y-auto">
           {screen}
         </main>
+        {gamepadToast && <Toast message={gamepadToast} />}
       </div>
     );
   }
 
-  return screen;
+  return (
+    <>
+      {screen}
+      {gamepadToast && <Toast message={gamepadToast} />}
+    </>
+  );
 }
 
 // A11y 2.4.2: título de janela por fase, em pt-BR. Fases sem entrada (as de

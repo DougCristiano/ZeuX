@@ -26,4 +26,12 @@ export const dict = {
     "pt-BR": "Não foi possível registrar o consentimento.",
     en: "Could not register consent.",
   },
+  gamepadConnected: {
+    "pt-BR": "Controle conectado: {{name}}",
+    en: "Controller connected: {{name}}",
+  },
+  gamepadDisconnected: {
+    "pt-BR": "Controle desconectado",
+    en: "Controller disconnected",
+  },
 } satisfies Dict;
