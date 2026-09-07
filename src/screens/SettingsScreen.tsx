@@ -3,11 +3,12 @@ import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
 import { api, ApiError } from "../api";
-import type { SystemInfo } from "../api/types";
+import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
 import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
+import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
 
 // `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
@@ -55,6 +56,22 @@ export function SettingsScreen() {
   const [pathError, setPathError] = useState<string | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
+  // Achado do critico-layout-biblioteca (2026-09-06): a única forma de
+  // chegar no mapeamento de controle era sidebar → Consoles → card do
+  // emulador → um botão que só existe se o emulador estiver instalado E for
+  // bindable — sem atalho nenhum em Configurações. Esta seção reaproveita o
+  // mesmo `EmulatorBindingsPanel` que `ConsoleDetailScreen` já usa, só que
+  // listado por emulador em vez de por console, para quem procura direto
+  // aqui achar de primeira.
+  const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
+  const [expandedAdapterId, setExpandedAdapterId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .getEmulators()
+      .then((res) => setEmulators(res.emulators))
+      .catch(() => setEmulators([]));
+  }, []);
 
   useEffect(() => {
     api
@@ -247,6 +264,43 @@ export function SettingsScreen() {
             </Button>
           )}
         </div>
+      </Card>
+
+      <Card className="mb-6">
+        <h2 className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("controllersHeading")}</h2>
+        <p className="mb-4 text-sm text-muted">{t("controllersDescription")}</p>
+
+        {emulators === null && <p className="text-sm text-muted">{t("loadingEmulatorsForControllers")}</p>}
+
+        {emulators !== null &&
+          (() => {
+            const bindable = emulators.filter((e) => e.installed && e.bindable);
+            if (bindable.length === 0) {
+              return <p className="text-sm text-muted">{t("noBindableEmulators")}</p>;
+            }
+            return (
+              <div className="flex flex-col gap-3">
+                {bindable.map((emulator) => (
+                  <div key={emulator.adapter_id}>
+                    <Button
+                      variant="secondary"
+                      className="w-fit"
+                      onClick={() =>
+                        setExpandedAdapterId((id) => (id === emulator.adapter_id ? null : emulator.adapter_id))
+                      }
+                    >
+                      {emulator.name} · {expandedAdapterId === emulator.adapter_id ? t("hideController") : t("configureController")}
+                    </Button>
+                    {expandedAdapterId === emulator.adapter_id && (
+                      <div className="mt-3">
+                        <EmulatorBindingsPanel adapterId={emulator.adapter_id} adapterName={emulator.name} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
       </Card>
 
       <Card className="mb-6">

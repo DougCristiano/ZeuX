@@ -489,7 +489,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
   consoles: "Consoles",
   "console-detail": "Detalhe do console",
   emulators: "Emuladores",
-  library: "Gerenciar pastas",
+  library: "Pastas de jogos",
   games: "Jogos do console",
   settings: "Configurações",
 };

@@ -92,9 +92,15 @@ export const dict = {
     "pt-BR": "Voltar",
     en: "Back",
   },
+  // Renomeado em 2026-09-06 (achado do critico-layout-biblioteca): esta
+  // tela e o destino "Biblioteca" da sidebar (que leva para
+  // AllGamesScreen) disputavam o mesmo nome — quem clicava em "Biblioteca"
+  // esperando pastas caía na grade de jogos, e vice-versa. "Pastas de
+  // jogos" descreve o que a tela faz e não colide com mais nada na
+  // navegação.
   library: {
-    "pt-BR": "Biblioteca",
-    en: "Library",
+    "pt-BR": "Pastas de jogos",
+    en: "Game folders",
   },
   seeFolderNamesAccepted: {
     "pt-BR": "Ver nomes de pasta aceitos",

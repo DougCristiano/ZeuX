@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "zeuxd",
+      "runtimeExecutable": "C:\\Users\\doufl\\AppData\\Local\\Microsoft\\WinGet\\Packages\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\mise\\bin\\mise.exe",
+      "runtimeArgs": ["exec", "--", "go", "run", "./cmd/zeuxd"],
+      "port": 7777
+    },
+    {
+      "name": "vite",
+      "runtimeExecutable": "C:\\Users\\doufl\\AppData\\Local\\Microsoft\\WinGet\\Packages\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\mise\\bin\\mise.exe",
+      "runtimeArgs": ["exec", "--", "npm", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

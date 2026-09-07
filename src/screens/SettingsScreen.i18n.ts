@@ -32,6 +32,20 @@ export const dict = {
   locateInstallError: { "pt-BR": "Não foi possível localizar a pasta de instalação.", en: "Could not locate installation folder." },
   openInstallFolder: { "pt-BR": "Abrir pasta de instalação", en: "Open installation folder" },
 
+  // Controllers section
+  controllersHeading: { "pt-BR": "Controles", en: "Controllers" },
+  controllersDescription: {
+    "pt-BR": "Escolha o perfil de controle e mapeie botões para cada emulador que suporta isso. Sem emuladores instalados que suportem mapeamento, esta lista fica vazia.",
+    en: "Choose the controller profile and map buttons for each emulator that supports it. With no installed emulator that supports mapping, this list stays empty.",
+  },
+  loadingEmulatorsForControllers: { "pt-BR": "Carregando emuladores…", en: "Loading emulators…" },
+  noBindableEmulators: {
+    "pt-BR": "Nenhum emulador instalado suporta mapeamento de controle ainda (hoje: PCSX2 e RetroArch).",
+    en: "No installed emulator supports controller mapping yet (currently: PCSX2 and RetroArch).",
+  },
+  configureController: { "pt-BR": "Configurar controle", en: "Configure controller" },
+  hideController: { "pt-BR": "Ocultar", en: "Hide" },
+
   // Uninstall section
   uninstallHeading: { "pt-BR": "Desinstalar o ZeuX", en: "Uninstall ZeuX" },
   uninstallWindowsDescription: {
