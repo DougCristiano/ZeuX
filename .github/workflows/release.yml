@@ -94,23 +94,28 @@ jobs:
           RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
         run: echo "release_id=$(gh api repos/${{ github.repository }}/releases/tags/$RELEASE_TAG --jq .id)" >> "$GITHUB_OUTPUT"
 
-  # Sem auto-updater (2026-08-17: decisão explícita do Douglas de adiar —
-  # exigiria gerar e guardar uma chave de assinatura e publicar um manifesto
-  # de atualização a cada release, escopo de infraestrutura que ainda não
-  # foi aberto). Até lá, "atualizar" é baixar o instalador de novo e rodar
-  # por cima — o que só atualiza no lugar (sem duplicar a instalação nem
-  # perder configuração) porque `identifier`/`productName` em
-  # tauri.conf.json nunca mudam entre versões: o NSIS os usa para registrar
-  # a instalação em HKCU\...\Uninstall, e detecta/reaproveita esse registro
-  # ao rodar um instalador mais novo. `nsis.installMode: "currentUser"`
-  # (tauri.conf.json) fixa esse comportamento (era o padrão implícito;
-  # deixado explícito para não depender de um valor-padrão que pode mudar
-  # numa versão futura do Tauri) — instala sempre no mesmo lugar fixo
-  # (`%LocalAppData%\Programs\zeux`), sem pedir administrador. Isso só
-  # funciona se quem instalar aceitar o caminho padrão do assistente: quem
-  # navegar manualmente para uma pasta diferente a cada instalador (ex.:
-  # "Área de Trabalho\Nova pasta") cria uma instalação paralela, não
-  # atualiza a existente.
+  # Auto-updater desde 2026-09-06 (feat(updater), v0.1.10): a tela de
+  # Configurações checa e instala atualização sem precisar baixar o
+  # instalador na mão. Continua verdade que a instalação em si sempre cai no
+  # mesmo lugar fixo (`%LocalAppData%\Programs\zeux`, sem admin) porque
+  # `identifier`/`productName` em tauri.conf.json nunca mudam entre versões —
+  # o NSIS usa isso para reconhecer e atualizar no lugar via
+  # HKCU\...\Uninstall (`nsis.installMode: "currentUser"` fixa esse
+  # comportamento). Isso só vale para quem aceita o caminho padrão do
+  # instalador: navegar para uma pasta diferente a cada instalação (ex.:
+  # "Área de Trabalho\Nova pasta") cria instalação paralela, não atualiza a
+  # existente — e nesse caso nem o auto-updater ajuda.
+  #
+  # Achado real (2026-09-07, relato do Douglas): o auto-updater nunca via
+  # atualização disponível, mesmo com releases mais novas publicadas.
+  # package.json e src-tauri/tauri.conf.json tinham "version" travado em
+  # "0.1.0" desde sempre — só a tag do git avançava a cada release. O
+  # latest.json que o plugin de updater consulta é gerado a partir desse
+  # "version" do build, não da tag; com os dois lados (app instalado e
+  # manifesto) sempre em "0.1.0", a comparação de versão do updater nunca via
+  # diferença. O passo "Sincronizar versão do build com a tag" em cada job
+  # de build escreve a versão real (extraída da tag) nos dois arquivos antes
+  # do build do Tauri — ver scripts/sync-version.mjs.
   build-windows:
     name: Windows 10/11 - instalador
     needs: create-release
@@ -130,6 +135,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24.18.1"
+
+      - name: Sincronizar versão do build com a tag (auto-updater)
+        # package.json e tauri.conf.json ficavam travados em "0.1.0" — ver
+        # comentário em scripts/sync-version.mjs para o bug que isso causava
+        # no auto-updater.
+        env:
+          RELEASE_TAG: ${{ needs.create-release.outputs.tag }}
+        run: node .github/workflows/scripts/sync-version.mjs
 
       - name: Instalar Rust
         uses: dtolnay/rust-toolchain@stable
@@ -170,6 +183,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24.18.1"
+
+      - name: Sincronizar versão do build com a tag (auto-updater)
+        # package.json e tauri.conf.json ficavam travados em "0.1.0" — ver
+        # comentário em scripts/sync-version.mjs para o bug que isso causava
+        # no auto-updater.
+        env:
+          RELEASE_TAG: ${{ needs.create-release.outputs.tag }}
+        run: node .github/workflows/scripts/sync-version.mjs
 
       - name: Instalar Rust
         uses: dtolnay/rust-toolchain@stable
@@ -228,6 +249,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24.18.1"
+
+      - name: Sincronizar versão do build com a tag (auto-updater)
+        # package.json e tauri.conf.json ficavam travados em "0.1.0" — ver
+        # comentário em scripts/sync-version.mjs para o bug que isso causava
+        # no auto-updater.
+        env:
+          RELEASE_TAG: ${{ needs.create-release.outputs.tag }}
+        run: node .github/workflows/scripts/sync-version.mjs
 
       - name: Instalar Rust
         uses: dtolnay/rust-toolchain@stable
