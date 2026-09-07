@@ -322,19 +322,21 @@ export function Badge({
 export function Callout({
   label,
   tone = "neutral",
+  className = "",
   children,
 }: {
   label: string;
   tone?: "neutral" | "amber";
+  className?: string;
   children: ReactNode;
 }) {
   return (
     <div
-      className={
+      className={`${
         tone === "amber"
           ? "rounded-lg border border-amber-line bg-amber-bg p-3"
           : "rounded-lg border border-dashed border-line-strong p-3"
-      }
+      } ${className}`}
     >
       <p className="mb-1 font-mono text-xs tracking-wide text-muted uppercase">{label}</p>
       <div className="text-base text-ink">{children}</div>
@@ -1159,6 +1161,18 @@ const ICON_LABEL_OVERRIDES: Readonly<Record<string, string>> = {
   xbox360: "X360", // `xbox` sozinho continua "XBOX" (slice normal, sem entrada aqui)
 };
 
+/**
+ * Resolve a sigla que os ícones de console mostram — extraído de dentro de
+ * `ConsoleIcon` (2026-09-07) para `ConsolesScreen` poder desenhar seu
+ * próprio tile clicável (não pode aninhar o `<button>` de `ConsoleIcon`
+ * dentro de outro `<button>`, HTML inválido) sem duplicar o mapa de
+ * exceções. Mesma regra de sempre: overrides pros 4 casos que colidem de
+ * verdade, `slice(0, 4)` pro resto.
+ */
+export function consoleIconLabel(consoleId: string, label: string): string {
+  return (ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase();
+}
+
 export function ConsoleIcon({ label, consoleId, onClick }: { label: string; consoleId: string; onClick: () => void }) {
   const accent = consoleAccentColor(consoleId);
   return (
@@ -1184,7 +1198,7 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       // label futuro ainda maior corta em vez de vazar.
       className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
-      {(ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase()}
+      {consoleIconLabel(consoleId, label)}
     </button>
   );
 }

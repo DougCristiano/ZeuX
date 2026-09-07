@@ -2,13 +2,6 @@ import type { Dict } from "../i18n/i18n";
 
 export const dict = {
   specifications: { "pt-BR": "Especificações", en: "Specifications" },
-  // Achado do critico-design (2026-09-06): a tela não tinha ScreenHeader —
-  // o <h1> "Especificações" morava dentro da coluna esquerda, e a coluna
-  // abria com um parágrafo de ressalva antes de qualquer título. `thisMachine`
-  // é o novo SectionHeading da coluna, "Especificações" sobe pro cabeçalho
-  // de tela cheia.
-  thisMachine: { "pt-BR": "Esta máquina", en: "This machine" },
-  estimateLabel: { "pt-BR": "estimativa", en: "estimate" },
   system: { "pt-BR": "Sistema", en: "System" },
   processor: { "pt-BR": "Processador", en: "Processor" },
   memory: { "pt-BR": "Memória", en: "Memory" },
@@ -48,23 +41,9 @@ export const dict = {
     "pt-BR": "Avisos da leitura de hardware",
     en: "Hardware scan warnings",
   },
-  thresholdsNotCalibrated: {
-    "pt-BR": "Os patamares abaixo são uma estimativa: os requisitos do catálogo ainda não foram medidos em hardware real.",
-    en: "The thresholds below are an estimate: the catalog requirements have not yet been measured on real hardware.",
-  },
   partialPrecision: {
     "pt-BR": "Nem tudo pôde ser lido desta máquina — o parecer abaixo é uma estimativa.",
     en: "Not everything could be read from this machine — the verdict below is an estimate.",
-  },
-  searchConsole: { "pt-BR": "Buscar console", en: "Search console" },
-  searchConsolePlaceholder: {
-    "pt-BR": "Buscar console…",
-    en: "Search console…",
-  },
-  filterAll: { "pt-BR": "TODOS", en: "ALL" },
-  noConsolesFound: {
-    "pt-BR": "Nenhum console encontrado para \"{{search}}\".",
-    en: "No consoles found for \"{{search}}\".",
   },
   loadingHardware: { "pt-BR": "Lendo hardware…", en: "Loading hardware…" },
   errorLoadingHardware: {

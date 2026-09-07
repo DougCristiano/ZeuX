@@ -1,26 +1,17 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
-import type { ConsoleVerdict, HardwareInfo, Report } from "../api/types";
+import type { HardwareInfo, Report } from "../api/types";
 import {
   Callout,
   Card,
   CardSkeleton,
-  ConsoleVerdictCard,
-  FOCUS_RING,
   InlineError,
-  inputClass,
-  useLevelLabel,
-  Pagination,
   PartialNotice,
   ScreenContainer,
   ScreenHeader,
-  SectionHeading,
 } from "../components/ui";
 import { useT } from "../i18n/i18n";
 import { dict } from "./VerdictScreen.i18n";
-
-const LEVEL_ORDER: ConsoleVerdict["level"][] = ["otimo", "bom", "limitado", "improvavel"];
-const PAGE_SIZE = 9;
 
 function formatBytes(bytes: number, unknownText: string): string {
   if (bytes <= 0) return unknownText;
@@ -29,10 +20,20 @@ function formatBytes(bytes: number, unknownText: string): string {
 }
 
 /**
- * Coluna esquerda da tela (2026-08-04, a pedido do Douglas): detalhe cru do
- * hardware, vindo de `GET /hardware` — dado que já existia na API
- * (`HardwareInfo`) mas nunca era mostrado; `report.summary` só tinha 4
- * strings pré-formatadas. Busca separada porque `Report` não carrega isso.
+ * Detalhe cru do hardware (2026-08-04, a pedido do Douglas), vindo de
+ * `GET /hardware` — dado que já existia na API (`HardwareInfo`) mas nunca
+ * era mostrado; `report.summary` só tinha 4 strings pré-formatadas. Busca
+ * separada porque `Report` não carrega isso.
+ *
+ * Achado do Douglas (2026-09-07): até esta sessão isto vivia numa coluna
+ * lateral de até 340px, ao lado da grade de parecer por console — 5-6 cards
+ * empilhados numa coluna estreita ficavam desproporcionalmente mais altos
+ * que a grade ao lado, com a paginação dela sobrando solta no meio do
+ * desequilíbrio. A grade de parecer saiu da tela (documentação completa em
+ * `VerdictScreen`, abaixo); sem ela, este painel virou o conteúdo inteiro da
+ * página e ganhou uma grade própria (`sm:grid-cols-2 lg:grid-cols-3`) em vez
+ * da pilha de uma coluna só — a largura cheia que sobrou é isso que resolve
+ * o desequilíbrio, não um layout novo.
  */
 function SpecsPanel() {
   const t = useT(dict);
@@ -60,7 +61,7 @@ function SpecsPanel() {
     // Processador, Memória, Placa de vídeo), então o skeleton na mesma
     // forma evita o conteúdo saltar quando os dados chegam.
     return (
-      <div role="status" aria-live="polite" className="flex flex-col gap-4">
+      <div role="status" aria-live="polite" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <span className="sr-only">{t("loadingHardware")}</span>
         <CardSkeleton className="h-32" />
         <CardSkeleton className="h-44" />
@@ -71,7 +72,7 @@ function SpecsPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <Card filled>
         <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("system")}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
@@ -194,7 +195,10 @@ function SpecsPanel() {
       )}
 
       {hardware.warnings.length > 0 && (
-        <Callout label={t("hardwareWarnings")}>
+        // `sm:col-span-2 lg:col-span-3`: um aviso de texto solto não deveria
+        // ficar espremido numa célula de card — ocupa a largura cheia da
+        // grade, como qualquer aviso de tela inteira do resto do app.
+        <Callout label={t("hardwareWarnings")} className="sm:col-span-2 lg:col-span-3">
           <ul className="list-disc space-y-1 pl-4">
             {hardware.warnings.map((line) => (
               <li key={line}>{line}</li>
@@ -211,45 +215,27 @@ function SpecsPanel() {
 // conhecimento geral, nunca medidas em hardware real. Enquanto isso não
 // mudar, a tela precisa dizer isso, sempre — não é o mesmo aviso da
 // `precision: "parcial"` (que é sobre o que não pôde ser lido desta máquina
-// específica); este é sobre o catálogo inteiro, em toda máquina. Vira `true`
-// quando o D2 fechar.
-const THRESHOLDS_CALIBRATED = false;
+// específica); este é sobre o catálogo inteiro, em toda máquina. O aviso
+// correspondente (`estimateLabel`/`thresholdsNotCalibrated`) migrou junto
+// com o próprio parecer para `ConsoleDetailScreen` — ver comentário lá.
 
 /**
- * Tela 03 do wireframe (docs/wireframe.html): o parecer por console.
- * Puramente apresentacional (props-driven) — como a tela 01, quem busca o
- * `Report` e trata erro/carregamento é o item B8.
+ * Tela 01 do wireframe (docs/wireframe.html): o retrato desta máquina.
+ * Puramente apresentacional (props-driven) — quem busca o `Report` e trata
+ * erro/carregamento é o item B8.
  *
- * Duas colunas (2026-08-04, a pedido do Douglas): à esquerda o detalhe do
- * hardware lido (`SpecsPanel`, busca própria de `GET /hardware`); à direita
- * a grade de consoles com busca + filtro por patamar + paginação — a
- * paginação vale só para a coluna direita, a esquerda nunca pagina porque
- * não é uma lista, é um retrato só desta máquina.
+ * Achado do Douglas (2026-09-07): até esta sessão, esta tela também tinha
+ * uma segunda função — a grade de parecer por console (busca + filtro por
+ * patamar + paginação), ao lado do `SpecsPanel` numa coluna estreita.
+ * Virou poluição dupla: (1) os mesmos 33 pareceres já existem individualmente
+ * dentro de `ConsoleDetailScreen`, então esta era a segunda vez que o mesmo
+ * dado aparecia; (2) 5-6 cards de hardware empilhados numa coluna de até
+ * 340px ficavam desproporcionalmente altos ao lado da grade de consoles,
+ * com a paginação sobrando solta no desequilíbrio. Removida — "Especificações"
+ * agora é só o retrato da máquina, largura cheia, sem coluna dupla.
  */
 export function VerdictScreen({ report }: { report: Report }) {
   const t = useT(dict);
-  const levelLabel = useLevelLabel();
-  const [search, setSearch] = useState("");
-  const [levelFilter, setLevelFilter] = useState<ConsoleVerdict["level"] | null>(null);
-  const [page, setPage] = useState(1);
-
-  function handleSearch(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
-
-  function handleLevelFilter(level: ConsoleVerdict["level"] | null) {
-    setLevelFilter(level);
-    setPage(1);
-  }
-
-  const filtered = report.verdicts.filter((v) => {
-    if (levelFilter && v.level !== levelFilter) return false;
-    const term = search.trim().toLowerCase();
-    return !term || v.name.toLowerCase().includes(term);
-  });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     // N3 (docs/roadmap.md, Sprint N): era `max-w-7xl` + `py-10` própria (a
@@ -257,110 +243,15 @@ export function VerdictScreen({ report }: { report: Report }) {
     // o mesmo teto/espaçamento de listagem do resto do app
     // (`ScreenContainer`, que já herda o teto escalonado que o O5 validou).
     <ScreenContainer variant="listing">
-      {/* O6 (docs/roadmap.md, Sprint O): era `320px` fixo — largura fixa numa
-          coluna dentro da área que divide espaço com a sidebar, proibida pela
-          regra de "Layout responsivo" do CLAUDE.md. `minmax(260px, 340px)`
-          continua com teto (não estica sem limite num monitor grande, o que
-          ia deixar o texto de spec — nomes de CPU/GPU — perdido num espaço
-          vazio), mas encolhe de verdade em janela pequena; o `max-w` do
-          `<aside>` some porque a coluna do grid já é o teto, era redundante. */}
       <ScreenHeader title={t("specifications")} />
 
-      {/* Achado do critico-design (2026-09-06): 4.1 (ritmo vertical) — o
-          `gap-8` era o único espaçamento de seção fora dos dois valores que
-          o resto do app usa (`gap-6`/`gap-3`); desceu pra ficar consistente. */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(260px,340px)_1fr]">
-        <aside className="flex flex-col gap-4">
-          <SectionHeading>{t("thisMachine")}</SectionHeading>
-          <SpecsPanel />
-        </aside>
-
-        <div>
-          {report.precision === "parcial" && (
-            <div className="mb-4">
-              <PartialNotice>{t("partialPrecision")}</PartialNotice>
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-3">
-            <label htmlFor="verdict-search" className="sr-only">
-              {t("searchConsole")}
-            </label>
-            <input
-              id="verdict-search"
-              type="text"
-              name="verdict-search"
-              autoComplete="off"
-              value={search}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder={t("searchConsolePlaceholder")}
-              className={`${inputClass} max-w-xs`}
-            />
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleLevelFilter(null)}
-                // A11y 4.1.2: filtros de patamar alternáveis e mutuamente
-                // exclusivos — `aria-pressed` expõe o estado ativo para o
-                // leitor de tela (mesmo tratamento que ConsolesScreen e os
-                // chips de plataforma de AllGamesScreen).
-                aria-pressed={levelFilter === null}
-                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
-                  levelFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
-                }`}
-              >
-                {t("filterAll")}
-              </button>
-              {LEVEL_ORDER.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => handleLevelFilter(level)}
-                  aria-pressed={levelFilter === level}
-                  className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
-                    levelFilter === level ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
-                  }`}
-                >
-                  {levelLabel(level).toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Achado do critico-design (2026-09-06), 3.2: esta ressalva
-              morava ANTES dos filtros, então era a primeira coisa que o
-              olho encontrava na coluna — antes até do título. Um aviso de
-              precisão de dado não deveria competir com o conteúdo real da
-              tela por essa posição; desceu pra abaixo dos filtros, como
-              `Callout`, igual ao resto dos avisos secundários do app. */}
-          {!THRESHOLDS_CALIBRATED && (
-            <div className="mt-4">
-              <Callout label={t("estimateLabel")}>{t("thresholdsNotCalibrated")}</Callout>
-            </div>
-          )}
-
-          {filtered.length === 0 && (
-            <p className="mt-4 text-base text-muted">{t("noConsolesFound", { search })}</p>
-          )}
-
-          {/* 2xl, não xl (CLAUDE.md, regra de breakpoint): esta grade divide
-              espaço com a coluna lateral de até 340px acima, então tem menos
-              largura disponível que uma grade de tela cheia — xl (1280,
-              quase o tamanho padrão da janela) já era o valor frágil que
-              causou o bug de 2026-08-04 em outro lugar; aqui seria pior.
-              min-[2400px] (O5, Sprint O) acompanha o teto do container acima:
-              sem essa quarta coluna, os cards só ficariam maiores num monitor
-              grande, sem usar a largura extra pra mostrar mais consoles de
-              uma vez. */}
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3 min-[2400px]:grid-cols-4">
-            {pageItems.map((verdict) => (
-              <ConsoleVerdictCard key={verdict.console_id} verdict={verdict} />
-            ))}
-          </div>
-
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      {report.precision === "parcial" && (
+        <div className="mb-4">
+          <PartialNotice>{t("partialPrecision")}</PartialNotice>
         </div>
-      </div>
+      )}
+
+      <SpecsPanel />
     </ScreenContainer>
   );
 }

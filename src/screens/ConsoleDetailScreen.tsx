@@ -33,6 +33,15 @@ import { buildReadinessIndex, evaluateConsoleReadiness } from "../lib/consoleRea
 import { useT } from "../i18n/i18n";
 import { dict } from "./ConsoleDetailScreen.i18n";
 
+// D2 (docs/roadmap.md) — calibrar os limiares do catálogo — segue aberto: os
+// campos `requires` de consoles.json são estimativas escritas a partir de
+// conhecimento geral, nunca medidas em hardware real. Migrado de
+// VerdictScreen.tsx (2026-09-07) junto com o próprio parecer, que deixou de
+// ter uma grade dedicada — este é hoje o único lugar do produto que mostra
+// `ConsoleVerdictCard`, então é aqui que o aviso precisa estar. Vira `true`
+// quando o D2 fechar.
+const THRESHOLDS_CALIBRATED = false;
+
 /**
  * Uma forma de rodar este console. Cada opção é um card: o que é, se está
  * instalada, o core que ela precisa (quando carrega cores) e as ações.
@@ -820,6 +829,9 @@ export function ConsoleDetailScreen({
             <div className="flex flex-col gap-2">
               <h2 className="text-lg font-semibold text-ink">{t("onThisMachine")}</h2>
               <ConsoleVerdictCard verdict={verdict} />
+              {!THRESHOLDS_CALIBRATED && (
+                <Callout label={t("estimateLabel")}>{t("thresholdsNotCalibrated")}</Callout>
+              )}
             </div>
           )}
         </aside>

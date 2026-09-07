@@ -1,18 +1,10 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../api";
-import type {
-  ConsoleEntry,
-  ConsoleVerdict,
-  EmulatorEntry,
-  LibraryFolder,
-  Report,
-  RetroArchCoreStatus,
-} from "../api/types";
+import type { ConsoleEntry, EmulatorEntry, LibraryFolder, Report, RetroArchCoreStatus } from "../api/types";
 import {
-  Badge,
   Button,
-  Card,
   CardSkeleton,
+  consoleIconLabel,
   EmptyState,
   FOCUS_RING,
   InlineError,
@@ -20,7 +12,6 @@ import {
   Pagination,
   ScreenContainer,
   ScreenHeader,
-  useLevelLabel,
 } from "../components/ui";
 import { consoleAccentColor } from "../lib/consoleColor";
 import {
@@ -32,100 +23,75 @@ import {
 import { useT } from "../i18n/i18n";
 import { dict } from "./ConsolesScreen.i18n";
 
-const PAGE_SIZE = 12;
+// 24, não mais 12: o tile ocupa uma fração do espaço vertical que o card
+// antigo ocupava, então 12 por página deixava a grade sozinha em 1-2
+// fileiras curtas com um monte de espaço vazio antes da paginação.
+const PAGE_SIZE = 24;
 
-// `pronto` é o único estado que merece destaque visual positivo; os demais
-// são pendências equivalentes entre si — nenhuma é "pior" que a outra, só
-// vêm em ordem diferente na montagem. `sem-suporte` é o único que não é
-// pendência do usuário: não há o que ele faça a respeito hoje.
-const BADGE_VARIANT: Record<ReadinessStep, "solid" | "default"> = {
-  pronto: "solid",
-  "sem-emulador": "default",
-  "sem-core": "default",
-  "sem-bios": "default",
-  "sem-pasta": "default",
-  "sem-suporte": "default",
-};
-
-function ConsoleCard({
+/**
+ * Achado do Douglas (2026-09-07): a grade de 33 consoles mostrava, de cada
+ * vez, nome + ano + selo + frase de status + lista de emuladores + parecer —
+ * tudo isso ANTES de qualquer clique, para os 33 ao mesmo tempo (12 por
+ * página). "Deveria ter os ícones dos consoles pra clicar, e só depois
+ * mostrar as informações": o detalhe inteiro (frase de status, opções de
+ * emulador, parecer, BIOS, pasta) já existe em `ConsoleDetailScreen` — esta
+ * grade não precisava repetir nada disso antes do clique.
+ *
+ * O tile mostra só o que ajuda a *achar* o console: ícone com a cor de
+ * identidade (mesmo vocabulário do `ConsoleIcon`/`ConsoleDetailScreen`),
+ * nome, ano, e um pingo aceso quando já está pronto para jogar — nenhuma
+ * frase, nenhuma lista. `title` carrega o resto (nome completo + status) para
+ * quem passa o mouse ou usa leitor de tela antes de decidir clicar.
+ */
+function ConsoleTile({
   entry,
   readiness,
-  verdict,
   onOpen,
 }: {
   entry: ConsoleEntry;
   readiness: ConsoleReadiness;
-  verdict?: ConsoleVerdict;
   onOpen: () => void;
 }) {
-  const t = useT(dict);
-  const levelLabel = useLevelLabel();
   const accent = consoleAccentColor(entry.console_id);
-  const style: CSSProperties = { borderLeftColor: accent, borderLeftWidth: 3 };
+  const ready = readiness.step === "pronto";
 
   return (
-    <Card className="flex flex-col gap-3" style={style}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate font-semibold text-ink" title={entry.name}>
-            {entry.name}
-          </p>
-          <p className="text-xs text-muted">{entry.year}</p>
-        </div>
-        {/* `shrink-0 whitespace-nowrap` achado ao ver a tela de verdade
-            (Playwright, 2026-08-28): sem isso "instalar emulador" quebrava em
-            duas linhas nos cards de título longo (NES, PC Engine) e esticava
-            a altura do card, deixando a grade irregular. Quem cede largura é
-            o título, que já trunca — o selo é curto e precisa ser lido
-            inteiro. Fica aqui, e não no `Badge`, porque `whitespace-nowrap`
-            para todo badge do app impediria quebra onde ela é desejável. */}
-        <span className="shrink-0 whitespace-nowrap">
-          <Badge variant={BADGE_VARIANT[readiness.step]}>{readiness.badge}</Badge>
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`${entry.name} (${entry.year}) — ${readiness.badge}`}
+      className={`group flex flex-col items-center gap-2 rounded-lg p-2 text-center transition-colors hover:bg-fill ${FOCUS_RING}`}
+    >
+      <div
+        className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border font-pixel text-[11px] leading-none transition-[filter] group-hover:brightness-125"
+        style={{ borderColor: ready ? accent : `${accent}66` }}
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            background: `radial-gradient(circle at 30% 20%, color-mix(in srgb, ${accent} ${ready ? 40 : 20}%, transparent), transparent 70%)`,
+          }}
+        />
+        <span className="relative" style={{ color: accent }}>
+          {consoleIconLabel(entry.console_id, entry.short_name)}
         </span>
-      </div>
-
-      <p className="text-sm text-muted">{readiness.detail}</p>
-
-      {/* As opções, na ordem que o backend mandou — nunca reordenada aqui
-          (a preferência por emulador dedicado é regra de produto e mora em
-          Registry.ForConsole). A cor de acento marca a que o ZeuX usaria
-          hoje: é a resposta visual pra "posso escolher entre dois?" nos 5
-          consoles onde a escolha existe, sem virar ruído nos 28 que têm uma
-          opção só. */}
-      {entry.emulators.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {entry.emulators.map((option) => {
-            const isChosen = readiness.chosen?.adapter_id === option.adapter_id;
-            return (
-              <li
-                key={option.adapter_id}
-                className={`rounded-lg border px-2 py-1 text-xs ${
-                  isChosen ? "border-accent text-accent" : "border-line text-muted"
-                }`}
-                title={option.core ? `${option.name} · core ${option.core}` : option.name}
-              >
-                {option.name}
-                {option.core && <span className="opacity-70"> · {option.core}</span>}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <div className="mt-auto flex items-center justify-between gap-2">
-        {/* O parecer é informação secundária aqui, e some quando não existe
-            (sem consentimento/scan) em vez de virar um "desconhecido" que
-            ocuparia o mesmo espaço sem dizer nada. */}
-        {verdict ? (
-          <span className="text-xs text-muted">{t("verdict")} {levelLabel(verdict.level).toLowerCase()}</span>
-        ) : (
-          <span />
+        {/* O único sinal que a grade dá antes do clique: já dá pra jogar,
+            ou não. O que falta (emulador, core, BIOS, pasta) só aparece
+            depois, no detalhe — é lá que vale a pena nomear a peça exata
+            (princípio 3 do CLAUDE.md), não numa grade de 33 ícones. */}
+        {ready && (
+          <span
+            aria-hidden="true"
+            className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent-secondary shadow-[0_0_4px_var(--accent-secondary)]"
+          />
         )}
-        <Button variant="secondary" onClick={onOpen}>
-          {t("seeConsole")}
-        </Button>
       </div>
-    </Card>
+      <div className="w-full min-w-0">
+        <p className="truncate text-xs font-medium text-ink">{entry.name}</p>
+        <p className="text-[11px] text-muted">{entry.year}</p>
+      </div>
+    </button>
   );
 }
 
@@ -147,11 +113,14 @@ function ConsoleCard({
  * `report` vem ausente quando a tela é alcançada sem consentimento/scan (o
  * mesmo caminho que `EmulatorsScreen` já cobre a partir de `DeclinedScreen`).
  * A prontidão não depende dele de propósito: `GET /consoles` não exige
- * consentimento, então esta tela funciona inteira para quem recusou o scan —
- * só o rodapé de parecer de cada card não aparece.
+ * consentimento, então esta tela funciona inteira para quem recusou o scan.
+ * Aceito mas não usado agora (achado do Douglas, 2026-09-07): o tile deixou
+ * de mostrar o parecer por console — só existe uma vez, dentro do detalhe.
+ * Mantido na assinatura para não quebrar App.tsx e por já ser exigido por
+ * outras telas irmãs (EmulatorsScreen); se sobrar de vez, remover os dois
+ * juntos.
  */
 export function ConsolesScreen({
-  report,
   onOpenConsole,
   onOpenEmulators,
 }: {
@@ -200,7 +169,6 @@ export function ConsolesScreen({
   }, [t]);
 
   const index = useMemo(() => buildReadinessIndex(emulators, cores, folders), [emulators, cores, folders]);
-  const verdictById = useMemo(() => new Map(report?.verdicts.map((v) => [v.console_id, v]) ?? []), [report]);
 
   const avaliados = useMemo(
     () => (consoles ?? []).map((entry) => ({ entry, readiness: evaluateConsoleReadiness(entry, index) })),
@@ -314,11 +282,11 @@ export function ConsolesScreen({
         <div
           role="status"
           aria-live="polite"
-          className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 min-[2000px]:grid-cols-4"
+          className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-1"
         >
           <span className="sr-only">{t("loadingConsoles")}</span>
-          {Array.from({ length: 6 }, (_, i) => (
-            <CardSkeleton key={i} className="h-44" />
+          {Array.from({ length: 12 }, (_, i) => (
+            <CardSkeleton key={i} className="h-24" />
           ))}
         </div>
       )}
@@ -329,17 +297,18 @@ export function ConsolesScreen({
         </div>
       )}
 
-      {/* `lg`, não `xl` (regra de breakpoint do CLAUDE.md): esta grade ocupa
-          a largura inteira menos a sidebar (64px) e a barra de rolagem, então
-          `xl` (1280) bateria exatamente no tamanho padrão da janela e a
-          terceira coluna nunca apareceria de verdade. */}
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 min-[2000px]:grid-cols-4">
+      {/* Grade de ícones, não de cards (achado do Douglas, 2026-09-07) —
+          `auto-fill`/`minmax`, não breakpoints fixos: cada tile tem largura
+          conhecida e pequena (84px), então deixar o próprio CSS Grid decidir
+          quantas colunas cabem evita reescrever a lista de breakpoints toda
+          vez que o tile mudar de tamanho (o problema que a grade de cards
+          antiga tinha, um breakpoint por card). */}
+      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-1">
         {pageItems.map(({ entry, readiness }) => (
-          <ConsoleCard
+          <ConsoleTile
             key={entry.console_id}
             entry={entry}
             readiness={readiness}
-            verdict={verdictById.get(entry.console_id)}
             onOpen={() => onOpenConsole(entry.console_id, entry.name, entry.short_name)}
           />
         ))}
