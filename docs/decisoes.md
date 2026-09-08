@@ -110,6 +110,58 @@ decidiu seguir mesmo assim. Se isso precisar ser revisto no futuro (ex.:
 notificação de remoção, mudança de escopo do produto), a saída existente é
 `ConsoleIcon`, que nunca foi apagado.
 
+### Redesenho visual arcade/CRT (2026-09-07, v0.1.14)
+
+Até esta data o app usava a mesma cor de acento (`--accent` roxo) e o mesmo
+componente `Button variant="secondary"` para praticamente tudo — navegação,
+ação primária, chrome de tela — sem hierarquia visual entre eles. O Douglas
+testou o app ao vivo várias vezes nesta sessão e foi apontando o que
+destoava; o resultado virou um vocabulário fechado, não um estilo solto por
+tela:
+
+- **`Button variant="chrome"`** (`ui.tsx`) para navegação/arquivo (voltar,
+  abrir pasta, trocar visão, buscar capa) — `h-9`, `rounded-sm`, borda
+  `1.5px`, `font-mono uppercase tracking-wider`, bisel via `shadow-[inset...]`,
+  glow roxo no hover, `active:translate-y-px` (resposta de clique físico).
+  `primary`/`danger` continuam reservados a ação sobre conteúdo (jogar,
+  instalar, remover).
+- **Cor por papel, sempre em repouso, nunca só no hover**: roxo = "aqui você
+  age", ciano (`--accent-secondary`) = "aqui o sistema informa", vermelho =
+  destrutivo. `CHROME_TINT_INFO`/`CHROME_TINT_DANGER` (`ui.tsx`) tingem um
+  `chrome` sem reescrever a mesma string à mão em cada tela.
+- **`h-9` como altura única de controle de barra/toolbar** — input, select,
+  chips e botões de filtro mediam três ou quatro alturas diferentes por
+  acidente; ver `FILTER_CHIP_BASE`/`ON`/`OFF` em `ConsolesScreen.tsx`.
+- **Blur pesado (`blur-3xl`) em arte de fundo desfocada**, nunca sutil — um
+  blur fraco (2px) numa capa em pé esticada numa faixa larga vira mancha
+  turva, não lavagem de cor (achado testando a hero de "Continue jogando").
+  Sempre acompanhado de tingimento na cor de identidade via
+  `mix-blend-overlay`, pra garantir cor deliberada mesmo quando a paleta real
+  da arte for neutra.
+- **Logos oficiais de console com fundo branco** — a maioria foi desenhada
+  pra selo/embalagem em fundo claro; sobre o `--fill` quase preto do tema a
+  arte escura se perdia. `ConsoleIcon` (`ui.tsx`) tenta a logo real primeiro
+  e cai pra sigla em fundo escuro no `onError` — sem depender de `has_image`
+  do catálogo, então funciona em qualquer tela que use o componente.
+- **Cards verticais/centralizados preferidos a fitas horizontais esticadas
+  pela largura da janela** — uma fita de linha única com `flex-1` empurra o
+  texto pra longe do botão em janela larga (`ScreenContainer` chega a
+  2000px); um grid de cards mais estreitos e mais altos resolve o espaço
+  morto sem inventar layout novo por tela.
+
+**Telas cobertas nesta rodada:** splash de abertura (novo, só na primeira
+execução via `localStorage`), Todos os jogos (+ faixa "Continue jogando"),
+Pastas de jogos, Detalhe do jogo, Consoles + Detalhe do console, Jogos por
+console, Emuladores. Nenhuma lógica de produto foi alterada — só
+apresentação; toda regra de veredito/lançamento/instalação continua igual.
+
+**O que ainda está no visual antigo:** ver `pendencias.md`, "Redesenho
+visual — telas restantes".
+
+**O que quebra se desfizer:** reintroduzir `secondary`/cor solta em telas já
+migradas quebra a consistência que motivou o pedido — o achado original foi
+justamente "os botões estão destoando".
+
 ### Configuração de emulador dentro do ZeuX, não overlay in-game
 
 O pedido original admitia duas leituras: uma tela do ZeuX que edita a

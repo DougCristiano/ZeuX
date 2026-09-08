@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/ui.tsx"
+        ],
+        "createdAt": "2026-09-07T23:55:55.912Z",
+        "reason": "Agent: borda de identidade (InlineError=erro, GameTile=cor do console) é semântica, não chrome decorativo"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/components/ui.tsx"
+        ],
+        "createdAt": "2026-09-07T23:55:56.003Z",
+        "reason": "Agent: <img> citado em doc comment (prosa), não tag JSX real"
+      }
+    ]
+  }
+}

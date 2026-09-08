@@ -20,5 +20,33 @@
       "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; cd \"c:\\\\Users\\\\doufl\\\\OneDrive\\\\Documentos\\\\Portfólio\\\\ZeuX\"; mise exec -- npx -y skills add \"anthropics/knowledge-work-plugins@design-critique\" 2>&1 | Select-Object -Last 15; mise exec -- npx -y skills add \"mastepanoski/claude-skills@wcag-accessibility-audit\" 2>&1 | Select-Object -Last 15)",
       "PowerShell($env:PATH = \"C:\\\\Users\\\\doufl\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\jdx.mise_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\mise\\\\bin;$env:PATH\"; cd \"c:\\\\Users\\\\doufl\\\\OneDrive\\\\Documentos\\\\Portfólio\\\\ZeuX\"; git --no-pager diff src/index.css src/components/ui.tsx src/components/Sidebar.tsx src/hooks/useGamepadNavigation.ts)"
     ]
-  }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/impeccable\" ] || \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/impeccable\" hook",
+            "timeout": 5,
+            "statusMessage": "Checking UI changes"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/impeccable\" ] || \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/impeccable\" hook",
+            "timeout": 30,
+            "statusMessage": "Design deep pass"
+          }
+        ]
+      }
+    ]
+  },
+  "description": "Impeccable design detector: immediate-tier checks after Edit/Write on UI files, full-rule deep pass on Stop."
 }

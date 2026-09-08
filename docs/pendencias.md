@@ -90,6 +90,66 @@ de teste compartilhada já se mostrou custar caro antes (ver `decisoes.md`).
 
 ---
 
+## Onboarding para quem abre o app sem nenhuma ROM ainda
+
+**Origem:** achado do Douglas em 2026-09-07, depois do redesenho visual —
+"o app fica muito cru para esse público que vai entrar e não ver nada".
+
+**O problema:** hoje o percurso de zero é consentimento → scan → tela "Todos
+os jogos" **vazia**, com um `EmptyState` e um botão "Escolher pasta com
+jogos" (ver `docs/visao-do-produto.md`, história "Do zero ao primeiro
+jogo"). Isso cobre a ação mínima, mas não apresenta o app: quem nunca usou
+emulador não sabe o que esperar depois de apontar a pasta, o que é um
+"parecer de compatibilidade", ou que o ZeuX resolve emulador/preset sozinho.
+A primeira impressão de quem não tem ROM nenhuma ainda é uma tela quase em
+branco, sem contexto.
+
+**Ideia levantada, não desenhada ainda:** um modo tutorial/passo-a-passo
+logo após a instalação (ou logo após o consentimento, antes do scan) que
+explique o que o app faz, sem story vazio. Nada disto foi decidido:
+
+- Quando exibir: só na primeira execução (mesmo padrão do splash,
+  `localStorage`), ou sempre que a biblioteca estiver vazia (repete se a
+  pessoa remover todas as pastas depois)?
+- Conteúdo: um carrossel/wizard curto explicando consentimento → scan →
+  apontar pasta → parecer → jogar? Ou só uma versão mais rica do
+  `EmptyState` atual, com passos numerados em vez de um botão solto?
+- Onde entra na máquina de estados de `App.tsx` (mesmo cuidado do splash:
+  não pode atrasar quem já tem pasta apontada, e não pode ser uma `Phase`
+  que soma tempo ao boot de quem só quer abrir o jogo de sempre).
+- Vale mostrar um console de exemplo (sem jogo de verdade — nunca ROM) só
+  pra ilustrar como fica um card "pronto pra jogar" vs. "falta componente
+  X"? Isso pode ler como dado falso se não ficar claro que é ilustrativo —
+  cuidado editorial, não só técnico.
+
+**Depende de:** nada · **Bloqueia:** nada. Não teve critério de aceite
+desenhado ainda — é ideia registrada, não especificação pronta para
+implementar.
+
+## Redesenho visual — telas restantes
+
+**Origem:** o redesenho arcade/CRT de 2026-09-07 (`decisoes.md`) cobriu 7
+telas; estas continuam no visual anterior (`secondary`/cores soltas, sem o
+vocabulário `chrome`/`h-9`/blur pesado):
+
+- `ConsentScreen.tsx`, `DeclinedScreen.tsx`, `StatusScreen.tsx` — telas do
+  início do app, antes da biblioteca.
+- `VerdictScreen.tsx` — parecer geral de hardware.
+- `SettingsScreen.tsx` — preferências do app (só recebeu ajuste pontual de
+  botão, não uma passada completa).
+- `ControllerTestScreen.tsx` — não confirmado se precisa: já foi desenhada
+  do zero recentemente (ver commit "tela de teste visual do controle"),
+  pode já estar alinhada; conferir antes de mexer.
+
+**Limpeza pendente, não é tela nova:** `LibraryScreen.tsx` ainda escreve o
+tingimento de `chrome` ciano/vermelho inline (`border-accent-secondary/50!
+text-accent-secondary! hover:...`) em vez de usar `CHROME_TINT_INFO`/
+`CHROME_TINT_DANGER` (`ui.tsx`), criados numa rodada posterior
+(`EmulatorsScreen.tsx`) exatamente pra esse padrão. Troca mecânica, sem
+mudança visual.
+
+**Depende de:** nada · **Bloqueia:** nada
+
 ## Rodapé de prompts do controle na tela
 
 `useGamepadNavigation` já traduz D-pad/A/B em navegação, mas **não expõe se
