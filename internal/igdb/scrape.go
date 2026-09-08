@@ -97,6 +97,10 @@ func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error
 		return nil, ErrNotConfigured
 	}
 
+	// Lote (gameIDs vazio) e busca de um jogo só divergem em quem pode
+	// sobrescrever o quê — ver o comentário grande em processGame.
+	batch := len(gameIDs) == 0
+
 	games, err := m.resolveGames(ctx, gameIDs)
 	if err != nil {
 		return nil, err
@@ -129,7 +133,7 @@ func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error
 	// Contexto próprio do job, não da requisição HTTP — o lote precisa
 	// sobreviver ao fim da resposta 202 que o disparou (mesmo raciocínio de
 	// internal/install.Manager.run).
-	go m.run(job, creds, games)
+	go m.run(job, creds, games, batch)
 
 	return m.snapshot(job.ID), nil
 }
@@ -153,7 +157,7 @@ func (m *ScrapeManager) resolveGames(ctx context.Context, gameIDs []int64) ([]li
 	return games, nil
 }
 
-func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game) {
+func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game, batch bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 
@@ -186,7 +190,7 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game) {
 	}
 
 	for _, game := range games {
-		result := m.processGame(ctx, client, root, game)
+		result := m.processGame(ctx, client, root, game, batch)
 
 		m.mu.Lock()
 		job.Results = append(job.Results, result)
@@ -210,10 +214,47 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game) {
 // jogo específico nunca derruba o lote inteiro (docs/roadmap.md: "falha de
 // rede não quebra a biblioteca") — só grava o status e segue para o
 // próximo.
-func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root string, game library.Game) GameResult {
+//
+// batch distingue as duas origens possíveis de uma chamada (Start,
+// gameIDs vazio ou não) porque elas precisam de garantias opostas:
+//   - lote (batch=true, inclui a busca automática que dispara sozinha
+//     depois de toda pasta adicionada/revarrida): o snapshot de
+//     UncoveredGames() pode já estar desatualizado quando este jogo é
+//     processado minutos depois — o usuário pode ter trocado a capa à mão
+//     nesse meio-tempo (internal/api.handleSetGameCover). O lote nunca pode
+//     sobrescrever isso, então revalida o estado antes de gastar rede e usa
+//     escritas condicionais (SetCoverIfUncovered/SetCoverStatusIfUncovered).
+//   - jogo único (batch=false, "Buscar capa novamente" em
+//     GameDetailScreen.tsx): é um pedido explícito do usuário para
+//     substituir a capa atual, manual ou automática — precisa continuar
+//     sobrescrevendo sem condição, senão o botão pararia de funcionar
+//     depois de uma troca manual.
+func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root string, game library.Game, batch bool) GameResult {
 	result := GameResult{GameID: game.ID, Title: game.Title}
 	destDir := emulator.GameCoverDir(root, game.ConsoleID, game.ID)
 	destPath := filepath.Join(destDir, "cover.jpg")
+
+	if batch {
+		fresh, ok, err := m.library.GameByID(ctx, game.ID)
+		if err != nil {
+			result.Status = "error"
+			result.Message = err.Error()
+			return result
+		}
+		if !ok {
+			result.Status = "error"
+			result.Message = "jogo removido da biblioteca durante a busca"
+			return result
+		}
+		if fresh.CoverPath != "" {
+			result.Status = "found"
+			return result
+		}
+		if fresh.CoverStatus != "" {
+			result.Status = fresh.CoverStatus
+			return result
+		}
+	}
 
 	// Libretro-thumbnails primeiro (thumbnails.go): sem conta, sem cota
 	// compartilhada. Só segue pro IGDB abaixo se esta fonte não achar nada
@@ -225,7 +266,7 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 		m.logger.Warn("libretro-thumbnails falhou, seguindo pro IGDB", "jogo", game.ID, "erro", thumbErr)
 	}
 	if thumbFound {
-		if err := m.saveResolvedCover(ctx, game.ID, root, destPath); err != nil {
+		if err := m.saveResolvedCover(ctx, game.ID, root, destPath, batch); err != nil {
 			result.Status = "error"
 			result.Message = err.Error()
 			return result
@@ -236,13 +277,19 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 
 	match, found, err := client.SearchGame(ctx, game.Title)
 	if err != nil {
-		m.markError(ctx, game.ID, err)
+		m.markError(ctx, game.ID, err, batch)
 		result.Status = "error"
 		result.Message = err.Error()
 		return result
 	}
 	if !found || match.ImageID == "" {
-		if setErr := m.library.SetCoverStatus(ctx, game.ID, "not_found"); setErr != nil {
+		var setErr error
+		if batch {
+			_, setErr = m.library.SetCoverStatusIfUncovered(ctx, game.ID, "not_found")
+		} else {
+			setErr = m.library.SetCoverStatus(ctx, game.ID, "not_found")
+		}
+		if setErr != nil {
 			m.logger.Error("gravando status de capa não encontrada", "jogo", game.ID, "erro", setErr)
 		}
 		result.Status = "not_found"
@@ -250,13 +297,13 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 	}
 
 	if err := client.DownloadCover(ctx, match.ImageID, destPath); err != nil {
-		m.markError(ctx, game.ID, err)
+		m.markError(ctx, game.ID, err, batch)
 		result.Status = "error"
 		result.Message = err.Error()
 		return result
 	}
 
-	if err := m.saveResolvedCover(ctx, game.ID, root, destPath); err != nil {
+	if err := m.saveResolvedCover(ctx, game.ID, root, destPath, batch); err != nil {
 		result.Status = "error"
 		result.Message = err.Error()
 		return result
@@ -269,17 +316,27 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 // saveResolvedCover grava no banco o caminho (relativo a root) de uma capa
 // já baixada em destPath — passo final comum às duas fontes de capa
 // (libretro-thumbnails e IGDB), extraído para não duplicar o cálculo de
-// caminho relativo nem o tratamento de erro entre as duas.
-func (m *ScrapeManager) saveResolvedCover(ctx context.Context, gameID int64, root, destPath string) error {
+// caminho relativo nem o tratamento de erro entre as duas. batch escolhe a
+// escrita condicional ou incondicional — ver o comentário de processGame.
+func (m *ScrapeManager) saveResolvedCover(ctx context.Context, gameID int64, root, destPath string, batch bool) error {
 	relPath, err := filepath.Rel(root, destPath)
 	if err != nil {
 		// Não deveria acontecer — destPath é sempre construído a partir de
 		// root. Se acontecer, trata como erro deste jogo, não do lote.
-		m.markError(ctx, gameID, err)
+		m.markError(ctx, gameID, err, batch)
 		return err
 	}
 
-	if err := m.library.SetCover(ctx, gameID, filepath.ToSlash(relPath)); err != nil {
+	path := filepath.ToSlash(relPath)
+	if batch {
+		if _, err := m.library.SetCoverIfUncovered(ctx, gameID, path); err != nil {
+			m.logger.Error("gravando a capa resolvida", "jogo", gameID, "erro", err)
+			return err
+		}
+		return nil
+	}
+
+	if err := m.library.SetCover(ctx, gameID, path); err != nil {
 		m.logger.Error("gravando a capa resolvida", "jogo", gameID, "erro", err)
 		return err
 	}
@@ -287,8 +344,16 @@ func (m *ScrapeManager) saveResolvedCover(ctx context.Context, gameID int64, roo
 	return nil
 }
 
-func (m *ScrapeManager) markError(ctx context.Context, gameID int64, cause error) {
-	if err := m.library.SetCoverStatus(ctx, gameID, "error"); err != nil {
+// markError grava que a busca deste jogo falhou. batch escolhe a escrita
+// condicional ou incondicional — ver o comentário de processGame.
+func (m *ScrapeManager) markError(ctx context.Context, gameID int64, cause error, batch bool) {
+	var err error
+	if batch {
+		_, err = m.library.SetCoverStatusIfUncovered(ctx, gameID, "error")
+	} else {
+		err = m.library.SetCoverStatus(ctx, gameID, "error")
+	}
+	if err != nil {
 		m.logger.Error("gravando status de erro de capa", "jogo", gameID, "erro_original", cause, "erro", err)
 	}
 }

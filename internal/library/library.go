@@ -565,6 +565,50 @@ func (s *Store) SetCover(ctx context.Context, gameID int64, path string) error {
 	return checkAffected(result, gameID)
 }
 
+// SetCoverIfUncovered é SetCover, só que condicional: só grava se o jogo
+// ainda estiver "sem capa nem status" (cover_path='' AND cover_status='')
+// no exato momento da escrita. Existe para o lote automático de busca
+// (2026-09-08): entre o instante em que um jogo entra na lista de
+// UncoveredGames e o instante em que este lote termina de baixar a capa
+// dele, o usuário pode ter trocado a capa à mão (ver
+// internal/api.handleSetGameCover) — sem esta trava, o lote sobrescreveria
+// essa escolha manual silenciosamente ao terminar depois dela. `applied
+// = false` não é erro: é a proteção funcionando, o chamador só ignora o
+// resultado da busca automática para este jogo.
+func (s *Store) SetCoverIfUncovered(ctx context.Context, gameID int64, path string) (applied bool, err error) {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE library_games SET cover_path = ?, cover_status = ''
+		WHERE id = ? AND cover_path = '' AND cover_status = ''
+	`, path, gameID)
+	if err != nil {
+		return false, fmt.Errorf("gravando a capa do jogo %d: %w", gameID, err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("gravando a capa do jogo %d: %w", gameID, err)
+	}
+	return affected > 0, nil
+}
+
+// SetCoverStatusIfUncovered é a versão condicional de SetCoverStatus, pelo
+// mesmo motivo de SetCoverIfUncovered — usada quando o lote automático não
+// acha capa (not_found/error) para não sujar o status de um jogo que
+// ganhou uma capa manual entre o início do lote e este resultado.
+func (s *Store) SetCoverStatusIfUncovered(ctx context.Context, gameID int64, status string) (applied bool, err error) {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE library_games SET cover_path = '', cover_status = ?
+		WHERE id = ? AND cover_path = '' AND cover_status = ''
+	`, status, gameID)
+	if err != nil {
+		return false, fmt.Errorf("gravando o status de capa do jogo %d: %w", gameID, err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("gravando o status de capa do jogo %d: %w", gameID, err)
+	}
+	return affected > 0, nil
+}
+
 // SetCoverStatus grava que uma busca foi tentada e não resultou numa capa —
 // 'not_found' (IGDB não tem o jogo) ou 'error' (falha de rede/API). Nunca
 // grava um cover_path junto: os dois campos são mutuamente exclusivos.

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, ApiError, coverImageURL } from "../api";
 import type { LibraryGame, Report } from "../api/types";
@@ -116,6 +117,15 @@ export function GameDetailScreen({
   const [coverUrl, setCoverUrl] = useState(game.cover_url);
   const [scrapingCover, setScrapingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
+  // 2026-09-08, a pedido do Douglas: troca manual de capa, independente do
+  // IGDB estar configurado — mesma mecânica de setConsoleImage
+  // (ConsoleDetailScreen). `coverVersion` força o <img> a recarregar depois
+  // da troca: o arquivo físico sempre se chama "cover.jpg", então
+  // sobrescrevê-lo não muda a URL, e o navegador reaproveitaria a versão
+  // antiga do cache sem esse empurrão.
+  const [changingCover, setChangingCover] = useState(false);
+  const [coverChangeError, setCoverChangeError] = useState<string | null>(null);
+  const [coverVersion, setCoverVersion] = useState(0);
   // Mesmo raciocínio de coverUrl: estado próprio, não game.favorite direto,
   // porque o snapshot em App.tsx não muda sozinho depois do toggle aqui.
   const [favorite, setFavorite] = useState(game.favorite);
@@ -202,6 +212,27 @@ export function GameDetailScreen({
       });
   }
 
+  async function handleChangeCover() {
+    const picked = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: t("imageFileFilter"), extensions: ["png", "jpg", "jpeg"] }],
+    });
+    if (typeof picked !== "string") return;
+
+    setChangingCover(true);
+    setCoverChangeError(null);
+    try {
+      const res = await api.setGameCover(game.id, picked);
+      setCoverUrl(res.cover_url);
+      setCoverVersion((v) => v + 1);
+    } catch (err) {
+      setCoverChangeError(err instanceof ApiError ? err.message : t("errorChangingCover"));
+    } finally {
+      setChangingCover(false);
+    }
+  }
+
   // M6 — abrir a pasta do jogo no explorador de arquivos do SO, com o
   // arquivo já selecionado. `revealItemInDir` (não `openPath` + dirname
   // calculado à mão): evita reimplementar dirname pros dois separadores de
@@ -245,7 +276,7 @@ export function GameDetailScreen({
 
   const status = statusFor(game.id);
   const verdict = report.verdicts.find((v) => v.console_id === game.console_id);
-  const heroCoverUrl = coverImageURL(coverUrl);
+  const heroCoverUrl = coverImageURL(coverUrl, coverVersion || undefined);
   const accent = consoleAccentColor(game.console_id);
 
   const heroContent = (
@@ -280,6 +311,15 @@ export function GameDetailScreen({
           <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
         </div>
         {favoriteError && <InlineError className="mt-1">{favoriteError}</InlineError>}
+        {/* Troca manual (2026-09-08), independente de conta IGDB conectada —
+            "Buscar capa" abaixo é a fonte automática, esta é o escape hatch
+            pra quando ela erra ou não acha nada. */}
+        <div className="mt-2">
+          <Button variant="chrome" disabled={changingCover} onClick={handleChangeCover} className="w-full">
+            {changingCover ? t("searching") : t("changeCover")}
+          </Button>
+          {coverChangeError && <InlineError className="mt-1">{coverChangeError}</InlineError>}
+        </div>
         {igdbConfigured && (
           <div className="mt-2">
             {/* `chrome` (2026-09-07): mesma variante que "Buscar capas" da

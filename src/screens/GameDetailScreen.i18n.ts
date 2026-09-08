@@ -20,6 +20,13 @@ export const dict = {
   searching: { "pt-BR": "Buscando…", en: "Searching…" },
   searchCover: { "pt-BR": "Buscar capa", en: "Search cover" },
   searchCoverAgain: { "pt-BR": "Buscar capa de novo", en: "Search cover again" },
+  // 2026-09-08: troca manual de capa, independente de conta IGDB.
+  changeCover: { "pt-BR": "Trocar capa", en: "Change cover" },
+  imageFileFilter: { "pt-BR": "Imagem", en: "Image" },
+  errorChangingCover: {
+    "pt-BR": "Não foi possível trocar a capa deste jogo.",
+    en: "Could not change this game's cover.",
+  },
   errorSearchingCover: {
     "pt-BR": "Não foi possível buscar a capa deste jogo.",
     en: "Could not search for this game's cover.",

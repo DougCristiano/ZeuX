@@ -251,6 +251,24 @@ export const dict = {
     "pt-BR": "{{year}} · {{shortName}}",
     en: "{{year}} · {{shortName}}",
   },
+  // 2026-09-08: troca manual de logo (a busca automática do IGDB erra a
+  // variante com frequência — ver README.md de console-images).
+  changeImage: {
+    "pt-BR": "Trocar logo",
+    en: "Change logo",
+  },
+  restoreDefaultImage: {
+    "pt-BR": "Restaurar padrão",
+    en: "Restore default",
+  },
+  imageFileFilter: {
+    "pt-BR": "Imagem",
+    en: "Image",
+  },
+  couldNotChangeImage: {
+    "pt-BR": "Não foi possível trocar a logo deste console.",
+    en: "Could not change this console's logo.",
+  },
   howToRun: {
     "pt-BR": "Como rodar",
     en: "How to run",

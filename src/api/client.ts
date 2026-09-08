@@ -43,15 +43,28 @@ const API_BASE = `${API_ORIGIN}/api/v1`;
 // precisa saber) o próprio host:porta. Um <img src> com esse caminho cru
 // resolveria contra a origem do WebView/preview do front, não contra o
 // zeuxd. Esta função é o único lugar que faz essa junção.
-export function coverImageURL(coverUrl: string | undefined): string | undefined {
-  return coverUrl ? `${API_ORIGIN}${coverUrl}` : undefined;
+// `cacheBust` (2026-09-08): igual a consoleImageURL — uma capa customizada
+// pode sobrescrever o mesmo "cover.jpg" de sempre (mesma URL), então o
+// navegador precisa de um empurrão pra não servir a versão antiga do cache.
+export function coverImageURL(coverUrl: string | undefined, cacheBust?: number): string | undefined {
+  if (!coverUrl) return undefined;
+  const suffix = cacheBust ? `${coverUrl.includes("?") ? "&" : "?"}v=${cacheBust}` : "";
+  return `${API_ORIGIN}${coverUrl}${suffix}`;
 }
 
 // Mesmo motivo de coverImageURL acima: a rota é relativa, precisa da origem
 // do zeuxd. Só monta a URL quando `has_image` já confirmou que existe algo
 // pra buscar — quem chama nunca precisa tratar 404 no <img>.
-export function consoleImageURL(consoleId: string): string {
-  return `${API_ORIGIN}/api/v1/consoles/${encodeURIComponent(consoleId)}/image`;
+//
+// `cacheBust` (2026-09-08): a logo de um console pode mudar em runtime
+// agora (api.setConsoleImage/resetConsoleImage) sem trocar de rota — o
+// `Cache-Control: no-store` do servidor evita cache HTTP, mas o navegador
+// ainda reaproveita a última imagem carregada para o mesmo `src` de <img>.
+// Passar algo que muda (ex. Date.now() logo após trocar) força um pedido
+// novo de verdade.
+export function consoleImageURL(consoleId: string, cacheBust?: number): string {
+  const suffix = cacheBust ? `?v=${cacheBust}` : "";
+  return `${API_ORIGIN}/api/v1/consoles/${encodeURIComponent(consoleId)}/image${suffix}`;
 }
 
 /**
@@ -140,6 +153,17 @@ export const api = {
   // sem exigir consentimento nem scan — dá pra chamar antes do onboarding
   // (e depois de recusar), diferente do parecer.
   getConsoles: () => request<{ consoles: ConsoleEntry[] }>("/consoles"),
+  // 2026-09-08: troca manual de logo (a busca automática do IGDB erra a
+  // variante com frequência — ver internal/verdict/data/console-images/
+  // README.md). sourcePath é o caminho local escolhido no diálogo nativo de
+  // arquivo do SO — o Go lê o disco, o front nunca toca em bytes de imagem
+  // (mesma fronteira de confiança de pasta de ROM/binário de emulador).
+  setConsoleImage: (consoleId: string, sourcePath: string) =>
+    postJSON<{ updated: boolean }>(`/consoles/${encodeURIComponent(consoleId)}/image`, { source_path: sourcePath }),
+  // Apaga a customização — volta a servir a logo embutida (ou o ícone de
+  // sigla, se o console não tiver nenhuma).
+  resetConsoleImage: (consoleId: string) =>
+    request<{ removed: boolean }>(`/consoles/${encodeURIComponent(consoleId)}/image`, { method: "DELETE" }),
 
   getEmulators: () => request<{ emulators: EmulatorEntry[] }>("/emulators"),
   getRetroArchCores: () => request<{ cores: RetroArchCoreStatus[] }>("/retroarch/cores"),
@@ -268,4 +292,11 @@ export const api = {
   scrapeCovers: (gameId?: number) =>
     postJSON<ScrapeJob>("/library/games/scrape-covers", gameId ? { game_id: gameId } : {}),
   getScrapeJob: (id: string) => request<ScrapeJob>(`/scrape-jobs/${encodeURIComponent(id)}`),
+  // 2026-09-08: troca manual de capa — mesma mecânica de setConsoleImage
+  // (source_path local, o Go lê e grava). Vence qualquer busca automática
+  // futura: ListAllGames/UncoveredGames já ignoram um jogo com cover_path
+  // preenchido no lote (G1), então uma capa customizada nunca é
+  // sobrescrita sozinha.
+  setGameCover: (gameId: number, sourcePath: string) =>
+    postJSON<{ cover_url: string }>(`/library/games/${gameId}/cover`, { source_path: sourcePath }),
 };

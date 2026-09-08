@@ -248,6 +248,70 @@ func TestScrapeFallsBackToLibretroThumbnailWhenIGDBAuthFails(t *testing.T) {
 	}
 }
 
+// Trava a correção de 2026-09-08: uma capa colocada manualmente
+// (internal/api.handleSetGameCover) enquanto o lote automático já está
+// processando aquele jogo não pode ser sobrescrita quando o lote termina
+// depois — mesmo que o snapshot inicial (UncoveredGames) tenha capturado o
+// jogo como "sem capa" antes da troca manual acontecer. Sem a escrita
+// condicional (SetCoverIfUncovered), o lote vencia a corrida e revertia a
+// capa manual para a encontrada pelo scraper (ou para "error"/"not_found").
+func TestScrapeBatchNeverOverwritesCoverSetDuringTheRun(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	credsStore := newTestCredentialsStore(t)
+	if err := credsStore.Save(testCredentials()); err != nil {
+		t.Fatalf("Save credenciais: %v", err)
+	}
+
+	game := seedGame(t, lib, "snes", "Chrono Trigger")
+
+	// libretro-thumbnails não tem a capa: força o caminho até o IGDB, onde
+	// a autenticação fica presa em `block` até o teste liberar — dá tempo
+	// determinístico para simular a troca manual no meio do processamento.
+	thumbMux := http.NewServeMux()
+	thumbMux.HandleFunc("/", http.NotFound)
+	fakeLibretroThumbnailsServer(t, thumbMux)
+
+	block := make(chan struct{})
+	igdbMux := http.NewServeMux()
+	igdbMux.HandleFunc("/oauth2/token", func(w http.ResponseWriter, r *http.Request) {
+		<-block
+		tokenHandler(w, r)
+	})
+	igdbMux.HandleFunc("/v4/games", gamesEndpoint(t, map[string]string{"Chrono Trigger": "abcd1234"}))
+	igdbMux.HandleFunc("/images/upload/t_cover_big/abcd1234.jpg", imageEndpoint())
+	fakeIGDBServer(t, igdbMux)
+
+	manager := NewScrapeManager(lib, credsStore, silentLogger())
+	job, err := manager.Start(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	// A busca do lote está presa em `block`, tentando alcançar o IGDB — o
+	// jogo ainda estava "sem capa" quando UncoveredGames() foi lido lá
+	// dentro de Start(). Uma troca manual acontece agora, no meio da
+	// corrida.
+	const manualCover = "snes/jogos/manual/cover.jpg"
+	if err := lib.SetCover(context.Background(), game.ID, manualCover); err != nil {
+		t.Fatalf("SetCover manual: %v", err)
+	}
+
+	close(block)
+	done := waitJobDone(t, manager, job.ID)
+	if done.Phase != PhaseDone {
+		t.Fatalf("Phase = %q, esperado %q (erro: %s)", done.Phase, PhaseDone, done.Error)
+	}
+
+	reloaded, ok, err := lib.GameByID(context.Background(), game.ID)
+	if err != nil || !ok {
+		t.Fatalf("GameByID: ok=%v err=%v", ok, err)
+	}
+	if reloaded.CoverPath != manualCover {
+		t.Fatalf("cover_path = %q, esperado a capa manual %q sobrevivendo ao lote", reloaded.CoverPath, manualCover)
+	}
+}
+
 // Trava que só um lote roda por vez — uma segunda chamada enquanto a
 // primeira está em andamento é recusada, não enfileirada silenciosamente.
 func TestScrapeStartWhileRunningRefuses(t *testing.T) {

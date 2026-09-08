@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { Pencil } from "lucide-react";
 import { api, ApiError, consoleImageURL } from "../api";
 import type {
   ConsoleEmulatorOption,
@@ -672,6 +673,52 @@ export function ConsoleDetailScreen({
   // embutido existir mas o <img> falhar em runtime. Os dois caem na sigla,
   // nunca num espaço quebrado — mesma rede de segurança de `ConsolesScreen`.
   const [heroImageFailed, setHeroImageFailed] = useState(false);
+  // 2026-09-08: troca manual de logo (a pedido do Douglas — a busca
+  // automática do IGDB erra a variante com frequência, ver
+  // internal/verdict/data/console-images/README.md). `imageVersion` força o
+  // <img> a recarregar depois de trocar/restaurar: o servidor já manda
+  // `Cache-Control: no-store`, mas o navegador ainda reaproveita a última
+  // imagem carregada para o mesmo `src` sem esse empurrão.
+  const [imageVersion, setImageVersion] = useState(0);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  async function handleChangeImage() {
+    const picked = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: t("imageFileFilter"), extensions: ["png", "jpg", "jpeg"] }],
+    });
+    if (typeof picked !== "string") return;
+
+    setImageBusy(true);
+    setImageError(null);
+    try {
+      await api.setConsoleImage(consoleId, picked);
+      setHeroImageFailed(false);
+      setImageVersion((v) => v + 1);
+      reload(); // has_image pode virar true se o console não tinha imagem nenhuma antes
+    } catch (err) {
+      setImageError(err instanceof ApiError ? err.message : t("couldNotChangeImage"));
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
+  async function handleResetImage() {
+    setImageBusy(true);
+    setImageError(null);
+    try {
+      await api.resetConsoleImage(consoleId);
+      setHeroImageFailed(false);
+      setImageVersion((v) => v + 1);
+      reload();
+    } catch (err) {
+      setImageError(err instanceof ApiError ? err.message : t("couldNotChangeImage"));
+    } finally {
+      setImageBusy(false);
+    }
+  }
 
   const reload = useCallback(() => {
     api
@@ -827,7 +874,7 @@ export function ConsoleDetailScreen({
             gradiente abaixo continua sozinho, como antes. */}
         {showHeroImage && (
           <img
-            src={consoleImageURL(consoleId)}
+            src={consoleImageURL(consoleId, imageVersion || undefined)}
             alt=""
             aria-hidden="true"
             className="pointer-events-none absolute -top-24 -left-10 h-72 w-72 object-contain opacity-40 blur-3xl saturate-[1.8]"
@@ -850,22 +897,39 @@ export function ConsoleDetailScreen({
               a sigla — via `consoleIconLabel`, não `slice(0, 4)` à mão, que
               ignorava o mapa de exceções do G5 — segue como fallback sobre
               `--fill`. */}
-          <span
-            aria-hidden="true"
-            style={{ borderColor: `${accent}66`, color: accent, backgroundColor: showHeroImage ? "#fff" : undefined }}
-            className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
-          >
-            {showHeroImage ? (
-              <img
-                src={consoleImageURL(consoleId)}
-                alt=""
-                className="h-14 w-14 object-contain p-0.5"
-                onError={() => setHeroImageFailed(true)}
-              />
-            ) : (
-              consoleIconLabel(consoleId, entry.short_name)
-            )}
-          </span>
+          <div className="relative shrink-0">
+            <span
+              aria-hidden="true"
+              style={{ borderColor: `${accent}66`, color: accent, backgroundColor: showHeroImage ? "#fff" : undefined }}
+              className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
+            >
+              {showHeroImage ? (
+                <img
+                  src={consoleImageURL(consoleId, imageVersion || undefined)}
+                  alt=""
+                  className="h-14 w-14 object-contain p-0.5"
+                  onError={() => setHeroImageFailed(true)}
+                />
+              ) : (
+                consoleIconLabel(consoleId, entry.short_name)
+              )}
+            </span>
+            {/* Troca manual de logo (2026-09-08): mesmo padrão visual de
+                FavoriteToggle (botão circular pequeno flutuando sobre a
+                arte) — aqui reposicionado no canto porque a caixa de 64px
+                já é pequena, um botão do mesmo tamanho por cima escondia a
+                logo inteira. */}
+            <button
+              type="button"
+              disabled={imageBusy}
+              onClick={handleChangeImage}
+              aria-label={t("changeImage")}
+              title={t("changeImage")}
+              className="absolute -right-1.5 -bottom-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line-strong bg-black/70 text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Pencil size={11} aria-hidden="true" />
+            </button>
+          </div>
           <div>
             <h1 className="text-2xl font-semibold text-ink">{entry.name}</h1>
             {/* `font-mono`: ano e sigla são dado de catálogo, não prosa — o
@@ -874,8 +938,24 @@ export function ConsoleDetailScreen({
             <p className="mt-1 font-mono text-sm tracking-wide text-muted">
               {t("consoleYearShortName", { year: entry.year, shortName: entry.short_name })}
             </p>
+            {/* Só quando há uma logo de verdade (embutida ou customizada) —
+                "restaurar padrão" sem nada pra restaurar seria uma ação sem
+                efeito visível, mais confusa que útil. */}
+            {showHeroImage && (
+              <button
+                type="button"
+                disabled={imageBusy}
+                onClick={handleResetImage}
+                className="mt-1 font-mono text-xs tracking-wide text-muted underline decoration-dotted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t("restoreDefaultImage")}
+              </button>
+            )}
           </div>
         </div>
+        {imageError && (
+          <p className="relative mt-2 text-sm text-danger">{imageError}</p>
+        )}
       </div>
 
       {/* A prontidão abre a tela porque é a resposta à pergunta que trouxe o

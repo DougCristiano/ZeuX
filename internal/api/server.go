@@ -113,6 +113,8 @@ func (s *Server) Routes() http.Handler {
 	// cmd/generate-console-images e viaja dentro do executável). Ver
 	// docs/decisoes.md, "Identidade visual por console".
 	mux.HandleFunc("GET /api/v1/consoles/{id}/image", s.handleConsoleImage)
+	mux.HandleFunc("POST /api/v1/consoles/{id}/image", s.handleSetConsoleImage)
+	mux.HandleFunc("DELETE /api/v1/consoles/{id}/image", s.handleResetConsoleImage)
 	mux.HandleFunc("GET /api/v1/emulators", s.handleEmulators)
 	// Rota própria em vez de embutir em /emulators: cores só existem para o
 	// RetroArch (nenhum outro adapter carrega bibliotecas plugáveis), e
@@ -188,6 +190,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/igdb/credentials", s.handleClearIGDBCredentials)
 	mux.HandleFunc("POST /api/v1/library/games/scrape-covers", s.handleScrapeCovers)
 	mux.HandleFunc("GET /api/v1/scrape-jobs/{id}", s.handleScrapeJob)
+	mux.HandleFunc("POST /api/v1/library/games/{id}/cover", s.handleSetGameCover)
 	// Serve as capas já baixadas em disco (nunca a URL do IGDB direto — G1
 	// exige arquivo local). Primeiro uso de http.FileServer neste servidor.
 	mux.HandleFunc("GET /api/v1/covers/", s.handleCoverFile)
@@ -311,11 +314,11 @@ func (s *Server) handleConsoles(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"consoles": consoles})
 }
 
-// handleConsoleImage serve a logo embutida de um console. 404 é o estado
-// esperado (nem todo console tem uma — GET /consoles já anuncia isso via
-// has_image, então a interface só chama esta rota quando espera 200), não
-// um erro de servidor: nada aqui lê disco nem rede, só o binário já
-// compilado.
+// handleConsoleImage serve a logo de um console — customizada pelo usuário
+// (ver handleSetConsoleImage), se existir, senão a embutida no binário.
+// 404 é o estado esperado (nem todo console tem uma — GET /consoles já
+// anuncia isso via has_image, então a interface só chama esta rota quando
+// espera 200), não um erro de servidor.
 func (s *Server) handleConsoleImage(w http.ResponseWriter, r *http.Request) {
 	data, ok := verdict.ConsoleImage(r.PathValue("id"))
 	if !ok {
@@ -323,15 +326,105 @@ func (s *Server) handleConsoleImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Imutável: o binário só muda numa atualização do app, e uma atualização
-	// já é uma URL diferente do ponto de vista de um cache HTTP normal só
-	// pela troca de conteúdo — mas como este servidor é sempre localhost,
-	// sem CDN entre o pedido e a resposta, o cache aqui só evita reservir a
-	// mesma imagem repetidas vezes dentro da MESMA sessão do app.
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
+	// Content-Type detectado, não fixo em "image/png": desde 2026-09-08 este
+	// arquivo pode ser uma logo customizada pelo usuário em qualquer formato
+	// de imagem comum, não só a logo embutida (sempre PNG). Cache-Control
+	// sem "immutable": o arquivo agora pode mudar em runtime (POST/DELETE
+	// abaixo) sem trocar de URL — servidor é sempre localhost, então não
+	// cachear custa perto de nada.
+	w.Header().Set("Content-Type", http.DetectContentType(data))
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
+}
+
+// handleSetConsoleImage grava uma logo customizada para um console — troca
+// manual pela interface (2026-09-08, a pedido do Douglas: a busca
+// automática via cmd/generate-console-images erra a variante com
+// frequência, ex. NES com a foto do SNES, e corrigir isso hoje exige uma
+// release nova). sourcePath é um caminho local escolhido pelo usuário no
+// diálogo nativo de arquivo do front — mesma fronteira de confiança que
+// pasta de ROM e binário de emulador manual já usam, só que aqui é o Go
+// que lê o arquivo, não o front.
+func (s *Server) handleSetConsoleImage(w http.ResponseWriter, r *http.Request) {
+	consoleID := r.PathValue("id")
+	if _, ok := s.catalog.ConsoleByID(consoleID); !ok {
+		s.writeError(w, http.StatusBadRequest, "unknown_console",
+			"O console informado não está no catálogo do ZeuX.")
+		return
+	}
+
+	var body struct {
+		SourcePath string `json:"source_path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON com {"source_path": "..."}.`)
+		return
+	}
+	if body.SourcePath == "" {
+		s.writeError(w, http.StatusBadRequest, "missing_fields", "O campo source_path é obrigatório.")
+		return
+	}
+
+	dest, err := verdict.CustomImagePath(consoleID)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "image_root_unavailable",
+			"Não foi possível localizar a pasta de dados do ZeuX.")
+		return
+	}
+
+	if err := copyValidatedImage(body.SourcePath, dest); err != nil {
+		s.writeImageError(w, body.SourcePath, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"updated": true})
+}
+
+// handleResetConsoleImage apaga a logo customizada de um console, voltando
+// a servir a embutida (ou o ícone de sigla, se não houver nenhuma) — não
+// existe um "gerador automático" acionável em runtime
+// (cmd/generate-console-images é uma CLI de desenvolvimento, exige
+// credencial do IGDB), então esta é a única forma de desfazer a troca.
+func (s *Server) handleResetConsoleImage(w http.ResponseWriter, r *http.Request) {
+	consoleID := r.PathValue("id")
+	if _, ok := s.catalog.ConsoleByID(consoleID); !ok {
+		s.writeError(w, http.StatusBadRequest, "unknown_console",
+			"O console informado não está no catálogo do ZeuX.")
+		return
+	}
+
+	dest, err := verdict.CustomImagePath(consoleID)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "image_root_unavailable",
+			"Não foi possível localizar a pasta de dados do ZeuX.")
+		return
+	}
+
+	if err := os.Remove(dest); err != nil && !os.IsNotExist(err) {
+		s.writeError(w, http.StatusInternalServerError, "image_write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"removed": true})
+}
+
+// writeImageError traduz o erro de copyValidatedImage (compartilhado entre
+// logo de console e capa de jogo) para um code HTTP estável — separado
+// para as duas rotas não duplicarem o switch.
+func (s *Server) writeImageError(w http.ResponseWriter, sourcePath string, err error) {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		s.writeError(w, http.StatusBadRequest, "path_not_found",
+			fmt.Sprintf("O arquivo %q não existe.", sourcePath))
+	case errors.Is(err, errInvalidImage):
+		s.writeError(w, http.StatusBadRequest, "invalid_image", errInvalidImage.Error())
+	case errors.Is(err, errImageTooLarge):
+		s.writeError(w, http.StatusBadRequest, "image_too_large", errImageTooLarge.Error())
+	default:
+		s.writeError(w, http.StatusInternalServerError, "image_write_failed", err.Error())
+	}
 }
 
 // emulatorEntry é um emulator.Status mais o que a camada de API sabe e o
@@ -1769,6 +1862,72 @@ func (s *Server) handleScrapeJob(w http.ResponseWriter, r *http.Request) {
 // recalculada a cada requisição (só um os.UserConfigDir(), barato) em vez de
 // guardada no Server, para não propagar uma falha de resolução do diretório
 // ao construir o servidor inteiro.
+// handleSetGameCover grava uma capa customizada pelo usuário — mesma
+// mecânica de handleSetConsoleImage (sourcePath local, validado e copiado
+// atomicamente por copyValidatedImage), gravando no mesmo lugar e pelo
+// mesmo caminho relativo que o scraper automático já usa
+// (emulator.GameCoverDir + "cover.jpg", library.SetCover). Sem rota de
+// "restaurar automática": ListAllGames/UncoveredGames já ignoram um jogo
+// com cover_path preenchido no lote (G1) — uma capa customizada nunca é
+// sobrescrita sozinha. Pra voltar à automática, o botão "Buscar capa
+// novamente" da tela de detalhe (handleScrapeCovers com game_id) já
+// sobrescreve explicitamente.
+func (s *Server) handleSetGameCover(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id", "O identificador do jogo deve ser numérico.")
+		return
+	}
+
+	game, ok, err := s.library.GameByID(r.Context(), id)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
+	}
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum jogo com o id %d.", id))
+		return
+	}
+
+	var body struct {
+		SourcePath string `json:"source_path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON com {"source_path": "..."}.`)
+		return
+	}
+	if body.SourcePath == "" {
+		s.writeError(w, http.StatusBadRequest, "missing_fields", "O campo source_path é obrigatório.")
+		return
+	}
+
+	root, err := emulator.ManagedRoot()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "cover_root_unavailable",
+			"Não foi possível localizar a pasta gerenciada do ZeuX.")
+		return
+	}
+	destPath := filepath.Join(emulator.GameCoverDir(root, game.ConsoleID, game.ID), "cover.jpg")
+
+	if err := copyValidatedImage(body.SourcePath, destPath); err != nil {
+		s.writeImageError(w, body.SourcePath, err)
+		return
+	}
+
+	relPath, err := filepath.Rel(root, destPath)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "cover_root_unavailable", err.Error())
+		return
+	}
+	if err := s.library.SetCover(r.Context(), id, filepath.ToSlash(relPath)); err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"cover_url": coverURLFor(filepath.ToSlash(relPath))})
+}
+
 func (s *Server) handleCoverFile(w http.ResponseWriter, r *http.Request) {
 	root, err := emulator.ManagedRoot()
 	if err != nil {
