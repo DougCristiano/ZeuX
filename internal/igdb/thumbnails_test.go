@@ -67,13 +67,41 @@ func TestFetchLibretroThumbnailFindsMappedConsole(t *testing.T) {
 
 // Console fora de libretroSystemFolders nunca faz requisição — devolve
 // (false, nil) direto, sem tocar a rede nem exigir servidor de teste.
+// "arcade" é o único console do catálogo fora do mapa (auditoria de
+// 2026-09-08, ver comentário de libretroSystemFolders) — usar qualquer
+// console mapeado aqui faria este teste bater na rede real por engano em
+// vez de travar a regra que o nome promete.
 func TestFetchLibretroThumbnailSkipsUnmappedConsole(t *testing.T) {
-	found, err := FetchLibretroThumbnail(context.Background(), "wiiu", "Algum Jogo", filepath.Join(t.TempDir(), "cover.jpg"))
+	found, err := FetchLibretroThumbnail(context.Background(), "arcade", "Algum Jogo", filepath.Join(t.TempDir(), "cover.jpg"))
 	if err != nil {
 		t.Fatalf("FetchLibretroThumbnail: esperava sem erro para console fora do mapa, veio %v", err)
 	}
 	if found {
 		t.Fatal("FetchLibretroThumbnail: console fora do mapa não deveria achar nada")
+	}
+}
+
+// Trava a auditoria de 2026-09-08: 32 dos 33 consoles do catálogo têm pasta
+// real confirmada em libretro-thumbnails, só "arcade" fica de fora (ver o
+// comentário de libretroSystemFolders para o motivo). Uma remoção
+// acidental de qualquer um destes ids passaria despercebida sem este
+// teste — o efeito é silencioso (o console simplesmente cai pro IGDB sem
+// erro nenhum).
+func TestLibretroSystemFoldersCoversAuditedConsoles(t *testing.T) {
+	audited := []string{
+		"atari2600", "nes", "snes", "n64", "gb", "gbc", "gba", "virtualboy",
+		"mastersystem", "megadrive", "gamegear", "segacd", "sega32x", "saturn",
+		"dreamcast", "ps1", "ps2", "ps3", "psp", "vita", "neogeo", "ngpc",
+		"wonderswan", "3do", "pcengine", "gamecube", "wii", "wiiu", "nds",
+		"3ds", "xbox", "xbox360",
+	}
+	for _, id := range audited {
+		if _, ok := libretroSystemFolders[id]; !ok {
+			t.Errorf("console %q deveria estar em libretroSystemFolders (auditoria de 2026-09-08)", id)
+		}
+	}
+	if _, ok := libretroSystemFolders["arcade"]; ok {
+		t.Error(`"arcade" não deveria estar em libretroSystemFolders — nome de arquivo de romset MAME/FBNeo é código curto, não título`)
 	}
 }
 

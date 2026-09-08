@@ -23,16 +23,16 @@
 // caminho (cobre os consoles que faltam aqui e os arquivos com nome fora do
 // padrão).
 //
-// AVISO DE HONESTIDADE (mesma regra do CLAUDE.md para flags de adapter
-// nunca validadas contra binário real): os nomes de pasta em
-// libretroSystemFolders não foram confirmados contra o repositório real
-// nesta sessão — o ambiente de desenvolvimento não tem acesso de rede a
-// thumbnails.libretro.com para testar ao vivo. Um nome errado não quebra
-// nada (o console correspondente simplesmente nunca acha capa por aqui e
-// cai pro IGDB, exatamente como um console fora do mapa) — mas também não
-// economiza cota pra ele até alguém confirmar a string certa em
-// https://github.com/libretro-thumbnails. Douglas, confira a lista abaixo
-// antes de contar com ela.
+// Todos os nomes de pasta em libretroSystemFolders foram confirmados ao
+// vivo em 2026-09-08 contra a listagem raiz de thumbnails.libretro.com e o
+// `Named_Boxarts/` de cada um (ver o comentário do mapa) — versões
+// anteriores deste comentário avisavam que a maioria não tinha sido
+// verificada (rede indisponível no ambiente de dev da época); com rede
+// disponível nesta sessão, a auditoria fechou os 32 que fazem sentido.
+// Um nome errado não quebraria nada mesmo assim (o console correspondente
+// simplesmente nunca acharia capa por aqui e cairia pro IGDB, exatamente
+// como um console fora do mapa) — mas a garantia agora é mais forte que
+// "não deveria quebrar".
 package igdb
 
 import (
@@ -57,11 +57,29 @@ const libretroThumbnailCategory = "Named_Boxarts"
 // no libretro-thumbnails. Console ausente daqui cai direto pro IGDB — sem
 // erro, sem tentativa.
 //
-// De propósito só cobre consoles de geração 5 ou anterior mais o PS1: é a
-// faixa onde o libretro-thumbnails historicamente tem cobertura ampla e
-// consistente. "arcade" fica de fora mesmo tendo pasta lá (MAME/FBNeo) —
-// romset de arcade usa código curto (ex.: "sf2"), não título por extenso,
-// incompatível com a convenção de nome que esta busca assume.
+// Auditoria completa em 2026-09-08 (achado investigando por que a busca de
+// capa não funcionava com a credencial compartilhada suspensa no Twitch):
+// com acesso de rede de verdade a thumbnails.libretro.com nesta sessão,
+// conferimos os 33 consoles do catálogo contra a listagem raiz do
+// repositório e o `Named_Boxarts/` de cada pasta candidata. Resultado: 32
+// dos 33 têm pasta real e populada — a suposição antiga de que só geração 5
+// ou anterior tinha cobertura "ampla e consistente" nunca foi medida,
+// era só uma hipótese conservadora. Cobertura desigual entre eles (de
+// ~9 imagens em "Sony - PlayStation Vita" a mais de 7000 em "Nintendo -
+// Nintendo DS") não é motivo para excluir — uma pasta rala só significa
+// mais misses individuais, nunca erro: uma imagem que não existe cai pro
+// IGDB exatamente como um console fora do mapa.
+//
+// "arcade" é o único de fora, por um motivo diferente do que o comentário
+// antigo dizia: o `FBNeo - Arcade Games/Named_Boxarts/` de fato existe e
+// usa título por extenso ("Street Fighter II - The World Warrior..."), não
+// o código curto que a hipótese antiga citava — mas romName aqui vem do
+// nome do arquivo da ROM no disco do usuário, e um romset MAME/FBNeo
+// sempre nomeia esse arquivo pelo código curto interno do jogo (ex.:
+// "sf2.zip"), nunca pelo título. Sem uma tabela código→título (que o
+// ZeuX não tem, e MAME/FBNeo não expõem de forma simples), o nome que
+// chega aqui nunca bate com o nome do arquivo lá — não é falta de
+// cobertura, é incompatibilidade da chave de busca.
 var libretroSystemFolders = map[string]string{
 	"atari2600":    "Atari - 2600",
 	"nes":          "Nintendo - Nintendo Entertainment System",
@@ -79,11 +97,22 @@ var libretroSystemFolders = map[string]string{
 	"saturn":       "Sega - Saturn",
 	"dreamcast":    "Sega - Dreamcast",
 	"ps1":          "Sony - PlayStation",
+	"ps2":          "Sony - PlayStation 2",
+	"ps3":          "Sony - PlayStation 3",
+	"psp":          "Sony - PlayStation Portable",
+	"vita":         "Sony - PlayStation Vita",
 	"neogeo":       "SNK - Neo Geo",
 	"ngpc":         "SNK - Neo Geo Pocket Color",
 	"wonderswan":   "Bandai - WonderSwan",
 	"3do":          "The 3DO Company - 3DO",
 	"pcengine":     "NEC - PC Engine - TurboGrafx 16",
+	"gamecube":     "Nintendo - GameCube",
+	"wii":          "Nintendo - Wii",
+	"wiiu":         "Nintendo - Wii U",
+	"nds":          "Nintendo - Nintendo DS",
+	"3ds":          "Nintendo - Nintendo 3DS",
+	"xbox":         "Microsoft - Xbox",
+	"xbox360":      "Microsoft - Xbox 360",
 }
 
 // FetchLibretroThumbnail tenta baixar a capa de romName (nome de arquivo da
