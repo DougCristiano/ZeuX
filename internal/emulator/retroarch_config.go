@@ -128,10 +128,22 @@ func retroArchDriverToRenderer(driver string) (Renderer, bool) {
 // padrão **não verificado** contra binário real aqui — só a convenção que o
 // próprio RetroArch documenta.
 var retroArchConfigPath = func(install Installation) (string, error) {
+	dir, err := retroArchBaseDir(install)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "retroarch.cfg"), nil
+}
+
+// retroArchBaseDir resolve a pasta onde o RetroArch guarda tanto o
+// retroarch.cfg quanto autoconfig/ — extraída de retroArchConfigPath para
+// ControllerConfigured (2026-09-08) reusar a mesma decisão portátil vs.
+// padrão do sistema sem duplicar a lógica.
+func retroArchBaseDir(install Installation) (string, error) {
 	if install.BinaryPath != "" {
 		portable := filepath.Join(filepath.Dir(install.BinaryPath), "retroarch.cfg")
 		if _, err := os.Stat(portable); err == nil {
-			return portable, nil
+			return filepath.Dir(portable), nil
 		}
 	}
 
@@ -139,7 +151,7 @@ var retroArchConfigPath = func(install Installation) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "retroarch", "retroarch.cfg"), nil
+	return filepath.Join(dir, "retroarch"), nil
 }
 
 func retroArchReadConfig(path string) (PersistedOptions, error) {
@@ -205,6 +217,43 @@ func retroArchWriteConfig(path string, opts Options) ([]string, error) {
 	}
 
 	return unapplied, nil
+}
+
+// ControllerConfigured diz se existe pelo menos um arquivo de autoconfig de
+// controle salvo — confirmado em 2026-09-08 que é aqui, não em
+// retroarch.cfg, que o RetroArch grava o mapeamento de um controle físico
+// real: ao clicar "Salvar perfil de controle" (Configurações → Entrada →
+// Porta 1), ele cria um .cfg em <base>/autoconfig/ identificado pelo
+// vendor/product ID do dispositivo, carregado sozinho sempre que aquele
+// modelo conectar — as chaves input_player1_*_btn de retroarch.cfg
+// continuam "nul" o tempo todo, mesmo com o controle funcionando de
+// verdade.
+//
+// Não confirma que o arquivo é do controle atualmente conectado (o
+// navegador não expõe vendor/product de forma confiável para o ZeuX
+// comparar — ver o comentário de useGamepad.ts no frontend); só que algum
+// autoconfig existe. Pasta ausente conta como "ainda não configurado", não
+// erro — o RetroArch pode nunca ter sido aberto.
+func (retroArchAdapter) ControllerConfigured(install Installation) (bool, error) {
+	dir, err := retroArchBaseDir(install)
+	if err != nil {
+		return false, err
+	}
+
+	entries, err := os.ReadDir(filepath.Join(dir, "autoconfig"))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("lendo a pasta de autoconfig do RetroArch: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".cfg") {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // ReadConfig/WriteConfig/RestoreConfig satisfazem ConfigurableAdapter (H1)

@@ -214,6 +214,10 @@ export const api = {
     postJSON<{ adapter_id: string; profile_id?: string }>(`/emulators/${encodeURIComponent(id)}/controller-profile`, {
       profile_id: profileId ?? "",
     }),
+  // Passo guiado "Configurar controle" (2026-09-08): só lê, nunca escreve —
+  // confirma se o mapeamento nativo do emulador já existe.
+  getControllerStatus: (id: string) =>
+    request<{ configured: boolean }>(`/emulators/${encodeURIComponent(id)}/controller-status`),
   getInstalls: () => request<{ installs: InstallJob[] }>("/installs"),
   getInstallJob: (id: string) => request<InstallJob>(`/installs/${encodeURIComponent(id)}`),
   // Só cancela download de core em andamento (R3) — instalação de emulador

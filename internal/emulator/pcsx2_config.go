@@ -152,11 +152,13 @@ func (pcsx2ConfigurableAdapter) Actions() []string {
 	return append([]string(nil), pcsx2PadActions...)
 }
 
-// pcsx2ReadBindings lê "[Pad1] Ação = Keyboard/Tecla". Só o formato de
-// teclado foi confirmado contra o arquivo real — o formato de botão de
-// controle (joypad físico) não apareceu no arquivo real desta sessão (o
-// Douglas mapeou por teclado, não com um controle conectado), então Button
-// fica sempre nil na leitura.
+// pcsx2ReadBindings lê "[Pad1] Ação = Keyboard/Tecla" ou
+// "[Pad1] Ação = SDL-N/NomePosicional" (ex.: "SDL-0/FaceSouth") — o segundo
+// formato foi confirmado em 2026-09-08 mapeando um controle físico de
+// verdade (Xbox Series S/X) direto no Pad1 padrão do PCSX2, sem perfil de
+// entrada separado. Um valor "SDL-" vira Button (valor bruto, com o índice
+// de dispositivo incluído — não é o vocabulário do ZeuX, é o do PCSX2);
+// qualquer outro valor continua sendo tratado como tecla.
 func (pcsx2ConfigurableAdapter) ReadBindings(install Installation) ([]InputBinding, error) {
 	path, err := pcsx2ConfigPath()
 	if err != nil {
@@ -176,12 +178,50 @@ func (pcsx2ConfigurableAdapter) ReadBindings(install Installation) ([]InputBindi
 	for _, action := range pcsx2PadActions {
 		binding := InputBinding{Action: action}
 		if raw, ok := ini.get("Pad1", action); ok {
-			key := strings.TrimPrefix(raw, "Keyboard/")
-			binding.Key = &key
+			if strings.HasPrefix(raw, "SDL-") {
+				value := raw
+				binding.Button = &value
+			} else {
+				key := strings.TrimPrefix(raw, "Keyboard/")
+				binding.Key = &key
+			}
 		}
 		bindings = append(bindings, binding)
 	}
 	return bindings, nil
+}
+
+// pcsx2ControllerConfigured diz se o Pad1 padrão tem, agora, pelo menos uma
+// ação vinculada a um botão físico (prefixo "SDL-") em vez de teclado —
+// sinal de que o usuário já mapeou um controle de verdade dentro do próprio
+// PCSX2 (Configurações → Controladores → Pad1). Arquivo ausente conta como
+// "ainda não configurado", não como erro — o PCSX2 pode nunca ter sido
+// aberto.
+func pcsx2ControllerConfigured() (bool, error) {
+	path, err := pcsx2ConfigPath()
+	if err != nil {
+		return false, err
+	}
+
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("lendo %s: %w", path, err)
+	}
+
+	ini := parseINI(data)
+	for _, action := range pcsx2PadActions {
+		if raw, ok := ini.get("Pad1", action); ok && strings.HasPrefix(raw, "SDL-") {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (pcsx2ConfigurableAdapter) ControllerConfigured(install Installation) (bool, error) {
+	return pcsx2ControllerConfigured()
 }
 
 // pcsx2WriteBindings grava "[Pad1] Ação = Keyboard/Tecla" para cada binding

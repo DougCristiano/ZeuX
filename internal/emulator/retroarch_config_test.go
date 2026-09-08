@@ -162,3 +162,49 @@ func TestRestoreConfigWithoutPriorWriteFails(t *testing.T) {
 		t.Fatal("RestoreConfig sem backup deveria falhar, não ter sucesso silencioso")
 	}
 }
+
+// Trava o mecanismo real confirmado em 2026-09-08: o RetroArch não grava o
+// bind de controle físico em retroarch.cfg (input_player1_*_btn continua
+// "nul" mesmo com o controle funcionando) — grava um .cfg separado em
+// autoconfig/, identificado por vendor/product do dispositivo. false com a
+// pasta ausente (RetroArch nunca aberto) ou vazia, true assim que existe
+// pelo menos um .cfg.
+func TestRetroArchControllerConfigured(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("AppData", dir)
+
+	adapter := newRetroArch().(NativeControllerAdapter)
+
+	configured, err := adapter.ControllerConfigured(Installation{})
+	if err != nil {
+		t.Fatalf("pasta ausente não deveria ser erro: %v", err)
+	}
+	if configured {
+		t.Fatal("pasta autoconfig ausente deveria ser \"ainda não configurado\"")
+	}
+
+	autoconfigDir := filepath.Join(dir, "retroarch", "autoconfig")
+	if err := os.MkdirAll(autoconfigDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configured, err = adapter.ControllerConfigured(Installation{})
+	if err != nil {
+		t.Fatalf("ControllerConfigured: %v", err)
+	}
+	if configured {
+		t.Fatal("pasta autoconfig vazia deveria ser \"ainda não configurado\"")
+	}
+
+	profile := "input_driver = \"udev\"\ninput_vendor_id = \"1118\"\ninput_product_id = \"2834\"\ninput_b_btn = \"0\"\n"
+	if err := os.WriteFile(filepath.Join(autoconfigDir, "Microsoft Xbox Series S_X Controller.cfg"), []byte(profile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configured, err = adapter.ControllerConfigured(Installation{})
+	if err != nil {
+		t.Fatalf("ControllerConfigured: %v", err)
+	}
+	if !configured {
+		t.Fatal("um .cfg em autoconfig/ deveria contar como controle configurado")
+	}
+}

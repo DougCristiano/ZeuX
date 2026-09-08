@@ -6,10 +6,21 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
-import { Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
+import { Badge, Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
+import { useGamepad } from "../hooks/useGamepad";
+
+// Instruções fixas por adapter (2026-09-08) — passos reais confirmados
+// mapeando um controle físico de verdade dentro de cada emulador. Não vem
+// do backend: é texto de UI, não protocolo, e cada app tem seu próprio
+// menu — um mapa aqui é mais simples que inventar uma abstração de "passo"
+// genérica para dois casos.
+const GUIDED_SETUP_INSTRUCTION_KEYS: Record<string, keyof typeof dict> = {
+  pcsx2: "guidedSetupInstructionsPcsx2",
+  retroarch: "guidedSetupInstructionsRetroarch",
+};
 
 // `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
 // sem conta pessoal, o ZeuX cai numa credencial de teste embutida (ver
@@ -278,30 +289,52 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
 
         {emulators !== null &&
           (() => {
+            const checkable = emulators.filter((e) => e.installed && e.controller_check);
+            if (checkable.length > 0) {
+              return (
+                <div className="mb-6">
+                  <h3 className="mb-2 text-sm font-semibold text-primary">{t("guidedSetupHeading")}</h3>
+                  <GamepadStatusLine />
+                  <div className="mt-3 flex flex-col gap-3">
+                    {checkable.map((emulator) => (
+                      <GuidedControllerSetupStep key={emulator.adapter_id} emulator={emulator} />
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
+        {emulators !== null &&
+          (() => {
             const bindable = emulators.filter((e) => e.installed && e.bindable);
             if (bindable.length === 0) {
               return <p className="text-sm text-muted">{t("noBindableEmulators")}</p>;
             }
             return (
-              <div className="flex flex-col gap-3">
-                {bindable.map((emulator) => (
-                  <div key={emulator.adapter_id}>
-                    <Button
-                      variant="secondary"
-                      className="w-fit"
-                      onClick={() =>
-                        setExpandedAdapterId((id) => (id === emulator.adapter_id ? null : emulator.adapter_id))
-                      }
-                    >
-                      {emulator.name} · {expandedAdapterId === emulator.adapter_id ? t("hideController") : t("configureController")}
-                    </Button>
-                    {expandedAdapterId === emulator.adapter_id && (
-                      <div className="mt-3">
-                        <EmulatorBindingsPanel adapterId={emulator.adapter_id} adapterName={emulator.name} />
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-primary">{t("manualMappingHeading")}</h3>
+                <div className="flex flex-col gap-3">
+                  {bindable.map((emulator) => (
+                    <div key={emulator.adapter_id}>
+                      <Button
+                        variant="secondary"
+                        className="w-fit"
+                        onClick={() =>
+                          setExpandedAdapterId((id) => (id === emulator.adapter_id ? null : emulator.adapter_id))
+                        }
+                      >
+                        {emulator.name} · {expandedAdapterId === emulator.adapter_id ? t("hideManualMapping") : t("manualMappingButton")}
+                      </Button>
+                      {expandedAdapterId === emulator.adapter_id && (
+                        <div className="mt-3">
+                          <EmulatorBindingsPanel adapterId={emulator.adapter_id} adapterName={emulator.name} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })()}
@@ -452,5 +485,81 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
         )}
       </Card>
     </ScreenContainer>
+  );
+}
+
+/** Linha de status do controle detectado, acima dos passos guiados — reusa
+ * o mesmo hook que ControllerTestScreen já usa (Gamepad API da WebView). */
+function GamepadStatusLine() {
+  const t = useT(dict);
+  const gamepad = useGamepad();
+  return (
+    <p className="text-sm text-muted">
+      {gamepad.connected ? t("guidedSetupDetectedController", { name: gamepad.name ?? "" }) : t("guidedSetupNoController")}
+    </p>
+  );
+}
+
+type VerifyState = { kind: "idle" } | { kind: "checking" } | { kind: "done"; configured: boolean } | { kind: "error"; message: string };
+
+/**
+ * Um passo do fluxo guiado "Configurar controle" (2026-09-08): abre o
+ * emulador real, mostra a instrução fixa daquele app, e confirma lendo o
+ * arquivo dele via GET .../controller-status — o ZeuX nunca escreve o bind
+ * de botão físico sozinho, cada emulador resolve isso do jeito nativo dele.
+ */
+function GuidedControllerSetupStep({ emulator }: { emulator: EmulatorEntry }) {
+  const t = useT(dict);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [verify, setVerify] = useState<VerifyState>({ kind: "idle" });
+
+  const instructionKey = GUIDED_SETUP_INSTRUCTION_KEYS[emulator.adapter_id];
+
+  async function openEmulator() {
+    setOpening(true);
+    setOpenError(null);
+    try {
+      await api.openEmulator(emulator.adapter_id);
+    } catch (err) {
+      setOpenError(
+        err instanceof ApiError ? err.message : t("guidedSetupOpenError", { emulator: emulator.name }),
+      );
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  async function verifyStatus() {
+    setVerify({ kind: "checking" });
+    try {
+      const { configured } = await api.getControllerStatus(emulator.adapter_id);
+      setVerify({ kind: "done", configured });
+    } catch (err) {
+      setVerify({ kind: "error", message: err instanceof ApiError ? err.message : t("guidedSetupCheckError") });
+    }
+  }
+
+  return (
+    <Card filled dense>
+      <p className="mb-2 font-medium text-primary">{emulator.name}</p>
+      {instructionKey && <p className="mb-3 text-sm text-muted">{t(instructionKey)}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="secondary" disabled={opening} onClick={openEmulator}>
+          {opening ? t("guidedSetupOpening") : t("guidedSetupOpenButton", { emulator: emulator.name })}
+        </Button>
+        <Button variant="secondary" disabled={verify.kind === "checking"} onClick={verifyStatus}>
+          {verify.kind === "checking" ? t("guidedSetupVerifying") : t("guidedSetupVerifyButton")}
+        </Button>
+        {verify.kind === "done" &&
+          (verify.configured ? (
+            <Badge variant="solid">{t("guidedSetupConfigured")}</Badge>
+          ) : (
+            <Badge variant="warn">{t("guidedSetupNotConfiguredYet")}</Badge>
+          ))}
+      </div>
+      {openError && <InlineError>{openError}</InlineError>}
+      {verify.kind === "error" && <InlineError>{verify.message}</InlineError>}
+    </Card>
   );
 }

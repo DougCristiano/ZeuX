@@ -143,6 +143,94 @@ func TestPCSX2WriteConfigRendererGoesToUnapplied(t *testing.T) {
 	}
 }
 
+// withPCSX2ConfigPath aponta pcsx2ConfigPath para um arquivo temporário
+// durante o teste, restaurando o original ao final — mesmo padrão que o
+// comentário de pcsx2ConfigPath já descreve como o propósito da variável.
+func withPCSX2ConfigPath(t *testing.T, path string) {
+	t.Helper()
+	orig := pcsx2ConfigPath
+	pcsx2ConfigPath = func() (string, error) { return path, nil }
+	t.Cleanup(func() { pcsx2ConfigPath = orig })
+}
+
+// Trava o formato real confirmado em 2026-09-08 mapeando um controle físico
+// (Xbox Series S/X) direto no Pad1 padrão do PCSX2: "SDL-0/FaceSouth" tem
+// que virar Button, não uma "tecla" com lixo dentro (era o comportamento
+// antes desta correção, quando qualquer valor era tratado como teclado).
+func TestPCSX2ReadBindingsRecognizesControllerButton(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "PCSX2.ini")
+	raw := "[Pad1]\nType = DualShock2\nUp = SDL-0/DPadUp\nCross = SDL-0/FaceSouth\nStart = Keyboard/Return\n"
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withPCSX2ConfigPath(t, path)
+
+	bindings, err := (pcsx2ConfigurableAdapter{}).ReadBindings(Installation{})
+	if err != nil {
+		t.Fatalf("ReadBindings: %v", err)
+	}
+
+	byAction := make(map[string]InputBinding, len(bindings))
+	for _, b := range bindings {
+		byAction[b.Action] = b
+	}
+
+	cross := byAction["Cross"]
+	if cross.Button == nil || *cross.Button != "SDL-0/FaceSouth" {
+		t.Fatalf("Cross.Button = %v, esperado \"SDL-0/FaceSouth\"", cross.Button)
+	}
+	if cross.Key != nil {
+		t.Fatalf("Cross.Key deveria ficar nil para um bind de controle, veio %q", *cross.Key)
+	}
+
+	start := byAction["Start"]
+	if start.Key == nil || *start.Key != "Return" {
+		t.Fatalf("Start.Key = %v, esperado \"Return\" (bind de teclado não deveria ser afetado)", start.Key)
+	}
+	if start.Button != nil {
+		t.Fatalf("Start.Button deveria ficar nil, veio %q", *start.Button)
+	}
+}
+
+// Trava ControllerConfigured: true assim que qualquer ação do Pad1 padrão
+// tem um valor "SDL-", false com só teclado ou arquivo ausente.
+func TestPCSX2ControllerConfigured(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "PCSX2.ini")
+	withPCSX2ConfigPath(t, path)
+
+	configured, err := pcsx2ControllerConfigured()
+	if err != nil {
+		t.Fatalf("arquivo ausente não deveria ser erro: %v", err)
+	}
+	if configured {
+		t.Fatal("arquivo ausente deveria ser \"ainda não configurado\"")
+	}
+
+	if err := os.WriteFile(path, []byte("[Pad1]\nCross = Keyboard/K\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configured, err = pcsx2ControllerConfigured()
+	if err != nil {
+		t.Fatalf("pcsx2ControllerConfigured: %v", err)
+	}
+	if configured {
+		t.Fatal("só teclado mapeado não deveria contar como controle configurado")
+	}
+
+	if err := os.WriteFile(path, []byte("[Pad1]\nCross = SDL-0/FaceSouth\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configured, err = pcsx2ControllerConfigured()
+	if err != nil {
+		t.Fatalf("pcsx2ControllerConfigured: %v", err)
+	}
+	if !configured {
+		t.Fatal("bind SDL- no Pad1 deveria contar como controle configurado")
+	}
+}
+
 func containsLine(text, substr string) bool {
 	for _, line := range strings.Split(text, "\n") {
 		if line == substr {

@@ -228,3 +228,50 @@ func TestEmulatorBindingsNotBindableAdapter(t *testing.T) {
 		t.Fatalf("code = %q, esperado not_bindable", code)
 	}
 }
+
+// Trava a rota da tela guiada "Configurar controle": false enquanto o
+// [Pad1] do PCSX2 só tem teclado, true assim que aparece um bind "SDL-".
+func TestControllerStatusPCSX2(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	installFakePCSX2(t)
+
+	rec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/emulators/pcsx2/controller-status", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, esperado 200, corpo: %s", rec.Code, rec.Body.String())
+	}
+	if configured := decodeBody(t, rec)["configured"]; configured != false {
+		t.Fatalf("configured = %v, esperado false (só o PCSX2.ini de installFakePCSX2, sem [Pad1])", configured)
+	}
+
+	configHome, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatalf("UserConfigDir: %v", err)
+	}
+	iniPath := filepath.Join(configHome, "PCSX2", "inis", "PCSX2.ini")
+	raw, err := os.ReadFile(iniPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(iniPath, append(raw, []byte("\n[Pad1]\nCross = SDL-0/FaceSouth\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	rec2 := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/emulators/pcsx2/controller-status", nil)
+	if configured := decodeBody(t, rec2)["configured"]; configured != true {
+		t.Fatalf("configured = %v, esperado true depois do bind SDL-", configured)
+	}
+}
+
+// Adapter sem NativeControllerAdapter (a maioria dos standalone) devolve
+// controller_check_unsupported, não um 200 fingindo saber responder.
+func TestControllerStatusUnsupportedAdapter(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+
+	rec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/emulators/duckstation/controller-status", nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, esperado 400", rec.Code)
+	}
+	if code := errorCode(decodeBody(t, rec)); code != "controller_check_unsupported" {
+		t.Fatalf("code = %q, esperado controller_check_unsupported", code)
+	}
+}

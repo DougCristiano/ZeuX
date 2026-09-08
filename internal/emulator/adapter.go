@@ -210,6 +210,21 @@ type KeyBindableAdapter interface {
 	WriteBindings(install Installation, bindings []InputBinding) (unapplied []string, err error)
 }
 
+// NativeControllerAdapter é a capacidade opcional de dizer se este emulador
+// já tem, agora, algum mapeamento de controle físico salvo no próprio
+// mecanismo nativo dele — não diz qual controle é, nem substitui
+// KeyBindableAdapter (que é teclado/botão por ação, no vocabulário do
+// adapter). Existe só para o passo guiado de "Configurar controle"
+// (SettingsScreen, 2026-09-08) confirmar que o usuário completou o
+// mapeamento dentro do próprio emulador, sem o ZeuX escrever bind nenhum
+// sozinho — PCSX2 e RetroArch resolvem isso cada um do seu jeito
+// (SDL_GameController posicional e autoconfig por vendor/product,
+// respectivamente), e os dois já são robustos o bastante para qualquer
+// marca de controle sem o ZeuX precisar traduzir nada.
+type NativeControllerAdapter interface {
+	ControllerConfigured(install Installation) (bool, error)
+}
+
 // Adapter traduz uma Request na linha de comando de um emulador específico.
 type Adapter interface {
 	// ID é o identificador estável usado em configuração e API.

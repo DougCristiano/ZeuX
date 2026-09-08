@@ -35,8 +35,8 @@ export const dict = {
   // Controllers section
   controllersHeading: { "pt-BR": "Controles", en: "Controllers" },
   controllersDescription: {
-    "pt-BR": "Escolha o perfil de controle e mapeie botões para cada emulador que suporta isso. Sem emuladores instalados que suportem mapeamento, esta lista fica vazia.",
-    en: "Choose the controller profile and map buttons for each emulator that supports it. With no installed emulator that supports mapping, this list stays empty.",
+    "pt-BR": "Configure seu controle físico uma vez só abaixo — o ZeuX abre cada emulador, diz o passo exato e confirma que funcionou. Sem emuladores instalados que suportem isso, a lista fica vazia.",
+    en: "Set up your physical controller once below — ZeuX opens each emulator, tells you the exact step, and confirms it worked. With no installed emulator that supports this, the list stays empty.",
   },
   testControllerButton: { "pt-BR": "Testar controle", en: "Test controller" },
   loadingEmulatorsForControllers: { "pt-BR": "Carregando emuladores…", en: "Loading emulators…" },
@@ -44,8 +44,43 @@ export const dict = {
     "pt-BR": "Nenhum emulador instalado suporta mapeamento de controle ainda (hoje: PCSX2 e RetroArch).",
     en: "No installed emulator supports controller mapping yet (currently: PCSX2 and RetroArch).",
   },
-  configureController: { "pt-BR": "Configurar controle", en: "Configure controller" },
-  hideController: { "pt-BR": "Ocultar", en: "Hide" },
+
+  // Configurar controle — fluxo guiado (2026-09-08): um passo por emulador,
+  // que abre o app real e confirma lendo o arquivo dele depois. O ZeuX
+  // nunca escreve o bind de botão físico sozinho — cada emulador resolve
+  // isso do seu jeito nativo (PCSX2: SDL posicional; RetroArch: autoconfig
+  // por vendor/product).
+  guidedSetupHeading: { "pt-BR": "Configurar controle", en: "Set up controller" },
+  guidedSetupDetectedController: { "pt-BR": "Controle detectado: {{name}}", en: "Detected controller: {{name}}" },
+  guidedSetupNoController: {
+    "pt-BR": "Nenhum controle detectado ainda — conecte um e aperte qualquer botão.",
+    en: "No controller detected yet — connect one and press any button.",
+  },
+  guidedSetupOpenButton: { "pt-BR": "Abrir {{emulator}}", en: "Open {{emulator}}" },
+  guidedSetupOpening: { "pt-BR": "Abrindo…", en: "Opening…" },
+  guidedSetupOpenError: { "pt-BR": "Não foi possível abrir o {{emulator}}.", en: "Could not open {{emulator}}." },
+  guidedSetupVerifyButton: { "pt-BR": "Concluído, verificar", en: "Done, verify" },
+  guidedSetupVerifying: { "pt-BR": "Verificando…", en: "Verifying…" },
+  guidedSetupCheckError: { "pt-BR": "Não foi possível verificar agora.", en: "Could not check right now." },
+  guidedSetupConfigured: { "pt-BR": "Configurado", en: "Configured" },
+  guidedSetupNotConfiguredYet: {
+    "pt-BR": "Ainda não detectamos — siga os passos acima e verifique de novo.",
+    en: "Not detected yet — follow the steps above and check again.",
+  },
+  guidedSetupInstructionsPcsx2: {
+    "pt-BR": "Configurações → Controladores → Pad1: aperte cada botão do vocabulário do PCSX2 (Up, Cross, Triangle...) com o seu controle físico, sem criar um perfil de entrada separado.",
+    en: "Settings → Controllers → Pad1: press each PCSX2 action (Up, Cross, Triangle...) with your physical controller, without creating a separate input profile.",
+  },
+  guidedSetupInstructionsRetroarch: {
+    "pt-BR": "Configurações → Entrada → Porta 1 → Configurar: aperte cada botão pedido com o seu controle físico e, ao final, escolha \"Salvar perfil de controle\".",
+    en: "Settings → Input → Port 1 Controls → Configure: press each requested button with your physical controller, and at the end choose \"Save Controller Profile\".",
+  },
+
+  // Mapeamento manual (avançado) — o painel de teclado/botão por ação que
+  // já existia antes do fluxo guiado acima; continua para overrides finos.
+  manualMappingHeading: { "pt-BR": "Mapeamento manual (avançado)", en: "Manual mapping (advanced)" },
+  manualMappingButton: { "pt-BR": "Mapear teclado/controle", en: "Map keyboard/controller" },
+  hideManualMapping: { "pt-BR": "Ocultar", en: "Hide" },
 
   // Uninstall section
   uninstallHeading: { "pt-BR": "Desinstalar o ZeuX", en: "Uninstall ZeuX" },

@@ -240,6 +240,13 @@ export type EmulatorEntry = {
   /** H3/H4 — diz se GET/POST .../bindings existe de verdade. */
   bindable: boolean;
   /**
+   * Diz se GET .../controller-status existe de verdade — usado pelo passo
+   * guiado "Configurar controle" (2026-09-08) pra saber quais emuladores
+   * sabem responder "já tem um controle físico mapeado?" sem o ZeuX
+   * escrever o bind ele mesmo (hoje PCSX2 e RetroArch).
+   */
+  controller_check: boolean;
+  /**
    * O que acontece se a interface pedir a instalação deste emulador (Q5,
    * docs/roadmap.md, Sprint Q):
    *

@@ -171,6 +171,12 @@ type Status struct {
 	Configurable bool `json:"configurable"`
 	Bindable     bool `json:"bindable"`
 
+	// ControllerCheck diz se este adapter satisfaz NativeControllerAdapter
+	// — a tela "Configurar controle" (2026-09-08) só oferece o passo guiado
+	// para quem sabe responder "já tem um controle físico mapeado?" sem o
+	// ZeuX ter que adivinhar.
+	ControllerCheck bool `json:"controller_check"`
+
 	// ManagedDir é onde findBinary procura primeiro (discovery.go) — o lugar
 	// que, se o usuário colar o emulador ali, o ZeuX acha sozinho na próxima
 	// abertura da tela. Preenchida sempre que dá pra calcular (mesmo com o
@@ -210,13 +216,15 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 		_, isCustom := adapter.(customAdapter)
 		_, configurable := adapter.(ConfigurableAdapter)
 		_, bindable := adapter.(KeyBindableAdapter)
+		_, controllerCheck := adapter.(NativeControllerAdapter)
 		status := Status{
-			AdapterID:    adapter.ID(),
-			Name:         adapter.Name(),
-			Consoles:     consoles,
-			Custom:       isCustom,
-			Configurable: configurable,
-			Bindable:     bindable,
+			AdapterID:       adapter.ID(),
+			Name:            adapter.Name(),
+			Consoles:        consoles,
+			Custom:          isCustom,
+			Configurable:    configurable,
+			Bindable:        bindable,
+			ControllerCheck: controllerCheck,
 		}
 
 		if root != "" && !isCustom {

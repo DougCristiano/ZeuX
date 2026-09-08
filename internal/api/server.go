@@ -152,6 +152,7 @@ func (s *Server) Routes() http.Handler {
 	// H3/H4: mapeamento de teclado/controle — só para
 	// emulator.KeyBindableAdapter (ver Status.Bindable).
 	mux.HandleFunc("GET /api/v1/emulators/{id}/bindings", s.handleGetEmulatorBindings)
+	mux.HandleFunc("GET /api/v1/emulators/{id}/controller-status", s.handleGetControllerStatus)
 	mux.HandleFunc("POST /api/v1/emulators/{id}/bindings", s.handleSetEmulatorBindings)
 	mux.HandleFunc("GET /api/v1/controllers", s.handleListControllerProfiles)
 	mux.HandleFunc("GET /api/v1/emulators/{id}/controller-profile", s.handleGetControllerProfile)
@@ -795,6 +796,44 @@ func (s *Server) handleSetEmulatorBindings(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"unapplied": unapplied})
+}
+
+// handleGetControllerStatus responde à tela guiada "Configurar controle"
+// (SettingsScreen, 2026-09-08): não lê o bind ação por ação
+// (KeyBindableAdapter) — pergunta ao adapter, no vocabulário nativo dele,
+// se já existe um mapeamento de controle físico salvo (PCSX2: bind "SDL-"
+// no Pad1; RetroArch: algum arquivo em autoconfig/). O ZeuX nunca escreve
+// esse bind sozinho — só confirma que o passo guiado dentro do emulador
+// funcionou.
+func (s *Server) handleGetControllerStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	adapter, ok := s.emulators.ByID(id)
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum emulador com o id %q.", id))
+		return
+	}
+
+	checkable, ok := adapter.(emulator.NativeControllerAdapter)
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "controller_check_unsupported",
+			fmt.Sprintf("O %s não sabe informar se um controle físico já está mapeado.", adapter.Name()))
+		return
+	}
+
+	install, ok := adapter.Locate(r.Context())
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "not_installed",
+			fmt.Sprintf("O %s não está instalado — instale antes de configurar o controle.", adapter.Name()))
+		return
+	}
+
+	configured, err := checkable.ControllerConfigured(install)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "controller_status_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"configured": configured})
 }
 
 func (s *Server) handleListControllerProfiles(w http.ResponseWriter, r *http.Request) {

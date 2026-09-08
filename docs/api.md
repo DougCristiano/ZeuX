@@ -86,6 +86,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `GET/POST /emulators/{id}/bindings` | Mapeamento de tecla/botão por emulador. `400 not_bindable` para adapter sem suporte. |
 | `GET /controllers` | Lista os perfis de controle conhecidos (ex. `xbox`, `dualshock`) — não é lista de hardware conectado fisicamente. |
 | `GET/POST /emulators/{id}/controller-profile` | Perfil de controle aplicado a um emulador. `POST` com `profile_id` desconhecido: `400 unknown_controller_profile`. |
+| `GET /emulators/{id}/controller-status` | `{"configured": bool}` — diz se este emulador já tem, agora, algum mapeamento de controle físico salvo no seu próprio mecanismo nativo (PCSX2: bind `SDL-` no Pad1; RetroArch: algum `.cfg` em `autoconfig/`). Não escreve nada; usado pela tela guiada "Configurar controle" para confirmar que o passo dentro do próprio emulador funcionou. Adapter sem suporte: `400 controller_check_unsupported`. |
 
 ## 6. Instalação: acompanhamento de job
 
@@ -136,7 +137,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `binary_not_found`, `not_installed`, `emulator_unavailable` | 400 | Emulador exigido não está no disco. |
 | `rom_unavailable` | 400 | ROM referenciada não existe/não é legível. |
 | `command_failed`, `launch_failed`, `open_failed` | 400 | Falha ao montar ou rodar o comando do emulador — quase sempre acionável pelo usuário. |
-| `not_configurable`, `not_bindable` | 400 | Emulador sem suporte a config/bindings pelo ZeuX. |
+| `not_configurable`, `not_bindable`, `controller_check_unsupported` | 400 | Emulador sem suporte a config/bindings/checagem de controle pelo ZeuX. |
 | `config_restore_failed`, `config_read_failed`, `config_write_failed` | 400/500 | Config de emulador (leitura, escrita, restauração de backup). |
 | `unknown_controller_profile` | 400 | `profile_id` não reconhecido. |
 | `install_refused`, `core_install_refused`, `uninstall_failed`, `cancel_failed` | 400 | Fluxo de instalação/desinstalação de emulador ou core. |
