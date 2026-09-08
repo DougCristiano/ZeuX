@@ -272,6 +272,20 @@ antes do build do Tauri. Validado na release v0.1.12 — instaladores e
 **O que quebra se desfizer:** volta a acontecer exatamente este bug — o
 updater relata "já está atualizado" pra sempre, silenciosamente.
 
+**Achado real (2026-09-08):** o Douglas relatou o mesmo sintoma de novo —
+abriu a v0.1.14 (baixada avulsa), checou atualização com a v0.1.16 já
+publicada, e o app respondeu "já está atualizado". `sync-version.mjs`
+nunca tocava `src-tauri/Cargo.toml`, que também declara `version = "0.1.0"`
+— só `package.json`/`tauri.conf.json` eram sincronizados. Não foi possível
+confirmar nesta sessão (sem uma máquina Linux com o toolchain Tauri
+completo) se esse era de fato o caminho que o binário usava para resolver
+sua própria versão, mas sincronizar os três arquivos elimina a ambiguidade
+de uma vez — `sync-version.mjs` agora escreve nos três. De quebra, não
+havia lugar nenhum no app mostrando a versão instalada, o que tornava
+impossível diagnosticar isso sem inspecionar o binário por fora; Configurações
+agora mostra "Versão instalada: X.Y.Z" (via `getVersion()`,
+`@tauri-apps/api/app` — mesma fonte que o próprio auto-updater consulta).
+
 ### Teste de controle: SVG desenhado do zero, não vendorizado de terceiro
 
 Pedido do Douglas (2026-09-07): toast de conectado/desconectado (referência:

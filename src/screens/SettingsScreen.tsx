@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
@@ -67,6 +68,20 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
   const [pathError, setPathError] = useState<string | null>(null);
   const [uninstallError, setUninstallError] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
+  // Achado real (2026-09-08, relato do Douglas): não existia nenhum lugar
+  // no app mostrando a versão instalada, o que tornava impossível
+  // diagnosticar por conta própria se um auto-update realmente aplicou ou
+  // se a janela aberta ainda era a versão antiga. getVersion() lê o mesmo
+  // "version" que tauri.conf.json embute em tempo de build (ver
+  // scripts/sync-version.mjs) — é a fonte de verdade que o próprio
+  // auto-updater usa para decidir se há algo mais novo.
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => setAppVersion(null));
+  }, []);
   // Achado do critico-layout-biblioteca (2026-09-06): a única forma de
   // chegar no mapeamento de controle era sidebar → Consoles → card do
   // emulador → um botão que só existe se o emulador estiver instalado E for
@@ -247,7 +262,8 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
 
       <Card className="mb-6">
         <SectionHeading className="mb-2">{t("updatesHeading")}</SectionHeading>
-        <p className="mb-4 text-sm text-muted">{t("updatesDescription")}</p>
+        <p className="mb-1 text-sm text-muted">{t("updatesDescription")}</p>
+        {appVersion && <p className="mb-4 text-sm text-muted">{t("currentVersion", { version: appVersion })}</p>}
 
         {updateState.kind === "available" && (
           <div className="mb-3 rounded-lg border border-accent bg-fill p-3">

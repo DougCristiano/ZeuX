@@ -12,6 +12,7 @@ export const dict = {
     "pt-BR": "Confira as releases oficiais do ZeuX no GitHub e instale uma versão nova diretamente pelo aplicativo.",
     en: "Check the official ZeuX releases on GitHub and install a new version directly from the app.",
   },
+  currentVersion: { "pt-BR": "Versão instalada: {{version}}", en: "Installed version: {{version}}" },
   checkUpdates: { "pt-BR": "Procurar atualização", en: "Check for updates" },
   checkingUpdates: { "pt-BR": "Procurando…", en: "Checking…" },
   updateAvailable: { "pt-BR": "Atualização disponível: v{{version}}", en: "Update available: v{{version}}" },
