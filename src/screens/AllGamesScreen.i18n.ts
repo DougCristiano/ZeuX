@@ -51,6 +51,17 @@ export const dict = {
     "pt-BR": "FAVORITOS",
     en: "FAVORITES",
   },
+  // 2026-09-08: chip que inverte o filtro de ausência — ligado, mostra só
+  // os jogos cujo arquivo sumiu (pasta trocada/revarrida), nunca os dois
+  // juntos com o resto da biblioteca.
+  missingLabel: {
+    "pt-BR": "AUSENTES",
+    en: "MISSING",
+  },
+  noMissingGames: {
+    "pt-BR": "Nenhum jogo ausente — todos os arquivos apontados estão no lugar.",
+    en: "No missing games — every pointed file is where it should be.",
+  },
   allPlatforms: {
     "pt-BR": "TODOS",
     en: "ALL",

@@ -112,7 +112,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `GET /library/folders` | Lista pastas apontadas. |
 | `DELETE /library/folders/{id}` | Remove uma pasta apontada (não apaga arquivo nenhum — é só a referência). |
 | `POST /library/folders/{id}/scan` | Revarre uma pasta específica. |
-| `GET /library/games` | Lista jogos encontrados. Aceita `?sort=` — valores em **português** de propósito (`recentes`/`titulo`/`tempo_jogado`), exceção deliberada registrada no `CLAUDE.md`: preferência de tela consumida só pela própria UI do ZeuX. |
+| `GET /library/games` | Lista jogos encontrados. Aceita `?sort=` — valores em **português** de propósito (`recentes`/`titulo`/`tempo_jogado`), exceção deliberada registrada no `CLAUDE.md`: preferência de tela consumida só pela própria UI do ZeuX. Sem `console_id` (modo "todos os jogos"), `?favorite=true` restringe aos favoritos e `?missing=true` (2026-09-08) inverte o filtro de ausência — por padrão um jogo com arquivo não achado na última varredura fica fora da lista; com esse parâmetro aparecem só eles, nunca misturados com o resto. |
 | `POST/DELETE /library/games/{id}/favorite` | Marca/desmarca favorito. |
 
 ## 9. Capas de jogo (IGDB)

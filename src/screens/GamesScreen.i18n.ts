@@ -121,6 +121,16 @@ export const dict = {
     "pt-BR": 'Nenhum jogo encontrado para "{{search}}".',
     en: 'No games found for "{{search}}".',
   },
+  // 2026-09-08: mesmo par de chaves de AllGamesScreen.i18n.ts — chip que
+  // inverte o filtro de ausência (mostra só os jogos sem arquivo achado).
+  missingLabel: {
+    "pt-BR": "AUSENTES",
+    en: "MISSING",
+  },
+  noMissingGames: {
+    "pt-BR": "Nenhum jogo ausente — todos os arquivos apontados estão no lugar.",
+    en: "No missing games — every pointed file is where it should be.",
+  },
   downloadingCore: {
     "pt-BR": "Baixando o core {{coreName}}…",
     en: "Downloading core {{coreName}}…",

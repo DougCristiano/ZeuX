@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { FileX } from "lucide-react";
 import { api, ApiError, consoleImageURL, isDownloadingCore } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
@@ -13,6 +14,7 @@ import {
   consoleIconLabel,
   EmptyState,
   ErrorModal,
+  FOCUS_RING,
   InlineError,
   inputClass,
   ManualInstallModal,
@@ -110,6 +112,13 @@ export function GamesScreen({
   // `games` sem reordenar, preservando a ordenação por último jogado que o
   // GET /library/games já devolve (L11).
   const [search, setSearch] = useState("");
+  // 2026-09-08, a pedido do Douglas: jogos cujo arquivo sumiu (pasta trocada
+  // ou revarrida sem achar o ROM de novo) ficam fora da grade por padrão —
+  // antes apareciam misturados com o resto, só com um badge. Client-side
+  // pelo mesmo motivo do `search` acima: esta tela já carrega a lista
+  // inteira de um console só. Ligado, mostra só os ausentes — nunca os dois
+  // juntos, mesmo comportamento do filtro equivalente em AllGamesScreen.
+  const [missingOnly, setMissingOnly] = useState(false);
   // Erro de lançamento vira modal, não texto discreto na linha do jogo —
   // achado em 2026-08-04, um texto inline passava despercebido.
   const [launchError, setLaunchError] = useState<string | null>(null);
@@ -265,9 +274,10 @@ export function GamesScreen({
   }
 
   const trimmedSearch = search.trim();
+  const byMissing = (games ?? []).filter((g) => (missingOnly ? g.missing : !g.missing));
   const visibleGames = trimmedSearch
-    ? (games ?? []).filter((g) => g.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
-    : games;
+    ? byMissing.filter((g) => g.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
+    : byMissing;
 
   return (
     // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado — agora usa o
@@ -545,6 +555,19 @@ export function GamesScreen({
             placeholder={t("searchGamesPlaceholder")}
             className={`${inputClass} max-w-xs`}
           />
+          {games.some((g) => g.missing) && (
+            <button
+              type="button"
+              onClick={() => setMissingOnly((v) => !v)}
+              aria-pressed={missingOnly}
+              className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
+                missingOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
+              }`}
+            >
+              <FileX size={11} aria-hidden="true" />
+              {t("missingLabel")}
+            </button>
+          )}
           {trimmedSearch && visibleGames && (
             <p
               // `aria-live`: quem usa leitor de tela recebe o resultado da
@@ -562,7 +585,15 @@ export function GamesScreen({
         // Mesmo componente de vazio que a lista sem nenhum jogo já usava
         // acima — eram duas aparências para "não há o que mostrar" na mesma
         // tela (um `EmptyState` emoldurado e um parágrafo cinza solto).
-        <EmptyState message={t("noGamesMatchingSearch", { search: trimmedSearch })} />
+        <EmptyState
+          message={
+            trimmedSearch
+              ? t("noGamesMatchingSearch", { search: trimmedSearch })
+              : missingOnly
+                ? t("noMissingGames")
+                : t("noGamesFound")
+          }
+        />
       )}
 
       {/* B5 (achado do critico-design, 2026-08-18): a Sprint O escalonou a

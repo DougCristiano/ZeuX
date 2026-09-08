@@ -1,6 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { Star } from "lucide-react";
+import { FileX, Star } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
@@ -70,6 +70,12 @@ export interface AllGamesViewState {
   search: string;
   platformFilter: string | null;
   favoriteOnly: boolean;
+  // 2026-09-08, a pedido do Douglas: jogos cujo arquivo sumiu (pasta trocada
+  // ou revarrida sem achar o ROM de novo) ficam fora da lista por padrão —
+  // antes apareciam misturados com o resto, só com um badge. Ligado, mostra
+  // só os ausentes, nunca os dois juntos — mesmo filtro que `favoriteOnly`,
+  // resolvido no servidor (ver ListAllGames em internal/library/library.go).
+  missingOnly: boolean;
   sort: SortValue;
   viewMode: ViewMode;
 }
@@ -79,6 +85,7 @@ export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
   search: "",
   platformFilter: null,
   favoriteOnly: false,
+  missingOnly: false,
   sort: "recentes",
   viewMode: "grade",
 };
@@ -314,7 +321,7 @@ export function AllGamesScreen({
   initialScrollTop: number;
 }) {
   const t = useT(dict);
-  const { page, search, platformFilter, favoriteOnly, sort, viewMode } = view;
+  const { page, search, platformFilter, favoriteOnly, missingOnly, sort, viewMode } = view;
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [total, setTotal] = useState(0);
   // Consoles presentes no resultado completo (M4) — vem do servidor, não é
@@ -368,12 +375,12 @@ export function AllGamesScreen({
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Buscar (ou trocar o filtro de favoritos) reseta pra página 1 — senão
-  // "página 3" de um filtro novo quase sempre estaria vazia. `isFirstRun`
-  // existe para NÃO resetar a página restaurada (M4) quando a tela remonta
-  // com uma busca/filtro que já vieram de antes — sem ele, voltar do
-  // detalhe na página 3 com busca "mario" cairia direto na página 1 de novo,
-  // o exato bug que o item corrige.
+  // Buscar (ou trocar o filtro de favoritos/ausentes) reseta pra página 1 —
+  // senão "página 3" de um filtro novo quase sempre estaria vazia.
+  // `isFirstRun` existe para NÃO resetar a página restaurada (M4) quando a
+  // tela remonta com uma busca/filtro que já vieram de antes — sem ele,
+  // voltar do detalhe na página 3 com busca "mario" cairia direto na página
+  // 1 de novo, o exato bug que o item corrige.
   const isFirstRun = useRef(true);
   useEffect(() => {
     if (isFirstRun.current) {
@@ -382,7 +389,7 @@ export function AllGamesScreen({
     }
     onViewChange({ page: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, favoriteOnly]);
+  }, [debouncedSearch, favoriteOnly, missingOnly]);
 
   // M4: restaura a rolagem uma vez só, na primeira vez que `games` chega
   // depois do mount — depois disso, `restoredScrollRef` trava, pra não
@@ -420,6 +427,7 @@ export function AllGamesScreen({
         api.getAllLibraryGames(p, PAGE_SIZE, {
           query: debouncedSearch || undefined,
           favoriteOnly,
+          missingOnly,
           platform: platformFilter ?? undefined,
           sort,
         }),
@@ -442,7 +450,7 @@ export function AllGamesScreen({
       .finally(() => setLoadingMore(false));
   }
 
-  useEffect(loadGames, [page, debouncedSearch, favoriteOnly, platformFilter, sort]);
+  useEffect(loadGames, [page, debouncedSearch, favoriteOnly, missingOnly, platformFilter, sort]);
 
   // Auto-rescan (2026-09-06): "Todos os jogos" é a tela de entrada mais
   // comum do app (ver comentário de App.tsx sobre a fase "all-games") — é
@@ -1033,6 +1041,17 @@ export function AllGamesScreen({
           <Star size={11} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden="true" />
           {t("favoritesLabel")}
         </button>
+        <button
+          type="button"
+          onClick={() => onViewChange({ missingOnly: !missingOnly })}
+          aria-pressed={missingOnly}
+          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
+            missingOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
+          }`}
+        >
+          <FileX size={11} aria-hidden="true" />
+          {t("missingLabel")}
+        </button>
         {platformOptions.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
             <button
@@ -1123,7 +1142,7 @@ export function AllGamesScreen({
           // estados vazios continuam distintos entre si, não colapsam num
           // só). Só este ganha painel + ação principal, porque só este é a
           // primeira tela real de um usuário novo (docs/roadmap.md).
-          const trulyEmpty = !debouncedSearch && !platformFilter && !favoriteOnly;
+          const trulyEmpty = !debouncedSearch && !platformFilter && !favoriteOnly && !missingOnly;
           if (trulyEmpty) {
             return (
               <EmptyState
@@ -1160,11 +1179,15 @@ export function AllGamesScreen({
                   ? t("noGamesFound", { search: debouncedSearch })
                   : platformFilter
                     ? t("noGamesForPlatform", { platformName: shortNameFor(platformFilter) })
-                    : t("noFavoritedGames")}
+                    : missingOnly
+                      ? t("noMissingGames")
+                      : t("noFavoritedGames")}
               </p>
               <Button
                 variant="secondary"
-                onClick={() => onViewChange({ search: "", platformFilter: null, favoriteOnly: false, page: 1 })}
+                onClick={() =>
+                  onViewChange({ search: "", platformFilter: null, favoriteOnly: false, missingOnly: false, page: 1 })
+                }
               >
                 {t("clearFilters")}
               </Button>

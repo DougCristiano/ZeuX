@@ -328,9 +328,19 @@ func (s *Store) SyncFolder(ctx context.Context, folderID int64, found []NewGame)
 //
 // favoriteOnly restringe aos jogos marcados como favorito (G4) — combinável
 // com query, no SQL pelo mesmo motivo.
-func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly bool) ([]Game, error) {
-	conditions := make([]string, 0, 2)
-	args := make([]any, 0, 2)
+//
+// missingOnly troca o sentido do filtro de ausência (2026-09-08, a pedido do
+// Douglas): por padrão (missingOnly=false) jogos cujo arquivo sumiu de uma
+// pasta trocada/revarrida ficam FORA da lista — antes apareciam misturados
+// com o resto, badge "arquivo ausente", só sem botão de jogar, o que
+// empurrava ruído pro usuário toda vez que abria "Todos os jogos" sem razão
+// pra ver esses jogos ali. Com missingOnly=true a consulta inverte e
+// devolve só os ausentes — é o modo que a tela liga ao clicar no filtro
+// "mostrar ausentes", pra achar e reapontar a pasta certa. A linha nunca é
+// apagada (ver SyncFolder), só escondida por padrão.
+func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly bool, missingOnly bool) ([]Game, error) {
+	conditions := make([]string, 0, 3)
+	args := make([]any, 0, 3)
 
 	if query != "" {
 		conditions = append(conditions, `title LIKE ? ESCAPE '\'`)
@@ -338,6 +348,11 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 	}
 	if favoriteOnly {
 		conditions = append(conditions, `favorite = 1`)
+	}
+	if missingOnly {
+		conditions = append(conditions, `missing = 1`)
+	} else {
+		conditions = append(conditions, `missing = 0`)
 	}
 
 	sqlQuery := `SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite FROM library_games`

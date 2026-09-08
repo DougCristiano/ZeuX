@@ -208,7 +208,7 @@ func TestListAllGamesIncludesEveryConsole(t *testing.T) {
 		t.Fatalf("SaveGames n64: %v", err)
 	}
 
-	all, err := s.ListAllGames(ctx, "", false)
+	all, err := s.ListAllGames(ctx, "", false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestListAllGamesFiltersByTitleCaseInsensitive(t *testing.T) {
 		t.Fatalf("SaveGames: %v", err)
 	}
 
-	found, err := s.ListAllGames(ctx, "chrono", false)
+	found, err := s.ListAllGames(ctx, "chrono", false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestListAllGamesFiltersByTitleCaseInsensitive(t *testing.T) {
 
 	// "%" no termo de busca não pode virar curinga solto — sem escapar,
 	// "100%" casaria com qualquer título que comece com "100".
-	percentMatch, err := s.ListAllGames(ctx, "100%", false)
+	percentMatch, err := s.ListAllGames(ctx, "100%", false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestListAllGamesFiltersByFavorite(t *testing.T) {
 		t.Fatalf("SaveGames: %v", err)
 	}
 
-	all, err := s.ListAllGames(ctx, "", false)
+	all, err := s.ListAllGames(ctx, "", false, false)
 	if err != nil || len(all) != 2 {
 		t.Fatalf("ListAllGames setup: %v / %+v", err, all)
 	}
@@ -361,11 +361,54 @@ func TestListAllGamesFiltersByFavorite(t *testing.T) {
 		t.Fatalf("SetFavorite: %v", err)
 	}
 
-	favorites, err := s.ListAllGames(ctx, "", true)
+	favorites, err := s.ListAllGames(ctx, "", true, false)
 	if err != nil {
 		t.Fatalf("ListAllGames(favoriteOnly): %v", err)
 	}
 	if len(favorites) != 1 || favorites[0].ID != all[0].ID {
 		t.Fatalf("ListAllGames(favoriteOnly) = %+v, esperava só o jogo %d", favorites, all[0].ID)
+	}
+}
+
+// Trava o pedido de 2026-09-08: um jogo marcado como ausente (pasta trocada,
+// arquivo não achado na revarredura) some da listagem padrão, e só aparece
+// quando missingOnly=true — nunca misturado com o resto.
+func TestListAllGamesHidesMissingByDefault(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	if err := s.SaveGames(ctx, folder.ID, []NewGame{
+		{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"},
+		{ConsoleID: "ps1", Path: "/jogos/ps1/b.bin", Title: "B"},
+	}); err != nil {
+		t.Fatalf("SaveGames: %v", err)
+	}
+
+	// Revarredura só acha "a.bin" — SyncFolder marca "b.bin" como ausente,
+	// simulando a pasta de ROMs ter sido trocada por outra sem o arquivo.
+	if err := s.SyncFolder(ctx, folder.ID, []NewGame{
+		{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"},
+	}); err != nil {
+		t.Fatalf("SyncFolder: %v", err)
+	}
+
+	visible, err := s.ListAllGames(ctx, "", false, false)
+	if err != nil {
+		t.Fatalf("ListAllGames: %v", err)
+	}
+	if len(visible) != 1 || visible[0].Path != "/jogos/ps1/a.bin" {
+		t.Fatalf("ListAllGames(missingOnly=false) = %+v, esperava só o jogo presente", visible)
+	}
+
+	missing, err := s.ListAllGames(ctx, "", false, true)
+	if err != nil {
+		t.Fatalf("ListAllGames(missingOnly): %v", err)
+	}
+	if len(missing) != 1 || missing[0].Path != "/jogos/ps1/b.bin" {
+		t.Fatalf("ListAllGames(missingOnly=true) = %+v, esperava só o jogo ausente", missing)
 	}
 }

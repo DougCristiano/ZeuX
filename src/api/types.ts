@@ -498,7 +498,9 @@ export type LibraryGame = {
   added_at: string;
   /** `true` quando a última varredura não achou mais o arquivo neste caminho —
    * a entrada continua existindo (o tempo de jogo referencia o caminho), só
-   * marcada. Nunca some da lista sozinha. */
+   * marcada. No modo "todos os jogos" (sem `console_id`) some da listagem
+   * padrão (2026-09-08) — só aparece, isolado, com `?missing=true`; no modo
+   * por console continua vindo sempre, sem filtro de servidor. */
   missing: boolean;
   /** Marcado por POST/DELETE /library/games/{id}/favorite (G4). Sempre
    * presente, nunca ausente mesmo quando `false` — diferente de `cover_url`,

@@ -1473,8 +1473,11 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		// ?q= filtra por título no modo "todos os jogos" (2026-08-04, busca
 		// da Biblioteca) — no SQL, não no cliente, para achar o jogo mesmo
 		// se ele estiver em outra página. ?favorite=true filtra só os
-		// favoritos (G4), combinável com ?q=.
-		games, err = s.library.ListAllGames(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("favorite") == "true")
+		// favoritos (G4), combinável com ?q=. ?missing=true inverte o filtro
+		// de ausência (2026-09-08): por padrão jogos cujo arquivo sumiu
+		// ficam fora da lista; só aparecem, e só eles, quando a tela liga
+		// esse filtro explicitamente.
+		games, err = s.library.ListAllGames(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("favorite") == "true", r.URL.Query().Get("missing") == "true")
 	} else {
 		games, err = s.library.ListGames(r.Context(), consoleID)
 	}

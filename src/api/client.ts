@@ -239,14 +239,16 @@ export const api = {
   // `consoles` na resposta é o campo novo do M4: os `console_id` presentes
   // no resultado completo (respeitando `q`/`favorite`, não `platform`), para
   // os chips de filtro não mudarem de opção sozinhos ao trocar de
-  // página/plataforma.
+  // página/plataforma. `missingOnly` (2026-09-08) inverte o filtro de
+  // ausência: por padrão jogos sem arquivo ficam fora da lista; com
+  // `missing=true` a resposta traz só eles, nunca misturado com o resto.
   getAllLibraryGames: (
     page: number,
     pageSize: number,
-    opts: { query?: string; favoriteOnly?: boolean; platform?: string; sort?: string } = {},
+    opts: { query?: string; favoriteOnly?: boolean; missingOnly?: boolean; platform?: string; sort?: string } = {},
   ) =>
     request<{ games: LibraryGame[]; total: number; page: number; page_size: number; consoles: string[] }>(
-      `/library/games?page=${page}&page_size=${pageSize}${opts.query ? `&q=${encodeURIComponent(opts.query)}` : ""}${opts.favoriteOnly ? "&favorite=true" : ""}${opts.platform ? `&platform=${encodeURIComponent(opts.platform)}` : ""}${opts.sort ? `&sort=${encodeURIComponent(opts.sort)}` : ""}`,
+      `/library/games?page=${page}&page_size=${pageSize}${opts.query ? `&q=${encodeURIComponent(opts.query)}` : ""}${opts.favoriteOnly ? "&favorite=true" : ""}${opts.missingOnly ? "&missing=true" : ""}${opts.platform ? `&platform=${encodeURIComponent(opts.platform)}` : ""}${opts.sort ? `&sort=${encodeURIComponent(opts.sort)}` : ""}`,
     ),
   // G4: favoritar/desfavoritar — resposta idêntica nas duas, só o valor
   // gravado muda.
