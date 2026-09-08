@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { api, ApiError, consoleImageURL } from "../api";
 import type { ConsoleEntry, EmulatorEntry, LibraryFolder, Report, RetroArchCoreStatus } from "../api/types";
 import {
@@ -23,10 +23,32 @@ import {
 import { useT } from "../i18n/i18n";
 import { dict } from "./ConsolesScreen.i18n";
 
-// 24, não mais 12: o tile ocupa uma fração do espaço vertical que o card
-// antigo ocupava, então 12 por página deixava a grade sozinha em 1-2
-// fileiras curtas com um monte de espaço vazio antes da paginação.
-const PAGE_SIZE = 24;
+// 48, não mais 24 (2026-09-07): com o tile pequeno o catálogo inteiro (33
+// consoles) cabe em 3-4 fileiras, e 24 por página cortava a grade ao meio só
+// para oferecer um "Próxima" que levava a uma fileira e meia. A paginação
+// continua montada e volta sozinha se o catálogo passar de 48 — o que sumiu
+// foi o corte artificial, não a funcionalidade.
+const PAGE_SIZE = 48;
+
+/**
+ * A régua de filtros na mesma linguagem da régua de `AllGamesScreen` e do
+ * `Button variant="chrome"` (2026-09-07): `h-9` — a mesma altura do
+ * `inputClass` ao lado, que os chips de `py-1` não tinham —, canto reto,
+ * borda de 1.5px, rótulo monoespaçado em caixa alta e o friso interno de 1px
+ * no topo (luz vindo de cima) que dá o acabamento de chassi. Os três
+ * controles da barra (busca, chips, e qualquer botão) passam a medir igual,
+ * em vez de três alturas diferentes na mesma linha.
+ *
+ * Roxo no ativo e no hover, nunca ciano: filtrar é ação do usuário, e a regra
+ * da paleta (src/index.css) reserva `--accent-secondary` para o que o sistema
+ * informa — que aqui é o pingo de "pronto", não o filtro.
+ */
+const FILTER_CHIP_BASE =
+  "inline-flex h-9 items-center gap-1.5 rounded-sm border-[1.5px] px-3 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none";
+const FILTER_CHIP_ON =
+  "border-accent bg-accent/10 text-ink shadow-[0_0_14px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.06)]";
+const FILTER_CHIP_OFF =
+  "border-control-border text-muted hover:border-accent hover:bg-accent/10 hover:text-ink";
 
 /**
  * Achado do Douglas (2026-09-07): a grade de 33 consoles mostrava, de cada
@@ -69,11 +91,36 @@ function ConsoleTile({
       type="button"
       onClick={onOpen}
       title={`${entry.name} (${entry.year}) — ${readiness.badge}`}
+      // `--console-accent` como custom property no `style`, e não uma classe
+      // Tailwind com a cor interpolada: classe arbitrária é compilada em
+      // build, não lê valor dinâmico. Mesmo vocabulário que `GameCover` já
+      // usa para o halo de hover — o efeito não é novo, só passa a valer
+      // também aqui.
+      style={{ "--console-accent": accent } as CSSProperties}
       className={`group flex flex-col items-center gap-2 rounded-lg p-2 text-center transition-colors hover:bg-fill ${FOCUS_RING}`}
     >
       <div
-        className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border font-pixel text-[11px] leading-none transition-[filter] group-hover:brightness-125"
-        style={{ borderColor: ready ? accent : `${accent}66`, backgroundColor: showImage ? "var(--fill)" : undefined }}
+        // O halo na cor de identidade do console entra no hover/foco (achado
+        // do Douglas nesta sessão, aplicado antes em `LibraryScreen`: a cor
+        // do console é o ativo visual mais distintivo do projeto e estava
+        // sendo gasta só numa borda fina). `border-color`/`box-shadow` vêm de
+        // classe, nunca do `style` inline: inline venceria o `group-hover:`
+        // por especificidade e o halo nunca apareceria — só o
+        // `backgroundColor` branco (que não conflita) continua inline.
+        className={`relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border font-pixel text-[11px] leading-none transition duration-150 group-hover:border-[var(--console-accent)] group-hover:brightness-110 group-hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent)_45%,transparent)] group-focus-visible:border-[var(--console-accent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent)_45%,transparent)] ${
+          ready
+            ? "border-[var(--console-accent)]"
+            : "border-[color-mix(in_srgb,var(--console-accent)_40%,transparent)]"
+        }`}
+        // Fundo branco atrás da logo, não `--fill` (2026-09-07, achado do
+        // Douglas: "a visibilidade do console está difícil... um fundo
+        // branco seja o ideal" — mesmo ajuste do `ConsoleIcon` em ui.tsx). A
+        // maioria das logos do IGDB foi desenhada pra selo em fundo claro;
+        // sobre o `--fill` quase preto a arte escura da própria logo se
+        // perdia. `h-12` (era `h-10`, depois `h-11`): segunda rodada do
+        // mesmo achado — "os ícones pequenos, queria mais destaque" — a logo
+        // agora ocupa 75% da caixa de 64px, não só 62%.
+        style={{ backgroundColor: showImage ? "#fff" : undefined }}
       >
         {showImage ? (
           <img
@@ -83,7 +130,7 @@ function ConsoleTile({
             // no texto abaixo do ícone — um alt redundante duplicaria a
             // mesma informação pro leitor de tela.
             aria-hidden="true"
-            className="relative h-10 w-10 object-contain"
+            className="relative h-12 w-12 object-contain p-0.5"
             onError={() => setImageFailed(true)}
           />
         ) : (
@@ -107,13 +154,20 @@ function ConsoleTile({
         {ready && (
           <span
             aria-hidden="true"
-            className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent-secondary shadow-[0_0_4px_var(--accent-secondary)]"
+            // `ring-1 ring-black/25`: o pingo agora pousa sobre o fundo
+            // branco da logo em 30 dos 33 consoles — sem o anel escuro, ciano
+            // sobre branco quase some.
+            className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent-secondary ring-1 ring-black/25 shadow-[0_0_4px_var(--accent-secondary)]"
           />
         )}
       </div>
       <div className="w-full min-w-0">
-        <p className="truncate text-xs font-medium text-ink">{entry.name}</p>
-        <p className="text-[11px] text-muted">{entry.year}</p>
+        <p className="truncate text-[13px] font-medium text-ink">{entry.name}</p>
+        {/* `font-mono tabular-nums`: o ano é dado, não prosa — e alinhado em
+            coluna monoespaçada a grade inteira lê como uma tabela de catálogo,
+            que é o tempero arcade que esta tela pode pagar sem atrapalhar a
+            busca visual pela logo. */}
+        <p className="font-mono text-[11px] tracking-wide text-muted tabular-nums">{entry.year}</p>
       </div>
     </button>
   );
@@ -249,11 +303,14 @@ export function ConsolesScreen({
           // pertencem a um console só. Deixou de ser a entrada principal,
           // não de existir.
           //
-          // `secondary`, não `quiet` (achado testando com o Douglas,
-          // 2026-09-06): é uma troca de visão de tela inteira, mesma classe
-          // de ação que "← Consoles"/"Voltar" nas outras telas — `quiet`
-          // (sem borda) lê como texto solto, não como algo clicável.
-          <Button variant="secondary" onClick={onOpenEmulators}>
+          // `chrome`, não `secondary` (2026-09-07): o raciocínio de
+          // 2026-09-06 continua valendo — é uma troca de visão de tela
+          // inteira, mesma classe de ação que "← Consoles"/"Voltar" —, só que
+          // essa classe de ação ganhou variante própria desde então. Em
+          // `secondary` este botão media 40px de altura e canto de 8px ao
+          // lado de uma régua de filtros de 36px e canto reto, logo abaixo:
+          // o mesmo desencontro que motivou a variante.
+          <Button variant="chrome" onClick={onOpenEmulators}>
             {t("seeByEmulator")}
           </Button>
         }
@@ -291,22 +348,39 @@ export function ConsolesScreen({
                 // exclusivos — `aria-pressed` expõe o estado ativo (o estilo
                 // `border-accent`/`text-accent` só comunicava a quem vê).
                 aria-pressed={filter === item.id}
-                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
-                  filter === item.id ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
+                className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${
+                  filter === item.id ? FILTER_CHIP_ON : FILTER_CHIP_OFF
                 }`}
               >
-                {item.label.toUpperCase()} {total}
+                {item.label.toUpperCase()}
+                {/* A contagem separada do rótulo, em coluna monoespaçada:
+                    antes era um número solto grudado na frase e, com o chip
+                    inteiro em caixa alta, lia como parte do nome do filtro. */}
+                <span className={`tabular-nums ${filter === item.id ? "text-accent" : "opacity-70"}`}>{total}</span>
               </button>
             );
           })}
         </div>
       </div>
 
+      {/* Legenda do pingo. Sem ela, o único sinal que a grade dá antes do
+          clique era um ponto ciano de 8px que ninguém tinha como decifrar —
+          cor sozinha nunca é informação (WCAG 1.4.1). Fica ao lado da régua
+          de filtros, não dentro do tile, porque a explicação é uma só para os
+          33. */}
+      <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
+        <span
+          aria-hidden="true"
+          className="h-2 w-2 shrink-0 rounded-full bg-accent-secondary shadow-[0_0_4px_var(--accent-secondary)]"
+        />
+        {t("readyLegend")}
+      </p>
+
       {consoles === null && !error && (
         <div
           role="status"
           aria-live="polite"
-          className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-1"
+          className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2"
         >
           <span className="sr-only">{t("loadingConsoles")}</span>
           {Array.from({ length: 12 }, (_, i) => (
@@ -323,11 +397,11 @@ export function ConsolesScreen({
 
       {/* Grade de ícones, não de cards (achado do Douglas, 2026-09-07) —
           `auto-fill`/`minmax`, não breakpoints fixos: cada tile tem largura
-          conhecida e pequena (84px), então deixar o próprio CSS Grid decidir
+          conhecida e pequena (104px), então deixar o próprio CSS Grid decidir
           quantas colunas cabem evita reescrever a lista de breakpoints toda
           vez que o tile mudar de tamanho (o problema que a grade de cards
           antiga tinha, um breakpoint por card). */}
-      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-1">
+      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
         {pageItems.map(({ entry, readiness }) => (
           <ConsoleTile
             key={entry.console_id}

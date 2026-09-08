@@ -304,4 +304,17 @@ export const dict = {
     "pt-BR": "BIOS ausente",
     en: "BIOS absent",
   },
+  // Trilha das quatro peças da prontidão, no topo da tela. Rótulos curtos: o
+  // chip já está em caixa alta e monoespaçado, e a frase completa continua
+  // sendo `readiness.detail` logo acima.
+  trailEmulator: { "pt-BR": "Emulador", en: "Emulator" },
+  trailCore: { "pt-BR": "Core", en: "Core" },
+  trailBios: { "pt-BR": "BIOS", en: "BIOS" },
+  trailFolder: { "pt-BR": "Pasta", en: "Folder" },
+  trailStateOk: { "pt-BR": "no lugar", en: "in place" },
+  trailStatePending: { "pt-BR": "falta", en: "missing" },
+  // "o ZeuX não sabe", nunca "provavelmente ok": dado não verificável é
+  // declarado desconhecido (princípio 4 do CLAUDE.md).
+  trailStateUnknown: { "pt-BR": "o ZeuX não sabe", en: "ZeuX doesn't know" },
+  trailStateNotApplicable: { "pt-BR": "não se aplica", en: "not applicable" },
 } satisfies Dict;

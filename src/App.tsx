@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { api, ApiError, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
+import { SplashScreen, hasSeenSplash } from "./components/SplashScreen";
 import { AmbientGlow, Toast } from "./components/ui";
 import { useGamepad } from "./hooks/useGamepad";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
@@ -100,6 +101,17 @@ function App() {
   }, [gamepad.connected, gamepad.name, showGamepadToast, t]);
 
   const [phase, setPhase] = useState<Phase>("checking-port");
+
+  // Abertura com a logo (pedido do Douglas, 2026-09-07) — ver
+  // src/components/SplashScreen.tsx para a decisão de "só na primeira vez".
+  //
+  // **Não é uma `Phase`, de propósito.** Uma fase nova entraria no `switch`
+  // abaixo e pararia a máquina: as fases existentes encadeiam trabalho real
+  // (checar a porta → conectar no zeuxd → consentimento → scan), e enfileirar
+  // a abertura antes delas somaria 2,3s ao tempo até o app estar utilizável.
+  // Como estado à parte, a abertura só *cobre* a tela enquanto a máquina roda
+  // por baixo — quando ela sai, o app já está onde estaria sem ela.
+  const [splashVisible, setSplashVisible] = useState(() => !hasSeenSplash());
 
   // A11y 2.4.2 (auditoria de acessibilidade, 2026-09-06): `index.html` traz um
   // `<title>ZeuX</title>` estático que nunca muda de fase. Numa janela desktop
@@ -288,6 +300,34 @@ function App() {
       setPhase("consoles");
     }
     if (id === "settings") setPhase("settings");
+  }
+
+  // Depois de todos os hooks (nenhum deles depende da abertura) e antes do
+  // `switch`: a máquina de fases continua avançando nos efeitos acima
+  // enquanto isto está na tela.
+  if (splashVisible) {
+    return (
+      <>
+        <SplashScreen
+          onDone={() => {
+            setSplashVisible(false);
+            // A11y 2.4.3: a tela inteira troca por baixo de quem usa leitor
+            // de tela, sem nada indicando para onde ir. `mainRef` só existe
+            // no shell com sidebar (as fases de onboarding não o montam), daí
+            // o `?.` e o rAF — o nó só existe depois deste render.
+            requestAnimationFrame(() => mainRef.current?.focus());
+          }}
+        />
+        {/* O toast de controle conectado/desconectado precisa estar aqui
+            também, não só no shell abaixo: um controle já plugado antes de
+            abrir o ZeuX dispara o toast no primeiro render (ver o efeito no
+            topo deste arquivo) — que é justamente o render coberto pela
+            abertura. Sem esta linha, o toast nasceria e expiraria escondido
+            atrás dela, exatamente na primeira execução, que é a única em que
+            a abertura aparece. */}
+        {gamepadToast && <Toast message={gamepadToast} />}
+      </>
+    );
   }
 
   let screen: ReactNode;
@@ -517,7 +557,10 @@ function App() {
       <div className="relative flex h-screen overflow-hidden">
         <AmbientGlow opacity={9} />
         <Sidebar active={active} onNav={navigateSidebar} />
-        <main ref={mainRef} className="flex-1 overflow-y-auto">
+        {/* `tabIndex={-1}`: não entra na ordem de Tab, mas pode receber foco
+            por script — é o alvo para onde a abertura devolve o foco ao sair
+            (ver `SplashScreen.onDone`, acima). */}
+        <main ref={mainRef} tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
           {screen}
         </main>
         {gamepadToast && <Toast message={gamepadToast} />}

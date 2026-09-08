@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
-import { api, ApiError } from "../api";
+import { api, ApiError, consoleImageURL } from "../api";
 import type {
   ConsoleEmulatorOption,
   ConsoleEntry,
@@ -12,6 +12,7 @@ import type {
   RetroArchCoreStatus,
 } from "../api/types";
 import {
+  BackButton,
   Badge,
   Button,
   Callout,
@@ -19,9 +20,11 @@ import {
   CardSkeleton,
   ConfirmModal,
   ConsoleVerdictCard,
+  consoleIconLabel,
   InlineError,
   ProgressBar,
   ScreenContainer,
+  SectionHeading,
 } from "../components/ui";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
@@ -139,7 +142,15 @@ function EmulatorOptionCard({
     coreState.kind === "installing" || coreState.kind === "canceling" ? percentOf(coreState.job) : null;
 
   return (
-    <Card className="flex flex-col gap-3" style={isChosen ? { borderColor: "var(--accent)" } : undefined}>
+    <Card
+      className="flex flex-col gap-3"
+      // Barra esquerda de 3px, não a borda inteira em roxo (2026-09-07): o
+      // contorno roxo fechado lia como "selecionado/em foco", competindo com o
+      // botão primário dentro do próprio card. A barra lateral é o mesmo
+      // vocabulário de marcação que `ConsoleVerdictCard`/`EmulatorCard` usam
+      // para identidade, aqui com `--accent` porque quem marca é o ZeuX.
+      style={isChosen ? { borderLeftColor: "var(--accent)", borderLeftWidth: 3 } : undefined}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-semibold text-ink">{option.name}</p>
@@ -286,7 +297,11 @@ function EmulatorOptionCard({
                     falharia, e "criar" é o que o usuário faria em seguida de
                     qualquer jeito. Só aparece para instalação manual: nos
                     outros o ZeuX cria a pasta ele mesmo ao instalar. */}
-                <Button variant="quiet" className="px-2 py-1 text-xs" onClick={abrirPastaGerenciada}>
+                {/* `chrome` (2026-09-07): botão de pasta. O `px-2 py-1
+                    text-xs` que estava aqui à mão era, na prática, um
+                    "chrome" improvisado — a variante agora traz essa
+                    geometria (e a borda que faltava). */}
+                <Button variant="chrome" onClick={abrirPastaGerenciada}>
                   {t("openFolder")}
                 </Button>
                 {/* Q5 (docs/roadmap.md, Sprint Q): "o ZeuX confirmando sozinho
@@ -294,9 +309,11 @@ function EmulatorOptionCard({
                     extrair o RetroArch precisava sair da tela e voltar para o
                     app perceber — e não tinha como saber que era isso que
                     faltava fazer. */}
+                {/* `chrome` pelo mesmo motivo do botão de pasta ao lado: os
+                    dois estão na mesma fileira e vinham com a mesma
+                    geometria improvisada em `className`. */}
                 <Button
-                  variant="secondary"
-                  className="px-2 py-1 text-xs"
+                  variant="chrome"
                   disabled={verificando}
                   onClick={verificarInstalacao}
                 >
@@ -530,7 +547,11 @@ function GamesFolderSection({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button variant={folders.length === 0 ? "primary" : "secondary"} disabled={busy} onClick={pickFolder}>
+        {/* Sem pasta nenhuma, apontar uma é O que a tela pede — segue
+            `primary` (guideline `primary-action`: um CTA primário por tela).
+            Já tendo pasta, apontar outra vira chrome de arquivo, como os
+            outros botões de pasta do app. */}
+        <Button variant={folders.length === 0 ? "primary" : "chrome"} disabled={busy} onClick={pickFolder}>
           {folders.length === 0 ? t("chooseFolder") : t("assignAnotherFolder")}
         </Button>
         {onOpenGames && folders.length > 0 && (
@@ -605,7 +626,7 @@ function BiosSection({ entry, requiresExternalFile }: { entry?: EmulatorEntry; r
         {entry.bios_dir}
       </p>
       {error && <InlineError>{error}</InlineError>}
-      <Button type="button" variant="secondary" onClick={openBiosFolder}>
+      <Button type="button" variant="chrome" className="w-fit" onClick={openBiosFolder}>
         {t("openBiosFolder")}
       </Button>
     </Card>
@@ -646,6 +667,11 @@ export function ConsoleDetailScreen({
   const [cores, setCores] = useState<RetroArchCoreStatus[]>([]);
   const [folders, setFolders] = useState<LibraryFolder[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // `has_image` falso é o estado padrão até alguém rodar
+  // cmd/generate-console-images; este estado cobre o caso raro do arquivo
+  // embutido existir mas o <img> falhar em runtime. Os dois caem na sigla,
+  // nunca num espaço quebrado — mesma rede de segurança de `ConsolesScreen`.
+  const [heroImageFailed, setHeroImageFailed] = useState(false);
 
   const reload = useCallback(() => {
     api
@@ -680,15 +706,12 @@ export function ConsoleDetailScreen({
   if (error) {
     return (
       <ScreenContainer variant="listing">
-        {/* `secondary`, não `quiet` (achado testando com o Douglas,
-            2026-09-06): `quiet` é sem borda nenhuma, pensado pra ação
-            secundária dentro de uma linha (ex.: "Remover" de pasta) — numa
-            navegação de topo de tela, sem borda lê como texto solto, não
-            como botão clicável. Mesmo variant que "Voltar" já usa em
-            GameDetailScreen/LibraryScreen/EmulatorsScreen. */}
-        <Button variant="secondary" onClick={onBack}>
-          {t("backConsoles")}
-        </Button>
+        {/* O achado de 2026-09-06 continua valendo — este botão precisa de
+            borda, `quiet` (sem borda nenhuma) lia como texto solto no topo
+            da tela. O que mudou em 2026-09-07 é só de onde a borda vem:
+            `BackButton` (variante `chrome`), o mesmo componente das outras
+            cinco telas, em vez de `secondary` copiado à mão. */}
+        <BackButton label={t("backConsoles")} onClick={onBack} />
         <div className="mt-4">
           <InlineError>{error}</InlineError>
         </div>
@@ -716,14 +739,67 @@ export function ConsoleDetailScreen({
   const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
   const accent = consoleAccentColor(consoleId);
   const chosenEntry = readiness.chosen ? emulatorById.get(readiness.chosen.adapter_id) : undefined;
+  const showHeroImage = entry.has_image && !heroImageFailed;
+  const requiresExternalFile = entry.requires_external_file ?? false;
+
+  /**
+   * A trilha das quatro peças, derivada do MESMO dado que as seções abaixo já
+   * mostram — nenhuma regra de prontidão nova, nenhuma chamada nova.
+   *
+   * Existe por causa do princípio 3 do CLAUDE.md: `readiness.detail` nomeia a
+   * peça que barra AGORA, mas não diz onde ela fica na sequência nem o que já
+   * está resolvido — o usuário resolvia o emulador, voltava, e a frase trocava
+   * por outra sem que ele visse que tinha avançado. A trilha mostra a
+   * sequência inteira de uma vez.
+   *
+   * O estado "desconhecido" não é enfeite: `BiosDir` só responde para alguns
+   * casos verificados ao vivo (ver `BiosSection` abaixo), e afirmar "no lugar"
+   * ou "falta" nesses casos seria fingir certeza — princípio 4. Cada chip diz
+   * o estado por escrito, além da cor, porque cor sozinha não é informação.
+   */
+  type TrailState = "ok" | "pendente" | "desconhecido" | "na";
+  const emulatorState: TrailState = readiness.chosen ? "ok" : "pendente";
+  const coreState: TrailState = !readiness.chosen
+    ? "desconhecido" // depende de qual emulador for instalado
+    : !readiness.chosen.core
+      ? "na"
+      : coreByName.get(readiness.chosen.core)?.installed
+        ? "ok"
+        : "pendente";
+  const biosState: TrailState = !requiresExternalFile
+    ? "na"
+    : !chosenEntry?.bios_dir
+      ? "desconhecido"
+      : chosenEntry.bios_dir_empty
+        ? "pendente"
+        : "ok";
+  const folderState: TrailState = consoleFolders.length > 0 ? "ok" : "pendente";
+
+  const trail: { label: string; state: TrailState }[] = [
+    { label: t("trailEmulator"), state: emulatorState },
+    { label: t("trailCore"), state: coreState },
+    { label: t("trailBios"), state: biosState },
+    { label: t("trailFolder"), state: folderState },
+  ];
+  const trailStateLabel: Record<TrailState, string> = {
+    ok: t("trailStateOk"),
+    pendente: t("trailStatePending"),
+    desconhecido: t("trailStateUnknown"),
+    na: t("trailStateNotApplicable"),
+  };
+  // Ciano = "o sistema informa que está resolvido"; roxo = "aqui você age";
+  // âmbar = o mesmo tom que `PartialNotice`/`Callout` já usam para dado não
+  // verificável. Nenhuma cor nova entra no projeto.
+  const trailStateClass: Record<TrailState, string> = {
+    ok: "border-accent-secondary/60 text-accent-secondary",
+    pendente: "border-accent text-accent",
+    desconhecido: "border-amber-line text-muted",
+    na: "border-line text-muted opacity-60",
+  };
 
   return (
     <ScreenContainer variant="listing">
-      {/* `secondary`, não `quiet` — ver comentário no outro `onBack` acima
-          (estado de erro), mesmo raciocínio. */}
-      <Button variant="secondary" onClick={onBack}>
-        {t("backConsoles")}
-      </Button>
+      <BackButton label={t("backConsoles")} onClick={onBack} />
 
       {/* Achado do critico-design (2026-09-06): a cor de identidade por
           console — o ativo de marca mais distintivo do projeto
@@ -736,7 +812,28 @@ export function ConsoleDetailScreen({
           novo: o "ícone" ao lado do título é a mesma caixa/sigla que
           `ConsoleIcon` desenha em outras telas, só sem o `<button>` (não há
           o que abrir clicando no ícone da própria tela que já é dele). */}
-      <div className="relative mt-3 mb-6 overflow-hidden rounded-lg p-5">
+      <div
+        className="relative mt-3 mb-6 overflow-hidden rounded-lg border border-line p-5"
+        // Borda esquerda de 3px na cor de identidade — o mesmo tratamento que
+        // `ConsoleVerdictCard` e `EmulatorCard` já dão a uma linha de lista,
+        // aplicado à tela que é DESTE console.
+        style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
+      >
+        {/* A própria logo, gigante e desfocada, como arte de fundo — mesmo
+            recurso que `GameHero` usa com a capa do jogo (`blur-3xl`, nunca
+            um desfoque sutil). É o único asset de arte que esta tela tem, e
+            sem ele o cabeçalho era um gradiente e nada mais. Só entra quando
+            a logo existe de verdade: nos 3 consoles sem imagem cadastrada o
+            gradiente abaixo continua sozinho, como antes. */}
+        {showHeroImage && (
+          <img
+            src={consoleImageURL(consoleId)}
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-24 -left-10 h-72 w-72 object-contain opacity-40 blur-3xl saturate-[1.8]"
+            onError={() => setHeroImageFailed(true)}
+          />
+        )}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
@@ -744,17 +841,37 @@ export function ConsoleDetailScreen({
             background: `radial-gradient(65% 90% at 12% 25%, color-mix(in srgb, ${accent} 22%, transparent), transparent 70%)`,
           }}
         />
-        <div className="relative flex items-center gap-3">
+        <div className="relative flex items-center gap-4">
+          {/* Achado desta sessão: quem clicava na logo oficial do console na
+              grade caía numa tela que mostrava "NINT" em sigla — as duas
+              telas exibiam identidades diferentes para o mesmo console. Mesma
+              caixa de 64px com fundo branco de `ConsolesScreen`/`ConsoleIcon`
+              (as logos do IGDB foram desenhadas para selo em fundo claro), e
+              a sigla — via `consoleIconLabel`, não `slice(0, 4)` à mão, que
+              ignorava o mapa de exceções do G5 — segue como fallback sobre
+              `--fill`. */}
           <span
             aria-hidden="true"
-            style={{ borderColor: `${accent}66`, color: accent }}
-            className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
+            style={{ borderColor: `${accent}66`, color: accent, backgroundColor: showHeroImage ? "#fff" : undefined }}
+            className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
           >
-            {entry.short_name.slice(0, 4).toUpperCase()}
+            {showHeroImage ? (
+              <img
+                src={consoleImageURL(consoleId)}
+                alt=""
+                className="h-14 w-14 object-contain p-0.5"
+                onError={() => setHeroImageFailed(true)}
+              />
+            ) : (
+              consoleIconLabel(consoleId, entry.short_name)
+            )}
           </span>
           <div>
             <h1 className="text-2xl font-semibold text-ink">{entry.name}</h1>
-            <p className="mt-1 text-sm text-muted">
+            {/* `font-mono`: ano e sigla são dado de catálogo, não prosa — o
+                mesmo tratamento que o ano recebeu no tile da grade, para as
+                duas telas continuarem lendo como a mesma família. */}
+            <p className="mt-1 font-mono text-sm tracking-wide text-muted">
               {t("consoleYearShortName", { year: entry.year, shortName: entry.short_name })}
             </p>
           </div>
@@ -764,11 +881,39 @@ export function ConsoleDetailScreen({
       {/* A prontidão abre a tela porque é a resposta à pergunta que trouxe o
           usuário aqui. Uma frase, e ela nomeia a peça que falta — nunca uma
           nota opaca (princípio 3). */}
-      <Card className="mb-6 flex flex-wrap items-center justify-between gap-3" filled>
-        <p className="text-base text-ink">{readiness.detail}</p>
-        <span className="shrink-0 whitespace-nowrap">
-          <Badge variant={readiness.step === "pronto" ? "solid" : "default"}>{readiness.badge}</Badge>
-        </span>
+      <Card
+        className="mb-6 flex flex-col gap-3"
+        filled
+        // Barra esquerda na cor do papel, em repouso e não só no hover: ciano
+        // quando não falta nada (o sistema informa), roxo enquanto há uma peça
+        // a resolver (aqui você age). Mesmo par de papéis da paleta em
+        // src/index.css.
+        style={{
+          borderLeftColor: readiness.step === "pronto" ? "var(--accent-secondary)" : "var(--accent)",
+          borderLeftWidth: 3,
+        }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-base text-ink">{readiness.detail}</p>
+          <span className="shrink-0 whitespace-nowrap">
+            <Badge variant={readiness.step === "pronto" ? "solid" : "default"}>{readiness.badge}</Badge>
+          </span>
+        </div>
+
+        <ul className="flex flex-wrap gap-1.5">
+          {trail.map((piece) => (
+            <li
+              key={piece.label}
+              className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-xs tracking-wide uppercase ${trailStateClass[piece.state]}`}
+            >
+              <span className="text-ink">{piece.label}</span>
+              <span aria-hidden="true" className="opacity-40">
+                ·
+              </span>
+              <span>{trailStateLabel[piece.state]}</span>
+            </li>
+          ))}
+        </ul>
       </Card>
 
       {/* O6 (Sprint O) e a regra de layout responsivo do CLAUDE.md: coluna
@@ -785,9 +930,12 @@ export function ConsoleDetailScreen({
           só com "sobre a sua biblioteca/máquina" (Jogos + Nesta máquina). */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_minmax(280px,360px)]">
         <div className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold text-ink">
+          {/* `SectionHeading`, não um `<h2>` montado à mão: os dois títulos
+              desta tela eram a última cópia manual do degrau intermediário da
+              escala (17px, caixa alta, ciano) que o componente já resolve. */}
+          <SectionHeading>
             {entry.emulators.length === 1 ? t("howToRun") : t("howToRunOptions", { count: entry.emulators.length })}
-          </h2>
+          </SectionHeading>
 
           {entry.emulators.length === 0 ? (
             <Card filled>
@@ -809,7 +957,7 @@ export function ConsoleDetailScreen({
             ))
           )}
 
-          <BiosSection entry={chosenEntry} requiresExternalFile={entry.requires_external_file ?? false} />
+          <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} />
         </div>
 
         <aside className="flex flex-col gap-4">
@@ -827,7 +975,7 @@ export function ConsoleDetailScreen({
               informação. Ausente sem consentimento/scan. */}
           {verdict && (
             <div className="flex flex-col gap-2">
-              <h2 className="text-lg font-semibold text-ink">{t("onThisMachine")}</h2>
+              <SectionHeading>{t("onThisMachine")}</SectionHeading>
               <ConsoleVerdictCard verdict={verdict} />
               {!THRESHOLDS_CALIBRATED && (
                 <Callout label={t("estimateLabel")}>{t("thresholdsNotCalibrated")}</Callout>

@@ -137,4 +137,28 @@ export const dict = {
     "pt-BR": "Cancelar",
     en: "Cancel",
   },
+  // Duas chaves em vez de uma com `{{count}}` porque o `useT` do ZeuX só
+  // interpola — não conhece regra de plural. Um console com um jogo só é
+  // comum (a pasta recém-apontada), e "1 jogos" no cabeçalho seria visível
+  // logo no primeiro uso.
+  gameCountOne: {
+    "pt-BR": "1 jogo",
+    en: "1 game",
+  },
+  gameCountMany: {
+    "pt-BR": "{{count}} jogos",
+    en: "{{count}} games",
+  },
+  searchMatchCount: {
+    "pt-BR": "{{count}} de {{total}}",
+    en: "{{count}} of {{total}}",
+  },
+  installingEmulator: {
+    "pt-BR": "Instalando {{emulator}}…",
+    en: "Installing {{emulator}}…",
+  },
+  emulatorFallbackName: {
+    "pt-BR": "emulador",
+    en: "emulator",
+  },
 } satisfies Dict;

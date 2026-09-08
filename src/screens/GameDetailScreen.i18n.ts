@@ -82,6 +82,9 @@ export const dict = {
     en: "Could not read statistics",
   },
   backButton: { "pt-BR": "Voltar", en: "Back" },
+  // Título da seção do parecer. Descritivo, nunca julgador (princípio 2 do
+  // CLAUDE.md): fala do que vai acontecer com o jogo, não da máquina.
+  howItRuns: { "pt-BR": "Como vai rodar", en: "How it will run" },
   fileHeading: { "pt-BR": "Arquivo", en: "File" },
   yourStats: { "pt-BR": "Suas estatísticas", en: "Your stats" },
   playtime: { "pt-BR": "Tempo jogado", en: "Playtime" },

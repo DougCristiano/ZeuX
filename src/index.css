@@ -251,6 +251,145 @@ body {
   background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.08) 2px, rgba(0, 0, 0, 0.08) 4px);
 }
 /*
+ * "Superfícies do navegador" (2026-09-07, redesenho da tela inicial): barra de
+ * rolagem, seleção de texto e cursor de digitação são desenhados pelo
+ * navegador e, até aqui, chegavam com o cinza padrão do WebView — as três
+ * únicas partes da janela que não pertenciam à identidade do ADR 0013. Num app
+ * desktop de tela cheia a barra de rolagem fica visível o tempo todo ao lado da
+ * grade de jogos, então é a peça que mais denuncia "página genérica".
+ * `scrollbar-color`/`scrollbar-width` (padrão CSS) cobre o WebView do Linux e
+ * do Windows moderno; o bloco `::-webkit-scrollbar` cobre o WebKit do macOS,
+ * que ainda ignora o padrão.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 2px solid var(--paper);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--control-border);
+}
+::selection {
+  /* Roxo da marca a 35%: o texto selecionado continua legível por cima (o
+     `--ink` original não é trocado), diferente do azul chapado do padrão. */
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--ink);
+}
+input,
+textarea {
+  caret-color: var(--accent);
+}
+
+/*
+ * Scanline de CRT — mesma técnica de `.game-cover-scanline` acima (repeating
+ * linear-gradient), com a linha CLARA em vez de escura porque aqui ela cobre
+ * arte escurecida do herói e da abertura, não a capa em brilho normal.
+ * Decorativa: sempre em elemento `aria-hidden`, nunca sobre texto que precise
+ * de contraste medido.
+ */
+.zeux-scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.045),
+    rgba(255, 255, 255, 0.045) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/*
+ * Abertura (SplashScreen) — o único momento de movimento autoral do app
+ * (craft floor: "one authored moment"). Escrito como keyframes aqui, não com
+ * biblioteca de animação: são quatro curvas, e trazer framer-motion/GSAP para
+ * isso custaria uma dependência de Node nova (CLAUDE.md pede perguntar antes)
+ * por nada que o CSS não faça.
+ *
+ * Todas usam só `transform`/`opacity`/`filter` — nenhuma anima largura ou
+ * posição, que forçariam reflow a cada quadro. O bloco de
+ * `prefers-reduced-motion` no fim deste arquivo já zera a duração de todas;
+ * `SplashScreen` também encurta o próprio tempo de espera nesse caso.
+ */
+@keyframes zeux-boot-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+    filter: brightness(2.4) blur(6px);
+  }
+  60% {
+    opacity: 1;
+    filter: brightness(1.15) blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1) blur(0);
+  }
+}
+
+/* Varredura horizontal que "liga a tela": uma faixa clara que desce uma vez
+   só sobre a marca, imitando o sweep de um tubo CRT ao ligar. */
+@keyframes zeux-boot-sweep {
+  0% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(220%);
+    opacity: 0;
+  }
+}
+
+/* Letra do wordmark subindo para o lugar. O atraso por letra é aplicado
+   inline em `SplashScreen` (30-50ms, faixa recomendada para stagger). */
+@keyframes zeux-boot-letter {
+  0% {
+    opacity: 0;
+    transform: translateY(0.4em);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes zeux-boot-bar {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+/* Saída mais curta que a entrada (~60% da duração) — a abertura precisa sair
+   do caminho assim que cumpriu seu papel, nunca fazer o usuário esperar. */
+@keyframes zeux-boot-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
  * Expõe as variáveis acima como cores/raio do Tailwind (`border-border`,
  * `ring-ring`, `rounded-lg` etc.) — é o que os componentes gerados pelo
  * shadcn (`src/components/ui/*`) usam. Sem `--chart-*`/`--sidebar-*`: nada

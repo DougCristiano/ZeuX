@@ -1,5 +1,6 @@
-import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
-import { Play, Star, TriangleAlert } from "lucide-react";
+import { useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
+import { ChevronLeft, Play, Star, TriangleAlert } from "lucide-react";
+import { consoleImageURL } from "../api";
 import type { ConsoleVerdict } from "../api/types";
 import logoZeux from "../assets/logo-zeux.png";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -56,21 +57,25 @@ export const FOCUS_RING =
 // exige para o limite visual de um controle de formulário. `border-control-border`
 // é o token dedicado calibrado ≥3:1 nos dois fundos (ver src/index.css).
 export const inputClass =
-  `h-[38px] w-full rounded-lg border border-control-border bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
+  `h-9 w-full rounded-lg border border-control-border bg-fill px-3 text-sm text-ink placeholder:text-muted ${FOCUS_RING}`;
 
 /**
  * N4 (docs/roadmap.md, Sprint N): wrapper sobre o `Select` do shadcn (J3)
- * que aplica a mesma altura (38px, `inputClass` acima), borda e
- * `FOCUS_RING` do input do ZeuX — sem isto, cada tela reconstruía o
- * `SelectTrigger` com um `className` própio e divergia (uma tinha `w-fit`,
- * outra `w-full max-w-xs`, nenhuma corrigia a altura de 32px nem o
- * `focus-visible:ring` de dois vocabulários — outline aqui, ring lá).
- * `data-[size=default]:h-[38px]`, não só `h-[38px]`: a base do
- * `SelectTrigger` fixa a altura sob esse mesmo seletor de atributo
- * (`data-[size=default]:h-8`) — um `h-[38px]` sem o mesmo modificador
- * perderia a MESMA disputa de especificidade que o O1 já achou nos modais
- * (`ui/dialog.tsx`): tailwind-merge não considera dois modificadores
- * diferentes como conflitantes, e a classe da base sobreviveria.
+ * que aplica a mesma altura (`h-9`/36px, `inputClass` acima — desceu de
+ * 38px em 2026-09-07 pra bater com o chip/botão `chrome` da régua de
+ * filtros: achado do Douglas testando o app, "nem na mesma altura e
+ * tamanho dos selects", revisando a decisão original do N4 de deixar chip
+ * mais baixo que input/select de propósito), borda e `FOCUS_RING` do input
+ * do ZeuX — sem isto, cada tela reconstruía o `SelectTrigger` com um
+ * `className` própio e divergia (uma tinha `w-fit`, outra `w-full
+ * max-w-xs`, nenhuma corrigia a altura de 32px nem o `focus-visible:ring`
+ * de dois vocabulários — outline aqui, ring lá).
+ * `data-[size=default]:h-9`, não só `h-9`: a base do `SelectTrigger` fixa a
+ * altura sob esse mesmo seletor de atributo (`data-[size=default]:h-8`) —
+ * um `h-9` sem o mesmo modificador perderia a MESMA disputa de
+ * especificidade que o O1 já achou nos modais (`ui/dialog.tsx`):
+ * tailwind-merge não considera dois modificadores diferentes como
+ * conflitantes, e a classe da base sobreviveria.
  * `focus-visible:ring-0`: desliga o ring do shadcn (grupo de utilitário
  * diferente do outline — os dois ficariam ativos ao mesmo tempo, dois
  * efeitos de foco sobrepostos, se não for desligado explicitamente).
@@ -100,7 +105,7 @@ export function ZSelect({
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         aria-label={ariaLabel}
-        className={`h-[38px] w-full rounded-lg border-control-border bg-fill px-3 text-sm text-ink data-[size=default]:h-[38px] focus-visible:border-control-border focus-visible:ring-0 ${FOCUS_RING} ${className}`}
+        className={`h-9 w-full rounded-lg border-control-border bg-fill px-3 text-sm text-ink data-[size=default]:h-9 focus-visible:border-control-border focus-visible:ring-0 ${FOCUS_RING} ${className}`}
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -109,7 +114,7 @@ export function ZSelect({
   );
 }
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "quiet" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "quiet" | "danger" | "chrome";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -135,6 +140,77 @@ const buttonVariants: Record<ButtonVariant, string> = {
   // `--danger-strong`, não `--danger` puro (comentário em src/index.css) —
   // é o fundo que mede ≥ 4.5:1 contra o texto branco.
   danger: "border border-danger-strong bg-danger-strong font-semibold text-white hover:brightness-110",
+  // `chrome` (achado do Douglas, 2026-09-07, testando o app de verdade: "os
+  // botões de voltar e pasta, buscar capas está destoando ainda"). A régua
+  // de filtros de `AllGamesScreen` foi redesenhada na linguagem arcade/CRT —
+  // canto reto (`rounded-sm`), rótulo miúdo em caixa alta com `tracking-wide`,
+  // borda que acende no roxo — e os botões de chrome logo acima e ao lado
+  // dela continuaram em `secondary`: canto arredondado de 8px, rótulo de
+  // 16px em caixa mista, cinza que nunca acende. Lado a lado, liam como
+  // dois aplicativos diferentes.
+  //
+  // Não é "secondary com outra cor": é o papel de **chrome de navegação e de
+  // arquivo** (voltar, apontar/abrir pasta, buscar capas) — ação sobre o
+  // aplicativo, não sobre o conteúdo da tela. `primary`/`danger` continuam
+  // sendo o conteúdo ("Jogar", "Instalar", "Remover"), e por isso não mudam:
+  // a hierarquia depende de o chrome ser visivelmente mais leve que eles
+  // (guideline `primary-action` do ui-ux-pro-max — um CTA primário por tela,
+  // ações secundárias visualmente subordinadas).
+  //
+  // O glow no hover/foco usa `--accent` (roxo), nunca `--accent-secondary`
+  // (ciano): a regra da paleta em src/index.css é "roxo é 'aqui você age',
+  // ciano é 'aqui o sistema informa'". Mesmo vocabulário de halo que o chip
+  // de plataforma ativo e a capa em hover já usam — nenhum efeito novo entra
+  // no projeto, só passa a valer também aqui.
+  //
+  // A11y: `border-control-border` em repouso (≥3:1, WCAG 1.4.11) e
+  // `text-ink` no rótulo — a versão em `text-muted` foi descartada porque o
+  // rótulo em 12px caixa alta já é o texto mais difícil da tela; cor não
+  // deveria somar dificuldade (o peso menor sozinho já subordina).
+  //
+  // Segunda rodada (2026-09-07, achado do Douglas: "quero... de uma ideia
+  // de botão mais retro ainda"): `border` (1px) virou `border-[1.5px]`
+  // (mais chapado, lê como chassi de hardware, não como contorno de campo de
+  // formulário) e ganhou `font-mono` (fonte monoespaçada do sistema, não
+  // `font-pixel`/Press Start 2P — o pixel bitmap já foi tirado dos rótulos
+  // de chip em 2026-09-06 por legibilidade ruim a 11px colorido; monoespaçada
+  // comum não tem esse problema e ainda lê como terminal/menu de console).
+  // `shadow-[inset...]` desenha um friso claro de 1px no topo por dentro —
+  // truque clássico de botão físico (luz vindo de cima), e `active:` some
+  // com ele e desce o botão 1px: o clique agora tem uma resposta tátil, não
+  // só a mudança de cor do `:hover`. `border-[1.5px]`, não `border-2`: 2px
+  // exatos empurrariam o texto/ícone 0.5px a mais que os outros variants
+  // (ainda em `border`/1px) e desalinharia baseline entre botões vizinhos de
+  // variants diferentes numa mesma linha.
+  chrome:
+    "border-[1.5px] border-control-border bg-transparent font-mono font-medium tracking-wider text-ink uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] hover:border-accent hover:bg-accent/10 hover:shadow-[0_0_14px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.06)] active:translate-y-px active:shadow-none",
+};
+
+/**
+ * Geometria por variante. `chrome` é o único que sai do botão de 16px com
+ * canto de 8px: precisa medir como os chips da régua de filtros
+ * (`rounded-sm`, `text-xs`), não como um botão de conteúdo. Fica aqui, e não
+ * concatenado em `buttonVariants`, porque a ordem de duas classes Tailwind
+ * conflitantes na mesma string (`rounded-lg` + `rounded-sm`) é decidida pela
+ * ordem no CSS gerado, não pela ordem na string — o resultado seria estável
+ * por acaso, não por desenho.
+ *
+ * `h-9` (2026-09-07: subiu de `py-1.5`/altura implícita ~28px — achado do
+ * Douglas, "nem na mesma altura e tamanho dos selects") deixa `chrome` com a
+ * mesma altura de 36px que `inputClass`/`ZSelect` e os chips da própria
+ * régua de filtros (`AllGamesScreen`) usam agora — um só valor de altura
+ * para toda a barra de controles da tela, em vez de cada família de
+ * controle ter a sua. `px-3` sozinho (sem `py`) mantém o alvo de clique
+ * dentro do mínimo de 24×24 CSS px da WCAG 2.2 AA (`web-target-size`) com
+ * folga, já que `h-9` (36px) já é maior que o piso.
+ */
+const buttonShapes: Record<ButtonVariant, string> = {
+  primary: "rounded-lg px-4 py-2 text-base",
+  secondary: "rounded-lg px-4 py-2 text-base",
+  ghost: "rounded-lg px-4 py-2 text-base",
+  quiet: "rounded-lg px-4 py-2 text-base",
+  danger: "rounded-lg px-4 py-2 text-base",
+  chrome: "h-9 gap-1.5 rounded-sm px-3 text-xs",
 };
 
 export function Button({ variant = "secondary", className = "", ...props }: ButtonProps) {
@@ -145,7 +221,10 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
       // `className` (lista de cores do RetroArch, painel de mapeamento) — esses
       // ficavam em ~20px. `inline-flex`/`items-center` mantém o rótulo centrado
       // quando o `min-h` passa a mandar na altura.
-      className={`inline-flex min-h-[24px] items-center justify-center rounded-lg px-4 py-2 text-base transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
+      // `transition-colors` virou `transition` (2026-09-07): `chrome` acende
+      // um `box-shadow` no hover, e `transition-colors` não cobre sombra — o
+      // halo apareceria de uma vez, sem a mesma inércia das cores ao lado.
+      className={`inline-flex min-h-[24px] items-center justify-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${buttonShapes[variant]} ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
       {...props}
     />
   );
@@ -255,7 +334,30 @@ export function Card({
   );
 }
 
-type BadgeVariant = "default" | "solid";
+/**
+ * Tingimento do `Button variant="chrome"` por papel (2026-09-07, redesenho da
+ * tela de Emuladores). O achado do Douglas que criou o padrão ("quero uma cor
+ * diferente de base, não só no hover") tinha gerado, em `LibraryScreen`, duas
+ * strings de seis utilities cada, escritas inline — e a tela de Emuladores
+ * precisava exatamente das mesmas duas. Nomear aqui evita a terceira cópia
+ * divergir da primeira.
+ *
+ * O `!` é necessário, não enfeite: `chrome` já define borda/fundo/sombra em
+ * repouso e no hover, o `className` só concatena (o `Button` não usa
+ * tailwind-merge), e quem vence duas utilities conflitantes é a ordem no CSS
+ * gerado, não a ordem na string — mesma armadilha que O1/N4 já documentaram.
+ *
+ * `INFO` é o ciano de "aqui o sistema informa" (regra da paleta em
+ * src/index.css); `DANGER` é o vermelho do destrutivo já em repouso, para o
+ * sinal chegar ANTES do clique. A cor nunca é o único sinal (o rótulo diz
+ * "Remover" e um `ConfirmModal` sempre confirma), então não viola 1.4.1.
+ */
+export const CHROME_TINT_INFO =
+  "border-accent-secondary/50! text-accent-secondary! hover:border-accent-secondary! hover:bg-accent-secondary/10! hover:shadow-[0_0_14px_-4px_var(--accent-secondary),inset_0_1px_0_0_rgba(255,255,255,0.06)]!";
+export const CHROME_TINT_DANGER =
+  "border-danger/50! text-danger! hover:border-danger! hover:bg-danger/10! hover:shadow-[0_0_14px_-4px_var(--danger),inset_0_1px_0_0_rgba(255,255,255,0.06)]!";
+
+type BadgeVariant = "default" | "solid" | "warn";
 
 /**
  * `accentColor` (2026-08-05): sobrepõe borda/texto com uma cor específica —
@@ -283,10 +385,18 @@ export function Badge({
   // "-ink" próprio do ciano: o mesmo quase-preto passa contraste alto contra
   // qualquer um dos dois fundos claros (medido: 4.62:1 do roxo, 12.7:1 do
   // ciano — ambos folgados o bastante pra não precisar de um segundo tom).
+  // `warn` (2026-09-07, redesenho da tela de Emuladores): "BIOS ausente"
+  // precisava ser escaneável na grade inteira de cards, não só depois de
+  // achar o `Callout` tracejado dentro de um card. Reusa os tokens âmbar que
+  // `Callout tone="amber"`/`PartialNotice` já usam — é o mesmo peso de
+  // "atenção", em tamanho de badge. Não é estado de erro: o texto continua
+  // descritivo ("a pasta está vazia"), nunca uma cobrança ao usuário.
   const styles =
     variant === "solid"
       ? "border-accent-secondary bg-accent-secondary text-accent-ink"
-      : "border-line-strong text-muted";
+      : variant === "warn"
+        ? "border-amber-line bg-amber-bg text-ink"
+        : "border-line-strong text-muted";
   return (
     <span
       title={title}
@@ -355,6 +465,43 @@ export function PartialNotice({ children }: { children: ReactNode }) {
 }
 
 /**
+ * "Voltar" — um componente, não cinco cópias (2026-09-07). O botão existia
+ * em seis lugares (`ScreenHeader`, `LibraryScreen`, `GamesScreen`,
+ * `GameDetailScreen` e duas vezes em `ConsoleDetailScreen`), sempre como
+ * `<Button variant="secondary" className="mb-4">` copiado à mão — e as
+ * cópias já tinham divergido: `GameDetailScreen` e `ConsoleDetailScreen`
+ * estavam sem `data-nav-back`, ou seja, o botão B do controle não voltava
+ * dessas duas telas (A11y 2.1.4). Com um componente só, o atributo e o
+ * espaçamento não têm mais como se perder na próxima cópia.
+ *
+ * O rótulo continua vindo de fora, e não fixo em "Voltar": as telas usam
+ * rótulos específicos de propósito ("Voltar à biblioteca", "Consoles") —
+ * `back-behavior` do ui-ux-pro-max pede um voltar previsível, e dizer para
+ * onde se volta é mais previsível que um genérico.
+ *
+ * A seta é `ChevronLeft` do lucide (N14: nada de "←" tipográfico fazendo
+ * papel de ícone) e é `aria-hidden` — decorativa ao lado de um rótulo que
+ * já diz a mesma coisa (`icon-context`).
+ */
+export function BackButton({
+  label,
+  onClick,
+  className = "",
+}: {
+  label: string;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    // A11y 2.1.4: `data-nav-back` — alvo do botão B do controle.
+    <Button variant="chrome" data-nav-back onClick={onClick} className={`mb-4 ${className}`}>
+      <ChevronLeft size={13} aria-hidden="true" />
+      {label}
+    </Button>
+  );
+}
+
+/**
  * Cabeçalho de tela — achado do critico-design (2026-09-06): seis telas
  * (`ConsolesScreen`, `EmulatorsScreen`, `SettingsScreen`, `AllGamesScreen`,
  * `ConsoleDetailScreen`, `VerdictScreen`) tinham seis anatomias de cabeçalho
@@ -388,11 +535,7 @@ export function ScreenHeader({
 }) {
   return (
     <div className="mb-6">
-      {back && (
-        <Button variant="secondary" data-nav-back onClick={back.onClick} className="mb-4">
-          {back.label}
-        </Button>
-      )}
+      {back && <BackButton label={back.label} onClick={back.onClick} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ink">{title}</h1>
@@ -1179,14 +1322,38 @@ export function consoleIconLabel(consoleId: string, label: string): string {
   return (ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase();
 }
 
+/**
+ * `ConsoleIcon` (2026-09-07: passou a tentar a logo real primeiro, achado do
+ * Douglas — "os consoles deveriam ter o mesmo ícone aqui do que tem na aba
+ * Consoles"). Antes só desenhava a sigla, mesmo para os 30 de 33 consoles
+ * que já têm logo oficial embutida (`cmd/generate-console-images`,
+ * `ConsolesScreen` já usa) — as duas telas mostravam identidades diferentes
+ * para o mesmo console. Sem `has_image` aqui (esse campo só vem de
+ * `GET /consoles`, que nem toda tela que usa `ConsoleIcon` busca): tenta a
+ * imagem direto e cai pra sigla no `onError` — mesmo efeito prático que
+ * `ConsolesScreen` obtém checando `has_image` antes, só que sem precisar de
+ * uma segunda chamada de API só pra isso. Onde a imagem falha, é 1 request
+ * 404 por ícone, não um estado quebrado visível.
+ *
+ * Fundo branco atrás da logo, não `--fill` (2026-09-07, achado do Douglas:
+ * "a visibilidade do console está difícil... muita cor escura, talvez um
+ * fundo branco seja o ideal"). A maioria das logos que o IGDB devolve (a da
+ * Nintendo incluída) foi desenhada pra selo/embalagem em fundo claro — sobre
+ * o `--fill` quase preto do tema, a arte escura da própria logo se perdia
+ * dentro do próprio ícone. Só entra quando a imagem carrega: a sigla
+ * (`imageFailed`) continua sobre `--fill`, porque essa foi desenhada com a
+ * cor de acento em mente para fundo escuro, e um branco atrás dela
+ * desligaria o contraste que já funciona.
+ */
 export function ConsoleIcon({ label, consoleId, onClick }: { label: string; consoleId: string; onClick: () => void }) {
   const accent = consoleAccentColor(consoleId);
+  const [imageFailed, setImageFailed] = useState(false);
   return (
     <button
       type="button"
       onClick={onClick}
       title={label}
-      style={{ borderColor: `${accent}66`, color: accent }}
+      style={{ borderColor: `${accent}66`, color: accent, backgroundColor: imageFailed ? undefined : "#fff" }}
       // M7 (docs/sprint-m-plano.md): 8px violava o piso de 11px da fonte
       // pixel (src/index.css) — mesma regra do badge de GameCover.
       //
@@ -1202,9 +1369,26 @@ export function ConsoleIcon({ label, consoleId, onClick }: { label: string; cons
       // `ICON_LABEL_OVERRIDES`) vazava sobre o ícone vizinho, sem colidir em
       // sigla nenhuma. `overflow-hidden` fica como rede de segurança: um
       // label futuro ainda maior corta em vez de vazar.
-      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
+      //
+      // `h-16 w-16` (era `h-12 w-12`): achado do Douglas testando a logo
+      // nova, 2026-09-07 — "os ícones pequenos, queria mais destaque". A
+      // sigla de texto continua no mesmo `text-[11px]` (ela só precisava
+      // caber, não precisa crescer); é a caixa ao redor — e a logo dentro
+      // dela — que ganham presença.
+      className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
     >
-      {consoleIconLabel(consoleId, label)}
+      {imageFailed ? (
+        consoleIconLabel(consoleId, label)
+      ) : (
+        <img
+          src={consoleImageURL(consoleId)}
+          alt=""
+          // Decorativo: `title` do botão já carrega o nome do console.
+          aria-hidden="true"
+          className="h-14 w-14 object-contain p-0.5"
+          onError={() => setImageFailed(true)}
+        />
+      )}
     </button>
   );
 }

@@ -11,17 +11,21 @@ import type {
 } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./EmulatorsScreen.i18n";
+import { Cpu, FolderOpen, Gamepad2, Settings2, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
   Callout,
   Card,
+  CHROME_TINT_DANGER,
+  CHROME_TINT_INFO,
   ConfirmModal,
   ConsoleIcon,
   ConsoleInfoModal,
   ConsoleMoreBadge,
   CardSkeleton,
   ErrorModal,
+  FOCUS_RING,
   InlineError,
   inputClass,
   Pagination,
@@ -52,6 +56,42 @@ const MAX_CONSOLE_ICONS = 6;
 // nativo. Convertido de volta para "" ao sair do componente (J3,
 // docs/roadmap.md), então `consoleFilter` continua "" pro resto da tela.
 const ALL_CONSOLES = "__all__";
+
+/**
+ * Régua de filtros no mesmo acabamento de `ConsolesScreen`/`AllGamesScreen`
+ * (2026-09-07): 36px de altura, canto reto, rótulo miúdo em caixa alta,
+ * borda que acende no roxo. Copiado de propósito em vez de importado — as
+ * três telas hoje declaram a régua localmente, e transformar isso num
+ * componente compartilhado é uma refatoração das três, não desta.
+ *
+ * Roxo no ativo, nunca ciano: filtrar é ação do usuário, e a paleta
+ * (src/index.css) reserva `--accent-secondary` para o que o sistema informa —
+ * que aqui é o selo "instalado" do card, não o filtro.
+ */
+const FILTER_CHIP_BASE =
+  "inline-flex h-9 items-center gap-1.5 rounded-sm border-[1.5px] px-3 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none";
+const FILTER_CHIP_ON =
+  "border-accent bg-accent/10 text-ink shadow-[0_0_14px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.06)]";
+const FILTER_CHIP_OFF =
+  "border-control-border text-muted hover:border-accent hover:bg-accent/10 hover:text-ink";
+
+/**
+ * Filtro de situação (2026-09-07). A tela é de gerenciamento: as duas
+ * perguntas reais são "o que já está instalado?" e "o que ainda dá pra
+ * instalar?", e antes disso a única forma de responder era ler os 14 cards um
+ * a um procurando a presença de um badge. `""` é "todos" — mesma convenção do
+ * filtro de console ao lado.
+ */
+type StatusFilter = "" | "installed" | "available";
+
+/**
+ * Barra de chrome do card: altura de 28px em vez dos 36px do `chrome` padrão.
+ * Um card de grade cabe 3 numa fileira (~290px de largura) e chega a ter
+ * cinco destes botões; na altura cheia eles ocupariam três linhas e
+ * empurrariam a ação de instalar/remover para fora do campo de visão. O piso
+ * de 24px da WCAG 2.2 AA (`web-target-size`) continua respeitado com folga.
+ */
+const CARD_CHROME = "h-7! px-2! whitespace-nowrap";
 
 // Achado em 2026-08-04: um core podia estar ausente por um bug silencioso
 // (log de aviso, nunca erro) e nada avisava até o usuário tentar lançar um
@@ -183,9 +223,14 @@ function RetroArchCoresList() {
             primário chamando atenção. Só aparece quando há mais de um
             faltando: para um só, o botão da linha já resolve. */}
         {missing.length > 1 && !bulk && (
+          // `chrome` compacto (2026-09-07): era o único `secondary` de canto
+          // arredondado dentro de um card que passou a ser todo `chrome` —
+          // lia como um botão de outro app. Continua subordinado de
+          // propósito (ADR 0015: o caminho normal é o core baixar sozinho ao
+          // jogar), agora no acabamento do resto da tela.
           <Button
-            variant="secondary"
-            className="shrink-0 px-2 py-1 text-xs"
+            variant="chrome"
+            className={`shrink-0 ${CARD_CHROME}`}
             onClick={() => downloadAllMissing(missing.map((c) => c.name))}
           >
             {t("downloadAllMissing", { missing: missing.length })}
@@ -253,8 +298,8 @@ function RetroArchCoresList() {
                   // caminhos para o mesmo core só geram o erro "já existe um
                   // download em andamento".
                   <Button
-                    variant="secondary"
-                    className="ml-auto shrink-0 px-2 py-1 text-xs"
+                    variant="chrome"
+                    className={`ml-auto shrink-0 ${CARD_CHROME}`}
                     onClick={() => installCore(core.name)}
                   >
                     {t("coreInstall")}
@@ -302,45 +347,52 @@ function RetroArchCoresList() {
   );
 }
 
-// Ponto de identidade (2026-08-05, a pedido do Douglas — reverte a decisão
-// anterior de "cor comunica estado real"): a cor não é mais instalado/erro/
-// não instalado — isso continua visível pelo Badge/texto logo abaixo. Aqui é
-// só a cor do console (consoleAccentColor), pra "padronizar de quem é o
-// jogo" mesmo na tela de Emuladores. Emulador de console único usa a cor
-// desse console; RetroArch e qualquer outro multi-console (sem uma
-// identidade só) cai no cinza neutro — decorar 20+ consoles com uma cor só
-// seria a mesma mentira de escolher uma ao acaso.
-function IdentityDot({ color }: { color: string | undefined }) {
+// Header com nome e a linha de situação — extraído do EmulatorCard monolítico
+// (K6, docs/roadmap.md) para o card parar de crescer como um arquivo só.
+// Puramente apresentacional, sem estado próprio.
+//
+// Redesenho de 2026-09-07 (modo Operate: escaneabilidade antes de
+// espetáculo), três mudanças:
+//
+//  1. **"não instalado" ganhou rótulo.** Antes, "instalado" era um badge e
+//     "não instalado" era a AUSÊNCIA dele — e ausência não é sinal: numa
+//     grade de 14 cards, quem procurava o que ainda dá pra instalar tinha que
+//     verificar, card a card, se faltava alguma coisa. Agora os dois estados
+//     ocupam o mesmo lugar, com o mesmo formato.
+//  2. **O selo é sempre o mesmo ("instalado"), e a origem virou legenda.**
+//     "instalado pelo ZeuX" e "já estava na máquina" são o MESMO estado com
+//     duas procedências; como dois badges de texto diferente, forçavam ler a
+//     frase inteira pra concluir a mesma coisa. O ciano (Badge `solid`) é
+//     estado passivo do sistema, nunca ação — regra da paleta em index.css.
+//  3. **"BIOS ausente" subiu para cá** (Badge `warn`, âmbar). O aviso já
+//     existia, mas só dentro do card, abaixo dos ícones de console: a
+//     condição que mais impede um jogo de abrir era a menos visível da tela.
+//     O `Callout` com a frase completa continua embaixo — o badge é o índice,
+//     não o substituto.
+//
+// O ponto de identidade de 8px (2026-08-05) saiu: a borda esquerda de 3px na
+// mesma `consoleAccentColor` (N12) chegou depois dele e diz a mesma coisa com
+// mais força; dois sinais idênticos no mesmo card só competiam pelo olho.
+function EmulatorCardHeader({ entry }: { entry: EmulatorEntry }) {
+  const t = useT(dict);
   return (
-    <span
-      className="inline-block h-2 w-2 shrink-0 rounded-full"
-      style={{ background: color ?? "var(--muted)" }}
-      aria-hidden="true"
-    />
-  );
-}
-
-// Header com nome, ponto de identidade e badge de instalação — extraído do
-// EmulatorCard monolítico (K6, docs/roadmap.md) para o card parar de crescer
-// como um arquivo só. Puramente apresentacional, sem estado próprio.
-function EmulatorCardHeader({ entry, identityColor }: { entry: EmulatorEntry; identityColor: string | undefined }) {
-  return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="flex items-start gap-2">
-        <span className="mt-1.5">
-          <IdentityDot color={identityColor} />
-        </span>
-        <p className="font-semibold text-ink">{entry.name}</p>
+    <div className="flex flex-col gap-2">
+      <p className="text-base leading-tight font-semibold text-ink">{entry.name}</p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <Badge variant={entry.installed ? "solid" : "default"}>
+          {entry.installed ? t("statusInstalled") : t("statusNotInstalled")}
+        </Badge>
+        {entry.bios_dir_empty && <Badge variant="warn">{t("biosAbsent")}</Badge>}
+        {entry.installed && (
+          <span className="font-mono text-xs tracking-wide text-muted">
+            {entry.installation?.managed ? t("managedByZeuX") : t("alreadyOnMachine")}
+            {/* Só presente em instalação gerenciada (Sprint A) — o ZeuX não
+                executa o binário de uma instalação alheia para descobrir a
+                versão dela. */}
+            {entry.installation?.version ? ` · ${entry.installation.version}` : ""}
+          </span>
+        )}
       </div>
-      {entry.installed && (
-        <div className="flex flex-col items-end gap-1">
-          <Badge variant="solid">{entry.installation?.managed ? "instalado pelo ZeuX" : "já estava na máquina"}</Badge>
-          {/* Só presente em instalação gerenciada (Sprint A) — o ZeuX não
-              executa o binário de uma instalação alheia para descobrir a
-              versão dela. */}
-          {entry.installation?.version && <span className="text-xs text-muted">{entry.installation.version}</span>}
-        </div>
-      )}
     </div>
   );
 }
@@ -379,63 +431,65 @@ function EmulatorCardConsoles({
 }
 
 /**
- * H2/H3/H4 (docs/roadmap.md): configuração e mapeamento persistidos, só
- * quando entry.configurable/bindable vêm true — hoje só PCSX2 e RetroArch
- * (H1 piloto). Emulador ainda não coberto degrada visivelmente (H5): mostra
- * que ainda é configurado por fora, em vez de simplesmente não ter nenhum
- * botão. showConfig/showBindings são estado genuinamente local a este
- * bloco — não precisam subir para o card.
+ * Barra de chrome do card: tudo que ABRE alguma coisa (o próprio emulador, um
+ * painel, uma pasta, a lista de cores), numa faixa só.
+ *
+ * Redesenho de 2026-09-07. Antes, esses controles estavam espalhados por três
+ * componentes irmãos e chegavam ao card em três acabamentos diferentes na
+ * mesma coluna vertical: `secondary` de 40px e canto arredondado
+ * (Configurações, Mapear controles), `chrome` de 36px e canto reto (Abrir
+ * pasta do BIOS), `quiet` sem borda nenhuma (Ver cores) e um `primary` roxo
+ * (Abrir configurações do emulador). Cinco pesos visuais para cinco ações do
+ * mesmo papel — o olho não tinha como agrupá-las, e o roxo, reservado a "aqui
+ * você age sobre o conteúdo", estava gasto num botão que só abre uma janela
+ * de outro programa.
+ *
+ * Agora é um papel, um acabamento: `chrome` compacto, ícone + rótulo. O roxo
+ * volta a existir no card só onde há ação sobre conteúdo (Instalar), e num
+ * emulador já instalado a única cor em repouso é o vermelho de Remover — que
+ * é a verdade da tela: o que havia para instalar já está instalado.
+ *
+ * H2/H3/H4 (docs/roadmap.md): configuração e mapeamento persistidos só quando
+ * entry.configurable/bindable vêm true — hoje só PCSX2 e RetroArch (H1
+ * piloto). Emulador ainda não coberto degrada visivelmente (H5): a frase de
+ * "ainda é configurado por fora" continua aparecendo, em vez de o card
+ * simplesmente não ter botão nenhum.
+ *
+ * showConfig/showBindings/showCores/biosError são estado genuinamente local a
+ * este bloco — nenhum deles precisa subir para o card.
  */
-function EmulatorCardConfigPanels({ entry }: { entry: EmulatorEntry }) {
+function EmulatorCardChrome({ entry }: { entry: EmulatorEntry }) {
   const t = useT(dict);
   const [showConfig, setShowConfig] = useState(false);
   const [showBindings, setShowBindings] = useState(false);
+  const [showCores, setShowCores] = useState(false);
+  const [biosError, setBiosError] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
 
-  if (!entry.installed) return null;
-
-  if (!entry.configurable && !entry.bindable) {
-    return <p className="text-xs text-muted">{t("configurationAndControls", { emulatorName: entry.name })}</p>;
+  // Botão "Configurar" (2026-08-04): abre o emulador sozinho, sem jogo — o
+  // ZeuX ainda não grava/aplica configuração nenhuma por ele (backlog
+  // separado). Renomeado para "Abrir configurações do emulador" no H2, e
+  // mantido mesmo nos adapters que já têm painel próprio: informar, não
+  // bloquear — o ZeuX nunca vira o único caminho.
+  async function openStandalone() {
+    setOpening(true);
+    setOpenError(null);
+    try {
+      await api.openEmulator(entry.adapter_id);
+    } catch (err) {
+      setOpenError(err instanceof ApiError ? err.message : t("failedToOpenEmulator"));
+    } finally {
+      setOpening(false);
+    }
   }
 
-  return (
-    <>
-      <div className="flex flex-wrap gap-2">
-        {entry.configurable && (
-          <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
-            {showConfig ? t("hideConfigurations") : t("configurations")}
-          </Button>
-        )}
-        {entry.bindable && (
-          <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
-            {showBindings ? t("hideBindings") : t("mapControls")}
-          </Button>
-        )}
-      </div>
-      {showConfig && entry.configurable && (
-        <EmulatorConfigPanel adapterId={entry.adapter_id} adapterName={entry.name} />
-      )}
-      {showBindings && entry.bindable && (
-        <EmulatorBindingsPanel adapterId={entry.adapter_id} adapterName={entry.name} />
-      )}
-    </>
-  );
-}
-
-/**
- * "Abrir pasta do BIOS" (2026-08-05): existia só dentro da tela de jogos de
- * um console (GamesScreen.tsx), a pedido do Douglas em 2026-08-04 — mas aí é
- * preciso navegar Biblioteca → console → jogos pra achar. GET /emulators já
- * traz bios_dir/bios_dir_empty por emulador (EmulatorEntry), então o botão
- * cabe aqui direto. Só aparece quando alguém já verificou de verdade onde
- * ESTE emulador lê o BIOS/firmware (BiosDir, internal/emulator/bios_dir.go)
- * — nunca um palpite por convenção.
- */
-function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
-  const t = useT(dict);
-  const [biosError, setBiosError] = useState<string | null>(null);
-
-  if (!entry.bios_dir) return null;
-
+  // "Abrir pasta do BIOS" (2026-08-05): existia só dentro da tela de jogos de
+  // um console (GamesScreen.tsx) — mas aí é preciso navegar Biblioteca →
+  // console → jogos pra achar. GET /emulators já traz bios_dir/bios_dir_empty
+  // por emulador (EmulatorEntry). Só aparece quando alguém já verificou de
+  // verdade onde ESTE emulador lê o BIOS/firmware (BiosDir,
+  // internal/emulator/bios_dir.go) — nunca um palpite por convenção.
   async function openBiosFolder() {
     setBiosError(null);
     try {
@@ -445,17 +499,101 @@ function EmulatorCardBios({ entry }: { entry: EmulatorEntry }) {
     }
   }
 
+  const isRetroArch = entry.adapter_id === "retroarch";
+  // "Abrir pasta do BIOS" e "Ver cores" nunca dependeram de o emulador estar
+  // instalado (apontar o BIOS antes de instalar é um caminho válido) — a
+  // barra existe se qualquer um dos três casos existir.
+  if (!entry.installed && !entry.bios_dir && !isRetroArch) return null;
+
   return (
     <div className="flex flex-col gap-2">
-      {entry.bios_dir_empty && (
-        <Callout label={t("biosAbsent")}>
-          {t("biosEmptyWarning")}
-        </Callout>
-      )}
-      <Button type="button" variant="secondary" onClick={openBiosFolder}>
-        {t("openBiosFolder")}
-      </Button>
+      {/* O aviso vem ANTES da barra, não depois: a frase explica por que o
+          botão "Abrir pasta do BIOS" logo abaixo é o próximo passo. Texto
+          descritivo, nunca cobrança — a pasta estar vazia é um fato sobre o
+          disco, não uma falha do usuário. */}
+      {entry.bios_dir_empty && <Callout label={t("biosAbsent")}>{t("biosEmptyWarning")}</Callout>}
+
+      <div className="flex flex-wrap gap-1.5">
+        {entry.installed && (
+          <Button
+            type="button"
+            variant="chrome"
+            className={CARD_CHROME}
+            disabled={opening}
+            onClick={openStandalone}
+            title={t("openEmulatorSettingsTooltip")}
+          >
+            <Settings2 size={12} aria-hidden="true" />
+            {opening ? t("opening") : t("openEmulatorSettings")}
+          </Button>
+        )}
+        {entry.installed && entry.configurable && (
+          <Button
+            type="button"
+            variant="chrome"
+            className={CARD_CHROME}
+            aria-expanded={showConfig}
+            onClick={() => setShowConfig((v) => !v)}
+          >
+            <SlidersHorizontal size={12} aria-hidden="true" />
+            {showConfig ? t("hideConfigurations") : t("configurations")}
+          </Button>
+        )}
+        {entry.installed && entry.bindable && (
+          <Button
+            type="button"
+            variant="chrome"
+            className={CARD_CHROME}
+            aria-expanded={showBindings}
+            onClick={() => setShowBindings((v) => !v)}
+          >
+            <Gamepad2 size={12} aria-hidden="true" />
+            {showBindings ? t("hideBindings") : t("mapControls")}
+          </Button>
+        )}
+        {entry.bios_dir && (
+          <Button type="button" variant="chrome" className={CARD_CHROME} onClick={openBiosFolder}>
+            <FolderOpen size={12} aria-hidden="true" />
+            {t("openBiosFolder")}
+          </Button>
+        )}
+        {isRetroArch && (
+          // Ciano em repouso (regra da paleta, src/index.css: "aqui o sistema
+          // informa"): a lista de cores não é uma decisão do usuário sobre o
+          // conteúdo, é o ZeuX abrindo o inventário do que já baixou. Mesmo
+          // papel que "Revarrer" tem na Biblioteca.
+          <Button
+            type="button"
+            variant="chrome"
+            className={`${CARD_CHROME} ${CHROME_TINT_INFO}`}
+            aria-expanded={showCores}
+            onClick={() => setShowCores((v) => !v)}
+          >
+            <Cpu size={12} aria-hidden="true" />
+            {showCores ? t("hideCores") : t("seeCores")}
+          </Button>
+        )}
+      </div>
+
       {biosError && <InlineError>{biosError}</InlineError>}
+      {openError && <InlineError>{openError}</InlineError>}
+
+      {entry.installed && !entry.configurable && !entry.bindable && (
+        <p className="text-xs text-muted">{t("configurationAndControls", { emulatorName: entry.name })}</p>
+      )}
+
+      {showConfig && entry.installed && entry.configurable && (
+        <EmulatorConfigPanel adapterId={entry.adapter_id} adapterName={entry.name} />
+      )}
+      {showBindings && entry.installed && entry.bindable && (
+        <EmulatorBindingsPanel adapterId={entry.adapter_id} adapterName={entry.name} />
+      )}
+      {showCores && isRetroArch && (
+        <div className="rounded-lg border border-line bg-fill p-3">
+          <p className="mb-2 font-mono text-xs tracking-wide text-muted uppercase">{t("coresSectionLabel")}</p>
+          <RetroArchCoresList />
+        </div>
+      )}
     </div>
   );
 }
@@ -485,8 +623,6 @@ function EmulatorCardActions({
   // para `useEmulatorInstall`, compartilhada com o detalhe do console.
   // Comportamento idêntico — só mudou de casa.
   const { state, setState, install, remove } = useEmulatorInstall({ adapterId: entry.adapter_id, onChanged });
-  const [openError, setOpenError] = useState<string | null>(null);
-  const [opening, setOpening] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -506,21 +642,9 @@ function EmulatorCardActions({
     }
   }
 
-  // Botão "Configurar" (2026-08-04): abre o emulador sozinho, sem jogo — o
-  // ZeuX ainda não grava/aplica configuração nenhuma (backlog separado, ver
-  // docs/roadmap.md). Por ora, "configurar" é literalmente abrir o próprio
-  // emulador para o usuário mexer na configuração dele diretamente.
-  async function openStandalone() {
-    setOpening(true);
-    setOpenError(null);
-    try {
-      await api.openEmulator(entry.adapter_id);
-    } catch (err) {
-      setOpenError(err instanceof ApiError ? err.message : t("failedToOpenEmulator"));
-    } finally {
-      setOpening(false);
-    }
-  }
+  // "Abrir configurações do emulador" saiu daqui no redesenho de 2026-09-07 —
+  // é chrome (abre a janela de outro programa), e mora em `EmulatorCardChrome`
+  // junto das outras ações do mesmo papel. Comportamento idêntico.
 
   // Até o ADR 0015 (R4), o RetroArch era um caso especial aqui: vinha
   // empacotado no instalador do ZeuX (ADR 0012), e removê-lo quebraria os 24
@@ -530,6 +654,18 @@ function EmulatorCardActions({
   // continua sendo a única condição real: só faz sentido remover o que o
   // ZeuX colocou na pasta gerenciada.
   const canRemove = entry.installed && entry.installation?.managed;
+
+  // A faixa de ações tem um filete no topo — um filete sozinho, sem botão
+  // nenhum embaixo, viraria uma régua decorativa no pé do card. Dois casos
+  // reais chegam sem ação: o emulador que já estava na máquina (não gerenciado,
+  // logo não removível) e o card enquanto a instalação corre (a barra de
+  // progresso acima é o estado, não há o que clicar).
+  const installBusy = state.kind === "installing" || state.kind === "done" || state.kind === "confirm-hardware";
+  const hasContentAction = customDef
+    ? true
+    : entry.installed
+      ? Boolean(canRemove)
+      : source?.kind === "manual" || !installBusy;
 
   return (
     <>
@@ -607,35 +743,32 @@ function EmulatorCardActions({
       )}
 
       {deleteError && <InlineError>{deleteError}</InlineError>}
-      {openError && <InlineError>{openError}</InlineError>}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {entry.installed && (
-          // Renomeado de "Configurar" para "Abrir configurações do
-          // emulador" (H2, docs/roadmap.md) — continua existindo como
-          // escape hatch mesmo para os adapters que já têm
-          // EmulatorConfigPanel/EmulatorBindingsPanel: informar, não
-          // bloquear, o ZeuX nunca vira o único caminho.
-          // N15 (docs/roadmap.md, Sprint N): é a única ação primária do card
-          // quando instalado — antes, todos os até 6 botões do card eram
-          // `secondary`, nenhum se destacava. É o único botão sempre presente
-          // (custom ou não) nesse estado, o candidato natural.
-          <Button variant="primary" disabled={opening} onClick={openStandalone} title={t("openEmulatorSettingsTooltip")}>
-            {opening ? t("opening") : t("openEmulatorSettings")}
-          </Button>
-        )}
-
+      {/* Faixa de ações sobre o CONTEÚDO, separada por um filete do resto do
+          card (2026-09-07). Numa grade de até cinco colunas, cada card
+          terminava com uma fileira de botões numa altura diferente, misturada
+          com barra de progresso e mensagens; o filete dá à grade uma linha de
+          base comum onde o olho sabe que "instalar/remover" mora. Aqui é o
+          único lugar do card onde cor em repouso significa ação: roxo para
+          instalar, vermelho para o que desfaz. */}
+      <div
+        className={`flex flex-wrap items-center gap-2 ${hasContentAction ? "border-t border-line pt-3" : ""}`}
+      >
         {customDef ? (
           // Emulador personalizado (I1): nunca passa por install/uninstall
           // genérico (não tem fonte de download) — Editar/Excluir são as
           // únicas ações, disponíveis mesmo se o binário sumiu do caminho.
           <>
             {/* N15 (docs/roadmap.md, Sprint N): primária só quando este
-                emulador personalizado NÃO está instalado — "Abrir
-                configurações do emulador" acima já é a primária do card
-                quando está (um card nunca tem duas). Sem instalação, "Editar"
-                (corrigir o caminho) é a ação óbvia seguinte. */}
-            <Button variant={entry.installed ? "secondary" : "primary"} onClick={() => onEditCustom(customDef)}>
+                emulador personalizado NÃO está instalado — nesse caso,
+                "Editar" (corrigir o caminho que não existe mais) é a ação
+                óbvia seguinte, e é o único roxo do card. Instalado, ele desce
+                para `chrome`: editar um cadastro que já funciona é
+                manutenção, e um card nunca tem duas primárias. */}
+            <Button
+              variant={entry.installed ? "chrome" : "primary"}
+              onClick={() => onEditCustom(customDef)}
+            >
               {t("edit")}
             </Button>
             {confirmingDelete ? (
@@ -657,8 +790,20 @@ function EmulatorCardActions({
                 }
               />
             ) : (
-              <Button variant="secondary" disabled={deleting} onClick={() => setConfirmingDelete(true)}>
-                Excluir
+              // Vermelho já em repouso, não só no hover (mesma decisão de
+              // "Remover" na Biblioteca, 2026-09-07): o sinal do destrutivo
+              // precisa chegar ANTES do clique. A cor não é o único sinal — o
+              // rótulo diz "Excluir" e o ConfirmModal acima confirma —, então
+              // não viola 1.4.1.
+              <Button
+                type="button"
+                variant="chrome"
+                className={CHROME_TINT_DANGER}
+                disabled={deleting}
+                onClick={() => setConfirmingDelete(true)}
+              >
+                <Trash2 size={12} aria-hidden="true" />
+                {t("deleteButton")}
               </Button>
             )}
           </>
@@ -683,11 +828,18 @@ function EmulatorCardActions({
               }
             />
           ) : (
+            // Ver o comentário de "Excluir" acima: destrutivo é vermelho em
+            // repouso. `chrome` e não `danger` (preenchido) de propósito —
+            // `danger` cheio é o peso do "Remover mesmo assim" do modal, o
+            // clique que de fato desinstala; este aqui só abre a pergunta.
             <Button
-              variant="secondary"
+              type="button"
+              variant="chrome"
+              className={CHROME_TINT_DANGER}
               disabled={state.kind === "removing"}
               onClick={() => setState({ kind: "confirm-remove" })}
             >
+              <Trash2 size={12} aria-hidden="true" />
               {state.kind === "remove-error" ? t("retryRemove") : t("remove")}
             </Button>
           ))
@@ -727,36 +879,26 @@ function EmulatorCard({
   onChanged: () => void;
   onEditCustom: (def: CustomDefinition) => void;
 }) {
-  const t = useT(dict);
-  const [showCores, setShowCores] = useState(false);
-
   // Só um console = a cor dele vira a identidade do card inteiro (12 dos 13
   // adapters embutidos além do RetroArch atendem exatamente 1). Mais de um
-  // (RetroArch) não tem uma identidade só — fica neutro.
+  // (RetroArch) não tem uma identidade só — fica neutro; decorar 20+ consoles
+  // com uma cor escolhida ao acaso seria uma mentira visual.
+  //
+  // 2026-09-07: o card multi-console ficava SEM borda esquerda nenhuma, e a
+  // grade tinha duas silhuetas diferentes (uma com filete de 3px, outra sem) —
+  // o que lia como "este card é de outro tipo", não como "este não tem uma cor
+  // só". Agora todo card tem o mesmo filete; o que varia é a cor dele.
   const identityColor = entry.consoles.length === 1 ? consoleAccentColor(entry.consoles[0]) : undefined;
-  const cardStyle: CSSProperties | undefined = identityColor
-    ? { borderLeftColor: identityColor, borderLeftWidth: 3 }
-    : undefined;
+  const cardStyle: CSSProperties = {
+    borderLeftColor: identityColor ?? "var(--line-strong)",
+    borderLeftWidth: 3,
+  };
 
   return (
     <Card className="flex flex-col gap-3" style={cardStyle}>
-      <EmulatorCardHeader entry={entry} identityColor={identityColor} />
+      <EmulatorCardHeader entry={entry} />
       <EmulatorCardConsoles entry={entry} verdictById={verdictById} onSelectConsole={onSelectConsole} />
-      <EmulatorCardConfigPanels entry={entry} />
-      <EmulatorCardBios entry={entry} />
-
-      {entry.adapter_id === "retroarch" && (
-        <div>
-          <Button type="button" variant="quiet" onClick={() => setShowCores((v) => !v)}>
-            {showCores ? t("hideCores") : t("seeCores")}
-          </Button>
-          {showCores && (
-            <div className="mt-2">
-              <RetroArchCoresList />
-            </div>
-          )}
-        </div>
-      )}
+      <EmulatorCardChrome entry={entry} />
 
       <EmulatorCardActions
         entry={entry}
@@ -802,6 +944,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   const [reloadKey, setReloadKey] = useState(0);
   const [search, setSearch] = useState("");
   const [consoleFilter, setConsoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [modalConsoleId, setModalConsoleId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
@@ -865,6 +1008,8 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   // fica grande o bastante pra justificar ida ao servidor a cada página.
   const filtered = (emulators ?? []).filter((e) => {
     if (consoleFilter && !e.consoles.includes(consoleFilter)) return false;
+    if (statusFilter === "installed" && !e.installed) return false;
+    if (statusFilter === "available" && e.installed) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return (
@@ -885,6 +1030,21 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
     setPage(1);
   }
 
+  function handleStatusFilter(value: StatusFilter) {
+    setStatusFilter(value);
+    setPage(1);
+  }
+
+  // Contagens do resumo e dos chips: sempre sobre a lista INTEIRA, nunca sobre
+  // o resultado filtrado — um chip que muda de número conforme o próprio chip
+  // ativo não é um índice do catálogo, é um espelho da última escolha.
+  const installedCount = (emulators ?? []).filter((e) => e.installed).length;
+  const statusItems: { id: StatusFilter; label: string; count: number }[] = [
+    { id: "", label: t("statusFilterAll"), count: emulators?.length ?? 0 },
+    { id: "installed", label: t("statusFilterInstalled"), count: installedCount },
+    { id: "available", label: t("statusFilterAvailable"), count: (emulators?.length ?? 0) - installedCount },
+  ];
+
   return (
     // N3 (docs/roadmap.md, Sprint N): teto centralizado em `ScreenContainer`
     // (src/components/ui.tsx) — mesmo teto escalonado que o O5 validou.
@@ -894,7 +1054,20 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           (era ao lado do h1, à direita). */}
       <ScreenHeader back={onBack ? { label: t("back"), onClick: onBack } : undefined} title={t("emulatorsTitle")} />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      {/* Resumo do catálogo (2026-09-07). A tela é de gerenciamento e a
+          primeira pergunta de quem chega é "quanto disso já está pronto?" —
+          antes, a resposta exigia contar cards. Ciano porque é o sistema
+          informando um fato sobre a máquina, não uma ação (regra da paleta,
+          src/index.css). Sem `aria-live`: o número chega junto com a lista, no
+          mesmo render — quem carrega é o `role="status"` do skeleton abaixo. */}
+      {emulators && emulators.length > 0 && (
+        <p className="mb-4 font-mono text-xs tracking-wide text-accent-secondary">
+          {t("emulatorCountLabel", { count: emulators.length })} ·{" "}
+          {t("installedSummary", { installed: installedCount, total: emulators.length })}
+        </p>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         {emulators && emulators.length > PAGE_SIZE && (
           <>
             <label htmlFor="emulators-search" className="sr-only">
@@ -928,13 +1101,40 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
             ))}
           </ZSelect>
         )}
+
+        {/* Filtro de situação (2026-09-07). Mesmos chips de 36px de
+            `ConsolesScreen`, na mesma régua do input e do select — a tela
+            tinha dois controles de filtro e nenhum atendia à pergunta que mais
+            se faz aqui ("o que ainda posso instalar?").
+            A11y 4.1.2: `aria-pressed` expõe o estado ativo, que o
+            `border-accent` só comunica a quem vê. */}
+        {emulators && emulators.length > 0 && (
+          <div role="group" aria-label={t("filterByStatusLabel")} className="flex flex-wrap gap-2">
+            {statusItems.map((item) => (
+              <button
+                key={item.id || "all"}
+                type="button"
+                onClick={() => handleStatusFilter(item.id)}
+                aria-pressed={statusFilter === item.id}
+                className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${
+                  statusFilter === item.id ? FILTER_CHIP_ON : FILTER_CHIP_OFF
+                }`}
+              >
+                {item.label.toUpperCase()}
+                {/* Contagem em coluna própria, tabular: colada ao rótulo em
+                    caixa alta, o número lia como parte do nome do filtro. */}
+                <span className="tabular-nums opacity-70">{item.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Falha ao listar os emuladores é erro de tela inteira (nada renderiza
           sem essa lista) — vira modal, não parágrafo vermelho solto no topo
           (mesmo achado do Douglas em GamesScreen/AllGamesScreen,
           2026-08-07). Os erros por card (instalar/remover/abrir pasta de
-          BIOS, em EmulatorCardActions/EmulatorCardBios abaixo) continuam
+          BIOS, em EmulatorCardActions/EmulatorCardChrome acima) continuam
           inline, de propósito: aparecem dentro do próprio card cuja ação
           falhou, ao lado do botão que a disparou — diferente do erro que
           motivou a troca, que ficava longe da célula que o causou. */}
@@ -955,8 +1155,13 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
         </div>
       )}
 
+      {/* Com o filtro de situação (2026-09-07), a lista pode esvaziar sem
+          nenhum termo digitado — a frase antiga saía como `Nenhum emulador
+          encontrado para ""`, culpando uma busca que não existia. */}
       {emulators && filtered.length === 0 && (
-        <p className="text-base text-muted">{t("noEmulatorsFound", { search })}</p>
+        <p className="text-base text-muted">
+          {search.trim() ? t("noEmulatorsFound", { search }) : t("noEmulatorsForFilters")}
+        </p>
       )}
 
       {pageItems.length > 0 && (
