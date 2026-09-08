@@ -23,6 +23,13 @@ export const dict = {
   filterMissingBios: { "pt-BR": "Falta BIOS", en: "Missing BIOS" },
   filterMissingFolder: { "pt-BR": "Falta pasta", en: "Missing folder" },
   verdict: { "pt-BR": "Parecer:", en: "Verdict:" },
+  // Legenda do pingo aceso no canto do tile — o único sinal que a grade dá
+  // antes do clique. Descreve o estado do ZeuX (peças no lugar), nunca a
+  // máquina do usuário.
+  readyLegend: {
+    "pt-BR": "Console com tudo no lugar para jogar",
+    en: "Console with everything in place to play",
+  },
   loadingConsoles: { "pt-BR": "Carregando consoles…", en: "Loading consoles…" },
   noConsolesFound: {
     "pt-BR": "Nenhum console encontrado com esse filtro.",

@@ -1,7 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Star } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
@@ -26,6 +26,7 @@ import { SelectItem } from "../components/ui/select";
 import { useToast } from "../hooks/useToast";
 import { useT } from "../i18n/i18n";
 import { dict } from "./AllGamesScreen.i18n";
+import { GameHero } from "../components/GameHero";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useIGDBStatus } from "../hooks/useIGDBStatus";
@@ -160,6 +161,89 @@ function useGridColumns(): number {
     return () => window.removeEventListener("resize", onResize);
   }, []);
   return columns;
+}
+
+/**
+ * Carrossel dos recentes que não viraram destaque.
+ *
+ * Faixa horizontal, não grade: mesma técnica que Steam/Epic/GOG usam para
+ * "recentes", com largura própria por item (`shrink-0`) para não encolher
+ * junto com a janela como a grade faz. `overflow-x-auto` só nesta faixa — a
+ * regra de "nunca scroll horizontal na página inteira" (CLAUDE.md) é sobre o
+ * body, não sobre um carrossel que existe justamente para rolar de lado.
+ *
+ * A máscara nas bordas (2026-09-07) é o que faltava: sem ela, o último tile
+ * era cortado em seco na beira do container e lia como bug de layout em vez
+ * de "tem mais para o lado". `mask-image` desvanece os últimos 40px do lado
+ * que ainda tem conteúdo escondido — puramente visual, não esconde nem torna
+ * inalcançável nada (o tile continua rolável, focável e clicável por baixo
+ * da máscara).
+ *
+ * Achado do Douglas testando o app (2026-09-07): com poucos itens (a faixa
+ * inteira cabe no container, sem nada pra rolar), a máscara antiga desbotava
+ * os dois lados incondicionalmente — o gradiente do lado esquerdo caía direto
+ * em cima do primeiro tile (o "Continue jogando" seguinte na fila) e lia como
+ * uma sombra malfeita sobre a capa, não como affordance de scroll. Agora mede
+ * de verdade quanto dá pra rolar pra cada lado (`scrollWidth` vs `clientWidth`
+ * e a posição atual) e só acende a máscara do lado que tem algo atrás dela.
+ */
+function RecentStrip({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fade, setFade] = useState({ left: false, right: false });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const scrollable = el.scrollWidth > el.clientWidth + 1;
+      setFade({
+        left: scrollable && el.scrollLeft > 1,
+        right: scrollable && el.scrollLeft < el.scrollWidth - el.clientWidth - 1,
+      });
+    };
+
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    // ResizeObserver, não só `resize` da janela: o conteúdo (capas
+    // carregando, favoritos entrando/saindo) muda `scrollWidth` sem a janela
+    // mudar de tamanho.
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, [children]);
+
+  const maskStops: string[] = [];
+  maskStops.push(fade.left ? "transparent 0" : "#000 0");
+  if (fade.left) maskStops.push("#000 40px");
+  if (fade.right) maskStops.push("#000 calc(100% - 40px)");
+  maskStops.push(fade.right ? "transparent 100%" : "#000 100%");
+  const mask = `linear-gradient(to right, ${maskStops.join(", ")})`;
+
+  return (
+    <div
+      ref={ref}
+      className="flex gap-3 overflow-x-auto pt-4 pb-2"
+      style={{
+        // Sem isto, o `scrollIntoView` implícito do foco (Tab ou D-pad, via
+        // `findNextFocus`) para o tile exatamente na borda do scrollport —
+        // isto é, dentro dos 40px que a máscara acima desbota quando ativa. O
+        // recuo é o mesmo tamanho do desvanecido, com folga; inofensivo
+        // quando a máscara está desligada.
+        scrollPaddingInline: "48px",
+        // `WebkitMaskImage` junto: o WKWebView do macOS (o WebView que o Tauri
+        // usa lá) ainda exige o prefixo; sem ele a faixa perde o desvanecido
+        // exatamente no SO em que ninguém do projeto testa ao vivo.
+        WebkitMaskImage: mask,
+        maskImage: mask,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -752,7 +836,12 @@ export function AllGamesScreen({
                     encolhia a cada jogo, empurrando o botão vizinho) e foi
                     pra `ProgressBar`, abaixo — mesmo componente que a
                     instalação inline já usa. Rótulo do botão agora é fixo. */}
-                <Button variant="secondary" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
+                {/* `chrome`, não `secondary` (2026-09-07): buscar capa é
+                    ação sobre o acervo, não sobre o jogo em foco — e ficava
+                    a poucos pixels da régua de filtros já redesenhada, com
+                    outro canto, outro tamanho de texto e outra caixa. Ver o
+                    comentário da variante em components/ui.tsx. */}
+                <Button variant="chrome" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
                   {scrapeJob ? t("fetchingCovers") : t("fetchCoversButton")}
                 </Button>
                 {scrapeJob && (
@@ -770,7 +859,7 @@ export function AllGamesScreen({
                 (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui
                 porque é sub-navegação da própria Biblioteca, não um destino
                 de primeiro nível. */}
-            <Button variant="secondary" onClick={onOpenLibrary}>
+            <Button variant="chrome" onClick={onOpenLibrary}>
               {t("manageFolders")}
             </Button>
           </>
@@ -787,60 +876,103 @@ export function AllGamesScreen({
       )}
 
       {recentGames && recentGames.length > 0 && (
-        <div className="mb-6">
-          <SectionHeading className="mb-2">{t("continuePlaying")}</SectionHeading>
-          {/* Faixa horizontal, não grade: é a mesma técnica que Steam/Epic/GOG
-              usam para "recentes" — cada capa maior que na grade abaixo
-              (w-40/w-48 vs. as ~208px que a grade divide em colunas), largura
-              própria de propósito (`shrink-0`) para não encolher junto com a
-              janela como a grade faz. `overflow-x-auto` só nesta faixa: a
-              regra de "nunca scroll horizontal na página inteira" (CLAUDE.md)
-              é sobre o body, não sobre um carrossel que existe justamente
-              para rolar de lado. */}
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {recentGames.map((game) => {
-              const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
-              const verdict = verdictFor(game.console_id);
-              const launchability = emulators
-                ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
-                : undefined;
-              return (
-                <div key={game.id} className="w-40 shrink-0 sm:w-48">
-                  <GameTile
-                    game={game}
-                    shortName={shortNameFor(game.console_id)}
-                    onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
-                    onPlay={playHandlerFor(game)}
-                    onToggleFavorite={() => toggleFavorite(game)}
-                    launchability={launchability}
-                    onInstall={
-                      verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict)) : undefined
-                    }
-                  />
-                </div>
-              );
-            })}
-          </div>
+        // Redesenho de 2026-09-07 (pedido do Douglas: "a tela mais impactante
+        // do app"): o primeiro item de "Continue jogando" sobe para uma faixa
+        // de destaque (`GameHero`) e o resto continua no carrossel de sempre.
+        // Nenhum dado novo e nenhuma requisição nova — é a mesma lista de
+        // `getAllLibraryGames(1, 8)` filtrada por `playtime_seconds > 0`, só
+        // com hierarquia entre o primeiro e os demais. O motivo está no doc
+        // comment de `GameHero`.
+        <div className="mb-8">
+          <SectionHeading className="mb-3">{t("continuePlaying")}</SectionHeading>
+          {(() => {
+            const [featured, ...rest] = recentGames;
+            const featuredVerdict = verdictFor(featured.console_id);
+            const featuredConsoleName =
+              report.verdicts.find((v) => v.console_id === featured.console_id)?.name ?? featured.console_id;
+            return (
+              <>
+                <GameHero
+                  game={featured}
+                  shortName={shortNameFor(featured.console_id)}
+                  onOpenDetail={() =>
+                    onOpenGame(featured, featuredConsoleName, shortNameFor(featured.console_id))
+                  }
+                  onPlay={playHandlerFor(featured)}
+                  onToggleFavorite={() => toggleFavorite(featured)}
+                  launchability={
+                    emulators
+                      ? evaluateGameLaunchability(featured, featuredVerdict, adapterEntryFor(featuredVerdict))
+                      : undefined
+                  }
+                  onInstall={
+                    featuredVerdict?.adapter_id
+                      ? () => install.handlePlay(featured, featuredVerdict, adapterEntryFor(featuredVerdict))
+                      : undefined
+                  }
+                />
+                {rest.length > 0 && (
+                  <RecentStrip>
+                    {rest.map((game) => {
+                      const consoleName =
+                        report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                      const verdict = verdictFor(game.console_id);
+                      const launchability = emulators
+                        ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
+                        : undefined;
+                      return (
+                        <div key={game.id} className="w-36 shrink-0 sm:w-40">
+                          <GameTile
+                            game={game}
+                            shortName={shortNameFor(game.console_id)}
+                            onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                            onPlay={playHandlerFor(game)}
+                            onToggleFavorite={() => toggleFavorite(game)}
+                            launchability={launchability}
+                            onInstall={
+                              verdict?.adapter_id
+                                ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict))
+                                : undefined
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                  </RecentStrip>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
       {/* M3: uma barra só, com busca, ordenação, alternância grade/lista,
           favoritos e chips de plataforma — nada solto fora dela (critério
           do item).
-          N4 (docs/roadmap.md, Sprint N): input e select medem 38px agora
-          (inputClass/ZSelect); os chips de tag (grade/lista, favoritos,
-          plataforma — abaixo) ficam de propósito mais baixos que os 38px.
-          Decisão revista durante a implementação: o achado do crítico era
-          "quatro alturas diferentes por acidente", não "toda barra precisa
-          da mesma caixa". `items-center` nesta linha já alinha os dois
-          tamanhos pelo centro vertical, o mesmo padrão que Steam/GitHub usam
-          em barra mista de input + tag.
           2026-09-06 (critico-design + auditoria de a11y): os chips saíram do
           `font-pixel text-[11px]` para Inter `text-xs` medium — um chip de
           filtro *ativável* é um controle, não badge nem título de navegação,
           e Press Start 2P a 11px colorido tem leitura ruim. Mesma decisão da
-          N17 (que tirou a pixel font da sidebar), agora nos controles. */}
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+          N17 (que tirou a pixel font da sidebar), agora nos controles.
+          2026-09-07: a decisão original do N4 (input/select em 38px, chips
+          "de propósito mais baixos") foi revista pelo Douglas testando o app
+          — "nem na mesma altura e tamanho dos selects, quero que deixe todos
+          com mesmo tamanho". Toda a barra mede `h-9` (36px) agora: input,
+          select, toggle grade/lista, chip de favoritos e chips de
+          plataforma. Os chips ganharam junto o mesmo acabamento do `Button
+          variant="chrome"` (borda `1.5px`, `font-mono`, friso claro no topo
+          via `shadow` inset, resposta de `active:` ao clicar) — um vocabulário
+          só de "controle físico" para toda a régua, não um por família. */}
+      {/* 2026-09-07: a barra virou um painel de verdade (borda + fundo
+          `--fill` + raio), em vez de controles soltos sobre o fundo da página.
+          Motivo: com a faixa de destaque acima dela, uma linha de controles
+          sem contorno ficava boiando entre dois blocos de peso visual alto e
+          não lia mais como "a régua que manda na grade abaixo". Não é sticky
+          de propósito — uma barra fixa no topo do `<main>` passaria por cima
+          do tile focado ao navegar a grade por teclado/controle (WCAG 2.2,
+          "focus not obscured"), e essa navegação é requisito real do produto,
+          não detalhe. */}
+      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-fill/60 px-3 py-2.5">
         <label htmlFor="all-games-search" className="sr-only">
           {t("searchPlaceholder")}
         </label>
@@ -868,14 +1000,18 @@ export function AllGamesScreen({
           ))}
         </ZSelect>
 
-        <div className="flex gap-1 rounded-sm border border-line-strong p-0.5" role="group" aria-label={t("viewModeLabel")}>
+        <div
+          className="flex h-9 items-center gap-1 rounded-sm border-[1.5px] border-line-strong p-0.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+          role="group"
+          aria-label={t("viewModeLabel")}
+        >
           {(["grade", "lista"] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               aria-pressed={viewMode === mode}
               onClick={() => onViewChange({ viewMode: mode })}
-              className={`rounded-sm px-2 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
+              className={`h-full rounded-sm px-2.5 font-mono text-xs font-medium tracking-wider uppercase transition duration-150 active:translate-y-px ${FOCUS_RING} ${
                 viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
               }`}
             >
@@ -888,7 +1024,7 @@ export function AllGamesScreen({
           type="button"
           onClick={() => onViewChange({ favoriteOnly: !favoriteOnly })}
           aria-pressed={favoriteOnly}
-          className={`flex items-center gap-1 rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
+          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
             favoriteOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
           }`}
         >
@@ -906,7 +1042,7 @@ export function AllGamesScreen({
               // mutuamente exclusivos — `aria-pressed` expõe qual está ativo
               // para o leitor de tela (o estilo só comunicava a quem vê).
               aria-pressed={platformFilter === null}
-              className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
+              className={`h-9 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
                 platformFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
               }`}
             >
@@ -935,10 +1071,20 @@ export function AllGamesScreen({
                 aria-pressed={platformFilter === id}
                 style={
                   platformFilter === id
-                    ? { borderColor: consoleAccentColor(id), background: `${consoleAccentColor(id)}1a` }
+                    ? {
+                        borderColor: consoleAccentColor(id),
+                        background: `${consoleAccentColor(id)}1a`,
+                        // 2026-09-07: o chip ativo tinha borda tingida e nada
+                        // mais — num painel de chips todos com borda, "o que
+                        // está ligado" dependia de comparar matizes de azul.
+                        // O halo é a mesma linguagem de glow que a capa e a
+                        // faixa de destaque já usam, e some junto com a borda
+                        // quando o filtro é desligado.
+                        boxShadow: `0 0 12px -4px ${consoleAccentColor(id)}`,
+                      }
                     : undefined
                 }
-                className={`rounded-sm border px-2.5 py-1 text-xs font-medium tracking-wide uppercase transition-colors ${FOCUS_RING} ${
+                className={`h-9 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
                   platformFilter === id ? "text-ink" : "border-line-strong text-muted hover:text-ink"
                 }`}
               >
@@ -983,21 +1129,46 @@ export function AllGamesScreen({
               <EmptyState
                 message={t("noGamesInLibrary")}
                 action={
-                  <Button variant="primary" onClick={onOpenLibrary}>
-                    {t("chooseFolderWithGames")}
-                  </Button>
+                  <>
+                    {/* 2026-09-07: a linha de apoio entra como `action` porque
+                        `EmptyState` só tem um slot livre — e o texto precisa
+                        vir ANTES do botão, senão o botão explica a si mesmo
+                        depois de já ter sido clicado. `max-w-md` prende a
+                        medida perto de 65 caracteres por linha; a caixa da
+                        tela vazia é larga demais para uma frase solta. */}
+                    <p className="mb-2 max-w-md text-sm text-muted">{t("emptyLibraryHelp")}</p>
+                    <Button variant="primary" onClick={onOpenLibrary}>
+                      {t("chooseFolderWithGames")}
+                    </Button>
+                  </>
                 }
               />
             );
           }
+          // Os outros dois estados vazios (busca sem resultado, filtro sem
+          // resultado) continuam distintos entre si e distintos do de cima —
+          // critério do M12, preservado. O que muda em 2026-09-07: o texto
+          // deixou de ser um `<p>` solto no meio da página, alinhado com nada,
+          // e ganhou a mesma caixa tracejada do outro estado (sem a marca, que
+          // é reservada à biblioteca de fato vazia) mais a saída óbvia — antes
+          // o usuário tinha que descobrir sozinho qual dos quatro controles da
+          // barra desfazer.
           return (
-            <p className="text-base text-muted">
-              {debouncedSearch
-                ? t("noGamesFound", { search: debouncedSearch })
-                : platformFilter
-                  ? t("noGamesForPlatform", { platformName: shortNameFor(platformFilter) })
-                  : t("noFavoritedGames")}
-            </p>
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong px-6 py-12 text-center">
+              <p className="max-w-md text-base text-muted">
+                {debouncedSearch
+                  ? t("noGamesFound", { search: debouncedSearch })
+                  : platformFilter
+                    ? t("noGamesForPlatform", { platformName: shortNameFor(platformFilter) })
+                    : t("noFavoritedGames")}
+              </p>
+              <Button
+                variant="secondary"
+                onClick={() => onViewChange({ search: "", platformFilter: null, favoriteOnly: false, page: 1 })}
+              >
+                {t("clearFilters")}
+              </Button>
+            </div>
           );
         })()
       )}

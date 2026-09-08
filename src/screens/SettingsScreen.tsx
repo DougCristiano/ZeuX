@@ -322,7 +322,9 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
               {systemInfo.info.app_data_dir}
             </p>
             {pathError && <InlineError>{pathError}</InlineError>}
-            <Button variant="secondary" onClick={openInstallFolder} className="w-fit">
+            {/* `chrome` (2026-09-07): abrir pasta é chrome de arquivo em
+                toda tela do app — ver a variante em components/ui.tsx. */}
+            <Button variant="chrome" onClick={openInstallFolder} className="w-fit">
               {t("openInstallFolder")}
             </Button>
           </div>

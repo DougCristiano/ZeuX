@@ -144,6 +144,26 @@ export const dict = {
     "pt-BR": "Não foi possível apontar esta pasta.",
     en: "Could not assign this folder.",
   },
+  // Resumo do topo (2026-09-07, redesenho): a tela tinha 33 consoles
+  // possíveis e nenhum lugar que dissesse, de relance, quantos já estão
+  // configurados — a resposta exigia contar as linhas. Descritivo, nunca
+  // avaliativo ("poucos", "falta configurar").
+  screenSummary: {
+    "pt-BR": "{{configured}} de {{total}} consoles com pasta apontada",
+    en: "{{configured}} of {{total}} consoles with a folder assigned",
+  },
+  availableCount: {
+    "pt-BR": "{{count}} sem pasta",
+    en: "{{count}} without a folder",
+  },
+  folderPathsLabel: {
+    "pt-BR": "Pastas apontadas",
+    en: "Assigned folders",
+  },
+  bulkKicker: {
+    "pt-BR": "Caminho mais rápido",
+    en: "Fastest path",
+  },
   couldNotRemoveFolder: {
     "pt-BR": "Não foi possível remover esta pasta.",
     en: "Could not remove this folder.",

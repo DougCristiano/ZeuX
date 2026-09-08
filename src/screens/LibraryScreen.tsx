@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Folder, FolderPlus, RefreshCw, Trash2 } from "lucide-react";
 import { api, ApiError } from "../api";
+import { consoleAccentColor } from "../lib/consoleColor";
 import type { BulkMatchedFolder, LibraryFolder, LibraryGame, Report } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
+  BackButton,
   Button,
   Callout,
   Card,
@@ -60,12 +63,34 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <Card filled className="mb-4 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    /* 2026-09-07 (redesenho arcade/CRT): este cartão e as linhas de console
+       tinham exatamente o mesmo peso visual (`Card filled`, borda cinza) —
+       numa tela em que ele é o atalho que resolve 33 consoles de uma vez e
+       elas são o resultado, os dois liam como itens irmãos de uma lista. Ganha
+       a borda esquerda roxa (a cor de ação da paleta) e a scanline decorativa
+       que a abertura e o herói já usam, marcando "isto é o caminho rápido"
+       sem tirar espaço nenhum de conteúdo. `overflow-hidden`: a scanline é um
+       overlay absoluto e precisa ser cortada no raio do cartão. */
+    <Card
+      filled
+      className="relative mb-4 flex flex-col gap-3 overflow-hidden"
+      style={{ borderLeftColor: "var(--accent)", borderLeftWidth: 3 }}
+    >
+      <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-30" />
+      <div className="relative flex flex-wrap items-center justify-between gap-2">
         <div>
+          {/* Rótulo-kicker em monoespaçada: mesmo vocabulário de "etiqueta de
+              chassi" dos chips e do `Callout`, e o degrau que diz o papel do
+              cartão antes do título. */}
+          <p className="mb-1 font-mono text-xs tracking-wider text-accent uppercase">{t("bulkKicker")}</p>
           <p className="font-semibold text-ink">{t("selectFolderForAllGames")}</p>
           <p className="text-sm text-muted">{t("selectFolderDescription")}</p>
         </div>
+        {/* Continua `primary` (e não `chrome`, embora "apontar pasta" seja
+            papel de chrome no vocabulário de ui.tsx): é o único CTA primário
+            da tela — a ação que resolve a tarefa inteira de uma vez. O
+            "Escolher pasta" console a console, abaixo, é que virou `chrome`,
+            preservando um primário por tela. */}
         <Button type="button" variant="primary" disabled={busy} onClick={handlePick}>
           {busy ? t("scanning") : t("chooseFolderButton")}
         </Button>
@@ -74,7 +99,7 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
       {error && <InlineError>{error}</InlineError>}
 
       {result && (
-        <div className="flex flex-col gap-2">
+        <div className="relative flex flex-col gap-2">
           {result.matched.length > 0 ? (
             <p className="text-sm text-ink">
               {t("consolesMatched", { count: result.matched.length, names: result.matched.map((m) => `${m.name} (${m.games_found})`).join(", ") })}
@@ -131,9 +156,26 @@ function ConfiguredConsoleRow({
   // uma pasta pode existir por console (comentário do componente, acima).
   const [confirmingRemove, setConfirmingRemove] = useState<number | null>(null);
   const confirmingFolder = folders.find((f) => f.id === confirmingRemove);
+  // 2026-09-07 (redesenho): a linha era 100% cinza — 33 consoles possíveis,
+  // todos idênticos exceto pelo texto, e o `ConsoleIcon` era o único ponto de
+  // cor. Mesma borda esquerda de 3px na cor de identidade que
+  // `ConsoleVerdictCard` e `EmulatorCard` já usam (M10/N12): o olho encontra
+  // "a linha do PS2" pela cor antes de ler o nome. Decorativa, nunca estado
+  // (regra do consoleColor.ts, e a guideline de não codificar status só em cor).
+  const accent = consoleAccentColor(consoleInfo.console_id);
 
   return (
-    <Card filled dense className="flex flex-col gap-1.5">
+    <Card
+      filled
+      dense
+      // O halo no hover usa a cor do próprio console, via custom property —
+      // uma classe Tailwind arbitrária não consegue ler um valor dinâmico,
+      // então a variável entra pelo `style` e a classe a consome. Mesmo
+      // vocabulário de halo do `Button variant="chrome"`, só que na cor da
+      // linha em vez do roxo fixo.
+      style={{ borderLeftColor: accent, borderLeftWidth: 3, "--console-accent": accent } as CSSProperties}
+      className="flex flex-col gap-2 transition duration-150 hover:shadow-[0_0_20px_-10px_var(--console-accent)]"
+    >
       {confirmingFolder && (
         <ConfirmModal
           title={t("removeFolderTitle")}
@@ -158,33 +200,101 @@ function ConfiguredConsoleRow({
           }
         />
       )}
-      <div className="flex items-center gap-3">
+      {/* 2026-09-07, segunda rodada (achado do Douglas: "centralize o ícone"
+          não resolveu de verdade porque o card continuava sendo uma fita
+          horizontal larga — "tem muito espaço vazio entre o nome e os
+          botões de ação", "seria melhor mudar pra card vertical mais alto
+          que horizontal"). Trocado de fita de linha única (icon | texto |
+          botão, esticada pela largura toda do container) para bloco
+          centralizado: ícone, nome e contagem empilhados, "Ver jogos" logo
+          abaixo — nada de `flex-1` esticando o texto até empurrar o botão
+          pra beira direita de um container que pode chegar a 2000px. A
+          lista de pastas vira uma seção à parte, com borda superior,
+          alinhada à esquerda (caminho de arquivo lê melhor alinhado, não
+          centralizado). O grid do container-pai (`flex flex-col` →
+          `grid lg:grid-cols-2`) mudou junto, mais abaixo. */}
+      <div className="flex flex-col items-center gap-2 text-center">
         <ConsoleIcon consoleId={consoleInfo.console_id} label={consoleInfo.short_name} onClick={onSelectConsole} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <p className="truncate font-semibold text-ink">{consoleInfo.name}</p>
-          <p className="text-xs text-muted">
+          {/* A contagem é o dado que a pessoa vem conferir nesta tela — saiu
+              de `text-xs text-muted` (o mesmo cinza do caminho da pasta,
+              mais abaixo) para monoespaçada em ciano, a cor que a paleta
+              reserva para "aqui o sistema informa" (src/index.css). Não é
+              badge nem chip: é texto estático, e a guideline
+              `compact-label-semantics` pede que só o que é acionável
+              pareça acionável. */}
+          {/* Sem `aria-live`: a contagem chega para todos os consoles
+              configurados quase ao mesmo tempo (um fetch por console, em
+              paralelo) — uma região viva por linha viraria uma rajada de
+              anúncios. O `role="status"` do skeleton da tela já cobre
+              "está carregando". */}
+          <p className={`font-mono text-xs tracking-wide ${games ? "text-accent-secondary" : "text-muted"}`}>
             {games ? t("gamesCount", { count: games.length }) : t("countingGames")}
           </p>
         </div>
         {/* Sempre visível, mesmo com 0 jogos (2026-08-04) — é em GamesScreen
             que fica "Abrir pasta do BIOS"; configurar o BIOS não deveria
-            depender de já ter um jogo achado primeiro (critério do M9). */}
-        <Button type="button" variant="secondary" onClick={onOpenGames}>
+            depender de já ter um jogo achado primeiro (critério do M9).
+            `chrome` em vez de `secondary` (2026-09-07): navegar para outra
+            tela é chrome de navegação, o papel que a variante encarna. */}
+        <Button type="button" variant="chrome" onClick={onOpenGames}>
           {t("seeGames")} {games ? `(${games.length})` : ""}
         </Button>
       </div>
 
-      <ul className="flex flex-col gap-1 pl-12">
+      {/* O caminho da pasta é o dado técnico da linha: monoespaçada (é um
+          caminho de arquivo, alinha ponto a ponto e lê como terminal) com
+          ícone de pasta na frente, para o olho separar sub-linha de linha
+          principal sem precisar do recuo sozinho. `border-line`: separa
+          visualmente o bloco de identidade (centralizado, acima) da lista
+          de pastas (alinhada à esquerda, abaixo) — sem isso os dois blocos
+          de alinhamento diferente colidiam sem transição. */}
+      <ul aria-label={t("folderPathsLabel")} className="flex flex-col gap-2 border-t border-line pt-3">
         {folders.map((folder) => (
-          <li key={folder.id} className="flex items-center justify-between gap-2 text-sm">
-            <span className="truncate text-muted" title={folder.path}>
-              {folder.path}
+          <li key={folder.id} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex min-w-0 items-center gap-2 text-muted" title={folder.path}>
+              <Folder size={13} aria-hidden="true" className="shrink-0" />
+              <span className="truncate font-mono text-xs">{folder.path}</span>
             </span>
             <span className="flex shrink-0 gap-2">
-              <Button type="button" variant="quiet" disabled={busy} onClick={() => onRescan(folder.id)}>
+              {/* 2026-09-07 (achado do Douglas: "tão com a mesma cor
+                  inicial... quero uma cor diferente de base, não só no
+                  hover"): Revarrer e Remover eram os dois `chrome` neutro em
+                  repouso, distinguíveis só pelo rótulo — o sinal de cor só
+                  aparecia depois do clique/hover, tarde demais pra ajudar a
+                  escanear a linha. Revarrer ganha o ciano (regra da paleta em
+                  src/index.css: "ciano é aqui o sistema informa" — revarrer é
+                  o sistema resincronizando, não uma decisão do usuário sobre
+                  o conteúdo). O `!` é necessário, não enfeite: `chrome` já
+                  define borda/fundo/sombra em repouso e no hover, o
+                  `className` desta chamada só concatena (o `Button` não usa
+                  tailwind-merge), e quem vence duas utilities conflitantes é
+                  a ordem no CSS gerado, não a ordem na string — mesma
+                  armadilha que O1/N4 já documentaram em ui.tsx. */}
+              <Button
+                type="button"
+                variant="chrome"
+                disabled={busy}
+                onClick={() => onRescan(folder.id)}
+                className="border-accent-secondary/50! text-accent-secondary! hover:border-accent-secondary! hover:bg-accent-secondary/10! hover:shadow-[0_0_14px_-4px_var(--accent-secondary),inset_0_1px_0_0_rgba(255,255,255,0.06)]!"
+              >
+                <RefreshCw size={12} aria-hidden="true" className={busy ? "animate-spin" : ""} />
                 {t("rescan")}
               </Button>
-              <Button type="button" variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
+              {/* Destrutivo: agora vermelho já em repouso, não só no
+                  hover/foco — o A5 já tinha dado a confirmação a este botão
+                  (modal), faltava o sinal ANTES do clique. A cor não é o
+                  único sinal (o rótulo diz "Remover" e o modal confirma),
+                  então não viola 1.4.1. */}
+              <Button
+                type="button"
+                variant="chrome"
+                disabled={busy}
+                onClick={() => setConfirmingRemove(folder.id)}
+                className="border-danger/50! text-danger! hover:border-danger! hover:bg-danger/10! hover:shadow-[0_0_14px_-4px_var(--danger),inset_0_1px_0_0_rgba(255,255,255,0.06)]!"
+              >
+                <Trash2 size={12} aria-hidden="true" />
                 {t("remove")}
               </Button>
             </span>
@@ -248,8 +358,16 @@ function AddConsoleSection({
   }
 
   return (
-    <Card filled className="flex flex-col gap-3">
-      <p className="font-semibold text-ink">{t("addConsole")}</p>
+    /* Borda tracejada, não sólida (2026-09-07): é o vocabulário que o app já
+       reserva para "slot a preencher" (o `ghost` de ui.tsx, o `Callout`
+       neutro, o `EmptyState`) — distingue de relance a área de *adicionar* das
+       linhas de console já configuradas, que são conteúdo sólido. Sem
+       `filled`: um painel de ação não deveria pesar tanto quanto o resultado. */
+    <Card className="flex flex-col gap-3 border-dashed border-line-strong">
+      <p className="flex items-center gap-2 font-mono text-xs tracking-wider text-muted uppercase">
+        <FolderPlus size={13} aria-hidden="true" />
+        {t("availableCount", { count: availableConsoles.length })}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         {/* O2 (docs/roadmap.md, Sprint O): largura fixa cortava nomes longos de
             console ("Nintendo Entertainment System") mesmo sobrando espaço ao lado —
@@ -261,7 +379,13 @@ function AddConsoleSection({
             </SelectItem>
           ))}
         </ZSelect>
-        <Button type="button" variant="primary" disabled={busy || !consoleId} onClick={handlePick}>
+        {/* `chrome`, não `primary`: "apontar/abrir pasta" é exatamente o papel
+            que a variante nomeia em ui.tsx, e o único primário da tela já é o
+            atalho do topo (que resolve vários consoles de uma vez). Dois
+            botões roxos disputando na mesma tela contradiriam a guideline
+            `primary-action` — um CTA primário por tela. */}
+        <Button type="button" variant="chrome" disabled={busy || !consoleId} onClick={handlePick}>
+          <FolderPlus size={13} aria-hidden="true" />
           {busy ? t("pointing") : t("chooseFolderButton")}
         </Button>
       </div>
@@ -469,19 +593,31 @@ export function LibraryScreen({
           Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
           (all-games), não pro Parecer/Especificações — ficou desatualizado
           desde a reestruturação da sidebar (Sprint 1). */}
-      {/* A11y 2.1.4: `data-nav-back` — alvo do botão B do controle. */}
-      <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
-        {t("back")}
-      </Button>
-      <h1 className="mb-4 text-2xl font-semibold text-ink">{t("library")}</h1>
-
-      <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
-
-      <div className="mb-4 -mt-2 flex justify-end">
-        <Button type="button" variant="quiet" onClick={() => setShowNameGuide(true)}>
+      <BackButton label={t("back")} onClick={onBack} />
+      {/* 2026-09-07 (redesenho): o título vinha sozinho e "Ver nomes de pasta
+          aceitos" flutuava num `-mt-2 justify-end` logo abaixo do cartão do
+          atalho — grudado no cartão errado (é ajuda sobre a tela inteira, não
+          sobre aquele resultado) e num `quiet` que quase não se lê como
+          botão. Vira a ação de cabeçalho da tela, na mesma linha do `h1`
+          (padrão de `ScreenHeader`), em `chrome`.
+          A linha de resumo responde "quantos dos 33 já estão apontados?" sem
+          contar linha por linha. Descritiva, nunca avaliativa. */}
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">{t("library")}</h1>
+          {folders && (
+            <p className="mt-1 font-mono text-xs tracking-wide text-muted">
+              {t("screenSummary", { configured: configuredIds.length, total: allConsoles.length })}
+            </p>
+          )}
+        </div>
+        <Button type="button" variant="chrome" onClick={() => setShowNameGuide(true)}>
           {t("seeFolderNamesAccepted")}
         </Button>
       </div>
+
+      <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
+
       {showNameGuide && <FolderNameGuideModal report={report} onClose={() => setShowNameGuide(false)} />}
 
       {/* Falha ao listar as pastas é erro de tela inteira (nada renderiza
@@ -500,7 +636,11 @@ export function LibraryScreen({
         <div role="status" aria-live="polite" className="flex flex-col gap-2">
           <span className="sr-only">{t("loadingFolders")}</span>
           {Array.from({ length: 3 }, (_, i) => (
-            <CardSkeleton key={i} className="h-16" />
+            /* `h-24`, não `h-16` (2026-09-07): a linha real cresceu ao ganhar
+               os botões de 36px na sub-linha de pasta — um skeleton mais
+               baixo que o conteúdo que substitui devolve o salto de layout
+               que ele existe para evitar. */
+            <CardSkeleton key={i} className="h-24" />
           ))}
         </div>
       )}
@@ -515,7 +655,16 @@ export function LibraryScreen({
               o corpo e comunicava "título" só pelo estilo. Mesma decisão da
               N17 na sidebar, agora estendida aos `<h2>`. */}
           <div>
-            <SectionHeading className="mb-2">{t("configuredConsoles")}</SectionHeading>
+            {/* O número ao lado do título vem em `text-muted` dentro do
+                próprio `<h2>`: faz parte do rótulo lido ("Consoles
+                configurados 4"), então não deveria ser um elemento separado
+                que o leitor de tela anuncia solto depois. */}
+            <SectionHeading className="mb-2">
+              {t("configuredConsoles")}{" "}
+              {configuredConsoles.length > 0 && (
+                <span className="font-mono text-xs text-muted">{configuredConsoles.length}</span>
+              )}
+            </SectionHeading>
             {configuredConsoles.length === 0 ? (
               // N11 (docs/roadmap.md, Sprint N): sem botão de ação aqui — a
               // seção "Adicionar console" (a ação que resolve este vazio) já
@@ -523,7 +672,20 @@ export function LibraryScreen({
               // repetiria o que a tela já mostra.
               <EmptyState message={t("noConsolesFolderYet")} />
             ) : (
-              <div className="flex flex-col gap-2">
+              /* `grid lg:grid-cols-2` (era `flex flex-col`, uma fita por
+                 console com a largura toda do container — 2026-09-07,
+                 achado do Douglas). O card virou vertical/centralizado
+                 (`ConfiguredConsoleRow` acima); numa coluna só, ele ficaria
+                 tão largo quanto a fita antiga só que mais alto — o
+                 problema de espaço vazio simplesmente desceria pro card
+                 novo. Duas colunas em janela larga usa a largura que sobra
+                 em vez de esticar cada card sozinho; `lg`, não `xl`,
+                 descontando sidebar (64px) + scrollbar da regra de
+                 responsividade do CLAUDE.md. `items-start`: cards vizinhos
+                 têm alturas diferentes (número de pastas varia por
+                 console) — sem isso o grid esticaria todo card pra altura
+                 do mais alto da fileira. */
+              <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
                 {configuredConsoles.map((consoleInfo) => (
                   <ConfiguredConsoleRow
                     key={consoleInfo.console_id}

@@ -6,3 +6,6 @@
 [tools]
 go = "1.26.5"
 node = "24.18.1"
+# Só pra rodar o design-system da skill ui-ux-pro-max (Impeccable), que
+# exige Python 3 e nada mais do projeto depende disso.
+python = "3.14.7"

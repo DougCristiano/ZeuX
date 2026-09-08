@@ -233,4 +233,55 @@ export const dict = {
     "pt-BR": "+ Adicionar emulador manualmente",
     en: "+ Add emulator manually",
   },
+  // Redesenho de 2026-09-07: a tela dizia "instalado" só por um badge presente
+  // e "não instalado" por nenhum badge — ausência não é sinal. Agora os dois
+  // estados têm rótulo próprio, no mesmo lugar de todo card.
+  statusInstalled: {
+    "pt-BR": "instalado",
+    en: "installed",
+  },
+  statusNotInstalled: {
+    "pt-BR": "não instalado",
+    en: "not installed",
+  },
+  installedSummary: {
+    "pt-BR": "{{installed}} de {{total}} instalados",
+    en: "{{installed}} of {{total}} installed",
+  },
+  filterByStatusLabel: {
+    "pt-BR": "Filtrar por situação",
+    en: "Filter by status",
+  },
+  statusFilterAll: {
+    "pt-BR": "todos",
+    en: "all",
+  },
+  statusFilterInstalled: {
+    "pt-BR": "instalados",
+    en: "installed",
+  },
+  statusFilterAvailable: {
+    "pt-BR": "disponíveis",
+    en: "available",
+  },
+  noEmulatorsForFilters: {
+    "pt-BR": "Nenhum emulador corresponde aos filtros escolhidos.",
+    en: "No emulator matches the selected filters.",
+  },
+  // "Ver cores" já existia; o rótulo mudou de lugar (barra de chrome do card),
+  // não de sentido.
+  coresSectionLabel: {
+    "pt-BR": "Cores do RetroArch",
+    en: "RetroArch cores",
+  },
+  // Era string literal no JSX (única da faixa de ações que tinha escapado do
+  // dicionário).
+  deleteButton: {
+    "pt-BR": "Excluir",
+    en: "Delete",
+  },
+  emulatorCountLabel: {
+    "pt-BR": "{{count}} emuladores",
+    en: "{{count}} emulators",
+  },
 } satisfies Dict;

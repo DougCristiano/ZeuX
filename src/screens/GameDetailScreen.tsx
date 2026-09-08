@@ -3,6 +3,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, ApiError, coverImageURL } from "../api";
 import type { LibraryGame, Report } from "../api/types";
 import {
+  BackButton,
   Badge,
   Button,
   Card,
@@ -70,7 +71,18 @@ function formatLastPlayed(iso: string | undefined, neverPlayedText: string): str
  * novo: `verdict.headline` já cobre o caso "sem preset automático"
  * (`Level.Headline()`, `internal/verdict/catalog.go` — a frase para o
  * patamar "improvável" já diz "este hardware não alcança o mínimo
- * necessário", sem julgar a máquina, princípio 2 do `CLAUDE.md`). A
+ * necessário", sem julgar a máquina, princípio 2 do `CLAUDE.md`).
+ *
+ * Redesenho visual (2026-09-07, continuação do redesenho da tela inicial):
+ * nenhuma funcionalidade mudou — o que mudou foi a tela passar a falar a
+ * mesma língua visual do resto do app. O hero adotou as camadas de
+ * `GameHero` (arte desfocada pesada + tingimento na cor do console + piso de
+ * `--paper` + scanlines) e passou a existir **sempre**, com e sem capa; a
+ * capa ganhou o halo na cor de identidade do console que os cards de linha já
+ * usavam como borda esquerda; e os três cards empilhados viraram uma grade
+ * `lg:grid-cols-3` que promove o parecer — a resposta que a tela existe para
+ * dar — para a coluna maior, ao lado das caixas de estatísticas e de arquivo.
+ * A
  * correção ao próprio plano: `GamesScreen` **não** mostrava
  * `verdict.emulator`/`verdict.preset` como texto — só usava esses campos
  * internamente para decidir o fluxo de instalação; o roadmap dizia que sim,
@@ -234,6 +246,7 @@ export function GameDetailScreen({
   const status = statusFor(game.id);
   const verdict = report.verdicts.find((v) => v.console_id === game.console_id);
   const heroCoverUrl = coverImageURL(coverUrl);
+  const accent = consoleAccentColor(game.console_id);
 
   const heroContent = (
     <>
@@ -244,13 +257,37 @@ export function GameDetailScreen({
           A tela em volta é `variant="listing"` (wide) desde 2026-09-06 — a
           variante `"reading"` que existia antes foi removida a pedido do
           Douglas, ver comentário em `ScreenContainer`. */}
-      <div className="relative w-full max-w-[220px]">
-        <GameCover label={shortName} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
-        <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
+      {/* `shrink-0` (2026-09-07): sem ele o `flex-1` da coluna de texto
+          espremia a capa quando o título é longo — o `max-w` sozinho é teto,
+          não piso. */}
+      <div className="w-full max-w-[220px] shrink-0">
+        {/* Halo na cor de identidade do console em volta da arte — a mesma
+            regra dos cards de linha (`ConsoleVerdictCard`, `EmulatorCard`),
+            que ali é uma borda esquerda de 3px e aqui contorna a peça toda,
+            porque nesta tela a capa é o objeto e não uma linha de lista. Fica
+            num wrapper só da capa, não na coluna inteira: o botão "Buscar
+            capa" e o erro logo abaixo não fazem parte da arte e não deveriam
+            entrar na moldura. A sombra desenha a borda (`0 0 0 1px`) em vez
+            de `border`, para não somar 1px ao lado de fora do
+            `aspect-[3/4]` que a própria `GameCover` mantém. */}
+        <div
+          className="relative rounded-lg"
+          style={{
+            boxShadow: `0 0 0 1px color-mix(in srgb, ${accent} 55%, var(--line-strong)), 0 0 34px -10px color-mix(in srgb, ${accent} 90%, transparent)`,
+          }}
+        >
+          <GameCover label={shortName} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
+          <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
+        </div>
         {favoriteError && <InlineError className="mt-1">{favoriteError}</InlineError>}
         {igdbConfigured && (
           <div className="mt-2">
-            <Button variant="secondary" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full text-xs">
+            {/* `chrome` (2026-09-07): mesma variante que "Buscar capas" da
+                biblioteca — a mesma ação, em escopo de um jogo só, não
+                deveria ter outro visual. O `text-xs` que estava no
+                `className` era exatamente a correção que a variante agora
+                faz por padrão. */}
+            <Button variant="chrome" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full">
               {scrapingCover ? t("searching") : coverUrl ? t("searchCoverAgain") : t("searchCover")}
             </Button>
             {coverError && <InlineError className="mt-1">{coverError}</InlineError>}
@@ -265,12 +302,18 @@ export function GameDetailScreen({
           ao bloco de texto sem depender de esticar a capa (que já é
           `aspect-[3/4]` fixa por design, comentário acima); as ações de
           arquivo saíram para a seção "Arquivo" mais abaixo — "Jogar" agora é
-          a única ação primária aqui. */}
-      <div className="flex flex-1 flex-col justify-center gap-4">
+          a única ação primária aqui.
+
+          `max-w-3xl` (2026-09-07) é teto, não largura (CLAUDE.md, layout
+          responsivo): a coluna continua encolhendo livre com a janela — o teto
+          só impede que o texto alcance a faixa direita do gradiente do hero,
+          onde a arte volta a aparecer e o contraste deixa de ser garantido.
+          Mesma precaução de `GameHero`. */}
+      <div className="flex min-w-0 max-w-3xl flex-1 flex-col justify-center gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-ink sm:text-4xl">{game.title}</h1>
+          <h1 className="text-3xl font-semibold text-balance text-ink sm:text-4xl">{game.title}</h1>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <Badge accentColor={consoleAccentColor(game.console_id)}>{consoleName}</Badge>
+            <Badge accentColor={accent}>{consoleName}</Badge>
             {year !== undefined && <Badge>{year}</Badge>}
             {game.missing && <Badge>{t("missingFile")}</Badge>}
           </div>
@@ -356,86 +399,170 @@ export function GameDetailScreen({
         error && <ErrorModal title={t("errorReadingStats")} message={error} onClose={() => setError(null)} />
       )}
 
-      <Button variant="secondary" onClick={onBack} className="mb-4">
-        {t("backButton")}
-      </Button>
+      <BackButton label={t("backButton")} onClick={onBack} />
 
-      {/* M6: fundo do topo com a própria capa desfocada — só quando existe
-          capa real. Sem capa, o topo fica exatamente como estava (nada de
-          padding/fundo novo por cima do placeholder de sigla). */}
-      {heroCoverUrl ? (
-        <div className="relative overflow-hidden rounded-lg">
-          <img
-            src={heroCoverUrl}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 h-full w-full scale-125 object-cover opacity-30 blur-3xl"
+      {/* Hero (redesenho de 2026-09-07). Antes: a capa desfocada entrava como
+          `opacity-30 blur-3xl` **e só quando existia capa real** — sem capa, o
+          topo perdia moldura, fundo e presença, e a mesma tela tinha duas
+          aparências muito diferentes conforme o IGDB tivesse respondido ou
+          não. Agora as camadas são sempre as mesmas de `GameHero` (a faixa de
+          retomada da tela inicial), com o fallback de gradiente na cor do
+          console no lugar da arte: um vocabulário só de "arte de fundo" no
+          app, não um por tela.
+
+          Por que `opacity-30` saiu: opacidade achata a arte inteira contra o
+          fundo e mata a cor junto com o contraste. O par
+          `brightness-[0.55] saturate-[1.8]` + tingimento na cor de identidade
+          em `mix-blend-overlay` guarda a cor (é o que o Douglas pediu na
+          faixa inicial) e o piso de contraste vem de uma camada separada de
+          `--paper`, que não depende do brilho da arte por baixo dela. Com 88%
+          de `--paper` sobre arte a 55% de brilho, `--ink` (12.6:1 sobre
+          `--paper` puro) e `--muted` (7.62:1) passam com folga em todo o
+          trecho onde há texto — a coluna de texto tem teto de largura
+          justamente para não alcançar a faixa direita, onde a arte reaparece.
+          `scale-150`, não `scale-125`: blur de 64px revela a beira do frame
+          se o elemento não estourar a área visível com margem. */}
+      <div
+        className="relative overflow-hidden rounded-xl border"
+        style={{
+          borderColor: `color-mix(in srgb, ${accent} 45%, var(--line))`,
+          boxShadow: `0 0 60px -16px color-mix(in srgb, ${accent} 85%, transparent)`,
+        }}
+      >
+        <div aria-hidden="true" className="absolute inset-0">
+          {heroCoverUrl ? (
+            <img
+              src={heroCoverUrl}
+              alt=""
+              className="h-full w-full scale-150 object-cover blur-3xl brightness-[0.55] saturate-[1.8]"
+            />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{ background: `linear-gradient(135deg, ${accent}55, transparent 65%)` }}
+            />
+          )}
+          <div
+            className="absolute inset-0 mix-blend-overlay"
+            style={{ background: `linear-gradient(135deg, ${accent}, transparent 70%)`, opacity: 0.55 }}
           />
-          <div className="relative flex flex-col gap-5 p-6 sm:flex-row">{heroContent}</div>
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 55%, color-mix(in srgb, var(--paper) 88%, transparent) 72%, color-mix(in srgb, var(--paper) 18%, transparent) 100%)",
+            }}
+          />
+          {/* Mesmas linhas de CRT da abertura do app e da faixa inicial — a
+              marca aparece na mesma língua nos três lugares, não em três. */}
+          <div className="zeux-scanlines absolute inset-0 opacity-40" />
         </div>
-      ) : (
-        <div className="flex flex-col gap-5 sm:flex-row">{heroContent}</div>
-      )}
 
-      {/* M6: com o que o jogo vai rodar — o diferencial declarado do
-          produto, que faltava nesta tela. Mesmo cartão de VerdictScreen/
-          ConsoleInfoModal, não um texto novo: já cobre emulador+preset,
-          "sem preset automático" (via headline) e o gargalo nomeado. */}
-      {verdict && (
-        <div className="mt-6">
-          <ConsoleVerdictCard verdict={verdict} />
-        </div>
-      )}
+        <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:gap-6 sm:p-6">{heroContent}</div>
+      </div>
 
-      {/* Achado #5 do critico-layout-biblioteca: "Abrir pasta"/"Revarrer"
-          moraram no hero até esta sessão, competindo em peso visual com
-          "Jogar" — a única ação primária que um hero deveria ter. Viraram
-          seção própria, mesmo texto/comportamento de antes (M6: nenhum
-          link, nenhuma sugestão de onde obter o arquivo, regra 6 do
-          CLAUDE.md — só revela o que já está no disco do usuário). */}
-      <Card className="mt-6">
-        <SectionHeading className="mb-3">{t("fileHeading")}</SectionHeading>
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={openGameFolder} className="w-fit">
-              {t("openGameFolder")}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={rescanState.kind === "rescanning"}
-              onClick={rescanFolder}
-              className="w-fit"
-            >
-              {rescanState.kind === "rescanning" ? t("rescanning") : t("rescanFolder")}
-            </Button>
-          </div>
-          {folderError && <InlineError>{folderError}</InlineError>}
-          {rescanState.kind === "error" && <InlineError>{rescanState.message}</InlineError>}
-          <p className="truncate text-xs text-muted" title={game.path}>
-            {game.path}
-          </p>
-        </div>
-      </Card>
+      {/* Três cards de largura total empilhados viravam uma fita muito longa
+          numa janela larga (`ScreenContainer` chega a 2000px): cada card com
+          três linhas de texto e 1900px de vazio à direita, e a resposta que a
+          tela existe para dar ("com o que este jogo vai rodar") empurrada
+          para baixo por rolagem. A grade põe o parecer na coluna maior, ao
+          lado das duas caixas de serviço.
 
-      <Card className="mt-6">
-        <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <p className="text-xs text-muted">{t("playtime")}</p>
-            <p className="text-lg text-ink">
-              {formatPlaytime(game.playtime_seconds, t("neverPlayed"), t("lessThanOneMinute"), t("minuteUnit"), t("hourUnit"))}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted">{t("lastPlayed")}</p>
-            <p className="text-lg text-ink">{formatLastPlayed(game.last_played_at, t("neverPlayed"))}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted">{t("sessions")}</p>
-            <p className="text-lg text-ink">{sessionCount === null ? "…" : sessionCount}</p>
-          </div>
+          `lg:` (1024px), não `xl:`: o breakpoint mede a janela inteira, e a
+          área útil aqui já perde a sidebar (64px) e a barra de rolagem
+          (~16px) — um `xl:` nunca dispararia no tamanho padrão da janela
+          (1280px, `src-tauri/tauri.conf.json`). Regra registrada no
+          CLAUDE.md, aprendida num bug real. */}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* M6: com o que o jogo vai rodar — o diferencial declarado do
+            produto, que faltava nesta tela. Mesmo cartão de VerdictScreen/
+            ConsoleInfoModal, não um texto novo: já cobre emulador+preset,
+            "sem preset automático" (via headline) e o gargalo nomeado.
+            Ganhou título de seção (2026-09-07) porque, fora da grade de 33
+            consoles da VerdictScreen, um card solto embaixo do hero não
+            dizia sozinho o que ele responde. O título fala do jogo, nunca da
+            máquina (princípio 2 do CLAUDE.md). */}
+        {verdict && (
+          <section className="lg:col-span-2">
+            <SectionHeading className="mb-3">{t("howItRuns")}</SectionHeading>
+            <ConsoleVerdictCard verdict={verdict} />
+          </section>
+        )}
+
+        {/* Sem parecer (console fora do catálogo, ou relatório sem esse
+            console), a coluna de serviço ocupa a largura toda em vez de
+            deixar duas colunas vazias à esquerda dela. */}
+        <div className={`flex flex-col gap-6 ${verdict ? "" : "lg:col-span-3"}`}>
+          <section>
+            <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
+            <Card>
+              {/* Empilhado em linhas rotuladas, não em três colunas: na
+                  coluna estreita da grade os valores ("nunca jogado",
+                  "07/09/2026 21:14") quebravam em duas linhas cada um e
+                  desalinhavam entre si. Rótulo em `font-mono` caixa alta é o
+                  mesmo acabamento de legenda que `Callout`/`Badge` já usam —
+                  nenhum estilo novo entra no projeto. O valor em `font-mono`
+                  alinha os dígitos verticalmente, que é a única razão de a
+                  fonte mudar aqui. */}
+              <dl className="flex flex-col gap-3">
+                {[
+                  {
+                    label: t("playtime"),
+                    value: formatPlaytime(
+                      game.playtime_seconds,
+                      t("neverPlayed"),
+                      t("lessThanOneMinute"),
+                      t("minuteUnit"),
+                      t("hourUnit"),
+                    ),
+                  },
+                  { label: t("lastPlayed"), value: formatLastPlayed(game.last_played_at, t("neverPlayed")) },
+                  { label: t("sessions"), value: sessionCount === null ? "…" : String(sessionCount) },
+                ].map((stat) => (
+                  <div key={stat.label}>
+                    <dt className="font-mono text-xs tracking-wide text-muted uppercase">{stat.label}</dt>
+                    <dd className="mt-0.5 font-mono text-lg text-ink">{stat.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </Card>
+          </section>
+
+          {/* Achado #5 do critico-layout-biblioteca: "Abrir pasta"/"Revarrer"
+              moraram no hero até esta sessão, competindo em peso visual com
+              "Jogar" — a única ação primária que um hero deveria ter. Viraram
+              seção própria, mesmo texto/comportamento de antes (M6: nenhum
+              link, nenhuma sugestão de onde obter o arquivo, regra 6 do
+              CLAUDE.md — só revela o que já está no disco do usuário). */}
+          <section>
+            <SectionHeading className="mb-3">{t("fileHeading")}</SectionHeading>
+            <Card>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="chrome" onClick={openGameFolder} className="w-fit">
+                    {t("openGameFolder")}
+                  </Button>
+                  <Button
+                    variant="chrome"
+                    disabled={rescanState.kind === "rescanning"}
+                    onClick={rescanFolder}
+                    className="w-fit"
+                  >
+                    {rescanState.kind === "rescanning" ? t("rescanning") : t("rescanFolder")}
+                  </Button>
+                </div>
+                {folderError && <InlineError>{folderError}</InlineError>}
+                {rescanState.kind === "error" && <InlineError>{rescanState.message}</InlineError>}
+                {/* `font-mono`: é um caminho de arquivo, e o `title` continua
+                    carregando o valor inteiro quando o `truncate` corta. */}
+                <p className="truncate font-mono text-xs text-muted" title={game.path}>
+                  {game.path}
+                </p>
+              </div>
+            </Card>
+          </section>
         </div>
-      </Card>
+      </div>
     </ScreenContainer>
   );
 }

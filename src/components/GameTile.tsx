@@ -135,6 +135,12 @@ export function GameTile({
                 não tinha o que clicar. Os dois levam ao mesmo `onInstall`,
                 que já ramifica pelo motivo (useInlineInstall.handlePlay). */}
             {(launchability!.reason === "not_installed" || launchability!.reason === "install_manual") && onInstall ? (
+              // Versão em miniatura do `Button variant="primary"` da hero
+              // ("instalar emulador") — mesma cor de ação (roxo), não a
+              // `chrome` de navegação/arquivo. Antes era texto sublinhado
+              // pontilhado em cinza (`text-muted underline`): lia como link
+              // morto, não como algo clicável — achado do Douglas testando o
+              // app (2026-09-07), a mesma leva de ajuste que criou `chrome`.
               <button
                 type="button"
                 title={launchability!.title}
@@ -144,7 +150,7 @@ export function GameTile({
                   e.stopPropagation();
                   onInstall();
                 }}
-                className={`inline-block rounded-sm border border-line-strong px-1.5 py-0.5 font-mono text-xs tracking-wide text-muted underline decoration-dotted transition-colors hover:text-ink ${FOCUS_RING}`}
+                className={`inline-block rounded-sm border border-accent/60 bg-accent/10 px-1.5 py-0.5 font-mono text-xs tracking-wide text-accent-hover transition duration-150 hover:border-accent hover:bg-accent/20 hover:shadow-[0_0_12px_-4px_var(--accent)] ${FOCUS_RING}`}
               >
                 {launchability!.badge}
               </button>

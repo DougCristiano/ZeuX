@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { api, ApiError, isDownloadingCore } from "../api";
+import { api, ApiError, consoleImageURL, isDownloadingCore } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
+  BackButton,
   Button,
   Callout,
-  CardSkeleton,
+  CHROME_TINT_DANGER,
+  CHROME_TINT_INFO,
   ConfirmModal,
+  consoleIconLabel,
   EmptyState,
   ErrorModal,
   InlineError,
@@ -17,7 +20,7 @@ import {
   ScreenContainer,
   Toast,
 } from "../components/ui";
-import { GameTile } from "../components/GameTile";
+import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
@@ -67,6 +70,15 @@ type RowStatus =
  * tile) e ir até o botão "▶ Jogar" de lá — que hoje lança direto, sem passar
  * pela checagem de instalado/BIOS deste console (`GameDetailScreen` ainda
  * não conhece este hook). Fica registrado como lacuna, não escondido.
+ *
+ * Redesenho visual de 2026-09-07 (nada de comportamento mudou): o cabeçalho
+ * virou o mesmo hero de identidade de console que `ConsoleDetailScreen` usa
+ * — esta é a tela de UM console, e ela se apresentava como listagem
+ * genérica; a régua de busca ganhou a altura de chrome (36px) e a contagem
+ * do filtro; os dois blocos de progresso sob o tile passaram a rótulo de
+ * estado (mono/caixa alta) em vez de prosa; "Cancelar download" virou
+ * `chrome` tingido de vermelho em repouso; e o esqueleto de carregamento
+ * passou a ser `GameTileSkeleton`, com a forma do que vai chegar.
  */
 export function GamesScreen({
   consoleId,
@@ -101,7 +113,15 @@ export function GamesScreen({
   // Erro de lançamento vira modal, não texto discreto na linha do jogo —
   // achado em 2026-08-04, um texto inline passava despercebido.
   const [launchError, setLaunchError] = useState<string | null>(null);
+  // A logo oficial não existe para os 3 consoles sem imagem cadastrada no
+  // IGDB (ver PRODUCT.md). Esta tela não recebe o `has_image` do catálogo
+  // como `ConsoleDetailScreen` recebe, então a checagem é o próprio
+  // `onError` do <img> — mesma queda para a sigla, um quadro depois.
+  const [heroImageFailed, setHeroImageFailed] = useState(false);
   const { toastMessage, showToast } = useToast();
+
+  const accent = consoleAccentColor(consoleId);
+  const showHeroImage = !heroImageFailed;
 
   const verdict = report.verdicts.find((v) => v.console_id === consoleId);
 
@@ -336,6 +356,11 @@ export function GamesScreen({
                   <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
                     {t("cancel")}
                   </Button>
+                  {/* Continua `secondary`, e não `chrome` como os outros
+                      "Abrir pasta do BIOS" da tela: aqui o botão está na
+                      fileira de ações de um modal, ao lado de "Cancelar" e
+                      do primário — nessa fileira o que manda é as três
+                      ações terem a mesma altura, não a variante de chrome. */}
                   {adapterEntry?.bios_dir && (
                     <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
                       {t("openBiosFolder")}
@@ -359,16 +384,77 @@ export function GamesScreen({
       {/* B9 (achado do critico-design, 2026-08-18): mesma posição que
           GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
           (era ao lado do h1, à direita). */}
-      {/* A11y 2.1.4: `data-nav-back` — alvo do botão B do controle. */}
-      <Button variant="secondary" data-nav-back onClick={onBack} className="mb-4">
-        {t("backToLibrary")}
-      </Button>
-      {/* N12 (docs/roadmap.md, Sprint N): mesmo tratamento de borda esquerda
-          que EmulatorCard/ConsoleVerdictCard já usam — antes, esta era uma
-          das duas telas (junto do parecer, já corrigido) sem nenhum sinal da
-          cor de identidade por console, mesmo sendo a tela de UM console só. */}
-      <div className="mb-4 border-l-[3px] py-1 pl-3" style={{ borderColor: consoleAccentColor(consoleId) }}>
-        <h1 className="text-2xl font-semibold text-ink">{consoleName}</h1>
+      <BackButton label={t("backToLibrary")} onClick={onBack} />
+      {/* N12 (docs/roadmap.md, Sprint N) tinha dado a esta tela a borda
+          esquerda de 3px na cor do console — o sinal certo, na dose errada
+          para a tela que é DESTE console: um filete ao lado de um h1 solto,
+          o mesmo cabeçalho que qualquer listagem genérica teria.
+          Redesenho de 2026-09-07: o cabeçalho passa a ser o mesmo hero de
+          `ConsoleDetailScreen` (logo em caixa de 64px, a própria logo
+          gigante e desfocada como arte de fundo, gradiente radial na cor de
+          identidade, borda esquerda mantida) — vocabulário já estabelecido,
+          não uma linguagem nova, e as duas telas do mesmo console deixam de
+          se apresentar de jeitos diferentes. */}
+      <div
+        className="relative mb-6 overflow-hidden rounded-lg border border-line p-5"
+        style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
+      >
+        {showHeroImage && (
+          <img
+            src={consoleImageURL(consoleId)}
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-24 -left-10 h-72 w-72 object-contain opacity-40 blur-3xl saturate-[1.8]"
+            onError={() => setHeroImageFailed(true)}
+          />
+        )}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `radial-gradient(65% 90% at 12% 25%, color-mix(in srgb, ${accent} 22%, transparent), transparent 70%)`,
+          }}
+        />
+        <div className="relative flex items-center gap-4">
+          {/* Fundo branco quando há logo: as imagens do IGDB foram desenhadas
+              para selo em fundo claro (mesma razão registrada em
+              `ConsolesScreen`/`ConsoleDetailScreen`). */}
+          <span
+            aria-hidden="true"
+            style={{ borderColor: `${accent}66`, color: accent, backgroundColor: showHeroImage ? "#fff" : undefined }}
+            className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
+          >
+            {showHeroImage ? (
+              <img
+                src={consoleImageURL(consoleId)}
+                alt=""
+                className="h-14 w-14 object-contain p-0.5"
+                onError={() => setHeroImageFailed(true)}
+              />
+            ) : (
+              consoleIconLabel(consoleId, shortName)
+            )}
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold text-ink">{consoleName}</h1>
+            {/* `font-mono`: sigla e contagem são dado de catálogo, não prosa —
+                mesmo tratamento que o ano recebe no tile e no detalhe do
+                console. A contagem só aparece depois que a lista chega; até
+                lá o lugar fica vazio em vez de mostrar "0 jogos", que seria
+                afirmar algo ainda não sabido. */}
+            <p className="mt-1 font-mono text-sm tracking-wide text-muted">
+              <span className="uppercase">{shortName}</span>
+              {games && (
+                <>
+                  {" · "}
+                  <span className="tabular-nums">
+                    {games.length === 1 ? t("gameCountOne") : t("gameCountMany", { count: games.length })}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* L9: aviso genérico de dependência externa, nunca nomeando arquivo,
@@ -384,7 +470,17 @@ export function GamesScreen({
             {t("externalFileMessage")}
             {adapterEntry?.bios_dir && (
               <div className="mt-2">
-                <Button type="button" variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
+                {/* Ciano em repouso (`CHROME_TINT_INFO`), não só no hover: o
+                    papel do botão já é conhecido antes do clique — abrir a
+                    pasta é o sistema mostrando onde o arquivo mora, não uma
+                    ação sobre o conteúdo. Token compartilhado (ui.tsx), não a
+                    string de seis utilities escrita de novo à mão. */}
+                <Button
+                  type="button"
+                  variant="chrome"
+                  className={CHROME_TINT_INFO}
+                  onClick={() => openBiosFolder(adapterEntry.bios_dir!)}
+                >
                   {t("openBiosFolder")}
                 </Button>
               </div>
@@ -414,9 +510,14 @@ export function GamesScreen({
       {games === null && (
         <div role="status" aria-live="polite">
           <span className="sr-only">{t("loadingGames")}</span>
+          {/* Redesenho de 2026-09-07: `GameTileSkeleton`, e não um
+              `CardSkeleton` de proporção 3/4 — o placeholder precisa ter a
+              forma do que vai chegar (capa + duas linhas de texto), senão o
+              tile "cresce" ao carregar mesmo com a grade certa. É o mesmo
+              esqueleto que `AllGamesScreen` já usa. */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
             {Array.from({ length: 10 }, (_, i) => (
-              <CardSkeleton key={i} className="aspect-[3/4] h-auto" />
+              <GameTileSkeleton key={i} />
             ))}
           </div>
         </div>
@@ -425,7 +526,12 @@ export function GamesScreen({
       {games && games.length === 0 && <EmptyState message={t("noGamesFound")} />}
 
       {games && games.length > 0 && (
-        <>
+        // Redesenho de 2026-09-07: o input era um controle solto acima da
+        // grade. Vira uma régua de toolbar com a mesma altura de 36px (`h-9`,
+        // via `inputClass`) do resto do chrome do app, e ganha à direita a
+        // contagem do que a busca deixou visível — em coluna monoespaçada,
+        // porque o número muda a cada tecla e não pode empurrar o layout.
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           <label htmlFor="games-search" className="sr-only">
             {t("searchGames")}
           </label>
@@ -437,13 +543,26 @@ export function GamesScreen({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("searchGamesPlaceholder")}
-            className={`mb-4 ${inputClass} max-w-xs`}
+            className={`${inputClass} max-w-xs`}
           />
-        </>
+          {trimmedSearch && visibleGames && (
+            <p
+              // `aria-live`: quem usa leitor de tela recebe o resultado da
+              // filtragem sem precisar varrer a grade atrás dele.
+              aria-live="polite"
+              className="font-mono text-xs tracking-wider text-muted uppercase tabular-nums"
+            >
+              {t("searchMatchCount", { count: visibleGames.length, total: games.length })}
+            </p>
+          )}
+        </div>
       )}
 
       {games && games.length > 0 && visibleGames && visibleGames.length === 0 && (
-        <p className="text-base text-muted">{t("noGamesMatchingSearch", { search: trimmedSearch })}</p>
+        // Mesmo componente de vazio que a lista sem nenhum jogo já usava
+        // acima — eram duas aparências para "não há o que mostrar" na mesma
+        // tela (um `EmptyState` emoldurado e um parágrafo cinza solto).
+        <EmptyState message={t("noGamesMatchingSearch", { search: trimmedSearch })} />
       )}
 
       {/* B5 (achado do critico-design, 2026-08-18): a Sprint O escalonou a
@@ -484,12 +603,22 @@ export function GamesScreen({
                   }
                 />
 
+                {/* Redesenho de 2026-09-07: a frase era o único texto em
+                    português cravado no JSX desta tela (todo o resto já
+                    passava pelo `dict`), e vinha em `text-sm` de prosa. Vira
+                    rótulo de estado — mono, caixa alta — porque é o que os
+                    dois blocos de progresso desta tela são; a fase do job vai
+                    para uma segunda linha, para o nome do emulador não ser
+                    empurrado para fora da largura de um tile. */}
                 {isPendingInstall && install.state.kind === "installing" && (
                   <div>
-                    <p className="text-sm text-muted">
-                      Instalando {verdict?.emulator ?? "emulador"}… {install.state.job.phase}
+                    <p className="font-mono text-[11px] tracking-wider text-muted uppercase">
+                      {t("installingEmulator", { emulator: verdict?.emulator ?? t("emulatorFallbackName") })}
                     </p>
-                    <div className="mt-1">
+                    <p className="font-mono text-[11px] tracking-wider text-muted/70 uppercase">
+                      {install.state.job.phase}
+                    </p>
+                    <div className="mt-1.5">
                       <ProgressBar percent={percentOf(install.state.job)} />
                     </div>
                   </div>
@@ -502,17 +631,25 @@ export function GamesScreen({
                     400 MB: desistir precisa ser possível sem fechar o app. */}
                 {status.kind === "downloading-core" && (
                   <div>
-                    <p className="text-sm text-muted">
+                    <p className="font-mono text-[11px] tracking-wider text-muted uppercase">
                       {t("downloadingCore", { coreName: status.job.core_name ?? "" })}
                       {faseExtraDeDownload(status.job.phase)}
-                      {percentOf(status.job) !== null && ` · ${percentOf(status.job)}%`}
+                      {percentOf(status.job) !== null && (
+                        <span className="tabular-nums"> · {percentOf(status.job)}%</span>
+                      )}
                     </p>
-                    <div className="mt-1">
+                    <div className="mt-1.5">
                       <ProgressBar percent={percentOf(status.job)} label={t("downloadingCore", { coreName: status.job.core_name ?? "" })} />
                     </div>
+                    {/* Vermelho em repouso (`CHROME_TINT_DANGER`) e altura de
+                        chrome: interromper um download já começado é a ação
+                        destrutiva desta tela, e o sinal precisa chegar antes
+                        do clique. Era `secondary`, que media como botão de
+                        conteúdo (`text-base`, `py-2`) embaixo de um tile de
+                        capa e competia com o próprio "Jogar". */}
                     <Button
-                      className="mt-2"
-                      variant="secondary"
+                      className={`mt-2 ${CHROME_TINT_DANGER}`}
+                      variant="chrome"
                       onClick={() => cancelCoreDownload(game.id, status.job)}
                     >
                       {t("cancelDownload")}
