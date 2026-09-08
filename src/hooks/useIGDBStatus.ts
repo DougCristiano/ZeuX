@@ -7,10 +7,14 @@ import { api } from "../api";
  * duas só precisam saber "a busca de capa está disponível sim/não" para
  * decidir se mostram o botão de buscar capa.
  *
- * `configured` é praticamente sempre `true` desde 2026-08-17: sem conta
- * pessoal conectada, o ZeuX cai numa credencial de teste embutida (ver
- * SettingsScreen e internal/igdb/credentials.go) — só fica `false` quando a
- * própria consulta a GET /igdb/credentials falha (ver `.catch` abaixo).
+ * `configured` cai numa credencial de teste embutida (ver SettingsScreen e
+ * internal/igdb/credentials.go) quando ninguém conecta conta pessoal — mas
+ * essa credencial só existe de verdade num build oficial (release.yml
+ * injeta via ldflags; correção de 2026-09-08, antes ficava escrita no
+ * código-fonte). Um build local sem ela, e sem conta pessoal conectada,
+ * reporta `configured: false` de verdade agora — junto com a consulta em
+ * si falhando (ver `.catch` abaixo), são os dois jeitos do botão de buscar
+ * capa ficar escondido.
  *
  * `null` enquanto carrega: as telas escondem o botão nesse meio-tempo em vez
  * de mostrar e esconder de novo (evita o "pisca" de aparecer e sumir).

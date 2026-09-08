@@ -185,6 +185,44 @@ teste compartilhada já foi suspensa por uso agregado
 **O que quebra se desfizer:** qualquer credencial única do ZeuX estoura cota
 assim que o app tiver uso real, derrubando capas para todo mundo de uma vez.
 
+### Credencial de teste embutida movida do código-fonte para ldflags (2026-09-08)
+
+A decisão acima (cada usuário conecta a própria conta) coexistiu, desde
+**2026-08-17**, com uma exceção pontual a pedido do Douglas: uma credencial
+de teste embutida como literal em `internal/igdb/credentials.go`
+(`defaultCredentials`), para pequenos grupos de testadores não precisarem
+configurar nada. Essa mesma chave foi a que se suspendeu no Twitch em
+**2026-08-18** (achado citado acima) — e de novo em **2026-09-08**,
+investigando por que a busca de capa não funcionava sem conta pessoal
+conectada no Linux.
+
+Na segunda investigação, ficou claro que manter a chave como literal no
+código-fonte era um problema à parte da suspensão em si: fica gravada no
+histórico do git para sempre, extraível por qualquer pessoa com acesso ao
+repositório (não só ao binário instalado) — e rotacionar exigia editar
+código e cortar release toda vez que o Twitch suspendesse de novo.
+
+Solução: `defaultClientID`/`defaultClientSecret` (mesmo arquivo) nascem
+vazios no código-fonte; só o workflow oficial de release
+(`.github/workflows/release.yml`) os injeta via `-ldflags -X`, lendo de
+dois GitHub Secrets (`IGDB_DEFAULT_CLIENT_ID`/`IGDB_DEFAULT_CLIENT_SECRET`)
+— `scripts/build-zeuxd.mjs` monta os ldflags a partir de variáveis de
+ambiente do mesmo nome. Rotacionar a chave agora é atualizar o Secret no
+GitHub e cortar uma release nova, sem tocar em código.
+
+**O que quebra se desfizer:** a chave volta a ficar gravada no histórico do
+git para sempre — a antiga (`fr1sxo7h82iihh48lrhl1qg94bh42y`) já está lá e
+não dá para apagar sem reescrever o histórico (fora de escopo desta
+correção; a chave já estava suspensa mesmo antes desta mudança, então o
+custo de deixá-la no histórico é baixo, mas não é zero).
+
+**Efeito colateral corrigido de quebra:** `GET /igdb/credentials` sempre
+respondia `"configured": true` (a lógica assumia que a credencial embutida
+sempre existia) — com o valor agora podendo ficar vazio de verdade num
+build sem os Secrets, essa resposta virou uma mentira otimista. O handler
+passou a consultar `CredentialsStore.Load()` (a credencial efetiva) em vez
+de presumir.
+
 ### RetroArch: cores baixados sob demanda, não empacotados no instalador
 
 Existiu uma fase em que o instalador podia empacotar RetroArch + 24 cores

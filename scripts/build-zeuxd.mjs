@@ -24,8 +24,30 @@ const outPath = path.join(binariesDir, `zeuxd-${target}${ext}`);
 
 mkdirSync(binariesDir, { recursive: true });
 
+// A credencial de teste do IGDB compartilhada por quem não conecta a
+// própria conta (internal/igdb/credentials.go, defaultClientID/
+// defaultClientSecret) não fica mais escrita no código-fonte — só o
+// workflow oficial de release (.github/workflows/release.yml) tem essas
+// duas variáveis como GitHub Secret e as injeta aqui via ldflags. Um build
+// local sem elas simplesmente não embute credencial nenhuma: o app
+// continua funcionando, só exige conta pessoal conectada em Configurações
+// para buscar capa via IGDB (thumbnails.libretro.com, sem conta, não é
+// afetado).
+const ldflags = [];
+const defaultClientID = process.env.IGDB_DEFAULT_CLIENT_ID;
+const defaultClientSecret = process.env.IGDB_DEFAULT_CLIENT_SECRET;
+if (defaultClientID && defaultClientSecret) {
+  ldflags.push(`-X github.com/doufl/zeux/internal/igdb.defaultClientID=${defaultClientID}`);
+  ldflags.push(`-X github.com/doufl/zeux/internal/igdb.defaultClientSecret=${defaultClientSecret}`);
+}
+
 console.log(`build-zeuxd: compilando ./cmd/zeuxd para ${target} -> ${path.relative(repoRoot, outPath)}`);
-execFileSync("go", ["build", "-o", outPath, "./cmd/zeuxd"], {
+const goArgs = ["build", "-o", outPath];
+if (ldflags.length > 0) {
+  goArgs.push("-ldflags", ldflags.join(" "));
+}
+goArgs.push("./cmd/zeuxd");
+execFileSync("go", goArgs, {
   cwd: repoRoot,
   stdio: "inherit",
 });

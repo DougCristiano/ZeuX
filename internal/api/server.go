@@ -1793,19 +1793,29 @@ func (s *Server) setFavorite(w http.ResponseWriter, r *http.Request, favorite bo
 }
 
 // handleGetIGDBCredentials nunca ecoa client_secret de volta — mesmo
-// instinto de nunca logar uma senha. `configured` é sempre `true` desde
-// 2026-08-17 (igdb.CredentialsStore.Load cai numa credencial de teste
-// embutida quando ninguém conectou a própria conta — ver
-// internal/igdb/credentials.go) — `personal` é o campo que distingue "conta
-// própria conectada" de "usando o padrão compartilhado de teste", para a
-// tela de Configurações mostrar o texto certo em cada caso.
+// instinto de nunca logar uma senha. `configured` era sempre `true` desde
+// 2026-08-17 (igdb.CredentialsStore.Load caía numa credencial de teste
+// embutida no código-fonte quando ninguém conectava a própria conta) — a
+// correção de 2026-09-08 tirou essa credencial do código-fonte (agora só
+// existe se o release oficial a injetou via ldflags, ver
+// internal/igdb/credentials.go e scripts/build-zeuxd.mjs), então um build
+// sem ela precisa poder reportar `configured: false` de verdade — `Load`
+// (a credencial EFETIVA, pessoal ou padrão) é quem sabe isso, não
+// `LoadPersonal`. `personal` continua distinguindo "conta própria
+// conectada" de "usando o padrão compartilhado de teste", para a tela de
+// Configurações mostrar o texto certo em cada caso.
 func (s *Server) handleGetIGDBCredentials(w http.ResponseWriter, r *http.Request) {
+	_, configured, err := s.igdbCreds.Load()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "igdb_credentials_read_failed", err.Error())
+		return
+	}
 	_, personal, err := s.igdbCreds.LoadPersonal()
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "igdb_credentials_read_failed", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"configured": true, "personal": personal})
+	writeJSON(w, http.StatusOK, map[string]any{"configured": configured, "personal": personal})
 }
 
 // handleSetIGDBCredentials não valida contra o IGDB na hora — fica

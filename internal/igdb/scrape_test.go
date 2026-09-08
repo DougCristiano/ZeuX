@@ -176,6 +176,7 @@ func TestScrapeBatchPartialSuccess(t *testing.T) {
 // otimização que a busca automática depende), então este teste não precisa
 // de um servidor IGDB falso para travar a regra.
 func TestScrapeStartWithoutPersonalCredentialsFallsBackToDefault(t *testing.T) {
+	withDefaultCredentials(t, "default-id", "default-secret")
 	setManagedRootEnv(t)
 	lib := newTestLibrary(t)
 	credsStore := newTestCredentialsStore(t) // nunca Save() — sem credencial pessoal

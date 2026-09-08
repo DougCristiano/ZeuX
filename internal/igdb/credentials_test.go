@@ -32,11 +32,26 @@ func TestLoadPersonalWithoutFileReturnsUnconfigured(t *testing.T) {
 	}
 }
 
+// withDefaultCredentials aponta defaultClientID/defaultClientSecret para um
+// valor de teste durante o teste, restaurando ao original ao final — mesmo
+// padrão de pcsx2ConfigPath/retroArchConfigPath (var de pacote, não
+// const/literal, pra troca em teste sem precisar do ldflags do build
+// oficial que preenche essas duas em produção).
+func withDefaultCredentials(t *testing.T, id, secret string) {
+	t.Helper()
+	origID, origSecret := defaultClientID, defaultClientSecret
+	defaultClientID, defaultClientSecret = id, secret
+	t.Cleanup(func() { defaultClientID, defaultClientSecret = origID, origSecret })
+}
+
 // Trava a mudança de 2026-08-17: sem credencial pessoal, Load (a efetiva,
 // usada de verdade para autenticar) cai na credencial de teste embutida —
 // nunca "não configurado" — para que poucos testadores não precisem
-// conectar conta nenhuma.
+// conectar conta nenhuma. Só vale quando o build embutiu essa credencial de
+// verdade (ver TestLoadWithoutPersonalFileAndWithoutDefaultIsUnconfigured
+// para o outro lado).
 func TestLoadWithoutPersonalFileFallsBackToDefault(t *testing.T) {
+	withDefaultCredentials(t, "default-id", "default-secret")
 	store := newTestCredentialsStore(t)
 
 	creds, configured, err := store.Load()
@@ -46,8 +61,30 @@ func TestLoadWithoutPersonalFileFallsBackToDefault(t *testing.T) {
 	if !configured {
 		t.Fatal("Load: sem credencial pessoal deveria mesmo assim cair no padrão embutido")
 	}
-	if creds != defaultCredentials {
+	if creds != defaultCredentials() {
 		t.Fatalf("Load: esperava a credencial padrão embutida, veio %+v", creds)
+	}
+}
+
+// Trava a correção de 2026-09-08: a credencial padrão deixou de ser um
+// literal no código-fonte (ficava gravada no histórico do git para
+// sempre) — agora só existe se o build oficial a injetou via ldflags
+// (scripts/build-zeuxd.mjs). Um build local, sem essas variáveis de
+// ambiente, precisa continuar honesto: "não configurado", nunca uma
+// tentativa de autenticar com client_id/secret vazios.
+func TestLoadWithoutPersonalFileAndWithoutDefaultIsUnconfigured(t *testing.T) {
+	withDefaultCredentials(t, "", "")
+	store := newTestCredentialsStore(t)
+
+	creds, configured, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load: erro inesperado: %v", err)
+	}
+	if configured {
+		t.Fatal("Load: sem credencial pessoal nem padrão embutida não pode aparecer como configurado")
+	}
+	if creds != (Credentials{}) {
+		t.Fatalf("Load: esperava Credentials zerado, veio %+v", creds)
 	}
 }
 
@@ -78,6 +115,7 @@ func TestSavePersistsAndReloads(t *testing.T) {
 // sozinhos autenticam nada — e que Load ainda assim cai no padrão embutido
 // em vez de tentar autenticar com a credencial pessoal incompleta.
 func TestPartialCredentialsAreNotConfigured(t *testing.T) {
+	withDefaultCredentials(t, "default-id", "default-secret")
 	store := newTestCredentialsStore(t)
 
 	if err := store.Save(Credentials{ClientID: "abc123"}); err != nil {
@@ -96,7 +134,7 @@ func TestPartialCredentialsAreNotConfigured(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if !configured || creds != defaultCredentials {
+	if !configured || creds != defaultCredentials() {
 		t.Fatalf("Load: esperava cair no padrão embutido com credencial pessoal incompleta, veio %+v/%v", creds, configured)
 	}
 }
@@ -125,6 +163,7 @@ func TestLoadWithCorruptedFileReturnsUnconfigured(t *testing.T) {
 // embutido, não em "sem credencial"), e que chamar Clear sem nada conectado
 // é um no-op válido (não um erro).
 func TestClearRemovesCredentials(t *testing.T) {
+	withDefaultCredentials(t, "default-id", "default-secret")
 	store := newTestCredentialsStore(t)
 
 	if err := store.Save(Credentials{ClientID: "abc123", ClientSecret: "segredo"}); err != nil {
@@ -143,7 +182,7 @@ func TestClearRemovesCredentials(t *testing.T) {
 		t.Fatal("LoadPersonal após Clear: não deveria haver credencial pessoal")
 	}
 
-	if creds, configured, err := store.Load(); err != nil || !configured || creds != defaultCredentials {
+	if creds, configured, err := store.Load(); err != nil || !configured || creds != defaultCredentials() {
 		t.Fatalf("Load após Clear: esperava cair no padrão embutido, veio %+v/%v/%v", creds, configured, err)
 	}
 

@@ -161,6 +161,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Credencial de teste do IGDB compartilhada por quem não conecta a
+          # própria conta (internal/igdb/credentials.go) — chega aqui só
+          # como secret do GitHub, nunca escrita no repositório
+          # (2026-09-08: corrigido depois da anterior, hardcoded no
+          # código-fonte, ter sido extraída e a chave suspensa no Twitch).
+          # beforeBuildCommand (tauri.conf.json) chama scripts/build-zeuxd.mjs,
+          # que lê estas duas e as injeta via -ldflags -X. Ausentes (secret
+          # não cadastrado ainda) só significa build sem credencial padrão —
+          # nunca falha, ver o comentário do próprio script.
+          IGDB_DEFAULT_CLIENT_ID: ${{ secrets.IGDB_DEFAULT_CLIENT_ID }}
+          IGDB_DEFAULT_CLIENT_SECRET: ${{ secrets.IGDB_DEFAULT_CLIENT_SECRET }}
         with:
           tagName: ${{ needs.create-release.outputs.tag }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
@@ -227,6 +238,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Credencial de teste do IGDB compartilhada por quem não conecta a
+          # própria conta (internal/igdb/credentials.go) — chega aqui só
+          # como secret do GitHub, nunca escrita no repositório
+          # (2026-09-08: corrigido depois da anterior, hardcoded no
+          # código-fonte, ter sido extraída e a chave suspensa no Twitch).
+          # beforeBuildCommand (tauri.conf.json) chama scripts/build-zeuxd.mjs,
+          # que lê estas duas e as injeta via -ldflags -X. Ausentes (secret
+          # não cadastrado ainda) só significa build sem credencial padrão —
+          # nunca falha, ver o comentário do próprio script.
+          IGDB_DEFAULT_CLIENT_ID: ${{ secrets.IGDB_DEFAULT_CLIENT_ID }}
+          IGDB_DEFAULT_CLIENT_SECRET: ${{ secrets.IGDB_DEFAULT_CLIENT_SECRET }}
         with:
           tagName: ${{ needs.create-release.outputs.tag }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
@@ -275,6 +297,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Credencial de teste do IGDB compartilhada por quem não conecta a
+          # própria conta (internal/igdb/credentials.go) — chega aqui só
+          # como secret do GitHub, nunca escrita no repositório
+          # (2026-09-08: corrigido depois da anterior, hardcoded no
+          # código-fonte, ter sido extraída e a chave suspensa no Twitch).
+          # beforeBuildCommand (tauri.conf.json) chama scripts/build-zeuxd.mjs,
+          # que lê estas duas e as injeta via -ldflags -X. Ausentes (secret
+          # não cadastrado ainda) só significa build sem credencial padrão —
+          # nunca falha, ver o comentário do próprio script.
+          IGDB_DEFAULT_CLIENT_ID: ${{ secrets.IGDB_DEFAULT_CLIENT_ID }}
+          IGDB_DEFAULT_CLIENT_SECRET: ${{ secrets.IGDB_DEFAULT_CLIENT_SECRET }}
         with:
           tagName: ${{ needs.create-release.outputs.tag }}
           releaseId: ${{ needs.create-release.outputs.release_id }}

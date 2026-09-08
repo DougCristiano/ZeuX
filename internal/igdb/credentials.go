@@ -28,21 +28,34 @@ type Credentials struct {
 	ClientSecret string `json:"client_secret"`
 }
 
-// defaultCredentials é uma credencial de teste do IGDB embutida a pedido do
-// Douglas (2026-08-17), para pequenos grupos de testadores não precisarem
-// criar/colar a própria conta antes de ver a busca de capa funcionando.
-//
-// Trade-off aceito conscientemente, não decisão de arquitetura (sem ADR
-// formal — escopo pequeno demais para isso): esta chave fica gravada no
-// binário/instalador do ZeuX e no histórico do git, então é extraível por
-// qualquer pessoa com o app instalado; e é compartilhada por todo mundo que
-// não conectar a própria conta, sujeita ao mesmo limite de cota da
-// Twitch/IGDB para todos ao mesmo tempo. Se o público de testadores
-// crescer, rotacionar esta chave no painel da Twitch e reavaliar o
-// trade-off é o caminho — nunca aumentar o público sem reavaliar a cota.
-var defaultCredentials = Credentials{
-	ClientID:     "fr1sxo7h82iihh48lrhl1qg94bh42y",
-	ClientSecret: "2tt2naofqi6fkuwlbpo145q1kwplr9",
+// defaultClientID/defaultClientSecret chegam vazios no código-fonte de
+// propósito — são preenchidos em tempo de build via `-ldflags "-X
+// .../igdb.defaultClientID=... -X .../igdb.defaultClientSecret=..."`
+// (scripts/build-zeuxd.mjs, a partir das variáveis de ambiente
+// IGDB_DEFAULT_CLIENT_ID/IGDB_DEFAULT_CLIENT_SECRET) só no workflow oficial
+// de release (.github/workflows/release.yml, GitHub Secrets). Corrige o
+// desenho anterior (2026-08-17), que gravava a chave literal aqui — ficava
+// no histórico do git para sempre, extraível por qualquer pessoa com
+// acesso ao repositório, não só ao binário instalado. Um build local
+// (`go build`/`go run` direto, sem passar pelo release oficial) não recebe
+// nada aqui — Load() cai corretamente em "sem credencial configurada"
+// abaixo, sem inventar uma tentativa de autenticação com string vazia.
+var (
+	defaultClientID     string
+	defaultClientSecret string
+)
+
+// defaultCredentials monta a credencial de teste embutida a partir das duas
+// variáveis acima — ver o comentário delas para a origem e o trade-off
+// aceito conscientemente (Douglas, 2026-08-17, revisado em 2026-09-08):
+// pequenos grupos de testadores não precisam criar/colar a própria conta
+// antes de ver a busca de capa funcionando, ao custo de uma cota
+// compartilhada por todo mundo que não conectar a própria. Se o público de
+// testadores crescer, rotacionar esta chave no painel da Twitch e
+// reavaliar o trade-off é o caminho — nunca aumentar o público sem
+// reavaliar a cota.
+func defaultCredentials() Credentials {
+	return Credentials{ClientID: defaultClientID, ClientSecret: defaultClientSecret}
 }
 
 // configured informa se as duas chaves foram preenchidas. Uma credencial
@@ -79,10 +92,14 @@ func NewCredentialsStore() (*CredentialsStore, error) {
 
 // Load devolve a credencial EFETIVA a usar para autenticar contra o IGDB: a
 // pessoal, se alguém conectou uma em Configurações, ou a credencial de
-// teste embutida (defaultCredentials) caso contrário — por isso o segundo
-// retorno nunca é `false` aqui (sempre há alguma credencial para tentar).
-// Use LoadPersonal para saber se a credencial em uso é a pessoal ou a
-// padrão compartilhada (é o que a tela de Configurações precisa).
+// teste embutida (defaultCredentials()) caso contrário. O segundo retorno
+// só é `false` quando nem a pessoal nem a embutida existem — um build local
+// sem as variáveis de ambiente do release oficial (ver o comentário de
+// defaultClientID) não tem credencial nenhuma pra tentar, e isso precisa
+// chegar como "não configurado", não como uma tentativa de autenticação
+// com client_id/secret vazios. Use LoadPersonal para saber se a credencial
+// em uso é a pessoal ou a padrão compartilhada (é o que a tela de
+// Configurações precisa).
 func (s *CredentialsStore) Load() (Credentials, bool, error) {
 	creds, ok, err := s.LoadPersonal()
 	if err != nil {
@@ -91,7 +108,10 @@ func (s *CredentialsStore) Load() (Credentials, bool, error) {
 	if ok {
 		return creds, true, nil
 	}
-	return defaultCredentials, true, nil
+	if fallback := defaultCredentials(); fallback.configured() {
+		return fallback, true, nil
+	}
+	return Credentials{}, false, nil
 }
 
 // LoadPersonal devolve só a credencial que o próprio usuário conectou em
