@@ -207,6 +207,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/igdb/credentials", s.handleSetIGDBCredentials)
 	mux.HandleFunc("DELETE /api/v1/igdb/credentials", s.handleClearIGDBCredentials)
 	mux.HandleFunc("POST /api/v1/library/games/scrape-covers", s.handleScrapeCovers)
+	mux.HandleFunc("GET /api/v1/scrape-jobs", s.handleScrapeJobs)
 	mux.HandleFunc("GET /api/v1/scrape-jobs/{id}", s.handleScrapeJob)
 	mux.HandleFunc("POST /api/v1/library/games/{id}/cover", s.handleSetGameCover)
 	// Serve as capas já baixadas em disco (nunca a URL do IGDB direto — G1
@@ -2056,6 +2057,15 @@ func (s *Server) handleScrapeCovers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusAccepted, job)
+}
+
+// handleScrapeJobs lista as buscas de capa recentes (mais nova primeiro). A
+// tela "Todos os jogos" consulta isto ao abrir para descobrir um lote
+// automático (autoScrapeCovers, disparado ao adicionar/revarrer pasta) já em
+// andamento — sem um id de job, o placeholder de sigla parado lia como "a
+// busca falhou" em vez de "ainda buscando".
+func (s *Server) handleScrapeJobs(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"jobs": s.igdbJobs.Jobs()})
 }
 
 func (s *Server) handleScrapeJob(w http.ResponseWriter, r *http.Request) {

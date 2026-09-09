@@ -642,6 +642,51 @@ na pasta de ROM do usuário (regra 6). Não cabia com segurança no tempo
 desta rodada junto do título editável; o título editável (menor e sem risco
 de FS) foi entregue, o multi-disco virou pendência.
 
+### "Todos os jogos" fecha o ciclo pós-jogo e o de "jogar mesmo assim" (2026-09-09)
+
+Quatro ajustes na tela de entrada e no fluxo de lançar, todos sob o princípio
+5 (informar, nunca bloquear) e o 2/3 (texto descritivo, nomear o gargalo):
+
+1. **Recarga pós-jogo sem F5.** `useLaunchGame` ganhou um gancho `onLaunched`,
+   disparado só quando o jogo abre de fato (status `launched`, nunca no
+   caminho de download de core). `AllGamesScreen` o usa para rebuscar a grade
+   e a faixa "Continue jogando"; `GameDetailScreen`, para a contagem de
+   sessões. `GamesScreen` já fazia isso à mão com um `loadGames()` logo após
+   `api.launch` — as telas que usam o hook não tinham como. A recarga não
+   toca `restoredScrollRef` (M4), então a rolagem do usuário fica no lugar.
+
+2. **`GameDetailScreen` passou a compor `useInlineInstall`.** Era a lacuna
+   registrada no doc comment de `GamesScreen`: o "Jogar" grande do detalhe
+   chamava `launch(game)` direto — sem instalar o emulador que falta, sem
+   confirmar BIOS vazia, sem "jogar assim mesmo" num console sem preset. Agora
+   passa pela mesma `handlePlay` das outras duas telas, com as mesmas
+   confirmações em modal e o mesmo `ManualInstallModal`.
+
+3. **Chip acionável para `no_preset`/`bios_empty`.** Em `GameTile` e
+   `GameHero` o chip desses dois motivos era texto morto (só
+   `not_installed`/`install_manual` viravam botão). Agora vira "jogar assim
+   mesmo", que dispara a mesma `onPlay` do ▶ (lança sem `options` em "sem
+   preset"; abre a confirmação de BIOS em "bios vazia"). O motivo descritivo
+   continua no `title`/nome acessível e, no hero, na linha acima do botão.
+
+4. **`GET /scrape-jobs`.** O lote automático de capas (`autoScrapeCovers`)
+   roda sem a tela ter um id de job — o placeholder de sigla parado lia como
+   "a busca falhou". A rota nova lista as buscas recentes; `AllGamesScreen`
+   consulta ao abrir, adota uma que ainda esteja em andamento e mostra o
+   mesmo progresso discreto ("buscando capas… 12/48", com `aria-live`) do
+   botão "Buscar capas".
+
+5. **`EmptyState` de "Todos os jogos" com 3 passos numerados** (parte do item
+   de onboarding de `pendencias.md`): aponte a pasta · o ZeuX lê o hardware e
+   diz o que cada console alcança · clique no jogo, ele resolve emulador e
+   config. Não é wizard, não tem card de console de exemplo, não sugere de
+   onde tirar ROM (princípio 6). Substituiu a chave `emptyLibraryHelp`.
+
+**O que quebra se desfizer:** #2 volta a deixar o detalhe do jogo como a
+única das três telas de jogo que ignora BIOS vazia / emulador ausente e só
+falha depois no `ErrorModal`; #4 volta a fazer o lote automático parecer
+falha silenciosa.
+
 ---
 
 ## O que fica fora deste log, de propósito

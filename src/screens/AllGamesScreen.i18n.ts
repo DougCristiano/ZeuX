@@ -92,6 +92,12 @@ export const dict = {
     "pt-BR": "Buscar capas",
     en: "Fetch covers",
   },
+  // 2026-09-09: contador de progresso da busca de capas. Diz o que está
+  // acontecendo porque um lote automático roda sem clique nenhum do usuário.
+  scrapingCoversProgress: {
+    "pt-BR": "buscando capas… {{processed}}/{{total}}",
+    en: "fetching covers… {{processed}}/{{total}}",
+  },
   // 2026-09-07 (achado do Douglas: "GERENCIAR PASTAS não tem uma boa
   // nomenclatura"): o botão levava pra tela "Pastas de jogos" (renomeada em
   // 2026-09-06 pra não colidir com "Biblioteca" da sidebar — comentário em
@@ -122,15 +128,23 @@ export const dict = {
     "pt-BR": "Nenhum jogo na biblioteca ainda.",
     en: "No games in your library yet.",
   },
-  // 2026-09-07: a tela vazia dizia só "Nenhum jogo na biblioteca ainda." e
-  // oferecia o botão — não dizia o que o botão faz nem o que acontece depois.
-  // É a primeira tela real de quem acabou de instalar (docs/roadmap.md), e a
-  // promessa do produto ("apontar a pasta e clicar no jogo") não estava
-  // escrita em lugar nenhum dela. Sem vocabulário de emulador, e sem sugerir
-  // de onde tirar jogo — a pasta é a que já existe no computador da pessoa.
-  emptyLibraryHelp: {
-    "pt-BR": "Aponte a pasta onde seus jogos já estão no computador. O ZeuX reconhece cada um, prepara o que precisa e abre no clique.",
-    en: "Point to the folder where your games already are on this computer. ZeuX recognizes each one, sets up what it needs, and opens it on click.",
+  // 2026-09-09 (docs/pendencias.md, onboarding sem ROM): a tela vazia
+  // apresenta o app em 3 passos curtos antes da ação, em vez de um botão
+  // solto. Sem vocabulário de emulador, sem dizer de onde tirar jogo
+  // (princípio 6) — a pasta é a que já existe no computador da pessoa. O
+  // passo 2 fala do que a máquina alcança, nunca julga o hardware (princípio
+  // 2).
+  emptyStep1: {
+    "pt-BR": "Aponte a pasta onde seus jogos já estão no computador.",
+    en: "Point to the folder where your games already are on this computer.",
+  },
+  emptyStep2: {
+    "pt-BR": "O ZeuX lê o seu hardware e mostra o que cada console alcança nesta máquina.",
+    en: "ZeuX reads your hardware and shows what each console can reach on this machine.",
+  },
+  emptyStep3: {
+    "pt-BR": "Clique no jogo — o ZeuX resolve o emulador e a configuração sozinho.",
+    en: "Click a game — ZeuX sorts out the emulator and the configuration on its own.",
   },
   clearFilters: {
     "pt-BR": "Limpar filtros",

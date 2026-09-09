@@ -13,4 +13,9 @@ export const dict = {
     "pt-BR": "Jogado em {{date}}",
     en: "Played on {{date}}",
   },
+  // 2026-09-09: sem preset / BIOS vazia — o jogo abre assim mesmo (princípio 5).
+  playAnyway: {
+    "pt-BR": "Jogar assim mesmo",
+    en: "Play anyway",
+  },
 } satisfies Dict;

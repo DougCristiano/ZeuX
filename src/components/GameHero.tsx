@@ -198,6 +198,17 @@ export function GameHero({
               <Button variant="primary" onClick={onInstall}>
                 {launchability!.badge}
               </Button>
+            ) : blocked &&
+              onPlay &&
+              (launchability!.reason === "no_preset" || launchability!.reason === "bios_empty") ? (
+              // Princípio 5: sem preset ou BIOS vazia não bloqueia — o jogo
+              // abre assim mesmo (na config padrão do emulador). "Continuar"
+              // aqui prometeria retomar de onde parou; "jogar assim mesmo"
+              // não. O motivo do bloqueio já está escrito acima (`blocked`).
+              <Button variant="primary" onClick={onPlay} className="gap-2">
+                <Play size={15} fill="currentColor" aria-hidden="true" />
+                {t("playAnyway")}
+              </Button>
             ) : (
               onPlay && (
                 <Button variant="primary" onClick={onPlay} className="gap-2">

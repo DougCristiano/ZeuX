@@ -134,7 +134,25 @@ export function GameTile({
                 novo nascia texto morto — o usuário lia "instalação manual" e
                 não tinha o que clicar. Os dois levam ao mesmo `onInstall`,
                 que já ramifica pelo motivo (useInlineInstall.handlePlay). */}
-            {(launchability!.reason === "not_installed" || launchability!.reason === "install_manual") && onInstall ? (
+            {(launchability!.reason === "no_preset" || launchability!.reason === "bios_empty") && onPlay ? (
+              // Princípio 5 (informar, nunca bloquear): sem preset ou com BIOS
+              // vazia, o chip deixou de ser texto morto — vira "jogar assim
+              // mesmo", que dispara a mesma `onPlay` do ▶ (lança sem `options`
+              // em "sem preset"; abre a confirmação de BIOS em "bios vazia").
+              // O motivo completo continua no `title` (tooltip) e no nome
+              // acessível do tile.
+              <button
+                type="button"
+                title={launchability!.title}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPlay();
+                }}
+                className={`inline-block rounded-sm border border-accent/60 bg-accent/10 px-1.5 py-0.5 font-mono text-xs tracking-wide text-accent-hover transition duration-150 hover:border-accent hover:bg-accent/20 hover:shadow-[0_0_12px_-4px_var(--accent)] ${FOCUS_RING}`}
+              >
+                {t("playAnywayBadge")}
+              </button>
+            ) : (launchability!.reason === "not_installed" || launchability!.reason === "install_manual") && onInstall ? (
               // Versão em miniatura do `Button variant="primary"` da hero
               // ("instalar emulador") — mesma cor de ação (roxo), não a
               // `chrome` de navegação/arquivo. Antes era texto sublinhado

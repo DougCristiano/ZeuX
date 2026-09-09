@@ -104,6 +104,13 @@ emulador não sabe o que esperar depois de apontar a pasta, o que é um
 A primeira impressão de quem não tem ROM nenhuma ainda é uma tela quase em
 branco, sem contexto.
 
+**Feito em parte (2026-09-09):** o `EmptyState` de "Todos os jogos" virou a
+versão com passos numerados (opção "só uma versão mais rica do `EmptyState`
+atual", abaixo) — aponte a pasta · o ZeuX lê o hardware e diz o que cada
+console alcança · clique no jogo. Ver `decisoes.md`. O que **continua em
+aberto**: o modo tutorial/wizard dedicado e as perguntas de quando exibir /
+onde entra na máquina de estados de `App.tsx` / console de exemplo.
+
 **Ideia levantada, não desenhada ainda:** um modo tutorial/passo-a-passo
 logo após a instalação (ou logo após o consentimento, antes do scan) que
 explique o que o app faz, sem story vazio. Nada disto foi decidido:

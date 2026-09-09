@@ -21,11 +21,21 @@ export type LaunchStatus =
  * /home/douglas/.claude/plans/sleepy-roaming-pearl.md) para não duplicar a
  * mesma lógica pela terceira vez.
  *
- * Deliberadamente NÃO cobre o fluxo mais rico de `GamesScreen` (instalar
- * emulador inline, confirmar hardware insuficiente, confirmar BIOS vazio) —
- * essa profundidade continua só na tela por console, de propósito.
+ * Não cobre sozinho o fluxo mais rico de `GamesScreen` (instalar emulador
+ * inline, confirmar hardware insuficiente, confirmar BIOS vazio) — essa
+ * profundidade vive em `useInlineInstall`, e as telas que precisam dela
+ * (por console, "Todos os jogos", detalhe do jogo) compõem os dois hooks:
+ * `useInlineInstall` ramifica por motivo e, quando é hora de abrir, chama o
+ * `launch` daqui.
+ *
+ * `onLaunched` (2026-09-09): disparado quando um lançamento de fato abre o
+ * jogo (status `launched`) — nunca no caminho de download de core, que ainda
+ * não abriu nada. É o gancho para a tela recarregar o que a sessão nova
+ * muda (tempo de jogo, faixa "Continue jogando", capa) sem um F5.
+ * `GamesScreen` já fazia isso à mão com um `loadGames()` logo após
+ * `api.launch`; quem usa este hook não tinha como.
  */
-export function useLaunchGame() {
+export function useLaunchGame(opts?: { onLaunched?: () => void }) {
   const [statusByGameId, setStatusByGameId] = useState<Record<number, LaunchStatus>>({});
   const [launchError, setLaunchError] = useState<string | null>(null);
   // Guardado só para o "Tentar de novo" do ErrorModal (M1,
@@ -97,6 +107,10 @@ export function useLaunchGame() {
         return;
       }
       setStatus(game.id, { kind: "launched" });
+      // Só aqui: o jogo abriu de verdade. O caminho de download de core acima
+      // retorna antes de chegar nesta linha; a segunda tentativa
+      // (`afterCoreDownload`) volta por aqui e dispara o gancho normalmente.
+      opts?.onLaunched?.();
     } catch (err) {
       // Mensagem literal do servidor — nunca reescrita (regra do projeto).
       const message = err instanceof ApiError ? err.message : "Não foi possível abrir o jogo.";

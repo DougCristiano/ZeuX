@@ -378,6 +378,28 @@ func TestLaunchWithoutViableTierAttemptsLaunchWithoutPreset(t *testing.T) {
 	}
 }
 
+// Trava a regra do GET /scrape-jobs (2026-09-09): a lista existe para a tela
+// "Todos os jogos" descobrir um lote automático de capas já em andamento — sem
+// job nenhum, responde 200 com uma lista vazia, nunca 404 nem erro (senão a
+// tela trataria "nenhuma busca rodando" como falha).
+func TestScrapeJobsListEmptyReturns200(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	rec := doJSON(t, server.Routes(), http.MethodGet, "/api/v1/scrape-jobs", nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, esperado 200", rec.Code)
+	}
+	var body struct {
+		Jobs []map[string]any `json:"jobs"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("corpo não é o JSON esperado: %v", err)
+	}
+	if len(body.Jobs) != 0 {
+		t.Fatalf("jobs = %d, esperado 0 num servidor recém-criado", len(body.Jobs))
+	}
+}
+
 // Trava o ciclo completo de emuladores personalizados: criar, listar e
 // remover, exercitando o mesmo caminho que a interface usaria.
 func TestCustomEmulatorLifecycle(t *testing.T) {

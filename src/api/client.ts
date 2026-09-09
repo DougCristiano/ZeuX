@@ -354,6 +354,11 @@ export const api = {
   scrapeCovers: (gameId?: number) =>
     postJSON<ScrapeJob>("/library/games/scrape-covers", gameId ? { game_id: gameId } : {}),
   getScrapeJob: (id: string) => request<ScrapeJob>(`/scrape-jobs/${encodeURIComponent(id)}`),
+  // Buscas recentes, da mais nova para a mais antiga. "Todos os jogos" usa
+  // isto para descobrir um lote automático (autoScrapeCovers) já em andamento
+  // — sem um id de job em mãos, não havia como mostrar o progresso de uma
+  // busca que a tela não iniciou.
+  getScrapeJobs: () => request<{ jobs: ScrapeJob[] }>("/scrape-jobs"),
   // 2026-09-08: troca manual de capa — mesma mecânica de setConsoleImage
   // (source_path local, o Go lê e grava). Vence qualquer busca automática
   // futura: ListAllGames/UncoveredGames já ignoram um jogo com cover_path

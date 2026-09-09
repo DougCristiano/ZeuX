@@ -265,8 +265,19 @@ export function AllGamesScreen({
   // esperar os 300ms de debounce de novo.
   const [debouncedSearch, setDebouncedSearch] = useState(search.trim());
   const [error, setError] = useState<string | null>(null);
+  // 2026-09-09: fechar o ciclo pós-jogo sem F5. `GamesScreen` já recarregava
+  // a lista logo após lançar; aqui o lançamento passa pelo `useLaunchGame`,
+  // que agora avisa quando o jogo abriu de fato. Recarrega a grade e a faixa
+  // "Continue jogando" — não a tela inteira, e sem tocar `restoredScrollRef`
+  // (que já travou na primeira restauração do M4), então a rolagem do
+  // usuário fica onde está.
   const { statusFor, launch, activeCoreDownload, cancelCoreDownload, launchError, clearLaunchError, retryLaunch } =
-    useLaunchGame();
+    useLaunchGame({
+      onLaunched: () => {
+        loadGames();
+        loadRecentGames();
+      },
+    });
   const { toastMessage, showToast } = useToast();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
@@ -295,12 +306,14 @@ export function AllGamesScreen({
       .catch(() => setEmulators([]));
   }, []);
 
-  useEffect(() => {
+  function loadRecentGames() {
     api
       .getAllLibraryGames(1, 1)
       .then((res) => setRecentGames(res.games.filter((g) => g.playtime_seconds > 0)))
       .catch(() => setRecentGames([]));
-  }, []);
+  }
+
+  useEffect(loadRecentGames, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
@@ -392,7 +405,12 @@ export function AllGamesScreen({
   // o usuário precisar saber que existe um botão "Revarrer" escondido em
   // "Gerenciar pastas" (ver src/lib/autoRescan.ts).
   useEffect(() => {
-    rescanAllFoldersIfStale().then(loadGames);
+    rescanAllFoldersIfStale().then(() => {
+      loadGames();
+      // A revarredura pode ter disparado um lote automático de capas no
+      // servidor — só agora ele existe para ser adotado.
+      adoptRunningScrapeJob();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -451,6 +469,30 @@ export function AllGamesScreen({
         setScrapeJob(null);
       });
   }
+
+  // 2026-09-09: o lote automático de capas (autoScrapeCovers no servidor,
+  // disparado ao adicionar/revarrer pasta) roda sem a tela saber — sem um id
+  // de job em mãos, o placeholder de sigla parado lia como "a busca falhou".
+  // Aqui a tela pergunta ao servidor se há uma busca em andamento e, se
+  // houver, mostra o mesmo progresso discreto do botão "Buscar capas".
+  function adoptRunningScrapeJob() {
+    if (scrapeJob) return;
+    api
+      .getScrapeJobs()
+      .then((res) => {
+        const running = res.jobs.find((j) => j.finished_at === null && j.phase !== "falhou");
+        if (running) {
+          setScrapeJob(running);
+          pollScrapeJob(running.id);
+        }
+      })
+      .catch(() => {
+        // Sem indicador é melhor que um erro: a busca segue no servidor de
+        // qualquer forma, e a próxima abertura da tela tenta de novo.
+      });
+  }
+
+  useEffect(adoptRunningScrapeJob, []);
 
   function startScrapeCovers() {
     setScrapeError(null);
@@ -802,9 +844,13 @@ export function AllGamesScreen({
               {scrapeJob && (
                 <>
                   <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
-                  {/* A11y 4.1.3: contador que muda sozinho — anunciado por aria-live. */}
+                  {/* A11y 4.1.3: contador que muda sozinho — anunciado por
+                      aria-live. O texto ("buscando capas… 12/48") diz o que
+                      está acontecendo: um lote automático (adotado por
+                      `adoptRunningScrapeJob`) roda sem nenhum clique do
+                      usuário, e um número solto não explicava a si mesmo. */}
                   <p className="text-center text-xs text-muted" aria-live="polite">
-                    {scrapeJob.processed}/{scrapeJob.total}
+                    {t("scrapingCoversProgress", { processed: scrapeJob.processed, total: scrapeJob.total })}
                   </p>
                 </>
               )}
@@ -1093,13 +1139,28 @@ export function AllGamesScreen({
                 message={t("noGamesInLibrary")}
                 action={
                   <>
-                    {/* 2026-09-07: a linha de apoio entra como `action` porque
-                        `EmptyState` só tem um slot livre — e o texto precisa
-                        vir ANTES do botão, senão o botão explica a si mesmo
-                        depois de já ter sido clicado. `max-w-md` prende a
-                        medida perto de 65 caracteres por linha; a caixa da
-                        tela vazia é larga demais para uma frase solta. */}
-                    <p className="mb-2 max-w-md text-sm text-muted">{t("emptyLibraryHelp")}</p>
+                    {/* 2026-09-09 (docs/pendencias.md, "Onboarding para quem
+                        abre o app sem nenhuma ROM"): não é um wizard — é o
+                        `EmptyState` de sempre, com o que o app faz em 3 passos
+                        curtos antes da ação, em vez de um botão solto que só
+                        se explica depois do clique. Sem vocabulário de
+                        emulador, sem dizer de onde tirar jogo (princípio 6): a
+                        pasta é a que já existe no computador da pessoa.
+                        `max-w-md` ~65 caracteres por linha; a caixa vazia é
+                        larga demais para texto solto. */}
+                    <ol className="mb-4 max-w-md list-none space-y-2 text-left text-sm text-muted">
+                      {[t("emptyStep1"), t("emptyStep2"), t("emptyStep3")].map((step, i) => (
+                        <li key={i} className="flex gap-2.5">
+                          <span
+                            aria-hidden="true"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-strong font-mono text-xs text-ink"
+                          >
+                            {i + 1}
+                          </span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
                     <Button variant="primary" onClick={onOpenLibrary}>
                       {t("chooseFolderWithGames")}
                     </Button>

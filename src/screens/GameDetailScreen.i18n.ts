@@ -89,6 +89,31 @@ export const dict = {
     en: "Could not read statistics",
   },
   backButton: { "pt-BR": "Voltar", en: "Back" },
+  // 2026-09-09: fluxo de "jogar mesmo assim" / instalar inline nesta tela
+  // (antes só nas telas por console e "Todos os jogos"). Mesmos rótulos das
+  // outras telas — a ação é a mesma.
+  installAndPlay: { "pt-BR": "Instalar e jogar", en: "Install and play" },
+  installingEmulator: { "pt-BR": "Instalando…", en: "Installing…" },
+  installingEmulatorPhase: {
+    "pt-BR": "Instalando o emulador · {{phase}}",
+    en: "Installing the emulator · {{phase}}",
+  },
+  couldNotInstallEmulator: {
+    "pt-BR": "Não foi possível instalar o emulador",
+    en: "Could not install the emulator",
+  },
+  hardwareBelowRecommended: {
+    "pt-BR": "Hardware abaixo do recomendado",
+    en: "Hardware below recommended",
+  },
+  installAnyway: { "pt-BR": "Instalar mesmo assim", en: "Install anyway" },
+  biosAbsent: { "pt-BR": "BIOS ausente", en: "BIOS missing" },
+  biosEmptyMessage: {
+    "pt-BR": "A pasta de BIOS deste emulador está vazia. Sem o arquivo, o jogo não deve abrir.",
+    en: "This emulator's BIOS folder is empty. Without the file, the game may not open.",
+  },
+  openBiosFolder: { "pt-BR": "Abrir pasta do BIOS", en: "Open BIOS folder" },
+  playAnyway: { "pt-BR": "Jogar mesmo assim", en: "Play anyway" },
   // Título da seção do parecer. Descritivo, nunca julgador (princípio 2 do
   // CLAUDE.md): fala do que vai acontecer com o jogo, não da máquina.
   howItRuns: { "pt-BR": "Como vai rodar", en: "How it will run" },

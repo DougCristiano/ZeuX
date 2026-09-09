@@ -127,6 +127,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 |---|---|
 | `GET/POST/DELETE /igdb/credentials` | Credencial **do usuário** para o IGDB — nunca uma chave do ZeuX compartilhada (motivo: uma credencial de teste compartilhada já foi suspensa por uso agregado). `POST` com credencial inválida: `400 igdb_credentials_invalid`. |
 | `POST /library/games/scrape-covers` | Dispara busca de capa em lote (job assíncrono). Tenta libretro-thumbnails primeiro (sem credencial nenhuma) e só recorre ao IGDB se essa fonte não achar; sem credencial do IGDB configurada, um jogo que também não é achado em libretro-thumbnails fica `not_found` (nunca recusa o disparo por isso). Busca já em andamento: `409 scrape_in_progress`. |
+| `GET /scrape-jobs` | Lista as buscas de capa recentes (`{ "jobs": [...] }`), da mais nova para a mais antiga. A tela "Todos os jogos" usa para descobrir um lote automático já em andamento — sem um id de job, não havia como mostrar o progresso de uma busca que a tela não iniciou. |
 | `GET /scrape-jobs/{id}` | Progresso do job de busca de capas. |
 | `GET /covers/{arquivo}` | Serve o arquivo de capa já baixado, do cache local — nunca proxya uma URL de terceiro direto pro WebView. |
 

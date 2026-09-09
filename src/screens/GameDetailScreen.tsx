@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, ApiError, coverImageURL } from "../api";
-import type { LibraryGame, Report } from "../api/types";
+import type { EmulatorEntry, LibraryGame, Report } from "../api/types";
 import {
   BackButton,
   Badge,
@@ -15,14 +15,17 @@ import {
   GameCover,
   InlineError,
   inputClass,
+  ManualInstallModal,
   PlayIcon,
   ProgressBar,
   ScreenContainer,
   SectionHeading,
   Toast,
 } from "../components/ui";
+import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
+import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { useT } from "../i18n/i18n";
@@ -97,6 +100,7 @@ export function GameDetailScreen({
   year,
   report,
   onBack,
+  onOpenConsole,
 }: {
   game: LibraryGame;
   consoleName: string;
@@ -107,11 +111,24 @@ export function GameDetailScreen({
    * preset autoconfigurado), só o card de parecer some. */
   report?: Report;
   onBack: () => void;
+  /** Q5: leva ao detalhe do console deste jogo, onde ficam as instruções de
+   * instalação manual (RetroArch, Dolphin). */
+  onOpenConsole?: () => void;
 }) {
   const t = useT(dict);
   const [sessionCount, setSessionCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { statusFor, launch, cancelCoreDownload, launchError, clearLaunchError } = useLaunchGame();
+  const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
+  // 2026-09-09: recarrega a contagem de sessões quando o jogo abre de fato —
+  // era o único número desta tela que ficava velho até um F5.
+  const { statusFor, launch, cancelCoreDownload, launchError, clearLaunchError } = useLaunchGame({
+    onLaunched: () => {
+      api
+        .getSessions()
+        .then((res) => setSessionCount(res.sessions.filter((s) => s.rom_path === game.path).length))
+        .catch(() => {});
+    },
+  });
   const { toastMessage, showToast } = useToast();
   // Estado próprio, não `game.cover_url` direto: o prop `game` vem de um
   // snapshot guardado no App.tsx no momento do clique e não muda sozinho
@@ -348,10 +365,49 @@ export function GameDetailScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.path, t]);
 
+  useEffect(() => {
+    api
+      .getEmulators()
+      .then((res) => setEmulators(res.emulators))
+      .catch(() => setEmulators([]));
+  }, []);
+
   const status = statusFor(game.id);
   const verdict = report?.verdicts.find((v) => v.console_id === game.console_id);
   const heroCoverUrl = coverImageURL(coverUrl, coverVersion || undefined);
   const accent = consoleAccentColor(game.console_id);
+
+  // 2026-09-09 (princípio 5: informar, nunca bloquear): até esta data o botão
+  // "Jogar" desta tela chamava `launch(game)` direto — sem instalar o
+  // emulador que falta, sem confirmar BIOS vazio, sem oferecer "jogar assim
+  // mesmo" num console sem preset. As duas outras telas de jogo já
+  // compunham `useInlineInstall` (a cadeia de decisão compartilhada); esta
+  // era a lacuna registrada no doc comment de `GamesScreen`. Agora o clique
+  // passa pela mesma `handlePlay`, que ramifica por motivo.
+  const adapterEntry = verdict?.adapter_id
+    ? (emulators ?? []).find((e) => e.adapter_id === verdict.adapter_id)
+    : undefined;
+  const launchability = emulators ? evaluateGameLaunchability(game, verdict, adapterEntry) : undefined;
+  const install = useInlineInstall({
+    onEmulatorInstalled: (adapterId) =>
+      setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
+    onLaunch: () => launch(game),
+  });
+  const pendingInstall =
+    (install.state.kind === "installing" ||
+      install.state.kind === "confirm-hardware" ||
+      install.state.kind === "confirm-bios") &&
+    install.state.pendingGamePath === game.path;
+  const playBusy =
+    game.missing || status.kind === "launching" || status.kind === "downloading-core" || pendingInstall;
+
+  async function openBiosFolder(dir: string) {
+    try {
+      await openPath(dir);
+    } catch (err) {
+      setFolderError(t("errorOpeningFolder", { error: err instanceof Error ? err.message : String(err) }));
+    }
+  }
 
   const heroContent = (
     <>
@@ -496,8 +552,13 @@ export function GameDetailScreen({
         <Button
           variant="primary"
           autoFocus
-          disabled={game.missing || status.kind === "launching" || status.kind === "downloading-core"}
-          onClick={() => launch(game)}
+          disabled={playBusy}
+          // 2026-09-09: passa pela cadeia de decisão compartilhada
+          // (`useInlineInstall.handlePlay`) em vez de `launch` direto —
+          // instala o emulador que falta, confirma BIOS vazio, e num console
+          // sem preset deixa o clique cair no lançamento sem `options` (o
+          // emulador abre na config padrão dele). Princípio 5.
+          onClick={() => install.handlePlay(game, verdict, adapterEntry)}
           className="flex w-fit items-center gap-2 px-8 py-3 text-lg"
         >
           {/* N14 (docs/roadmap.md, Sprint N): era o caractere "▶".
@@ -506,7 +567,9 @@ export function GameDetailScreen({
               clique mais importante do produto ficava sem retorno até a
               janela do emulador subir. Mesma técnica de "Salvando…" em
               EmulatorConfigPanel. */}
-          {status.kind === "error" ? (
+          {pendingInstall && install.state.kind === "installing" ? (
+            t("installingEmulator")
+          ) : status.kind === "error" ? (
             t("retryButton")
           ) : status.kind === "launching" ? (
             t("opening")
@@ -516,6 +579,8 @@ export function GameDetailScreen({
             // maior (centenas de MB), então o rótulo diz o que está
             // acontecendo, e o progresso detalhado vem logo abaixo.
             t("downloadingCore")
+          ) : launchability && !launchability.launchable && launchability.reason === "not_installed" ? (
+            t("installAndPlay")
           ) : (
             <>
               <PlayIcon size={16} />
@@ -523,6 +588,28 @@ export function GameDetailScreen({
             </>
           )}
         </Button>
+
+        {/* Princípios 2 e 3: quando o jogo não abre no clique simples, dizer
+            o motivo — e, para "sem preset", qual componente barra (a frase
+            já vem pronta de `evaluateGameLaunchability`, derivada de
+            `verdict.bottlenecks`). Nunca julga a máquina. O botão acima
+            continua funcionando: em "sem preset" ele lança assim mesmo. */}
+        {launchability &&
+          !launchability.launchable &&
+          (launchability.reason === "no_preset" || launchability.reason === "bios_empty") && (
+            <p className="max-w-md text-sm text-amber">{launchability.title}</p>
+          )}
+
+        {pendingInstall && install.state.kind === "installing" && (
+          <div className="w-full max-w-md">
+            <p className="font-mono text-xs tracking-wider text-muted uppercase">
+              {t("installingEmulatorPhase", { phase: install.state.job.phase })}
+            </p>
+            <div className="mt-1.5">
+              <ProgressBar percent={percentOf(install.state.job)} />
+            </div>
+          </div>
+        )}
 
         {/* R3 (ADR 0015): o jogo abre sozinho quando o download terminar —
             até lá, dizer o que falta e deixar desistir. Mesma dupla
@@ -593,8 +680,86 @@ export function GameDetailScreen({
       )}
       {launchError ? (
         <ErrorModal title={t("errorOpeningGame")} message={launchError} onClose={clearLaunchError} />
+      ) : install.state.kind === "error" ? (
+        <ErrorModal
+          title={t("couldNotInstallEmulator")}
+          message={install.state.message}
+          onClose={() => install.setState({ kind: "idle" })}
+        />
       ) : (
         error && <ErrorModal title={t("errorReadingStats")} message={error} onClose={() => setError(null)} />
+      )}
+
+      {/* 2026-09-09: as mesmas confirmações das outras telas de jogo (M8/N13)
+          — instalar/lançar mesmo assim toca disco/rede ou ignora um aviso de
+          compatibilidade, então vira modal. */}
+      {install.state.kind === "confirm-hardware" &&
+        (() => {
+          const confirmState = install.state;
+          return (
+            <ConfirmModal
+              title={t("hardwareBelowRecommended")}
+              message={confirmState.message}
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    {t("cancelRemove")}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => install.startInstall(confirmState.adapterId, true, confirmState.pendingGamePath)}
+                  >
+                    {t("installAnyway")}
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
+      {install.state.kind === "confirm-bios" && (
+        <ConfirmModal
+          title={t("biosAbsent")}
+          message={t("biosEmptyMessage")}
+          onClose={() => install.setState({ kind: "idle" })}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                {t("cancelRemove")}
+              </Button>
+              {adapterEntry?.bios_dir && (
+                <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
+                  {t("openBiosFolder")}
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                onClick={() => {
+                  install.setState({ kind: "idle" });
+                  launch(game);
+                }}
+              >
+                {t("playAnyway")}
+              </Button>
+            </>
+          }
+        />
+      )}
+
+      {install.state.kind === "manual-install" && (
+        <ManualInstallModal
+          adapterName={install.state.adapterName}
+          onClose={() => install.setState({ kind: "idle" })}
+          onOpenConsole={
+            onOpenConsole
+              ? () => {
+                  install.setState({ kind: "idle" });
+                  onOpenConsole();
+                }
+              : undefined
+          }
+        />
       )}
 
       <BackButton label={t("backButton")} onClick={onBack} />

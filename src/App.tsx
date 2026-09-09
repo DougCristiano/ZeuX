@@ -471,6 +471,7 @@ function App() {
           year={selectedGame!.year}
           report={report ?? undefined}
           onBack={() => setPhase(gameDetailOrigin)}
+          onOpenConsole={() => abrirConsolePorID(selectedGame!.game.console_id)}
         />
       );
       break;
