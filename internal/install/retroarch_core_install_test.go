@@ -113,10 +113,12 @@ func waitForJob(t *testing.T, m *Manager, id string) Job {
 	return Job{}
 }
 
-// Trava o comportamento central do R2: SHA256 divergente do manifesto falha o
-// job com um code estável, nomeia o core, e não promove nada para o
-// diretório gerenciado. Sem rede — o "buildbot" é um httptest.Server local.
-func TestStartCoreRejectsHashMismatch(t *testing.T) {
+// Trava a decisão de 2026-09-09: SHA256 divergente do manifesto embutido NÃO
+// falha mais o job — o hash nunca foi conferido contra a origem e um nightly
+// reconstruído pelo buildbot é a causa esperada. O core é instalado, o job
+// termina em PhaseDone com ChecksumVerified=false e um Warning preenchido.
+// Sem rede — o "buildbot" é um httptest.Server local.
+func TestStartCoreInstallsWithWarningOnHashMismatch(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 
 	zipBytes := zipWithSingleFile(t, "testcore.so", []byte("conteudo do core"))
@@ -151,22 +153,22 @@ func TestStartCoreRejectsHashMismatch(t *testing.T) {
 	}
 
 	finished := waitForJob(t, manager, job.ID)
-	if finished.Phase != PhaseFailed {
-		t.Fatalf("Phase = %s, esperava %s", finished.Phase, PhaseFailed)
+	if finished.Phase != PhaseDone {
+		t.Fatalf("Phase = %s (%s), esperava %s", finished.Phase, finished.Error, PhaseDone)
 	}
-	if finished.Code != "core_hash_mismatch" {
-		t.Errorf("Code = %q, esperava %q", finished.Code, "core_hash_mismatch")
+	if finished.ChecksumVerified {
+		t.Error("ChecksumVerified deveria ser false quando o hash não bate")
 	}
-	if finished.Error == "" {
-		t.Error("Error vazio — a mensagem deveria dizer qual core e que o arquivo não confere")
+	if finished.Warning == "" {
+		t.Error("Warning vazio — o job deveria avisar que a soma não pôde ser confirmada")
 	}
 
 	coresDir, err := coresDirForTest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(coresDir, "testcore.so")); err == nil {
-		t.Error("o core não deveria ter sido promovido depois de um hash divergente")
+	if _, err := os.Stat(filepath.Join(coresDir, "testcore.so")); err != nil {
+		t.Error("o core deveria ter sido promovido mesmo com hash divergente")
 	}
 }
 
@@ -271,8 +273,8 @@ func TestStartCoreFailsOn404(t *testing.T) {
 	if finished.Phase != PhaseFailed {
 		t.Fatalf("Phase = %s, esperava %s", finished.Phase, PhaseFailed)
 	}
-	if finished.Code == "core_hash_mismatch" {
-		t.Error("um 404 não deveria ser relatado como hash divergente")
+	if finished.Code != "core_download_failed" {
+		t.Errorf("Code = %q, esperava %q", finished.Code, "core_download_failed")
 	}
 }
 

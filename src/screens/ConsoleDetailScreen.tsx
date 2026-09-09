@@ -23,6 +23,7 @@ import {
   ConsoleVerdictCard,
   consoleIconLabel,
   InlineError,
+  InlineWarning,
   ProgressBar,
   ScreenContainer,
   SectionHeading,
@@ -172,6 +173,7 @@ function EmulatorOptionCard({
           )}
 
           {coreState.kind === "error" && <InlineError>{coreState.message}</InlineError>}
+          {coreState.kind === "warned" && <InlineWarning>{coreState.message}</InlineWarning>}
 
           {/* Descritivo, nunca cobrança: o modelo sob demanda (ADR 0015) baixa
               o core sozinho ao abrir um jogo, então um core ausente não é

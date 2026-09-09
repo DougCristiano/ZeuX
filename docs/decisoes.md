@@ -330,6 +330,39 @@ continua em aberto; até ela ser tomada, o sintoma esperado quando reaparecer
 é exatamente este: hash batendo para quem já instalou, não batendo para
 quem instala depois que o buildbot reconstruiu o nightly.
 
+**Decisão tomada (2026-09-09): mismatch de hash deixa de ser fatal.** O
+SHA256 do manifesto embutido **nunca foi conferido contra uma soma publicada
+pela origem** — o próprio campo `hash_source` do JSON diz isso, e o buildbot
+não publica sidecar `.sha256` nem oferece URL imutável por core (o
+`stable/<versão>/` só tem o bundle `RetroArch_cores.7z`, centenas de MB). Ou
+seja: aquele hash só protegia contra corrupção de transporte, que TLS +
+checagem de `Content-Length` já cobrem. Tratar a divergência como erro fatal
+era cerimônia que travava o jogador até uma nova versão do ZeuX sair.
+
+`installCore` agora: hash bate → `checksum_verified: true`; hash não bate →
+instala mesmo assim, `checksum_verified: false` e `Job.Warning` preenchido
+(a UI mostra o aviso, não um erro). `generated: false` **continua
+recusando** — aí não há nem URL medida, é outra coisa. O code
+`core_hash_mismatch` foi removido (não existe mais falha por esse motivo);
+`coreHashMismatchError` idem.
+
+**O que ainda falta (trilha, não feito):** manifesto vivo — um workflow
+diário regenera o manifesto contra o buildbot e publica como asset; o ZeuX
+busca em runtime com o embutido como fallback offline. Aí `checksum_verified`
+volta a significar algo (medido < 24h) e o `warning` vira raro. Enquanto não
+existir, o `warning` no caminho de mismatch é o estado honesto.
+
+**Achado real (2026-09-09): macOS estava 100% quebrado, e não era hash.**
+`buildBotPlatform` montava `nightly/osx/<arch>/...`, mas o buildbot moveu os
+builds de macOS para baixo de `apple/` (`nightly/apple/osx/<arch>/...`) — o
+caminho antigo passou a devolver 404. Resultado: os 25 cores de `darwin/*`
+saíam `generated: false` do gerador e `StartCore` recusava todos *antes* de
+baixar. Corrigido em `retroarch_manifest.go` (com teste em
+`TestBuildBotCoreURLMatchesKnownFormat`) e o manifesto regenerado. Fica a
+lição: o formato de URL do buildbot não é estável nem no caminho, só no
+"latest" — mais um argumento para a trilha do manifesto vivo / pacote
+hospedado (`pendencias.md`).
+
 **Achado real (2026-09-06), Windows especificamente:** `coreDirs()` só
 olhava a pasta gerida pelo ZeuX e a pasta "portable" ao lado do executável.
 O instalador padrão do RetroArch no Windows (e a versão da Microsoft Store)

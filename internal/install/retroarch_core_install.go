@@ -165,15 +165,9 @@ func (m *Manager) runCore(job *Job, coreName string, asset RetroArchCoreAsset) {
 			return
 		}
 
-		code := "core_download_failed"
-		var mismatch *coreHashMismatchError
-		if errors.As(err, &mismatch) {
-			code = "core_hash_mismatch"
-		}
-
 		m.update(job, func(j *Job) {
 			j.Phase = PhaseFailed
-			j.Code = code
+			j.Code = "core_download_failed"
 			j.Error = err.Error()
 			j.Message = "O download do core " + coreName + " não foi concluído."
 			j.FinishedAt = &finished
@@ -234,12 +228,28 @@ func (m *Manager) installCore(ctx context.Context, job *Job, coreName string, as
 		j.Message = "Verificando a integridade do core " + coreName + "..."
 	})
 
-	if hash != asset.SHA256 {
-		// Nada é promovido para o diretório gerenciado — o arquivo errado
-		// fica preso no workDir, que o defer acima apaga.
-		return &coreHashMismatchError{core: coreName, expected: asset.SHA256, got: hash}
+	if hash == asset.SHA256 {
+		m.update(job, func(j *Job) { j.ChecksumVerified = true })
+	} else {
+		// O ZeuX já recusou a instalação aqui (coreHashMismatchError). Não
+		// recusa mais: esse SHA256 nunca foi conferido contra uma soma
+		// publicada pela origem — o manifesto embutido é medido pelo próprio
+		// ZeuX na hora de gerar, contra uma URL .../nightly/<plat>/latest/
+		// que o buildbot do libretro reconstrói sozinho (ver
+		// docs/decisoes.md, "RetroArch: cores baixados sob demanda"). Um
+		// nightly reconstruído depois desta versão do ZeuX é a causa
+		// esperada de divergência, não um pacote adulterado; o download por
+		// HTTPS e a checagem de tamanho já barram corrupção de transporte,
+		// que é tudo que um hash não verificável contra a origem realmente
+		// cobria. Recusar aqui só deixava o jogador travado até uma nova
+		// versão do ZeuX sair.
+		m.logger.Warn("core do RetroArch com SHA256 diferente do manifesto embutido; instalando mesmo assim",
+			"core", coreName, "esperado", asset.SHA256, "recebido", hash)
+		m.update(job, func(j *Job) {
+			j.Warning = "Não foi possível confirmar a soma de verificação do core " + coreName +
+				" contra esta versão do ZeuX — ela costuma mudar no servidor de origem entre as versões. O download por HTTPS e o tamanho conferem."
+		})
 	}
-	m.update(job, func(j *Job) { j.ChecksumVerified = true })
 
 	m.update(job, func(j *Job) {
 		j.Phase = PhaseExtracting
@@ -269,25 +279,6 @@ func (m *Manager) installCore(ctx context.Context, job *Job, coreName string, as
 	}
 
 	return nil
-}
-
-// coreHashMismatchError distingue "hash não confere" de qualquer outra falha
-// de download — runCore usa isso para atribuir o code estável
-// "core_hash_mismatch" ao job, em vez do genérico "core_download_failed".
-type coreHashMismatchError struct {
-	core, expected, got string
-}
-
-func (e *coreHashMismatchError) Error() string {
-	// A causa mais comum não é corrupção: o buildbot reconstrói o nightly
-	// depois que alguém rodou cmd/generate-retroarch-manifest, e o hash
-	// fixado no manifesto embutido fica desatualizado (ver docs/decisoes.md,
-	// "RetroArch: cores baixados sob demanda"). Nada foi instalado — mesma
-	// dica de saída da mensagem de "generated: false" em StartCore, pra não
-	// deixar o jogador sem alternativa até uma nova versão do ZeuX sair.
-	return fmt.Sprintf(
-		"o core %q foi baixado, mas o arquivo recebido não confere com o SHA256 esperado (esperado %s, recebido %s) — nada foi instalado. Isso costuma acontecer quando o core foi atualizado no servidor de origem depois desta versão do ZeuX; enquanto isso, dá para instalá-lo pelo Online Updater, dentro do próprio RetroArch",
-		e.core, e.expected, e.got)
 }
 
 // SetRetroArchManifestForTesting substitui o manifesto de cores do RetroArch

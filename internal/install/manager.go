@@ -48,7 +48,7 @@ type Job struct {
 	Phase   Phase  `json:"phase"`
 	Message string `json:"message"`
 
-	// Code é um identificador estável de falha (ex.: "core_hash_mismatch"),
+	// Code é um identificador estável de falha (ex.: "core_download_failed"),
 	// para a interface decidir o que mostrar sem parsear Error. Vazio quando
 	// Phase != PhaseFailed, ou para falhas que ainda não ganharam um code
 	// próprio.
@@ -67,6 +67,12 @@ type Job struct {
 	// ChecksumVerified diz se a soma foi conferida contra um valor publicado
 	// pelo projeto, e não apenas calculada por nós.
 	ChecksumVerified bool `json:"checksum_verified"`
+
+	// Warning carrega um aviso não fatal sobre um job que terminou em
+	// PhaseDone mesmo assim — hoje só o caso de um core do RetroArch cujo
+	// SHA256 não bateu com o manifesto embutido (ver installCore). Vazio na
+	// esmagadora maioria dos jobs.
+	Warning string `json:"warning,omitempty"`
 
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at"`

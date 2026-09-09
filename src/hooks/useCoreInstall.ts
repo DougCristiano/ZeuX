@@ -13,6 +13,11 @@ export type CoreInstallState =
   | { kind: "starting" }
   | { kind: "installing"; job: InstallJob }
   | { kind: "canceling"; job: InstallJob }
+  // Core instalado, mas o SHA256 não bateu com o manifesto embutido — o
+  // download foi por HTTPS e o tamanho confere, só não deu para confirmar a
+  // soma (ver docs/decisoes.md, "RetroArch: cores baixados sob demanda").
+  // Não é erro: o core está pronto pra uso.
+  | { kind: "warned"; message: string }
   | { kind: "error"; message: string };
 
 /**
@@ -49,8 +54,8 @@ export function useCoreInstall({ onCoreReady }: { onCoreReady?: () => void } = {
   function coreHandlers(name: string): PollJobHandlers {
     return {
       onProgress: (job) => setCoreState(name, { kind: "installing", job }),
-      onDone: () => {
-        setCoreState(name, { kind: "idle" });
+      onDone: (job) => {
+        setCoreState(name, job.warning ? { kind: "warned", message: job.warning } : { kind: "idle" });
         onCoreReady?.();
       },
       // "cancelado" (fase própria do R3) volta ao estado ocioso sem erro:

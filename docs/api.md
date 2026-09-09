@@ -74,7 +74,7 @@ JSON (isso desatualiza rápido e o compilador já garante que bate).
 | `POST /emulators/{id}/managed-dir` | Cria (se preciso) a pasta gerenciada onde o `findBinary` procura este emulador e devolve `{ "path": "<absoluto>" }`. Passo (b) do trilho de instalação manual: a tela abre essa pasta no explorador para o usuário largar ali o download oficial. Não baixa nem instala nada. `404 not_found` para id desconhecido. |
 | `GET/POST/DELETE /custom-emulators[/{id}]` | Cadastro manual: usuário aponta um binário que o ZeuX não achou sozinho. `POST` valida que o caminho existe e é executável (`emulator.IsExecutableFile`) antes de aceitar — `400 invalid_definition` caso contrário. |
 | `GET /retroarch/cores` | Status de cada core conhecido do RetroArch: instalado ou não, caminho. |
-| `POST /retroarch/cores/{core}/install` | Baixa um core sob demanda (ADR histórico 0015) — hash SHA256 contra o manifesto embutido; `400 core_install_refused` se o hash não bater ou o core for desconhecido. |
+| `POST /retroarch/cores/{core}/install` | Baixa um core sob demanda (ADR histórico 0015). `400 core_install_refused` se o core for desconhecido, não tiver download para a plataforma, ou a entrada do manifesto ainda não tiver sido medida (`generated: false`). O SHA256 do manifesto embutido é conferido durante o job: bateu, `checksum_verified: true`; não bateu, o core é instalado mesmo assim (`checksum_verified: false` + `warning` preenchido) — ver `docs/decisoes.md`, "RetroArch: cores baixados sob demanda". |
 
 ## 5. Configuração de emulador, bindings e perfil de controle
 

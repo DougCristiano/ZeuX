@@ -1151,6 +1151,24 @@ export function InlineError({ children, className = "" }: { children: ReactNode;
 }
 
 /**
+ * Mesmo peso visual do `InlineError`, mas âmbar e `role="status"` — para o
+ * caso em que a ação até funcionou, só ficou uma ressalva (hoje: um core do
+ * RetroArch instalado sem confirmar a soma de verificação contra esta versão
+ * do ZeuX). Vermelho aqui seria mentira: nada falhou.
+ */
+export function InlineWarning({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      role="status"
+      className={`flex items-start gap-2 rounded-sm border-l-2 border-amber bg-amber-bg px-2 py-1.5 text-sm text-ink ${className}`}
+    >
+      <TriangleAlert size={15} className="mt-0.5 shrink-0 text-amber" aria-hidden="true" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+/**
  * N11 (docs/roadmap.md, Sprint N): `AllGamesScreen` já resolveu carregando/
  * vazio no M12 — `GamesScreen`, `LibraryScreen` e `EmulatorsScreen` ainda
  * mostravam tela em branco enquanto o dado era `null` (sem nenhum sinal de

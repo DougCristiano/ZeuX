@@ -590,6 +590,36 @@ não tem caminho.
 
 **Depende de:** nada · **Bloqueia:** nada
 
+## Manifesto vivo dos cores do RetroArch (2026-09-09)
+
+**O que é:** um workflow agendado (diário) roda `cmd/generate-retroarch-manifest`
+contra o `buildbot.libretro.com`, comita/publica o `retroarch_cores_manifest.json`
+resultante como asset versionado, e o ZeuX passa a **buscar esse manifesto em
+runtime**, caindo no embutido no binário só quando estiver offline.
+
+**Por quê:** hoje o SHA256 do manifesto embutido envelhece sozinho — ele é
+medido contra `.../nightly/<plat>/latest/`, um alvo que o buildbot reconstrói
+sem aviso, e não existe URL imutável por core (só o bundle `RetroArch_cores.7z`
+de centenas de MB). Na decisão de 2026-09-09 (`decisoes.md`) o mismatch deixou
+de ser fatal — o core instala com um `warning` — mas isso é o **estado
+honesto de um remendo**, não o alvo. Com o manifesto vivo, o hash volta a ser
+medido há menos de 24h e `checksum_verified` volta a significar algo; o
+`warning` vira raro de verdade.
+
+**Critério de aceite (quando for implementado):**
+- [ ] Um workflow (fora do build normal, como o gerador já é) regenera e
+      publica o manifesto num intervalo fixo.
+- [ ] O ZeuX busca o manifesto remoto no início e usa o embutido como
+      fallback silencioso quando a busca falha (sem travar nenhum fluxo).
+- [ ] O manifesto remoto é cacheado localmente para não baixar a cada
+      `StartCore`.
+- [ ] `generated: false` continua recusando instalação (é outra coisa).
+- [ ] Testes cobrindo: remoto ok, remoto indisponível (usa embutido),
+      remoto malformado (usa embutido).
+
+**Depende de:** infraestrutura de CI/hospedagem do asset · **Bloqueia:** nada
+(o remendo do `warning` já desbloqueia o usuário)
+
 ## O que fica fora deste documento
 
 - Trabalho já feito, mesmo que recente — isso vive só no código e no

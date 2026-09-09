@@ -88,11 +88,17 @@ func buildBotPlatform(goos, goarch string) (string, error) {
 			return "windows/x86_64", nil
 		}
 	case "darwin":
+		// O buildbot moveu os builds de macOS para baixo de "apple/" em algum
+		// momento depois de 2026-08-04 — o caminho antigo ("nightly/osx/...")
+		// passou a devolver 404, e era por isso que TODOS os 25 cores de
+		// darwin saíam "generated": false do gerador. Confirmado em
+		// 2026-09-09: "nightly/apple/osx/arm64/latest/..." responde 200,
+		// "nightly/osx/arm64/latest/..." responde 404.
 		switch goarch {
 		case "amd64":
-			return "osx/x86_64", nil
+			return "apple/osx/x86_64", nil
 		case "arm64":
-			return "osx/arm64", nil
+			return "apple/osx/arm64", nil
 		}
 	}
 	return "", fmt.Errorf("plataforma %s/%s não é coberta pelo manifesto de cores do RetroArch", goos, goarch)

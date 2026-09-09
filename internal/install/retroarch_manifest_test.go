@@ -98,4 +98,15 @@ func TestBuildBotCoreURLMatchesKnownFormat(t *testing.T) {
 	if _, _, err := BuildBotCoreURL("plan9", "amd64", "mesen_libretro"); err == nil {
 		t.Error("esperava erro para plataforma não coberta")
 	}
+
+	// macOS vive sob "apple/osx/..." no buildbot — o caminho antigo ("osx/...")
+	// devolvia 404 e deixava todos os cores de darwin sem hash medido. Trava
+	// isso para não regredir de novo em silêncio.
+	macURL, _, err := BuildBotCoreURL("darwin", "arm64", "mesen_libretro")
+	if err != nil {
+		t.Fatalf("erro inesperado para darwin/arm64: %v", err)
+	}
+	if wantMac := "https://buildbot.libretro.com/nightly/apple/osx/arm64/latest/mesen_libretro.dylib.zip"; macURL != wantMac {
+		t.Errorf("URL darwin = %q, esperava %q", macURL, wantMac)
+	}
 }

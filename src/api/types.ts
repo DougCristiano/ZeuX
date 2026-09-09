@@ -378,7 +378,7 @@ export type InstallJob = {
   name: string;
   phase: InstallPhase;
   message: string;
-  /** Identificador estável de falha (ex.: `"core_hash_mismatch"`), quando
+  /** Identificador estável de falha (ex.: `"core_download_failed"`), quando
    *  `phase` é `"falhou"`. Vazio para falhas sem code próprio ainda. */
   code?: string;
   version?: string;
@@ -388,6 +388,11 @@ export type InstallJob = {
   total_bytes: number;
   sha256?: string;
   checksum_verified: boolean;
+  /** Aviso não fatal num job que terminou em `"concluido"` mesmo assim — hoje
+   *  só o caso de um core do RetroArch cujo SHA256 não bateu com o manifesto
+   *  embutido (o hash nunca foi conferido contra a origem; o core foi
+   *  instalado). Ausente na maioria dos jobs. */
+  warning?: string;
   started_at: string;
   /** `null` enquanto a instalação está em andamento. */
   finished_at: string | null;

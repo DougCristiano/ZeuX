@@ -27,6 +27,7 @@ import {
   ErrorModal,
   FOCUS_RING,
   InlineError,
+  InlineWarning,
   inputClass,
   Pagination,
   ProgressBar,
@@ -340,6 +341,7 @@ function RetroArchCoresList() {
               )}
 
               {!core.installed && state.kind === "error" && <InlineError>{state.message}</InlineError>}
+              {state.kind === "warned" && <InlineWarning>{state.message}</InlineWarning>}
             </li>
           );
         })}
