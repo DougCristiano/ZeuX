@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { Cpu, Gamepad2, LayoutGrid, Settings } from "lucide-react";
+import { Cpu, Gamepad2, History, LayoutGrid, Settings } from "lucide-react";
 import logoZeux from "../assets/logo-zeux.png";
 import { useT } from "../i18n/i18n";
 import { LanguageSelector } from "./LanguageSelector";
 import { FOCUS_RING } from "./ui";
 import { dict } from "./Sidebar.i18n";
 
-export type NavID = "library" | "consoles" | "verdict" | "settings";
+export type NavID = "library" | "consoles" | "history" | "verdict" | "settings";
 
 // N14 (docs/roadmap.md, Sprint N): os 4 ícones eram SVG desenhado à mão —
 // decisão do Douglas: lucide-react (já dependência via ui/dialog.tsx e
@@ -28,6 +28,15 @@ const NAV_ITEMS: { id: NavID; labelKey: keyof typeof dict; icon: ReactNode }[] =
     id: "consoles",
     labelKey: "navConsoles",
     icon: <Gamepad2 size={18} aria-hidden="true" />,
+  },
+  {
+    // Histórico/estatísticas (2026-09-09): "onde parei" e "quanto joguei".
+    // Item próprio, não sub-visão da Biblioteca — a pergunta que ele responde
+    // é sobre o comportamento do jogador ao longo do tempo, não sobre o
+    // acervo; nenhuma das três fases de "Biblioteca" cobre isso.
+    id: "history",
+    labelKey: "navHistory",
+    icon: <History size={18} aria-hidden="true" />,
   },
   {
     id: "verdict",

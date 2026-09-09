@@ -128,11 +128,20 @@ grade, "próximo" é posição na tela). Botão A confirma, abre o jogo. Botão 
 tenta voltar — mas só funciona se a tela atual tiver um botão de "Voltar"
 reconhecível; nem toda tela tem.
 
-Hoje falta uma peça: **nenhum prompt na tela avisa que os botões fazem
-isso.** Quem conecta o controle descobre por tentativa, não por indicação
-visual (pendência registrada em `pendencias.md` — rodapé de prompts do
-controle). A navegação em si funciona; o que falta é o app *dizer* que
-funciona.
+Assim que um controle é plugado, um rodapé fino aparece na base da tela com
+os prompts do que os botões fazem — **Ⓐ Selecionar** sempre, e **Ⓑ Voltar**
+só nas telas que têm um botão de voltar de verdade (o prompt some quando não
+têm, em vez de prometer o que não aconteceria). Sem controle, o rodapé não
+existe e o layout não muda em nada para quem usa mouse e teclado.
+
+### Onde parei, quanto joguei
+
+O ZeuX acompanha cada partida do começo ao fim da janela do emulador. A tela
+de Histórico junta isso em duas respostas: os últimos jogos abertos (cada um
+leva ao detalhe, para retomar de onde parou) e o tempo de jogo — total e por
+console. O texto é sempre descritivo: "3 h 20 min em PlayStation 2", nunca
+"você só jogou 3 h" (princípio 2). Sem nenhuma partida ainda, a tela diz que
+o histórico aparece depois do primeiro jogo aberto — não um painel vazio.
 
 ---
 

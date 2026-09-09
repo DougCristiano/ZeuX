@@ -103,7 +103,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 |---|---|
 | `POST /games/preview` | `BuildCommand` **sem** `Launch` — mostra a linha de comando exata que seria usada e o que não coube nela (`unapplied`), sem abrir nada. Se `options` não vier no corpo, o servidor puxa do veredito do console (é aqui que a autoconfiguração acontece de fato — `Server.toInput`). Sem scan ou sem patamar alcançado: segue com `options` no zero-value (nenhuma opção aplicada), nunca recusa — princípio 5, informar não bloquear (2026-09-08: quem recusou o consentimento pode jogar igual, só sem preset autoconfigurado). Console fora do catálogo: `400 unknown_console`. |
 | `POST /games/launch` | Mesma resolução do preview, mas executa de verdade. Não bloqueia — devolve a sessão assim que o processo sobe; uma goroutine supervisiona o fim. O processo do emulador roda com `context.Background()`, nunca o contexto da requisição HTTP — precisa sobreviver à resposta. |
-| `GET /sessions` | Sessões de jogo, persistidas no SQLite (sobrevivem a reinício do `zeuxd`). **`ended_at` sempre aparece no JSON** mesmo numa sessão em andamento (`"0001-01-01T00:00:00Z"` — `omitempty` não funciona em `time.Time`); use o campo `is_running` para saber se ainda está rodando. |
+| `GET /sessions` | Sessões de jogo, persistidas no SQLite (sobrevivem a reinício do `zeuxd`). Devolve também `playtime_seconds`: mapa `console_id → segundos` somado no servidor (`Launcher.Playtime`, inclui sessões em andamento) — a base do "tempo por console" da tela de Histórico. **`ended_at` sempre aparece no JSON** mesmo numa sessão em andamento (`"0001-01-01T00:00:00Z"` — `omitempty` não funciona em `time.Time`); use o campo `is_running` para saber se ainda está rodando. |
 
 ## 8. Biblioteca de jogos
 

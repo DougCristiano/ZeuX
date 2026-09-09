@@ -4,6 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { api, ApiError, setAppVersionCacheKey, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { SplashScreen, hasSeenSplash } from "./components/SplashScreen";
+import { GamepadHints } from "./components/GamepadHints";
 import { AmbientGlow, Toast } from "./components/ui";
 import { useGamepad } from "./hooks/useGamepad";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
@@ -26,6 +27,7 @@ import { DeclinedScreen } from "./screens/DeclinedScreen";
 import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { GamesScreen } from "./screens/GamesScreen";
+import { HistoryScreen } from "./screens/HistoryScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
@@ -58,6 +60,7 @@ type Phase =
   | "library"
   | "games"
   | "game-detail"
+  | "history"
   | "settings"
   | "controller-test"
   | "configure-controller";
@@ -76,7 +79,10 @@ function App() {
   // hardware para isso). Botão A ≈ clique, B ≈ Esc. Um lugar só, não por
   // tela — o hook opera sobre document.activeElement, não precisa saber a
   // phase atual.
-  useGamepadNavigation();
+  // `connected` alimenta o rodapé de prompts (`GamepadHints`), que só aparece
+  // com um controle plugado — sem controle, nada é renderizado e o layout não
+  // reserva espaço (pendência "Rodapé de prompts do controle").
+  const { connected: gamepadNavConnected } = useGamepadNavigation();
 
   const t = useT(dict);
 
@@ -175,7 +181,7 @@ function App() {
   // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
   // ver M5) — "Voltar" precisa saber pra qual fase retornar, senão sempre
   // devolveria pra "all-games" mesmo vindo de dentro de um console.
-  const [gameDetailOrigin, setGameDetailOrigin] = useState<"all-games" | "games">("all-games");
+  const [gameDetailOrigin, setGameDetailOrigin] = useState<"all-games" | "games" | "history">("all-games");
   const [selectedGame, setSelectedGame] = useState<{
     game: LibraryGame;
     consoleName: string;
@@ -339,6 +345,7 @@ function App() {
       setCameFromDeclined(false);
       setPhase("consoles");
     }
+    if (id === "history") setPhase("history");
     if (id === "settings") setPhase("settings");
   }
 
@@ -568,6 +575,23 @@ function App() {
       );
       break;
 
+    case "history":
+      screen = (
+        <HistoryScreen
+          report={report ?? undefined}
+          consoleCatalog={consoles}
+          onOpenGame={(game, consoleName, shortName) => {
+            const year =
+              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
+              consoles.find((c) => c.console_id === game.console_id)?.year;
+            setGameDetailOrigin("history");
+            setSelectedGame({ game, consoleName, shortName, year });
+            setPhase("game-detail");
+          }}
+        />
+      );
+      break;
+
     case "settings":
       screen = (
         <SettingsScreen
@@ -603,6 +627,8 @@ function App() {
     const active: NavID =
       phase === "verdict"
         ? "verdict"
+        : phase === "history"
+        ? "history"
         : // "emulators" acende "Consoles": é sub-visão dela desde 2026-08-28,
           // não um destino de sidebar próprio.
           phase === "consoles" || phase === "console-detail" || phase === "emulators"
@@ -631,6 +657,7 @@ function App() {
           {screen}
         </main>
         {gamepadToast && <Toast message={gamepadToast} />}
+        <GamepadHints connected={gamepadNavConnected} />
       </div>
     );
   }
@@ -639,6 +666,7 @@ function App() {
     <>
       {screen}
       {gamepadToast && <Toast message={gamepadToast} />}
+      <GamepadHints connected={gamepadNavConnected} />
     </>
   );
 }
@@ -654,6 +682,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
   "scan-error": "Erro na leitura do computador",
   "all-games": "Todos os jogos",
   "game-detail": "Detalhe do jogo",
+  history: "Histórico",
   verdict: "Especificações",
   consoles: "Consoles",
   "console-detail": "Detalhe do console",
@@ -674,6 +703,7 @@ const SIDEBAR_PHASES: Phase[] = [
   "library",
   "games",
   "game-detail",
+  "history",
   "settings",
   "controller-test",
   "configure-controller",

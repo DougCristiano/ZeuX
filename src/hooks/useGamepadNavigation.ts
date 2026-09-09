@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isGamepadNavigationSuspended } from "./gamepadNavigationSuspend";
 
 // Zona morta do analógico — abaixo disso, ruído do próprio hardware não
@@ -117,8 +117,33 @@ function pressBack() {
  * Montado uma vez em `App.tsx` (não por tela) — opera sobre
  * `document.activeElement` e os elementos focáveis visíveis, não precisa
  * saber em qual fase o app está.
+ *
+ * Devolve `{ connected }` — se há algum controle plugado agora — para que o
+ * rodapé de prompts (`GamepadHints`) saiba quando aparecer. A detecção usa
+ * os eventos `gamepadconnected`/`gamepaddisconnected` (mesma técnica de
+ * `useGamepad`), não o laço de poll: o poll só roda com um pad presente e
+ * não teria como sinalizar a ausência. Continua um laço só no app — este
+ * hook é montado uma única vez em `App.tsx`; `GamepadHints` recebe o
+ * `connected` por prop em vez de chamar o hook de novo (dois laços de poll
+ * duplicariam cada ação de navegação).
  */
-export function useGamepadNavigation() {
+export function useGamepadNavigation(): { connected: boolean } {
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    function refresh() {
+      const pads = Array.from(navigator.getGamepads?.() ?? []);
+      setConnected(pads.some((p) => p !== null));
+    }
+    refresh();
+    window.addEventListener("gamepadconnected", refresh);
+    window.addEventListener("gamepaddisconnected", refresh);
+    return () => {
+      window.removeEventListener("gamepadconnected", refresh);
+      window.removeEventListener("gamepaddisconnected", refresh);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     let frame: number;
@@ -200,4 +225,6 @@ export function useGamepadNavigation() {
       cancelAnimationFrame(frame);
     };
   }, []);
+
+  return { connected };
 }

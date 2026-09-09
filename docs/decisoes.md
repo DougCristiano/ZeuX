@@ -687,6 +687,39 @@ Quatro ajustes na tela de entrada e no fluxo de lançar, todos sob o princípio
 falha depois no `ErrorModal`; #4 volta a fazer o lote automático parecer
 falha silenciosa.
 
+### Rodapé de prompts do controle: `useGamepadNavigation` devolve `connected` (2026-09-09)
+
+O hook detectava o controle só dentro do laço de poll — que nem roda sem um
+pad presente — então não tinha como sinalizar "nenhum controle". Passou a
+manter um `useState` alimentado por `gamepadconnected`/`gamepaddisconnected`
+(mesma técnica de `useGamepad`) e a devolver `{ connected }`. `GamepadHints`
+(rodapé fino, `position: fixed`, só renderiza com `connected`) recebe isso
+**por prop** de `App.tsx`, nunca chamando o hook de novo: dois `useEffect` de
+poll rodando em paralelo duplicariam cada ação de navegação (A = clique, B =
+voltar).
+
+O prompt de Ⓑ só aparece quando existe `[data-nav-back]` na tela — um
+`MutationObserver` reavalia a cada troca de fase (o `switch` de `App.tsx`
+troca o filho do mesmo `<main>`, sem desmontar `GamepadHints`). Prompt que
+promete "voltar" numa tela sem botão de voltar seria pior que nenhum.
+
+**O que quebra se desfizer:** `GamepadHints` deixa de saber quando aparecer;
+voltar a chamar o hook em dois lugares reintroduz a navegação dupla.
+
+### Tela de Histórico deriva tudo do que já existe, sem endpoint novo (2026-09-09)
+
+`GET /sessions` já devolve `playtime_seconds` (mapa por console, somado no
+back por `Launcher.Playtime`) e `GET /library/games?played=true` já vem
+ordenado por último jogado. A tela de Histórico consome os dois direto —
+tempo total é a soma do mapa no front, "jogados recentemente" é a lista
+`played=true` cortada em 12. Nenhuma rota agregada nova entrou: um número de
+"tempo total consolidado" no servidor economizaria uma soma trivial e criaria
+mais uma superfície para manter em sincronia.
+
+**O que quebra se desfizer:** se `GET /sessions` parar de devolver
+`playtime_seconds`, a tela perde o bloco de tempo (a faixa de recentes
+continua).
+
 ---
 
 ## O que fica fora deste log, de propósito

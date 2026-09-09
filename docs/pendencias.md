@@ -157,28 +157,6 @@ mudança visual.
 
 **Depende de:** nada · **Bloqueia:** nada
 
-## Rodapé de prompts do controle na tela
-
-`useGamepadNavigation` já traduz D-pad/A/B em navegação, mas **não expõe se
-há controle conectado** — o hook detecta o pad dentro do laço de poll e não
-devolve nada nem escuta `gamepadconnected`. Resultado: o usuário não tem
-como saber que o controle funciona ali, porque nenhum prompt aparece.
-
-**Critério de aceite:**
-- [ ] `useGamepadNavigation()` devolve se há controle conectado, atualizado
-      quando um é ligado ou desligado.
-- [ ] Com controle conectado, um rodapé fino mostra os prompts (Ⓐ Jogar · Ⓑ
-      Voltar); sem controle, nada aparece e o layout não reserva espaço.
-- [ ] Os prompts refletem o que o hook faz de verdade — inclusive a
-      limitação de que B procura um botão cujo texto começa com "Voltar"; se
-      a tela não tiver, B não volta. Prompt que promete o que não acontece é
-      pior que prompt nenhum.
-- [ ] Teclado e mouse continuam sem nenhuma mudança visual.
-
-**Depende de:** nada · **Bloqueia:** nada
-
----
-
 ## Manifesto de cores do RetroArch: decisão de escopo em aberto
 
 Não é uma feature faltando — é uma escolha de arquitetura ainda não tomada.

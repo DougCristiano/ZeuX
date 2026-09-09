@@ -14,6 +14,21 @@ export function formatPlaytime(seconds: number): string {
   return remainder > 0 ? `${hours}h${remainder}min jogados` : `${hours}h jogados`;
 }
 
+// Tempo de jogo em texto descritivo e neutro — usado pela tela de Histórico,
+// onde o número aparece solto ("Tempo total") ou dentro de uma frase
+// ("3 h 20 min em PlayStation 2"). Diferente de `formatPlaytime` acima, que
+// carrega o sufixo "jogados" para se explicar sozinho na célula da grade, e
+// nunca diz "só" nada (princípio 2 do CLAUDE.md: descreve, não julga o
+// jogador).
+export function formatPlaytimeClean(seconds: number): string {
+  const minutes = Math.max(0, Math.floor(seconds / 60));
+  if (minutes < 1) return "menos de 1 min";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder > 0 ? `${hours} h ${remainder} min` : `${hours} h`;
+}
+
 // Achado do critico-layout-biblioteca (2026-09-06): o hover do tile não
 // mostrava nada além do que já aparecia sempre embaixo da capa — cada card
 // exigia abrir o detalhe para saber quando foi jogado pela última vez.
