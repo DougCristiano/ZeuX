@@ -49,6 +49,68 @@ func TestAddFolderIsIdempotent(t *testing.T) {
 	}
 }
 
+// Trava a regra do título editável: o override manual vence o título
+// derivado, é devolvido como `title` de exibição, e uma revarredura (que só
+// reescreve `title`) NÃO o desfaz — mesma durabilidade de favorite/excluded.
+func TestTitleOverrideWinsAndSurvivesRescan(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	game := NewGame{ConsoleID: "ps1", Path: "/jogos/ps1/ff7 (usa) (disc 1).cue", Title: "ff7 (usa) (disc 1)"}
+	if err := s.SyncFolder(ctx, folder.ID, []NewGame{game}); err != nil {
+		t.Fatalf("SyncFolder inicial: %v", err)
+	}
+
+	games, err := s.ListGames(ctx, "ps1")
+	if err != nil || len(games) != 1 {
+		t.Fatalf("ListGames: %v (n=%d)", err, len(games))
+	}
+	id := games[0].ID
+
+	if err := s.SetTitleOverride(ctx, id, "  Final Fantasy VII  "); err != nil {
+		t.Fatalf("SetTitleOverride: %v", err)
+	}
+
+	games, _ = s.ListGames(ctx, "ps1")
+	if games[0].Title != "Final Fantasy VII" {
+		t.Errorf("title = %q, queria o override aparado %q", games[0].Title, "Final Fantasy VII")
+	}
+	if games[0].TitleOverride != "Final Fantasy VII" {
+		t.Errorf("title_override = %q, queria %q", games[0].TitleOverride, "Final Fantasy VII")
+	}
+
+	// Revarredura com o mesmo caminho e o título derivado de sempre.
+	if err := s.SyncFolder(ctx, folder.ID, []NewGame{game}); err != nil {
+		t.Fatalf("SyncFolder de revarredura: %v", err)
+	}
+	games, _ = s.ListGames(ctx, "ps1")
+	if games[0].Title != "Final Fantasy VII" {
+		t.Errorf("depois do rescan title = %q, o override não deveria ter sido apagado", games[0].Title)
+	}
+
+	// Limpar o override volta ao derivado.
+	if err := s.SetTitleOverride(ctx, id, "   "); err != nil {
+		t.Fatalf("SetTitleOverride limpando: %v", err)
+	}
+	games, _ = s.ListGames(ctx, "ps1")
+	if games[0].Title != "ff7 (usa) (disc 1)" || games[0].TitleOverride != "" {
+		t.Errorf("apos limpar: title=%q override=%q, queria o derivado", games[0].Title, games[0].TitleOverride)
+	}
+}
+
+// SetTitleOverride num id inexistente devolve ErrGameNotFound (a API mapeia
+// para 404), nunca sucesso silencioso.
+func TestSetTitleOverrideUnknownGame(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.SetTitleOverride(context.Background(), 999999, "x"); !errors.Is(err, ErrGameNotFound) {
+		t.Errorf("erro = %v, queria ErrGameNotFound", err)
+	}
+}
+
 // A mesma pasta em consoles diferentes é uma escolha estranha do usuário,
 // mas não é a mesma pasta — cada console tem sua própria linha.
 func TestAddFolderAllowsSamePathForDifferentConsoles(t *testing.T) {

@@ -142,6 +142,12 @@ func (s *Server) Routes() http.Handler {
 	// não é lançamento de jogo, por isso não é /games/launch. Ver
 	// Launcher.LaunchStandalone, internal/emulator/session.go.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/open", s.handleOpenEmulator)
+	// Trilho guiado de instalação manual (2026-09-09): cria (se ainda não
+	// existir) a pasta onde o findBinary procura este emulador e devolve o
+	// caminho, para a tela abrir no explorador de arquivos. Sem isso, "abrir
+	// a pasta de destino" falha quando ela ainda não existe — que é
+	// justamente o caso de quem nunca instalou o emulador.
+	mux.HandleFunc("POST /api/v1/emulators/{id}/managed-dir", s.handleEnsureManagedDir)
 	// H1/H2 (docs/roadmap.md): configuração persistida do emulador — só
 	// para adapters que satisfazem emulator.ConfigurableAdapter
 	// (PCSX2/RetroArch nesta v1.0, ver Status.Configurable em GET
@@ -188,6 +194,11 @@ func (s *Server) Routes() http.Handler {
 	// favorite — um campo só, sem PATCH genérico.
 	mux.HandleFunc("POST /api/v1/library/games/{id}/exclude", s.handleExcludeGame)
 	mux.HandleFunc("DELETE /api/v1/library/games/{id}/exclude", s.handleUnexcludeGame)
+	// Título editável à mão (2026-09-09): PATCH grava o override; corpo
+	// {"title": ""} volta ao título derivado do nome do arquivo. É o único
+	// caso hoje com um valor livre no corpo (favorite/exclude são só o
+	// método), daí PATCH e não um par POST/DELETE.
+	mux.HandleFunc("PATCH /api/v1/library/games/{id}/title", s.handleSetGameTitle)
 
 	// G1 (docs/roadmap.md, Sprint G): scraper de metadados IGDB. Credencial
 	// é por usuário — sem ela, estas rotas de busca simplesmente recusam
@@ -251,7 +262,7 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		}
 
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -610,6 +621,38 @@ func (s *Server) handleOpenEmulator(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"opened": r.PathValue("id")})
+}
+
+// handleEnsureManagedDir garante que a pasta gerenciada deste emulador exista
+// e devolve o caminho absoluto. É o passo (b) do trilho de instalação manual:
+// a tela abre essa pasta no explorador para o usuário largar ali o download
+// oficial, e o findBinary a varre na próxima descoberta. Nunca baixa nem
+// instala nada — só cria o diretório de destino.
+func (s *Server) handleEnsureManagedDir(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	adapter, ok := s.emulators.ByID(id)
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum emulador com o id %q.", id))
+		return
+	}
+
+	root, err := emulator.ManagedRoot()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "managed_root_unavailable",
+			"Não foi possível localizar a pasta gerenciada do ZeuX.")
+		return
+	}
+
+	consoles := append([]string{}, adapter.Consoles()...)
+	sort.Strings(consoles)
+	dir := emulator.ManagedEmulatorDir(root, adapter.ID(), consoles)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		s.writeError(w, http.StatusInternalServerError, "managed_dir_create_failed",
+			fmt.Sprintf("Não foi possível criar a pasta %s: %v", dir, err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"path": dir})
 }
 
 // resolveConfigurableAdapter acha o adapter, confirma que ele está
@@ -1864,6 +1907,52 @@ func (s *Server) setExcluded(w http.ResponseWriter, r *http.Request, excluded bo
 	}
 
 	writeJSON(w, http.StatusOK, excludeResponse{ID: id, Excluded: excluded})
+}
+
+// handleSetGameTitle grava o título que o usuário digitou à mão. Corpo
+// {"title": ""} (ou só espaços) limpa o override e volta ao título derivado
+// do nome do arquivo. A resposta devolve o jogo já relido, com o `title` de
+// exibição resolvido — a tela troca o texto na hora sem refazer a listagem.
+func (s *Server) handleSetGameTitle(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id", "O identificador do jogo deve ser numérico.")
+		return
+	}
+
+	var body struct {
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON com {"title": "..."}.`)
+		return
+	}
+
+	if err := s.library.SetTitleOverride(r.Context(), id, body.Title); err != nil {
+		if errors.Is(err, library.ErrGameNotFound) {
+			s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum jogo com o id %d.", id))
+			return
+		}
+		s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
+		return
+	}
+
+	game, ok, err := s.library.GameByID(r.Context(), id)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
+	}
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum jogo com o id %d.", id))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":             game.ID,
+		"title":          game.Title,
+		"title_override": game.TitleOverride,
+	})
 }
 
 // handleGetIGDBCredentials nunca ecoa client_secret de volta — mesmo

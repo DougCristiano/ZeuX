@@ -177,21 +177,16 @@ func buildCandidates(names []string, extraDirs []string) []string {
 			continue
 		}
 
-		for _, name := range names {
-			candidates = append(candidates, filepath.Join(dir, name))
-		}
-
 		// Emuladores quase nunca ficam soltos no diretório: o normal é
-		// C:\Program Files\DuckStation\duckstation-qt.exe, não
-		// C:\Program Files\duckstation-qt.exe. Sem descer um nível, a busca no
-		// Windows praticamente nunca encontraria nada.
-		//
-		// Um nível é suficiente e mantém o custo previsível — varrer o Program
-		// Files inteiro seria lento e ainda assim não cobriria instalações em
-		// lugares arbitrários, que é o que o cadastro manual resolve.
-		for _, sub := range subdirectories(dir) {
+		// C:\Program Files\DuckStation\duckstation-qt.exe, e não é raro um
+		// nível a mais quando o usuário extrai o .zip do release
+		// (C:\Program Files\DuckStation\bin\..., ou
+		// Downloads\duckstation-0.1-windows-x64\bin\...). scanTree desce até
+		// maxScanDepth níveis, em largura, então o candidato mais raso é
+		// sempre testado antes do mais fundo.
+		for _, d := range scanTree(dir) {
 			for _, name := range names {
-				candidates = append(candidates, filepath.Join(sub, name))
+				candidates = append(candidates, filepath.Join(d.path, name))
 			}
 		}
 	}
@@ -221,10 +216,9 @@ type indexedDir struct {
 	files map[string]bool
 }
 
-// buildDirIndex varre cada diretório de sistema e suas subpastas diretas uma
-// única vez, reaproveitando o mesmo os.ReadDir tanto para achar os arquivos
-// do diretório quanto para descobrir suas subpastas — subdirectories()
-// sozinha faria uma segunda leitura do mesmo diretório.
+// buildDirIndex varre cada diretório de sistema e sua árvore de subpastas
+// (até maxScanDepth níveis) uma única vez — o mesmo trabalho que scanTree faz
+// para a busca não-indexada, feito aqui de uma vez para todos os adapters.
 func buildDirIndex() *dirIndex {
 	idx := &dirIndex{}
 
@@ -232,17 +226,78 @@ func buildDirIndex() *dirIndex {
 		if dir == "" {
 			continue
 		}
-
-		files, subs := scanDirEntries(dir)
-		idx.dirs = append(idx.dirs, indexedDir{path: dir, files: files})
-
-		for _, sub := range subs {
-			subFiles, _ := scanDirEntries(sub)
-			idx.dirs = append(idx.dirs, indexedDir{path: sub, files: subFiles})
-		}
+		idx.dirs = append(idx.dirs, scanTree(dir)...)
 	}
 
 	return idx
+}
+
+// maxScanDepth é quantos níveis abaixo de um diretório de sistema a descoberta
+// desce atrás do binário. Um nível achava
+// C:\Program Files\DuckStation\duckstation-qt.exe mas não quem extraiu o .zip
+// do release um nível mais fundo — "<app>\bin\..." ou
+// "<app>\<versão>\bin\..." — caso real que motivou o roadmap D6. Três níveis
+// cobrem esse aninhamento com folga sem virar um walk de disco: o fan-out é
+// limitado por maxSubdirsScanned por diretório e por maxDirsPerRoot no total,
+// e pastas notoriamente grandes e sem emulador (node_modules e afins) são
+// puladas por nome. Instalação em local arbitrário (outro drive, pasta
+// pessoal) continua sendo trabalho do cadastro manual, não da varredura.
+const maxScanDepth = 3
+
+// maxDirsPerRoot limita o total de diretórios visitados a partir de um único
+// diretório de sistema, para que uma árvore larga e profunda (um checkout de
+// código dentro de Downloads, por exemplo) não faça a descoberta custar caro
+// mesmo com as pastas conhecidas já puladas.
+const maxDirsPerRoot = 1500
+
+// skipDirNames são nomes de pasta que não hospedam emulador e que costumam ser
+// enormes — descer nelas é custo puro. Casada por nome exato de componente,
+// em qualquer nível.
+var skipDirNames = map[string]bool{
+	"node_modules": true,
+	".git":         true,
+	".svn":         true,
+	".hg":          true,
+	"__pycache__":  true,
+	".cache":       true,
+	"vendor":       true,
+	"Windows":      true, // C:\Windows sob nenhuma circunstância tem um emulador do usuário.
+}
+
+// scanTree devolve `root` e suas subpastas até maxScanDepth níveis abaixo, em
+// ordem de largura (BFS). A ordem BFS é o que preserva a precedência que a
+// busca sempre teve: um binário mais raso é sempre testado antes de um mais
+// fundo. O primeiro elemento é sempre o próprio `root`.
+func scanTree(root string) []indexedDir {
+	type queued struct {
+		path  string
+		depth int
+	}
+
+	out := make([]indexedDir, 0, 16)
+	queue := []queued{{path: root, depth: 0}}
+	visited := 0
+
+	for len(queue) > 0 && visited < maxDirsPerRoot {
+		cur := queue[0]
+		queue = queue[1:]
+		visited++
+
+		files, subs := scanDirEntries(cur.path)
+		out = append(out, indexedDir{path: cur.path, files: files})
+
+		if cur.depth >= maxScanDepth {
+			continue
+		}
+		for _, sub := range subs {
+			if skipDirNames[filepath.Base(sub)] {
+				continue
+			}
+			queue = append(queue, queued{path: sub, depth: cur.depth + 1})
+		}
+	}
+
+	return out
 }
 
 // scanDirEntries lê um diretório uma vez e separa arquivos de subpastas.
@@ -300,30 +355,10 @@ func discoveryIndexFromContext(ctx context.Context) *dirIndex {
 	return idx
 }
 
-// maxSubdirsScanned limita a varredura para que um diretório com muitas
-// entradas não torne a descoberta cara.
+// maxSubdirsScanned limita quantas subpastas de um mesmo diretório entram na
+// varredura, para que um diretório com muitas entradas não torne a descoberta
+// cara em nenhum nível.
 const maxSubdirsScanned = 400
-
-// subdirectories lista as subpastas diretas de um diretório.
-func subdirectories(dir string) []string {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
-
-	var subs []string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if len(subs) >= maxSubdirsScanned {
-			break
-		}
-		subs = append(subs, filepath.Join(dir, entry.Name()))
-	}
-
-	return subs
-}
 
 // systemDirs lista os diretórios onde emuladores costumam ser instalados em
 // cada sistema operacional.

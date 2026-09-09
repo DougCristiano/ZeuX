@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError } from "../api";
 import type {
   ConsoleVerdict,
@@ -39,6 +39,7 @@ import { SelectItem } from "../components/ui/select";
 import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -665,7 +666,9 @@ function EmulatorCardActions({
     ? true
     : entry.installed
       ? Boolean(canRemove)
-      : source?.kind === "manual" || !installBusy;
+      : // Instalação manual não tem botão nesta faixa — o trilho guiado
+        // (ManualInstallGuide) traz as ações acima dela.
+        source?.kind !== "manual" && !installBusy;
 
   return (
     <>
@@ -708,31 +711,18 @@ function EmulatorCardActions({
       {state.kind === "error" && <InlineError>{state.message}</InlineError>}
       {state.kind === "remove-error" && <InlineError>{state.message}</InlineError>}
 
-      {/* Fontes "manual" (hoje só o Dolphin) não distribuem por releases do
-          GitHub — não há como o ZeuX resolver a versão mais recente por API
-          (docs/adapters.md). Em vez do botão "Instalar" tentar e sempre
-          falhar com o motivo em texto puro, abre o site oficial direto no
-          navegador (2026-08-04, a pedido do Douglas). */}
+      {/* Fontes "manual" (RetroArch, Dolphin) não distribuem por releases que o
+          ZeuX consiga resolver por API. Trilho guiado compartilhado com a tela
+          de Consoles (ManualInstallGuide): passos numerados, abrir o site
+          oficial, abrir a pasta de destino, "Verificar de novo". */}
       {!entry.installed && source?.kind === "manual" && (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted">{source.reason}</p>
-          {/* O site oficial abre pelo botão abaixo, mas o download em si
-              precisa ir pra algum lugar que o ZeuX ache sozinho depois
-              (findBinary, internal/emulator/discovery.go) — o Program
-              Files funciona (é o primeiro lugar verificado fora da pasta
-              gerenciada), mas essa pasta é a garantia: colar/extrair aqui
-              sempre funciona, sem depender de onde o instalador do
-              Dolphin decidir instalar por padrão (achado real,
-              2026-08-17). */}
-          <p className="text-sm text-muted">
-            Extraia (ou instale) o {entry.name} nesta pasta para o ZeuX encontrar sozinho:
-          </p>
-          {entry.managed_dir && (
-            <p className="break-all rounded-lg border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
-              {entry.managed_dir}
-            </p>
-          )}
-        </div>
+        <ManualInstallGuide
+          emulatorId={entry.adapter_id}
+          emulatorName={entry.name}
+          homepage={source.homepage}
+          reason={source.reason}
+          onVerified={onChanged}
+        />
       )}
 
       {/* Emulador personalizado (I1) cujo caminho não foi encontrado —
@@ -844,9 +834,9 @@ function EmulatorCardActions({
             </Button>
           ))
         ) : source?.kind === "manual" ? (
-          <Button variant="primary" onClick={() => openUrl(source.homepage)}>
-            {t("openOfficialWebsite")}
-          </Button>
+          // ManualInstallGuide (acima) já traz "abrir o site oficial" como
+          // passo 1 — repetir o botão aqui seria a mesma ação duas vezes.
+          null
         ) : state.kind === "installing" || state.kind === "done" || state.kind === "confirm-hardware" ? null : (
           <Button variant="primary" disabled={state.kind === "starting"} onClick={() => install(false)}>
             {state.kind === "error" ? t("retryInstall") : t("install")}

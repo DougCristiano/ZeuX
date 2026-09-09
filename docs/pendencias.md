@@ -187,6 +187,57 @@ nenhuma escolhida ainda:
 
 ---
 
+## Multi-disco: agrupar "(Disc 1)"/"(Disc 2)" e lançar como playlist
+
+**Origem:** pedido do Douglas em 2026-09-09, junto do título editável. O
+título editável foi entregue nessa rodada; o multi-disco foi separado por
+esbarrar na regra de `BuildCommand` pura (ver `decisoes.md`, "Multi-disco:
+adiado").
+
+**O problema:** jogos de PS1/PS2 divididos em vários discos entram como
+entradas independentes na biblioteca — "Final Fantasy VII (Disc 1)",
+"(Disc 2)", "(Disc 3)" viram três cards, e trocar de disco no meio do jogo
+não tem caminho.
+
+**Escopo mínimo desenhado (não implementado):**
+
+1. **Detecção na varredura** (`internal/library/scan.go`): agrupar arquivos
+   do mesmo diretório cujo nome só difere pelo trecho `(Disc N)` / `(Disco N)`
+   (aparar essa etiqueta e comparar o resto, do mesmo jeito que
+   `TitleFromFilename` já apara `(USA)` etc.). Um grupo com 2+ discos vira
+   um jogo só; disco único continua entrada normal.
+2. **Modelo:** um jogo multi-disco precisa guardar os N caminhos ordenados.
+   Opções em aberto: linha "pai" + coluna `disc_paths` (JSON) na `library_games`,
+   ou tabela nova `library_game_discs` (migração em `internal/store/migrations/`).
+   Nenhuma escolhida — a segunda é mais limpa mas mais peso; decidir com o
+   "orçamento de simplicidade" (arquitetura-do-codigo.md §6) na mão.
+3. **Lançamento — a parte que travou:** RetroArch/DuckStation aceitam um
+   `.m3u` com um caminho por linha. `BuildCommand` **não pode** gerar esse
+   arquivo (regra: função pura, não toca o FS além da exceção do RetroArch;
+   ver `decisoes.md`). Duas saídas a avaliar:
+   - Gerar o `.m3u` numa área gerenciada do ZeuX (`emulator.ManagedRoot()`,
+     nunca a pasta de ROM do usuário — regra 6) numa camada **antes** de
+     `BuildCommand` (no `Launcher`, que já toca o FS), passando o caminho do
+     `.m3u` como se fosse o `rom_path`.
+   - Confirmar se algum dos dois emuladores aceita múltiplos caminhos de
+     disco direto por linha de comando (sem `.m3u`) — se sim, nada é escrito
+     em disco. **Não verificado.**
+4. **Fallback aceitável se (3) ficar grande:** só detecção + agrupamento
+   visual — um card "God of War (2 discos)" que ao abrir pergunta qual
+   disco lançar (lançamento de disco único, que já funciona). A playlist
+   automática fica como continuação desta pendência.
+
+**Critério de aceite (quando for implementado):**
+- [ ] Três arquivos `(Disc 1..3)` na mesma pasta viram um card só.
+- [ ] Revarredura não duplica nem desagrupa.
+- [ ] Nenhum arquivo é escrito na pasta de ROM do usuário em hipótese
+      nenhuma (regra 6 + `BuildCommand` pura).
+- [ ] Testes em `internal/library` (agrupamento) e, se a playlist for feita,
+      em `internal/emulator`/`internal/api` (o `.m3u` sai na área gerenciada,
+      com um caminho por linha, na ordem certa).
+
+**Depende de:** nada · **Bloqueia:** nada
+
 ## O que fica fora deste documento
 
 - Trabalho já feito, mesmo que recente — isso vive só no código e no

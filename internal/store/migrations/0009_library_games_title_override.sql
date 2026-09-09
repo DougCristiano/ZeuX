@@ -1,0 +1,13 @@
+-- Título editável à mão (2026-09-09, a pedido do Douglas): o título de um jogo
+-- é derivado do nome do arquivo (library.TitleFromFilename) e às vezes fica
+-- feio ("Final Fantasy VII (USA) (Disc 1) [SCUS-94163]" -> "Final Fantasy
+-- VII"), ou o usuário simplesmente prefere outro nome.
+--
+-- `title` continua sendo o derivado — SyncFolder o regrava a cada varredura.
+-- `title_override`, quando não-vazio, vence: as consultas de leitura devolvem
+-- CASE WHEN title_override != '' THEN title_override ELSE title END. Como a
+-- varredura só escreve em `title`, a escolha manual sobrevive ao rescan sem
+-- nenhum tratamento especial em SyncFolder (mesma ideia de `favorite`/
+-- `excluded`, que a varredura também não toca). Limpar o override (string
+-- vazia) volta ao título derivado.
+ALTER TABLE library_games ADD COLUMN title_override TEXT NOT NULL DEFAULT '';

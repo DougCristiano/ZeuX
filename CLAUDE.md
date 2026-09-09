@@ -318,9 +318,13 @@ Coisas que já custaram tempo e vale saber de antemão:
   `is_running` de `GET /sessions`.
 - **`retroArchAdapter.Consoles()` devolve ordem não determinística** (iteração de
   mapa). `Registry.Survey` ordena antes de expor.
-- **`findBinary` desce um nível de diretório.** Em `C:\Program Files\DuckStation\`,
-  encontra `duckstation-qt.exe`. Em `/home`, não entra em subdiretórios além de um.
-  Ver roadmap D6 se precisar de profundidade maior.
+- **`findBinary` desce até `maxScanDepth` (3) níveis** abaixo de cada diretório
+  de sistema, em largura (`scanTree` em `discovery.go`), com teto de fan-out
+  (`maxSubdirsScanned` por pasta, `maxDirsPerRoot` no total) e uma denylist de
+  nomes (`node_modules`, `.git`, `Windows`...). Acha
+  `C:\Program Files\DuckStation\bin\duckstation-qt.exe`; não acha emulador em
+  outro drive ou pasta pessoal — isso continua sendo trabalho do cadastro
+  manual. Ver `docs/decisoes.md`, "Profundidade da varredura de `findBinary`".
 - **`Options.Extra` é anexado depois do caminho da ROM**, o que no PCSX2 o coloca
   depois do separador `--`.
 - **`Installation.Version` só vem de instalação gerenciada.** Quem instalou

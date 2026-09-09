@@ -40,8 +40,19 @@ type Game struct {
 	FolderID  int64     `json:"folder_id"`
 	ConsoleID string    `json:"console_id"`
 	Path      string    `json:"path"`
-	Title     string    `json:"title"`
-	AddedAt   time.Time `json:"added_at"`
+
+	// Title é o título de EXIBIÇÃO já resolvido: o override manual quando
+	// existe, senão o derivado do nome do arquivo. Quem lê Title nunca precisa
+	// saber de onde ele veio.
+	Title string `json:"title"`
+
+	// TitleOverride é o título que o usuário digitou à mão (vazio = usando o
+	// derivado). Vai no JSON para a tela de detalhe saber se há o que
+	// "restaurar ao padrão". A varredura nunca escreve aqui — é o que faz a
+	// escolha manual sobreviver ao rescan (ver SyncFolder).
+	TitleOverride string `json:"title_override"`
+
+	AddedAt time.Time `json:"added_at"`
 
 	// Missing é true quando uma varredura mais recente não achou mais o
 	// arquivo neste caminho — o usuário pode ter movido, apagado, ou só
@@ -355,8 +366,12 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 	args := make([]any, 0, 4)
 
 	if query != "" {
-		conditions = append(conditions, `title LIKE ? ESCAPE '\'`)
-		args = append(args, "%"+escapeLike(query)+"%")
+		// Casa contra o título de exibição real: o derivado OU o override
+		// manual. Buscar só por `title` faria um jogo renomeado à mão sumir da
+		// busca pelo nome que o usuário vê.
+		conditions = append(conditions, `(title LIKE ? ESCAPE '\' OR title_override LIKE ? ESCAPE '\')`)
+		like := "%" + escapeLike(query) + "%"
+		args = append(args, like, like)
 	}
 	if favoriteOnly {
 		conditions = append(conditions, `favorite = 1`)
@@ -372,7 +387,7 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 		conditions = append(conditions, `excluded = 0`)
 	}
 
-	sqlQuery := `SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded FROM library_games`
+	sqlQuery := `SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded FROM library_games`
 	if len(conditions) > 0 {
 		sqlQuery += " WHERE " + strings.Join(conditions, " AND ")
 	}
@@ -393,7 +408,7 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 			favorite int
 			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -424,7 +439,7 @@ func escapeLike(s string) string {
 // antigos.
 func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games
 		WHERE console_id = ? AND excluded = 0
 		ORDER BY id DESC
@@ -443,7 +458,7 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 			favorite int
 			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -465,7 +480,7 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 // título antes de disparar a consulta ao IGDB.
 func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games WHERE id = ?
 	`, id)
 
@@ -476,7 +491,7 @@ func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 		favorite int
 		excluded int
 	)
-	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
+	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 		if err == sql.ErrNoRows {
 			return Game{}, false, nil
 		}
@@ -501,7 +516,7 @@ func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 // conseguir consultá-las.
 func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games
 		WHERE folder_id = ?
 	`, folderID)
@@ -519,7 +534,7 @@ func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, erro
 			favorite int
 			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -543,7 +558,7 @@ func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, erro
 // específico via ClearCover.
 func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games
 		WHERE cover_path = '' AND cover_status = '' AND excluded = 0
 		ORDER BY id
@@ -562,7 +577,7 @@ func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 			favorite int
 			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -691,6 +706,20 @@ func (s *Store) SetExcluded(ctx context.Context, gameID int64, excluded bool) er
 	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET excluded = ? WHERE id = ?`, value, gameID)
 	if err != nil {
 		return fmt.Errorf("gravando exclusão do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+// SetTitleOverride grava (ou limpa, com title vazio) o título que o usuário
+// digitou à mão para um jogo. Espaço em volta é aparado aqui — um override
+// que fosse só espaços seria indistinguível de "sem override" na hora de
+// exibir, mas ocuparia a coluna e passaria pelo CASE. Nunca toca o arquivo
+// no disco nem o título derivado: é uma camada por cima, reversível.
+func (s *Store) SetTitleOverride(ctx context.Context, gameID int64, title string) error {
+	trimmed := strings.TrimSpace(title)
+	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET title_override = ? WHERE id = ?`, trimmed, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando o título do jogo %d: %w", gameID, err)
 	}
 	return checkAffected(result, gameID)
 }

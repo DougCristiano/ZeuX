@@ -501,7 +501,13 @@ export type LibraryGame = {
   folder_id: number;
   console_id: string;
   path: string;
+  /** Título de EXIBIÇÃO já resolvido pelo servidor: o `title_override` quando
+   * existe, senão o derivado do nome do arquivo. É o que a UI mostra sempre. */
   title: string;
+  /** Título que o usuário digitou à mão (PATCH /library/games/{id}/title).
+   * Vazio = usando o derivado. Serve só para a tela de detalhe saber se há o
+   * que "restaurar ao padrão". A varredura nunca o sobrescreve. */
+  title_override: string;
   added_at: string;
   /** `true` quando a última varredura não achou mais o arquivo neste caminho —
    * a entrada continua existindo (o tempo de jogo referencia o caminho), só

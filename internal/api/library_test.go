@@ -484,6 +484,58 @@ func TestExcludeGameHidesFromListingAndCanBeRestored(t *testing.T) {
 	}
 }
 
+// Trava o título editável à mão (2026-09-09): PATCH .../title grava o
+// override, ele aparece como `title` na listagem, e {"title":""} volta ao
+// título derivado do nome do arquivo. Id inexistente devolve 404.
+func TestSetGameTitleOverridesAndResets(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "sonic 2 (usa).nes"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM: %v", err)
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+
+	all := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10", nil))["games"].([]any)
+	game := all[0].(map[string]any)
+	id := int64(game["id"].(float64))
+	if game["title"] != "sonic 2" {
+		t.Fatalf("título derivado = %v, esperava %q", game["title"], "sonic 2")
+	}
+	if ov, ok := game["title_override"]; !ok || ov != "" {
+		t.Fatalf("title_override = %v (presente=%v), esperava \"\" sempre presente", ov, ok)
+	}
+
+	patchURL := "/api/v1/library/games/" + strconv.FormatInt(id, 10) + "/title"
+	rec := doJSON(t, server.Routes(), http.MethodPatch, patchURL, map[string]any{"title": "Sonic the Hedgehog 2"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PATCH title = %d, corpo: %s", rec.Code, rec.Body.String())
+	}
+	if decodeBody(t, rec)["title"] != "Sonic the Hedgehog 2" {
+		t.Fatalf("resposta do PATCH não trouxe o título novo: %s", rec.Body.String())
+	}
+
+	after := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?console_id=nes", nil))["games"].([]any)
+	ag := after[0].(map[string]any)
+	if ag["title"] != "Sonic the Hedgehog 2" || ag["title_override"] != "Sonic the Hedgehog 2" {
+		t.Fatalf("listagem apos override = %+v", ag)
+	}
+
+	doJSON(t, server.Routes(), http.MethodPatch, patchURL, map[string]any{"title": ""})
+	reset := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?console_id=nes", nil))["games"].([]any)
+	rg := reset[0].(map[string]any)
+	if rg["title"] != "sonic 2" || rg["title_override"] != "" {
+		t.Fatalf("apos limpar o override = %+v, esperava voltar ao derivado", rg)
+	}
+
+	notFound := doJSON(t, server.Routes(), http.MethodPatch, "/api/v1/library/games/999999/title", map[string]any{"title": "x"})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("PATCH em id inexistente = %d, esperava 404", notFound.Code)
+	}
+}
+
 // Trava ?played=true: só os jogos já abertos ao menos uma vez (playtime > 0).
 func TestLibraryGamesFilterByPlayed(t *testing.T) {
 	server, db := newTestServerWithDB(t, fakeProbe{})

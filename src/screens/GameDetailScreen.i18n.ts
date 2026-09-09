@@ -99,6 +99,25 @@ export const dict = {
   sessions: { "pt-BR": "Sessões", en: "Sessions" },
   // "Remover da biblioteca" (2026-09-09). O texto deixa claro que o arquivo
   // no disco não é tocado — só a entrada na biblioteca some.
+  editTitle: { "pt-BR": "Editar título", en: "Edit title" },
+  titleInputLabel: { "pt-BR": "Título do jogo", en: "Game title" },
+  saveTitle: { "pt-BR": "Salvar", en: "Save" },
+  savingTitle: { "pt-BR": "Salvando…", en: "Saving…" },
+  cancelTitle: { "pt-BR": "Cancelar", en: "Cancel" },
+  restoreDerivedTitle: { "pt-BR": "Usar o nome do arquivo", en: "Use the file name" },
+  titleIsCustom: {
+    "pt-BR": "Título editado à mão. Uma nova varredura não desfaz isso.",
+    en: "Title edited by hand. A rescan won't undo it.",
+  },
+  titleSaved: { "pt-BR": "Título salvo.", en: "Title saved." },
+  titleRestored: {
+    "pt-BR": "Título voltou ao nome do arquivo.",
+    en: "Title reverted to the file name.",
+  },
+  errorSavingTitle: {
+    "pt-BR": "Não foi possível salvar o título.",
+    en: "Could not save the title.",
+  },
   removeHeading: { "pt-BR": "Remover da biblioteca", en: "Remove from library" },
   removeFromLibraryHelp: {
     "pt-BR": "Esconde este jogo da biblioteca. O arquivo continua no seu computador, intacto — só some da lista, e não volta na próxima varredura. Para trazer de volta, use o filtro \"Ocultos\" em Todos os jogos.",

@@ -219,6 +219,10 @@ export const api = {
   // jogo, escape hatch que sempre continua existindo (H2, docs/roadmap.md).
   openEmulator: (id: string) =>
     request<{ opened: string }>(`/emulators/${encodeURIComponent(id)}/open`, { method: "POST" }),
+  // Trilho de instalação manual: cria a pasta de destino (se preciso) e
+  // devolve o caminho, para a tela abrir no explorador de arquivos.
+  ensureManagedDir: (id: string) =>
+    request<{ path: string }>(`/emulators/${encodeURIComponent(id)}/managed-dir`, { method: "POST" }),
 
   // --- Configuração persistida do emulador (H1/H2) ---
   getEmulatorConfig: (id: string) =>
@@ -329,6 +333,15 @@ export const api = {
     request<{ id: number; excluded: boolean }>(`/library/games/${id}/exclude`, { method: "POST" }),
   unexcludeGame: (id: number) =>
     request<{ id: number; excluded: boolean }>(`/library/games/${id}/exclude`, { method: "DELETE" }),
+  // Título editável à mão (2026-09-09): `title` vazio limpa o override e volta
+  // ao título derivado do nome do arquivo. A resposta traz o `title` de
+  // exibição já resolvido.
+  setGameTitle: (id: number, title: string) =>
+    request<{ id: number; title: string; title_override: string }>(`/library/games/${id}/title`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    }),
 
   // --- Scraper de metadados IGDB (G1) ---
   getIGDBCredentials: () => request<IGDBCredentialsStatus>("/igdb/credentials"),

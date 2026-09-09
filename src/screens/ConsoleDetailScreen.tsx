@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { Pencil } from "lucide-react";
 import { api, ApiError, consoleImageURL } from "../api";
 import type {
@@ -28,6 +28,7 @@ import {
   SectionHeading,
 } from "../components/ui";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
@@ -80,10 +81,6 @@ function EmulatorOptionCard({
   const [openError, setOpenError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [showBindings, setShowBindings] = useState(false);
-  const [verificando, setVerificando] = useState(false);
-  // Só depois de uma verificação que não achou nada — no primeiro carregamento
-  // a ausência é o estado esperado, não um resultado a comentar.
-  const [naoEncontrado, setNaoEncontrado] = useState(false);
 
   const installed = entry?.installed ?? false;
   // Só faz sentido remover o que o ZeuX colocou na pasta gerenciada — o
@@ -99,42 +96,6 @@ function EmulatorOptionCard({
       setOpenError(err instanceof ApiError ? err.message : t("couldNotOpenEmulator"));
     } finally {
       setOpening(false);
-    }
-  }
-
-  async function abrirPastaGerenciada() {
-    if (!entry?.managed_dir) return;
-    setOpenError(null);
-    try {
-      await openPath(entry.managed_dir);
-    } catch (err) {
-      setOpenError(
-        t("couldNotOpenFolder", { error: err instanceof Error ? err.message : String(err) }) + ". " +
-          t("createFolderIfNotExists"),
-      );
-    }
-  }
-
-  // Reconsulta o disco. `GET /emulators` roda o Survey a cada chamada, então
-  // recarregar já é a verificação — o que faltava era um jeito de pedir isso
-  // sem sair da tela, e um retorno dizendo o que aconteceu.
-  async function verificarInstalacao() {
-    setVerificando(true);
-    setNaoEncontrado(false);
-    try {
-      const res = await api.getEmulators();
-      const achou = res.emulators.find((e) => e.adapter_id === option.adapter_id)?.installed ?? false;
-      if (achou) {
-        onChanged();
-      } else {
-        setNaoEncontrado(true);
-      }
-    } catch {
-      // Falhar em verificar não merece um erro na cara: o botão continua ali
-      // para tentar de novo, e nada do estado da tela mudou.
-      setNaoEncontrado(true);
-    } finally {
-      setVerificando(false);
     }
   }
 
@@ -277,58 +238,18 @@ function EmulatorOptionCard({
       {state.kind === "remove-error" && <InlineError>{state.message}</InlineError>}
       {openError && <InlineError>{openError}</InlineError>}
 
-      {/* Fontes "manual" (RetroArch e Dolphin) não distribuem por releases do
-          GitHub — não há como o ZeuX resolver a versão mais recente por API
-          (docs/adapters.md). Em vez de um botão "Instalar" que sempre falha,
-          abre o site oficial e mostra a pasta onde extrair para o ZeuX
-          encontrar sozinho depois (achado real, 2026-08-17). */}
+      {/* Fontes "manual" (RetroArch e Dolphin) não distribuem por releases que
+          o ZeuX consiga resolver por API. O trilho guiado (passos numerados +
+          abrir site + abrir pasta + verificar) mora num componente
+          compartilhado com a tela de Emuladores. */}
       {!installed && source?.kind === "manual" && (
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted">{source.reason}</p>
-          <p className="text-sm text-muted">
-            {t("extractManualInstall", { emulatorName: option.name })}
-          </p>
-          {entry?.managed_dir && (
-            <>
-              <p className="break-all rounded-lg border border-line bg-fill px-3 py-2 font-mono text-xs text-ink select-all">
-                {entry.managed_dir}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {/* A pasta pode não existir ainda — o `openPath` do Tauri
-                    falharia, e "criar" é o que o usuário faria em seguida de
-                    qualquer jeito. Só aparece para instalação manual: nos
-                    outros o ZeuX cria a pasta ele mesmo ao instalar. */}
-                {/* `chrome` (2026-09-07): botão de pasta. O `px-2 py-1
-                    text-xs` que estava aqui à mão era, na prática, um
-                    "chrome" improvisado — a variante agora traz essa
-                    geometria (e a borda que faltava). */}
-                <Button variant="chrome" onClick={abrirPastaGerenciada}>
-                  {t("openFolder")}
-                </Button>
-                {/* Q5 (docs/roadmap.md, Sprint Q): "o ZeuX confirmando sozinho
-                    quando o binário aparecer". Sem isto, quem acabou de
-                    extrair o RetroArch precisava sair da tela e voltar para o
-                    app perceber — e não tinha como saber que era isso que
-                    faltava fazer. */}
-                {/* `chrome` pelo mesmo motivo do botão de pasta ao lado: os
-                    dois estão na mesma fileira e vinham com a mesma
-                    geometria improvisada em `className`. */}
-                <Button
-                  variant="chrome"
-                  disabled={verificando}
-                  onClick={verificarInstalacao}
-                >
-                  {verificando ? t("verifying") : t("alreadyInstalledVerify")}
-                </Button>
-              </div>
-              {naoEncontrado && (
-                <p className="text-xs text-muted">
-                  {t("notFoundEmulator", { emulatorName: option.name })}
-                </p>
-              )}
-            </>
-          )}
-        </div>
+        <ManualInstallGuide
+          emulatorId={option.adapter_id}
+          emulatorName={option.name}
+          homepage={source.homepage}
+          reason={source.reason}
+          onVerified={onChanged}
+        />
       )}
 
       {/* Q4 (docs/roadmap.md, Sprint Q): configuração e mapeamento passam a ser
@@ -392,9 +313,10 @@ function EmulatorOptionCard({
             )}
           </>
         ) : source?.kind === "manual" ? (
-          <Button variant="primary" onClick={() => openUrl(source.homepage)}>
-            {t("openOfficialSite")}
-          </Button>
+          // O trilho guiado (ManualInstallGuide, acima) já traz "abrir o site
+          // oficial" como passo 1 — um segundo botão aqui seria a mesma ação
+          // repetida.
+          null
         ) : state.kind === "installing" || state.kind === "done" || state.kind === "confirm-hardware" ? null : (
           <Button variant="primary" disabled={state.kind === "starting"} onClick={() => install(false)}>
             {state.kind === "error" ? t("retryInstall") : t("install")}

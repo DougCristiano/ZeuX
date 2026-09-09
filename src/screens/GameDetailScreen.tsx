@@ -14,6 +14,7 @@ import {
   FavoriteToggle,
   GameCover,
   InlineError,
+  inputClass,
   PlayIcon,
   ProgressBar,
   ScreenContainer,
@@ -131,6 +132,16 @@ export function GameDetailScreen({
   // porque o snapshot em App.tsx não muda sozinho depois do toggle aqui.
   const [favorite, setFavorite] = useState(game.favorite);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  // Título editável à mão (2026-09-09): `title` é o de exibição já resolvido
+  // pelo servidor; `titleOverride` diz se há o que "restaurar ao padrão".
+  // Estado próprio pelo mesmo motivo de coverUrl/favorite: o snapshot em
+  // App.tsx não muda sozinho depois de editar aqui.
+  const [title, setTitle] = useState(game.title);
+  const [titleOverride, setTitleOverride] = useState(game.title_override);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(game.title);
+  const [savingTitle, setSavingTitle] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
   // M6: "abrir a pasta do jogo" — erro fica colado no botão (mesmo padrão
   // de favoriteError/coverError), não solto pela tela.
   const [folderError, setFolderError] = useState<string | null>(null);
@@ -186,7 +197,30 @@ export function GameDetailScreen({
   useEffect(() => {
     setCoverUrl(game.cover_url);
     setFavorite(game.favorite);
-  }, [game.id, game.cover_url, game.favorite]);
+    setTitle(game.title);
+    setTitleOverride(game.title_override);
+    setEditingTitle(false);
+    setTitleError(null);
+  }, [game.id, game.cover_url, game.favorite, game.title, game.title_override]);
+
+  // `value` vazio limpa o override e volta ao título derivado do nome do
+  // arquivo. A resposta traz o `title` de exibição já resolvido — não é
+  // preciso rebuscar a listagem.
+  async function saveTitle(value: string) {
+    setSavingTitle(true);
+    setTitleError(null);
+    try {
+      const res = await api.setGameTitle(game.id, value);
+      setTitle(res.title);
+      setTitleOverride(res.title_override);
+      setEditingTitle(false);
+      showToast(res.title_override ? t("titleSaved") : t("titleRestored"));
+    } catch (err) {
+      setTitleError(err instanceof ApiError ? err.message : t("errorSavingTitle"));
+    } finally {
+      setSavingTitle(false);
+    }
+  }
 
   // B4 (achado do critico-design, 2026-08-18): favoritar confirmava em
   // AllGamesScreen e ficava mudo aqui e em GamesScreen.
@@ -392,7 +426,66 @@ export function GameDetailScreen({
           Mesma precaução de `GameHero`. */}
       <div className="flex min-w-0 max-w-3xl flex-1 flex-col justify-center gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-balance text-ink sm:text-4xl">{game.title}</h1>
+          {editingTitle ? (
+            <form
+              className="flex flex-col gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveTitle(titleDraft);
+              }}
+            >
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setEditingTitle(false);
+                }}
+                aria-label={t("titleInputLabel")}
+                placeholder={game.title}
+                className={inputClass}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant="primary" disabled={savingTitle || titleDraft.trim() === ""}>
+                  {savingTitle ? t("savingTitle") : t("saveTitle")}
+                </Button>
+                <Button type="button" variant="secondary" disabled={savingTitle} onClick={() => setEditingTitle(false)}>
+                  {t("cancelTitle")}
+                </Button>
+                {titleOverride !== "" && (
+                  <Button
+                    type="button"
+                    variant="chrome"
+                    disabled={savingTitle}
+                    onClick={() => void saveTitle("")}
+                  >
+                    {t("restoreDerivedTitle")}
+                  </Button>
+                )}
+              </div>
+              {titleError && <InlineError>{titleError}</InlineError>}
+            </form>
+          ) : (
+            <div className="flex items-start gap-2">
+              <h1 className="text-3xl font-semibold text-balance text-ink sm:text-4xl">{title}</h1>
+              {/* `chrome` (chrome de arquivo, não ação sobre conteúdo) — mesma
+                  família de "Abrir pasta"/"Trocar capa". */}
+              <Button
+                variant="chrome"
+                className="mt-1 shrink-0"
+                onClick={() => {
+                  setTitleDraft(title);
+                  setTitleError(null);
+                  setEditingTitle(true);
+                }}
+              >
+                {t("editTitle")}
+              </Button>
+            </div>
+          )}
+          {!editingTitle && titleOverride !== "" && (
+            <p className="mt-1 text-xs text-muted">{t("titleIsCustom")}</p>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Badge accentColor={accent}>{consoleName}</Badge>
             {year !== undefined && <Badge>{year}</Badge>}
@@ -477,7 +570,7 @@ export function GameDetailScreen({
       {confirmingExclude && (
         <ConfirmModal
           title={t("removeFromLibraryTitle")}
-          message={t("removeFromLibraryConfirm", { title: game.title })}
+          message={t("removeFromLibraryConfirm", { title })}
           onClose={() => setConfirmingExclude(false)}
           actions={
             <>

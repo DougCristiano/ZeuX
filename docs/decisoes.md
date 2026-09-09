@@ -583,6 +583,65 @@ só o uso), e o fetch caiu de `getAllLibraryGames(1, 8)` para `(1, 1)`.
 tela de entrada. Reintroduzir o carrossel volta a duplicar visualmente os
 recentes.
 
+### Profundidade da varredura de `findBinary` (2026-09-09)
+
+Até aqui a descoberta de binário (`internal/emulator/discovery.go`) descia
+**um nível** abaixo de cada diretório de sistema: achava
+`C:\Program Files\DuckStation\duckstation-qt.exe`, mas não quem extraiu o
+`.zip` do release e ficou com o executável em `<app>\bin\...` ou
+`<app>\<versão>\bin\...` (relatado; era o "roadmap D6").
+
+Decisão: BFS até **3 níveis** (`maxScanDepth`), com o custo contido por
+teto de fan-out — `maxSubdirsScanned` (400) por diretório, `maxDirsPerRoot`
+(1500) no total a partir de cada raiz — e uma denylist de nomes de pasta que
+nunca hospedam emulador e costumam ser enormes (`node_modules`, `.git`,
+`vendor`, `C:\Windows`, ...). A varredura em largura preserva a precedência
+antiga: um binário mais raso é sempre testado antes de um mais fundo.
+`scanTree` é usada tanto pela busca avulsa quanto pela construção do
+`dirIndex` de `Survey`, então as duas enxergam a mesma árvore.
+
+3 e não mais: o aninhamento real observado é de 1–2 níveis; o terceiro é
+folga. Instalação em local arbitrário (outro drive, pasta pessoal) **não**
+é resolvida aqui de propósito — continua sendo o caso do cadastro manual de
+emulador, que existe justamente para isso.
+
+**O que quebra se desfizer:** volta o sintoma do D6 — emulador extraído de
+`.zip` com o binário em subpasta fica "não instalado" mesmo estando num
+diretório de sistema conhecido.
+
+### Título editável: coluna `title_override`, não sobrescrever `title` (2026-09-09)
+
+O título de um jogo vem de `library.TitleFromFilename` e às vezes fica feio.
+O Douglas pediu para poder editar. Sobrescrever a coluna `title` direto não
+funciona: `SyncFolder` faz `ON CONFLICT (path) DO UPDATE SET title =
+excluded.title` a cada varredura, então a edição sumiria no próximo rescan
+(o mesmo problema que `excluded` resolveu com uma flag).
+
+Escolha: coluna nova `title_override TEXT NOT NULL DEFAULT ''` (migração
+0009). As consultas de leitura devolvem `CASE WHEN title_override != ''
+THEN title_override ELSE title END AS title` — quem lê `Game.Title` recebe
+o de exibição já resolvido e não precisa saber da existência do override.
+A varredura continua só escrevendo `title`, então a edição manual sobrevive
+sem nenhum tratamento especial em `SyncFolder` (igual a `favorite`/
+`excluded`). `PATCH /library/games/{id}/title` com corpo `{"title":""}`
+limpa o override.
+
+**O que quebra se desfizer:** editar o título volta a ser desfeito pela
+revarredura seguinte; ou, se a edição passar a escrever em `title`, o
+título derivado original é perdido e não há como "restaurar o padrão".
+
+### Multi-disco: adiado, não implementado nesta rodada (2026-09-09)
+
+Jogos de PS1/PS2 em vários discos ("(Disc 1)", "(Disc 2)") entram como
+entradas soltas. O pedido incluía agrupá-los e lançar como playlist `.m3u`.
+Adiado para `pendencias.md` com escopo escrito: a parte de lançamento
+esbarra na regra de `BuildCommand` ser pura (não tocar o FS além da exceção
+do RetroArch, ver "RetroArch: cores baixados sob demanda") — gerar o `.m3u`
+teria que acontecer noutra camada e numa área gerenciada do ZeuX, **nunca**
+na pasta de ROM do usuário (regra 6). Não cabia com segurança no tempo
+desta rodada junto do título editável; o título editável (menor e sem risco
+de FS) foi entregue, o multi-disco virou pendência.
+
 ---
 
 ## O que fica fora deste log, de propósito

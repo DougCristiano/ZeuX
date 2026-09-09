@@ -268,6 +268,91 @@ func TestDirIndexRespectsNameOrderWithinSameDir(t *testing.T) {
 	}
 }
 
+// Trava o critério de aceite do roadmap D6: um binário aninhado dois níveis
+// abaixo de um diretório de sistema (o caso "extraí o .zip do release e o
+// executável ficou em <app>\bin\") passa a ser encontrado, coisa que a
+// varredura de um nível só não cobria.
+func TestScanTreeFindsBinaryTwoLevelsDeep(t *testing.T) {
+	root := t.TempDir()
+	deep := filepath.Join(root, "DuckStation", "bin")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bin := filepath.Join(deep, "duckstation-qt")
+	if err := os.WriteFile(bin, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := &dirIndex{dirs: scanTree(root)}
+	got, ok := idx.find([]string{"duckstation-qt"})
+	if !ok || got != bin {
+		t.Errorf("find = %q (ok=%v), queria %q", got, ok, bin)
+	}
+}
+
+// Trava o teto de profundidade: sem um limite, a varredura viraria um walk de
+// disco inteiro. Um binário fundo demais (além de maxScanDepth) NÃO é achado —
+// é trabalho do cadastro manual.
+func TestScanTreeStopsAtMaxDepth(t *testing.T) {
+	root := t.TempDir()
+	parts := []string{root}
+	for i := 0; i < maxScanDepth+1; i++ {
+		parts = append(parts, "n")
+	}
+	tooDeep := filepath.Join(parts...)
+	if err := os.MkdirAll(tooDeep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tooDeep, "emu.bin"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := &dirIndex{dirs: scanTree(root)}
+	if _, ok := idx.find([]string{"emu.bin"}); ok {
+		t.Error("binário além de maxScanDepth não deveria ser encontrado")
+	}
+}
+
+// Trava que pastas grandes e sem emulador (node_modules e afins) são puladas —
+// descer nelas é custo puro e nunca acha nada.
+func TestScanTreeSkipsHugeDirs(t *testing.T) {
+	root := t.TempDir()
+	inside := filepath.Join(root, "node_modules", "pkg")
+	if err := os.MkdirAll(inside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inside, "emu.bin"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := &dirIndex{dirs: scanTree(root)}
+	if _, ok := idx.find([]string{"emu.bin"}); ok {
+		t.Error("não deveria descer em node_modules")
+	}
+}
+
+// Trava que o caso raso continua vencendo o fundo: um binário na raiz precede
+// um de mesmo nome aninhado, porque scanTree varre em largura.
+func TestScanTreeShallowBeatsDeep(t *testing.T) {
+	root := t.TempDir()
+	deep := filepath.Join(root, "a", "b")
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	shallow := filepath.Join(root, "emu.bin")
+	for _, p := range []string{shallow, filepath.Join(deep, "emu.bin")} {
+		if err := os.WriteFile(p, []byte("x"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	idx := &dirIndex{dirs: scanTree(root)}
+	got, ok := idx.find([]string{"emu.bin"})
+	if !ok || got != shallow {
+		t.Errorf("find = %q, queria o raso %q", got, shallow)
+	}
+}
+
 // scanDirEntries devolve os arquivos e as subpastas numa única leitura —
 // trava que a otimização não perdeu nenhuma das duas informações.
 func TestScanDirEntriesSeparatesFilesFromSubdirs(t *testing.T) {
