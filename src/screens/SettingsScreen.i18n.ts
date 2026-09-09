@@ -39,6 +39,7 @@ export const dict = {
     "pt-BR": "Configure seu controle físico uma vez só abaixo — o ZeuX abre cada emulador, diz o passo exato e confirma que funcionou. Sem emuladores instalados que suportem isso, a lista fica vazia.",
     en: "Set up your physical controller once below — ZeuX opens each emulator, tells you the exact step, and confirms it worked. With no installed emulator that supports this, the list stays empty.",
   },
+  configureControllerButton: { "pt-BR": "Configurar controle", en: "Configure controller" },
   testControllerButton: { "pt-BR": "Testar controle", en: "Test controller" },
   loadingEmulatorsForControllers: { "pt-BR": "Carregando emuladores…", en: "Loading emulators…" },
   noBindableEmulators: {
@@ -122,6 +123,10 @@ export const dict = {
   usingTestCredential: {
     "pt-BR": "Usando a credencial de teste do ZeuX — a busca de capa já funciona, sem precisar configurar nada. Ela é compartilhada com quem também não conectou a própria conta; conecte a sua para não depender dessa cota.",
     en: "Using ZeuX's test credential — cover search already works without any setup. It's shared with anyone else who hasn't connected their own account; connect yours to avoid depending on that quota.",
+  },
+  noTestCredential: {
+    "pt-BR": "Esta instalação não tem a credencial de teste do ZeuX (ela só vem em builds oficiais do release). A busca de capa continua funcionando pela fonte livre (libretro-thumbnails) para a maioria dos jogos; para os que dependem do IGDB, conecte sua própria conta abaixo.",
+    en: "This installation doesn't have ZeuX's test credential (it only ships with official release builds). Cover search still works through the free source (libretro-thumbnails) for most games; for ones that depend on IGDB, connect your own account below.",
   },
   clientIdLabel: { "pt-BR": "ID do cliente", en: "Client ID" },
   clientSecretLabel: { "pt-BR": "Segredo do cliente", en: "Client secret" },

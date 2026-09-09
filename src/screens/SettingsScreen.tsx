@@ -23,12 +23,18 @@ const GUIDED_SETUP_INSTRUCTION_KEYS: Record<string, keyof typeof dict> = {
   retroarch: "guidedSetupInstructionsRetroarch",
 };
 
-// `configured` de GET /igdb/credentials é sempre `true` desde 2026-08-17 —
-// sem conta pessoal, o ZeuX cai numa credencial de teste embutida (ver
-// docs/api.md e internal/igdb/credentials.go). `personal` é o campo que
-// importa aqui: distingue "conta própria conectada" de "usando o padrão
-// compartilhado".
-type LoadState = { kind: "loading" } | { kind: "loaded"; personal: boolean } | { kind: "error"; message: string };
+// `configured` de GET /igdb/credentials nem sempre é `true` (achado real,
+// 2026-09-08): a credencial de teste embutida só existe em builds oficiais
+// do release, injetada via ldflags a partir de GitHub Secrets
+// (internal/igdb/credentials.go, scripts/build-zeuxd.mjs) — um build local
+// sem essas variáveis de ambiente sobe com `configured: false` também sem
+// conta pessoal. `personal` distingue "conta própria conectada" de "usando
+// o padrão compartilhado"; `configured` é o que decide se existe *algum*
+// padrão compartilhado disponível quando não há conta própria.
+type LoadState =
+  | { kind: "loading" }
+  | { kind: "loaded"; personal: boolean; configured: boolean }
+  | { kind: "error"; message: string };
 
 type SystemInfoState =
   | { kind: "loading" }
@@ -55,7 +61,13 @@ type UpdateState =
  * credencial errada só aparece na primeira busca de capa, onde já é
  * acionável ("confira o client_id/client_secret").
  */
-export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest: () => void }) {
+export function SettingsScreen({
+  onOpenControllerTest,
+  onOpenConfigureController,
+}: {
+  onOpenControllerTest: () => void;
+  onOpenConfigureController: () => void;
+}) {
   const t = useT(dict);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [clientId, setClientId] = useState("");
@@ -160,7 +172,7 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
     setState({ kind: "loading" });
     api
       .getIGDBCredentials()
-      .then((status) => setState({ kind: "loaded", personal: status.personal }))
+      .then((status) => setState({ kind: "loaded", personal: status.personal, configured: status.configured }))
       .catch((err) =>
         setState({ kind: "error", message: err instanceof ApiError ? err.message : t("accountStatusError") }),
       );
@@ -297,9 +309,14 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
         <SectionHeading className="mb-2">{t("controllersHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">{t("controllersDescription")}</p>
 
-        <Button variant="secondary" className="mb-4 w-fit" onClick={onOpenControllerTest}>
-          {t("testControllerButton")}
-        </Button>
+        <div className="mb-4 flex flex-wrap gap-3">
+          <Button variant="primary" className="w-fit" onClick={onOpenConfigureController}>
+            {t("configureControllerButton")}
+          </Button>
+          <Button variant="secondary" className="w-fit" onClick={onOpenControllerTest}>
+            {t("testControllerButton")}
+          </Button>
+        </div>
 
         {emulators === null && <p className="text-sm text-muted">{t("loadingEmulatorsForControllers")}</p>}
 
@@ -464,9 +481,18 @@ export function SettingsScreen({ onOpenControllerTest }: { onOpenControllerTest:
                 algo, o ZeuX já busca sozinho com uma credencial de teste
                 embutida (internal/igdb/credentials.go, defaultCredentials).
                 O formulário abaixo continua disponível pra quem quiser
-                conectar a própria conta e sair da cota compartilhada. */}
+                conectar a própria conta e sair da cota compartilhada.
+
+                Achado real, 2026-09-08: essa credencial de teste só existe
+                em builds oficiais do release (injetada via ldflags a partir
+                de GitHub Secrets) — um build local sem essas variáveis de
+                ambiente chega aqui com `configured: false`, e dizer
+                "já funciona sem configurar nada" seria falso nesse caso
+                (busca de capa que dependa do IGDB fica sem fonte nenhuma até
+                conectar uma conta própria abaixo; libretro-thumbnails
+                continua funcionando do mesmo jeito, sem depender disto). */}
             <p className="text-sm text-ink">
-              {t("usingTestCredential")}
+              {state.configured ? t("usingTestCredential") : t("noTestCredential")}
             </p>
             {formError && <InlineError>{formError}</InlineError>}
             <label className="flex flex-col gap-1 text-sm text-ink">

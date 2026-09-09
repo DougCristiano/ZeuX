@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import type { HardwareInfo, Report } from "../api/types";
 import {
+  Button,
   Callout,
   Card,
   CardSkeleton,
@@ -234,7 +235,7 @@ function SpecsPanel() {
  * com a paginação sobrando solta no desequilíbrio. Removida — "Especificações"
  * agora é só o retrato da máquina, largura cheia, sem coluna dupla.
  */
-export function VerdictScreen({ report }: { report: Report }) {
+export function VerdictScreen({ report, onAuthorize }: { report?: Report; onAuthorize: () => void }) {
   const t = useT(dict);
 
   return (
@@ -245,13 +246,28 @@ export function VerdictScreen({ report }: { report: Report }) {
     <ScreenContainer variant="listing">
       <ScreenHeader title={t("specifications")} />
 
-      {report.precision === "parcial" && (
-        <div className="mb-4">
-          <PartialNotice>{t("partialPrecision")}</PartialNotice>
-        </div>
-      )}
+      {!report ? (
+        // 2026-09-08: sem consentimento, `GET /hardware` (que `SpecsPanel`
+        // busca sozinho) devolveria 404 "sem scan" — em vez de deixar isso
+        // aparecer como um erro genérico de rede, a tela já sabe por que não
+        // há nada pra mostrar e diz exatamente isso, com o caminho de volta.
+        <Callout label={t("noReadingHeading")} className="mb-4">
+          <p className="mb-3">{t("noReadingDescription")}</p>
+          <Button variant="primary" onClick={onAuthorize}>
+            {t("authorizeNow")}
+          </Button>
+        </Callout>
+      ) : (
+        <>
+          {report.precision === "parcial" && (
+            <div className="mb-4">
+              <PartialNotice>{t("partialPrecision")}</PartialNotice>
+            </div>
+          )}
 
-      <SpecsPanel />
+          <SpecsPanel />
+        </>
+      )}
     </ScreenContainer>
   );
 }

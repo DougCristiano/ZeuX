@@ -223,6 +223,44 @@ build sem os Secrets, essa resposta virou uma mentira otimista. O handler
 passou a consultar `CredentialsStore.Load()` (a credencial efetiva) em vez
 de presumir.
 
+**Achado real, mesmo dia (2026-09-08), investigado com um agente Opus contra
+o `zeuxd` real do Douglas em execução:** depois da correção acima,
+`ScrapeManager.Start` (`internal/igdb/scrape.go`) continuava recusando o
+lote **inteiro** com `igdb_not_configured` sempre que não havia credencial
+nenhuma — mesmo para jogos que libretro-thumbnails (que não pede credencial
+nenhuma, ver auditoria dos 32/33 consoles acima) teria resolvido sozinho.
+Isso vinha de antes da expansão do libretro-thumbnails, quando IGDB era a
+única fonte e a checagem fazia sentido; virou regressão silenciosa quando a
+segunda fonte passou a cobrir a maioria dos consoles. Sintoma visível: o
+botão "Buscar capas" sumia da tela (`AllGamesScreen.tsx`/`GameDetailScreen.tsx`
+escondiam o botão inteiro quando `!igdbConfigured`) e a busca de um jogo
+específico recusava sem sequer tentar a fonte livre.
+
+Corrigido: `Start` não recusa mais por falta de credencial — só `resolveGames`
+e o disparo do job. `processGame` tenta libretro-thumbnails primeiro (como já
+fazia) e, se não achar, só tenta o IGDB quando há credencial configurada;
+sem credencial, o jogo vira `"not_found"` com uma `Message` explicando o
+motivo, em vez de erro. `ErrNotConfigured` foi removido (não tinha mais
+nenhum caminho que o disparasse). Os dois botões de "Buscar capa(s)" no
+front-end voltaram a aparecer sempre, e a tela de Configurações passou a
+distinguir "usando a credencial de teste" de "esta instalação não tem
+nenhuma credencial de teste" (antes as duas liam igual, herdado do mesmo
+otimismo do handler).
+
+**Achado relacionado, mesmo investigação — armadilha do AppImage:** o
+sintoma original ("capas não buscam mesmo com a versão certa mostrada") não
+era só o gating acima. Um `zeuxd` de uma versão **anterior** (0.1.15),
+ainda montado a partir de um AppImage antigo, continuava de pé segurando a
+porta 7777; quando o Douglas abriu o AppImage novo (0.1.17), o `zeuxd` dele
+não conseguiu bindar a porta já ocupada, e a janela nova ficou conversando
+com o backend velho sem nenhum aviso — que tinha embutida a credencial
+antiga já suspensa pelo Twitch, daí `"configured": true` mesmo depois da
+correção. **Como reconhecer isso de novo:** `ps aux | grep zeuxd` mostrando
+mais de um processo, ou um caminho `/tmp/.mount_zeux_*` bem mais antigo que
+o AppImage atual. O auto-updater/relaunch do Tauri não mata processos órfãos
+de uma montagem anterior — fechar todas as janelas do ZeuX antes de abrir
+uma nova versão (ou reiniciar a máquina) evita a duplicidade.
+
 ### RetroArch: cores baixados sob demanda, não empacotados no instalador
 
 Existiu uma fase em que o instalador podia empacotar RetroArch + 24 cores
@@ -242,6 +280,19 @@ que o buildbot.libretro.com reconstrói periodicamente. Quando isso acontece,
 `cmd/generate-retroarch-manifest` de novo. Decisão ainda em aberto: aceitar
 que isso se repete (caminho atual) ou buildar contra versão pinada/datada em
 vez de "latest".
+
+**Reincidência confirmada (2026-09-08):** o `sameboy` (e, ao medir de novo,
+praticamente todo core com nightly recente — `snes9x`, `stella` etc.)
+estava com hash desatualizado; usuários iniciando no sistema recebiam o
+arquivo atual do buildbot (`a4e48f2...` para `sameboy`/windows) contra o
+hash antigo do manifesto (`839be19...`), e a instalação era corretamente
+recusada. Douglas já tinha o core instalado de antes, por isso não via o
+erro. Corrigido rodando `cmd/generate-retroarch-manifest` de novo (rede
+liberada nesta sessão) — mas isso **vai se repetir** enquanto o manifesto
+apontar para `latest` em vez de um build pinado. A decisão de fundo
+continua em aberto; até ela ser tomada, o sintoma esperado quando reaparecer
+é exatamente este: hash batendo para quem já instalou, não batendo para
+quem instala depois que o buildbot reconstruiu o nightly.
 
 **Achado real (2026-09-06), Windows especificamente:** `coreDirs()` só
 olhava a pasta gerida pelo ZeuX e a pasta "portable" ao lado do executável.
@@ -314,6 +365,184 @@ dependência nova, sem asset externo a rastrear licença.
 
 **O que quebra se desfizer:** trocar por um asset de terceiro sem repetir
 essa checagem de marca/licença reabre o mesmo risco que motivou a busca.
+
+### Foto de controle real no lugar do SVG desenhado à mão (2026-09-08)
+
+**Revertida, nesta data, a decisão logo acima.** O SVG genérico passou por
+duas rodadas de desenho à mão e nenhuma chegou a algo que parecesse um
+controle de verdade — geometria e espaçamento artificiais, do tipo que o
+olho identifica como "desenho de controle" antes de identificar como
+"controle". O Douglas cortou o caminho: em vez de uma terceira rodada,
+usar a foto de um controle real como asset visual.
+
+**Decisão explícita do Douglas, perguntado e confirmado antes de
+implementar:** usar a foto **como está** — com a logo do fabricante visível
+e os botões de face rotulados A/B/X/Y. É reabrir de propósito o vocabulário
+de marca que a entrada anterior evitava, pelo mesmo raciocínio (e no mesmo
+dia da semana) da imagem real de console em "Identidade visual por console":
+a fidelidade visual vale mais para este produto do que a neutralidade.
+
+**Risco aceito, não eliminado:** a foto traz marca registrada de terceiro.
+O Douglas decidiu seguir mesmo assim, ciente disso.
+
+Como o asset foi produzido (registrado porque não dá para refazer no
+escuro): a captura original tinha fundo cinza sólido `#DDDDDD`; o recorte
+foi feito por *flood fill* a partir das bordas com tolerância apertada
+(±6) — tolerância folgada come o corpo branco do controle, que mede ~245 e
+fica dentro da distância do fundo — mais um *feather* de 1px na máscara,
+corte no *bounding box*, redução para 760px de largura e quantização de cor
+em passos de 4. Resultado: `src/assets/controller-reference.png`, 169 KB,
+fundo transparente, sem halo cinza sobre o tema escuro.
+
+Onde a foto é usada, e por que as duas telas compartilham um módulo:
+
+- `ControllerTestScreen.tsx` — a foto com marcadores por botão que acendem
+  ao vivo (a leitura da Gamepad API não mudou nesta troca; só a camada
+  visual).
+- `EmulatorBindingsPanel.tsx` — a foto no centro, com os cards de
+  mapeamento agrupados por região ao redor dela (referência trazida pelo
+  Douglas: o painel de controle do PCSX2). O agrupamento é um palpite
+  *best-effort* por palavra-chave no nome da ação, e **toda ação que não
+  casa com região nenhuma continua visível em "Outras ações"** — as ações
+  vêm da API e variam por adapter, então sumir com o que não foi
+  reconhecido seria sumir com a única forma de mapear aquilo.
+- `src/lib/controllerRegions.ts` — a geometria da foto (em % , nunca px) e
+  o casamento nome→região. Existe como módulo porque duas telas leem a
+  mesma imagem: duas tabelas de coordenadas separadas divergiriam no
+  primeiro ajuste fino.
+
+O painel usa **container query** (`@container` + `@4xl:`), não breakpoint
+de janela: ele é montado tanto em largura quase cheia quanto dentro de um
+card de grade de ~300px em `EmulatorsScreen`, e um `lg:`/`xl:` (que mede a
+janela) espremeria as três colunas dentro do card estreito.
+
+**O que quebra se desfizer:** voltar ao desenho neutro é possível — o
+histórico do Git tem o SVG inteiro —, mas exige refazer os marcadores,
+porque a geometria de `controllerRegions.ts` é medida sobre ESTA foto.
+Trocar a foto por outra sem remedir os spots desalinha os realces das duas
+telas de uma vez.
+
+**Achado real, 2026-09-08 (relato do Douglas com um controle Xbox real):**
+`ControllerTestScreen` acendia o marcador errado. Causa: `BTN` (o mapa de
+índice→botão no topo do arquivo) assume o layout "standard" da Gamepad API
+(A/B/X/Y em 0-3, gatilhos em 6-7, direcional em 12-15) — mas o navegador só
+garante essa ordem quando `pad.mapping === "standard"`. Fora disso (visto de
+verdade no Linux/WebKitGTK com o controle do Douglas conectado por
+adaptador/Bluetooth), a ordem é a crua do driver, sem relação nenhuma com o
+layout assumido, e não tem como esta tela adivinhar a ordem certa sem o
+controle físico em mãos para medir — o mesmo limite que já vale para a
+heurística de navegação por D-pad (ADR 0014).
+
+Não dava pra "consertar" a ordem sem o hardware; a correção honesta (regra 4
+do CLAUDE.md — dado não confirmado é declarado desconhecido) foi expor
+`pad.mapping` em `useGamepad` e mostrar um aviso âmbar quando não for
+`"standard"`, em vez de continuar acendendo um botão errado sem dizer nada.
+`EmulatorBindingsPanel` não tem este problema: ele captura o índice que
+realmente veio do evento de apertar o botão, nunca assume posição fixa — por
+isso continua sendo o caminho confiável para mapear um controle cujo
+`mapping` não é "standard", enquanto a tela de teste é só diagnóstico visual.
+
+### Recusar consentimento não pode ser uma versão mais pobre do app (2026-09-08)
+
+Achado real, relato do Douglas: "quem não dá consentimento não consegue
+acessar a biblioteca — tem que poder fazer tudo que uma pessoa que deu
+consentimento pode fazer". Auditando o código, o problema era maior que só
+`DeclinedScreen` sem um link para a Biblioteca — a engine inteira de
+lançamento e as quatro telas de biblioteca (`AllGamesScreen`,
+`LibraryScreen`, `GamesScreen`, `GameDetailScreen`) assumiam `report`
+(o parecer de compatibilidade, que só existe depois de scan) como
+obrigatório, com `report!` forçado em vários pontos de `App.tsx`.
+
+Duas causas distintas, corrigidas juntas:
+
+1. **Backend, `internal/api/server.go`, `toInput`:** sem scan (`"no_scan"`)
+   ou sem nenhum patamar de compatibilidade alcançado (`"no_preset"`), a
+   função recusava o lançamento inteiro com `400`. Isso violava o princípio
+   5 (informar, não bloquear) — falta de leitura de hardware virava falta de
+   JOGO, não falta de PRESET. Agora os dois casos seguem com `Options` no
+   zero-value: o jogo abre com a configuração que o próprio emulador já tem,
+   e `Registry.Resolve` ainda escolhe automaticamente o primeiro emulador
+   instalado quando nenhum é pedido explicitamente (mesma ordem que
+   `consoleReadiness.ts` usa para decidir "o que o ZeuX usaria hoje"). Os
+   códigos de erro `no_scan_yet`/`no_preset_available` continuam existindo
+   para outras rotas que genuinamente precisam de scan (`GET
+   /consoles/verdicts`, `GET /hardware`) — só pararam de existir para
+   `/games/launch`/`/games/preview`.
+
+   Achado de quebra: as três telas de jogo (`AllGamesScreen`, `GamesScreen`,
+   `GameDetailScreen`) já tinham, no front-end, o fallback certo para "sem
+   preset" — `useInlineInstall.handlePlay` já caía em `onLaunch` mesmo sem
+   preset (comentário existente: "informar, não bloquear... deixa o clique
+   cair no launch mesmo assim"), e `GameDetailScreen` sempre chamou `launch`
+   direto, sem checagem nenhuma. O único bloqueio real era o backend
+   recusando a chamada antes de chegar lá.
+
+2. **Front-end, `report` obrigatório demais:** `AllGamesScreen`,
+   `LibraryScreen`, `GamesScreen`, `GameDetailScreen` e `VerdictScreen`
+   tinham `report: Report` (nunca opcional) e liam `report.verdicts` até
+   para o nome do console — sem scan, `report` é sempre `null`, e essas
+   telas nunca puderam ser alcançadas por quem recusou. Corrigido: `report`
+   virou opcional nas cinco; nome/sigla/ano de console, quando o parecer não
+   existe, vêm de `GET /consoles` (`ConsoleEntry`, catálogo estático,
+   sempre disponível) — carregado uma vez em `App.tsx` (`consoles` state),
+   independente de consentimento. `VerdictScreen` sem `report` mostra por
+   que não há parecer e um atalho para autorizar, em vez de tentar renderizar
+   com dado que não existe.
+
+   `App.tsx` também parou de exigir `report` para montar o shell com sidebar
+   (`SIDEBAR_PHASES`) — a única exceção que continua fora do shell é
+   "emulators" alcançado direto de `DeclinedScreen` (a confirmação imediata
+   pós-recusa, que sempre foi tela cheia); alcançado pela sidebar normal, o
+   shell aparece igual. `DeclinedScreen` ganhou um terceiro botão,
+   "Continuar sem autorizar", que leva para o app inteiro sem nenhum scan.
+
+**O que continua fora de escopo, de propósito:** hardware que não alcança
+nenhum patamar de compatibilidade (`level "improvavel"`, mesmo com
+consentimento dado) já caía no mesmo `Options` zero-value por um caminho
+distinto (`result.Options == nil`) — não era um bug novo, mas a correção do
+item 1 acima também destrava esse caso, que antes também recusava com
+`no_preset_available`.
+
+### Logo de console "presa" entre versões — cache de `<img>`, não binário desatualizado (2026-09-08)
+
+Achado real, investigado ao vivo: o Douglas reportou a logo do N64 continuando
+a mostrar a marca antiga da iQue (achado e corrigido no commit `0b152c7`,
+"IGDB tinha devolvido a marca da iQue por engano") mesmo depois de fechar e
+reabrir o ZeuX inteiro. A princípio pareceu ser mais um caso do padrão já
+visto nesta sessão (binário local desatualizado — ver a entrada da
+credencial do IGDB, acima) — mas desta vez a comparação byte a byte contra o
+`zeuxd` real rodando na máquina do Douglas (`curl` direto na rota
+`/api/v1/consoles/n64/image`, comparado com `cmp` contra o arquivo do
+repositório) deu **idêntico**. O servidor já estava servindo a logo certa; o
+problema era só visual.
+
+Causa real: uma tag `<img src="...">` cujo `src` não muda entre renders só
+busca a imagem **uma vez** — o navegador reusa o bitmap já decodificado
+indefinidamente enquanto aquele elemento (ou a página) continuar viva, e
+`Cache-Control: no-store` no servidor não influencia nada aqui, porque
+nenhuma requisição nova chega a sair. Se a imagem embutida no binário mudou
+entre uma execução e outra do app mas a URL pedida continua sendo a mesma
+de sempre (`/consoles/n64/image`, sem parâmetro nenhum), não há garantia de
+que o WebView vá descartar o que já tinha em memória — isso já era conhecido
+o bastante para existir um mecanismo de `cacheBust` em `consoleImageURL`
+(`src/api/client.ts`), mas ele só cobria a troca manual de imagem em tempo
+de execução (`POST/DELETE /consoles/{id}/image`), nunca o caso "a versão do
+app mudou e a logo embutida corrigiu".
+
+Corrigido com `setAppVersionCacheKey` (`src/api/client.ts`): `App.tsx` busca
+`getVersion()` (Tauri) uma vez, o mais cedo possível, e todo `consoleImageURL`
+passa a incluir essa versão como parâmetro (`?av=X.Y.Z`) — toda imagem de
+console troca de URL automaticamente a cada nova versão instalada, sem
+depender de o usuário saber que precisa de um "hard refresh" (que nem
+sempre está disponível numa build de release, sem DevTools). Composto com o
+`cacheBust` existente, nunca no lugar dele — os dois invalidam motivos
+diferentes de a imagem ter mudado.
+
+**O que quebra se desfizer:** sem isso, qualquer correção futura de logo de
+console (ou de capa customizada trocada manualmente em versão anterior)
+volta a poder ficar presa visualmente até o usuário descobrir sozinho que
+precisa recarregar a página de algum jeito — o que numa build de release,
+sem DevTools expostos, pode não ter um caminho óbvio nenhum.
 
 ---
 

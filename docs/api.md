@@ -100,7 +100,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 
 | Rota | Propósito |
 |---|---|
-| `POST /games/preview` | `BuildCommand` **sem** `Launch` — mostra a linha de comando exata que seria usada e o que não coube nela (`unapplied`), sem abrir nada. Se `options` não vier no corpo, o servidor puxa do veredito do console (é aqui que a autoconfiguração acontece de fato — `Server.toInput`). Sem scan: `400 no_scan_yet`. Console fora do catálogo: `400 unknown_console`. |
+| `POST /games/preview` | `BuildCommand` **sem** `Launch` — mostra a linha de comando exata que seria usada e o que não coube nela (`unapplied`), sem abrir nada. Se `options` não vier no corpo, o servidor puxa do veredito do console (é aqui que a autoconfiguração acontece de fato — `Server.toInput`). Sem scan ou sem patamar alcançado: segue com `options` no zero-value (nenhuma opção aplicada), nunca recusa — princípio 5, informar não bloquear (2026-09-08: quem recusou o consentimento pode jogar igual, só sem preset autoconfigurado). Console fora do catálogo: `400 unknown_console`. |
 | `POST /games/launch` | Mesma resolução do preview, mas executa de verdade. Não bloqueia — devolve a sessão assim que o processo sobe; uma goroutine supervisiona o fim. O processo do emulador roda com `context.Background()`, nunca o contexto da requisição HTTP — precisa sobreviver à resposta. |
 | `GET /sessions` | Sessões de jogo, persistidas no SQLite (sobrevivem a reinício do `zeuxd`). **`ended_at` sempre aparece no JSON** mesmo numa sessão em andamento (`"0001-01-01T00:00:00Z"` — `omitempty` não funciona em `time.Time`); use o campo `is_running` para saber se ainda está rodando. |
 
@@ -121,7 +121,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | Rota | Propósito |
 |---|---|
 | `GET/POST/DELETE /igdb/credentials` | Credencial **do usuário** para o IGDB — nunca uma chave do ZeuX compartilhada (motivo: uma credencial de teste compartilhada já foi suspensa por uso agregado). `POST` com credencial inválida: `400 igdb_credentials_invalid`. |
-| `POST /library/games/scrape-covers` | Dispara busca de capa em lote (job assíncrono). Sem credencial configurada: `400 igdb_not_configured`. Busca já em andamento: `409 scrape_in_progress`. |
+| `POST /library/games/scrape-covers` | Dispara busca de capa em lote (job assíncrono). Tenta libretro-thumbnails primeiro (sem credencial nenhuma) e só recorre ao IGDB se essa fonte não achar; sem credencial do IGDB configurada, um jogo que também não é achado em libretro-thumbnails fica `not_found` (nunca recusa o disparo por isso). Busca já em andamento: `409 scrape_in_progress`. |
 | `GET /scrape-jobs/{id}` | Progresso do job de busca de capas. |
 | `GET /covers/{arquivo}` | Serve o arquivo de capa já baixado, do cache local — nunca proxya uma URL de terceiro direto pro WebView. |
 
@@ -133,7 +133,6 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `no_scan_yet` | 400 / 404 | Rota que depende de veredito, sem scan feito na sessão. |
 | `unknown_console` | 400 / 500 | `console_id` fora do catálogo. |
 | `hardware_insufficient` | — | Não é erro HTTP — é um valor dentro de `Report`, não trava a resposta (informar, nunca bloquear). |
-| `no_preset_available` | 400 | Console sem patamar atingido e sem preset aplicável. |
 | `binary_not_found`, `not_installed`, `emulator_unavailable` | 400 | Emulador exigido não está no disco. |
 | `rom_unavailable` | 400 | ROM referenciada não existe/não é legível. |
 | `command_failed`, `launch_failed`, `open_failed` | 400 | Falha ao montar ou rodar o comando do emulador — quase sempre acionável pelo usuário. |
@@ -142,7 +141,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `unknown_controller_profile` | 400 | `profile_id` não reconhecido. |
 | `install_refused`, `core_install_refused`, `uninstall_failed`, `cancel_failed` | 400 | Fluxo de instalação/desinstalação de emulador ou core. |
 | `invalid_definition` | 400 | Cadastro manual de emulador com caminho inválido/não executável. |
-| `igdb_not_configured`, `igdb_credentials_invalid` | 400 | Fluxo de capas sem credencial válida. |
+| `igdb_credentials_invalid` | 400 | Conectar conta pessoal do IGDB com credencial que a Twitch recusou. |
 | `scrape_refused`, `scrape_in_progress` (409) | 400/409 | Busca de capa recusada ou já rodando. |
 | `path_not_found`, `missing_fields`, `invalid_id`, `invalid_body` | 400 | Validação de corpo/parâmetro genérica. |
 | `not_found` | 404 | Recurso por id inexistente (job, jogo, instalação). |

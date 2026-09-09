@@ -55,6 +55,23 @@ export const dict = {
     "pt-BR": "Não foi possível salvar o mapeamento.",
     en: "Could not save bindings.",
   },
+  // Rótulos dos grupos do layout espacial (2026-09-08). Trazem a sigla entre
+  // parênteses porque o nome que o adapter devolve é justamente a sigla crua
+  // ("L2", "r3", "Cross") — o rótulo é o que traduz sigla em peça física.
+  groupTriggerLeft: { "pt-BR": "Gatilho esquerdo (L2)", en: "Left trigger (L2)" },
+  groupTriggerRight: { "pt-BR": "Gatilho direito (R2)", en: "Right trigger (R2)" },
+  groupShoulderLeft: { "pt-BR": "Ombro esquerdo (L1)", en: "Left shoulder (L1)" },
+  groupShoulderRight: { "pt-BR": "Ombro direito (R1)", en: "Right shoulder (R1)" },
+  groupLeftStick: { "pt-BR": "Analógico esquerdo (L3)", en: "Left stick (L3)" },
+  groupRightStick: { "pt-BR": "Analógico direito (R3)", en: "Right stick (R3)" },
+  groupDpad: { "pt-BR": "Direcional", en: "D-pad" },
+  groupFace: { "pt-BR": "Botões de face", en: "Face buttons" },
+  groupCenter: { "pt-BR": "Centro", en: "Center" },
+  groupOther: { "pt-BR": "Outras ações", en: "Other actions" },
+  groupOtherHint: {
+    "pt-BR": "Ações que não têm uma peça correspondente na foto — atalhos do emulador, ou nomes que o Zeux não reconheceu. Continuam mapeáveis do mesmo jeito.",
+    en: "Actions with no matching part on the photo — emulator hotkeys, or names Zeux did not recognise. They map exactly the same way.",
+  },
   bindingSaved: { "pt-BR": "Mapeamento salvo.", en: "Binding saved." },
   gamepadMapped: { "pt-BR": "Controle mapeado.", en: "Gamepad mapped." },
 } satisfies Dict;

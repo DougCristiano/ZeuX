@@ -94,7 +94,9 @@ export function GamesScreen({
   consoleId: string;
   consoleName: string;
   shortName: string;
-  report: Report;
+  /** Ausente sem consentimento/scan — a grade continua funcionando (jogos
+   * abrem sem preset autoconfigurado), só o cabeçalho de parecer some. */
+  report?: Report;
   onBack: () => void;
   onOpenGame: (game: LibraryGame, consoleName: string, shortName: string) => void;
   /** Q5: leva ao detalhe deste console, onde ficam as instruções de
@@ -132,7 +134,7 @@ export function GamesScreen({
   const accent = consoleAccentColor(consoleId);
   const showHeroImage = !heroImageFailed;
 
-  const verdict = report.verdicts.find((v) => v.console_id === consoleId);
+  const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
 
   async function openBiosFolder(dir: string) {
     try {

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
+import controllerPhoto from "../assets/controller-reference.png";
 import type { InputBinding } from "../api/types";
 import type { ControllerAssignment, ControllerProfile } from "../api/types";
+import { CONTROLLER_SPOTS, regionForAction, type ControllerRegion } from "../lib/controllerRegions";
 import { translateKeyForAdapter } from "../lib/keyMapping";
 import { Button, Callout, InlineError, Toast, ZSelect } from "./ui";
 import { SelectItem } from "./ui/select";
@@ -9,6 +11,17 @@ import { useToast } from "../hooks/useToast";
 import { useGamepad } from "../hooks/useGamepad";
 import { useT } from "../i18n/i18n";
 import { dict } from "./EmulatorBindingsPanel.i18n";
+
+/**
+ * As duas colunas que ladeiam a foto, de cima para baixo na ordem em que a
+ * região aparece no controle de verdade. É isto que torna o layout espacial:
+ * o card de "L2" fica acima do card de "L1", que fica acima do analógico
+ * esquerdo, do mesmo jeito que as peças se empilham na foto. Referência que o
+ * Douglas trouxe: o painel de configuração de controle do PCSX2 — foto no
+ * centro, grupos ao redor, sem seta ligando um ao outro.
+ */
+const LEFT_COLUMN: ControllerRegion[] = ["triggerLeft", "shoulderLeft", "leftStick", "dpad"];
+const RIGHT_COLUMN: ControllerRegion[] = ["triggerRight", "shoulderRight", "face", "rightStick"];
 
 /**
  * Tela de mapeamento de teclado/controle (H3/H4, docs/roadmap.md) — só
@@ -305,6 +318,105 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
 
   if (loading) return <p className="text-sm text-muted">{t("loadingBindings", { adapterName })}</p>;
 
+  // Palpite por nome, uma vez por render. `regionForAction` devolve null para
+  // o que não reconhece, e o null é levado a sério: vira "Outras ações", nunca
+  // desaparece.
+  const porRegiao = new Map<ControllerRegion, string[]>();
+  const residuais: string[] = [];
+  for (const action of actions) {
+    const region = regionForAction(action);
+    if (!region) {
+      residuais.push(action);
+      continue;
+    }
+    const lista = porRegiao.get(region);
+    if (lista) lista.push(action);
+    else porRegiao.set(region, [action]);
+  }
+
+  // A ação em foco é a que está esperando um aperto — durante a sequência é a
+  // da vez. É ela que acende a região correspondente na foto.
+  const acaoEmFoco = listeningButtonFor ?? listeningKeyFor;
+  const regiaoEmFoco = acaoEmFoco ? regionForAction(acaoEmFoco) : null;
+
+  const rotuloDaRegiao: Record<ControllerRegion, string> = {
+    triggerLeft: t("groupTriggerLeft"),
+    triggerRight: t("groupTriggerRight"),
+    shoulderLeft: t("groupShoulderLeft"),
+    shoulderRight: t("groupShoulderRight"),
+    leftStick: t("groupLeftStick"),
+    rightStick: t("groupRightStick"),
+    dpad: t("groupDpad"),
+    face: t("groupFace"),
+    center: t("groupCenter"),
+  };
+
+  // Funções que devolvem JSX, não componentes: declarar um componente aqui
+  // dentro faria o React remontar cada card a cada render, e o `autoFocus`/foco
+  // de teclado dentro do card se perderia no meio da captura.
+  function renderAction(action: string) {
+    const binding = bindings.find((b) => b.action === action);
+    const naVez = sequence?.actions[sequence.index] === action;
+    const emCaptura = listeningKeyFor === action || listeningButtonFor === action;
+    return (
+      <div
+        key={action}
+        // A ação da vez precisa se destacar sem mover nada: durante a
+        // sequência o usuário está olhando o controle, não a tela, e volta o
+        // olho para conferir onde parou. A borda existe sempre (na cor da
+        // linha) justamente para o realce não mudar a altura do card.
+        className={`rounded-lg border bg-fill px-2.5 py-2 ${
+          naVez || emCaptura ? "border-accent" : "border-line"
+        }`}
+      >
+        <p className="text-sm break-words text-ink">{action}</p>
+        <p className="text-xs break-words text-muted">
+          {binding?.key ?? t("noKeyMapped")}
+          {binding?.button ? ` · ${t("buttonDisplay", { button: binding.button })}` : ""}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <Button
+            variant="secondary"
+            className="px-2 py-1 text-xs"
+            disabled={listeningKeyFor !== null && listeningKeyFor !== action}
+            onClick={() => setListeningKeyFor(action)}
+          >
+            {listeningKeyFor === action ? t("listeningForKey") : t("mapKeyButton")}
+          </Button>
+          {/* A11y 2.1.2: saída visível da captura sem efeito colateral —
+              Esc também cancela (ver o listener acima), este botão é o
+              caminho para mouse/toque. */}
+          {listeningKeyFor === action && (
+            <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => setListeningKeyFor(null)}>
+              {t("cancelButton")}
+            </Button>
+          )}
+          {gamepadConnected && (
+            <Button
+              variant="secondary"
+              className="px-2 py-1 text-xs"
+              disabled={listeningButtonFor !== null}
+              onClick={() => setListeningButtonFor(action)}
+            >
+              {listeningButtonFor === action ? t("listeningForButton") : t("mapGamepadButton")}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderGroup(region: ControllerRegion) {
+    const doGrupo = porRegiao.get(region);
+    if (!doGrupo || doGrupo.length === 0) return null;
+    return (
+      <div key={region} className="flex flex-col gap-1.5">
+        <p className="font-mono text-[11px] tracking-wider text-muted uppercase">{rotuloDaRegiao[region]}</p>
+        {doGrupo.map((action) => renderAction(action))}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {toastMessage && <Toast message={toastMessage} />}
@@ -410,67 +522,83 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </div>
       )}
 
-      {/* O4 (docs/roadmap.md, Sprint O): era `grid grid-cols-[1fr_auto_auto]` —
-          em janela de notebook (1024-1279px) o card fica estreito demais para
-          duas colunas `auto` de botão + a coluna `1fr` do nome da ação, e o
-          grid estourava o card com rolagem horizontal. `flex-wrap` deixa os
-          botões quebrarem para a linha de baixo em vez de forçar largura. */}
-      <div className="flex flex-col gap-2">
-        {actions.map((action) => {
-          const binding = bindings.find((b) => b.action === action);
-          const naVez = sequence?.actions[sequence.index] === action;
-          return (
-            <div
-              key={action}
-              // A ação da vez precisa se destacar sem mover nada: durante a
-              // sequência o usuário está olhando o controle, não a tela, e
-              // volta o olho para conferir onde parou.
-              className={`flex flex-wrap items-center justify-between gap-2 ${
-                naVez ? "-mx-2 rounded-lg border border-accent px-2 py-1" : ""
-              }`}
-            >
-              <span className="min-w-0 shrink text-sm break-words text-ink">
-                {/* Espaço de verdade antes do `ml-2` (achado testando com o
-                    Douglas, 2026-09-06): sem um caractere de espaço na árvore
-                    de texto, `{action}` e o span seguinte ficavam colados na
-                    hora de copiar/colar ou para um leitor de tela — só o
-                    CSS separava visualmente para quem usa mouse. `ml-2`
-                    continua para o espaçamento fino do layout. */}
-                {action}{" "}
-                <span className="ml-2 text-xs text-muted">
-                  {binding?.key ?? t("noKeyMapped")}
-                  {binding?.button ? ` · ${t("buttonDisplay", { button: binding.button })}` : ""}
-                </span>
-              </span>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  disabled={listeningKeyFor !== null && listeningKeyFor !== action}
-                  onClick={() => setListeningKeyFor(action)}
-                >
-                  {listeningKeyFor === action ? t("listeningForKey") : t("mapKeyButton")}
-                </Button>
-                {/* A11y 2.1.2: saída visível da captura sem efeito colateral —
-                    Esc também cancela (ver o listener acima), este botão é o
-                    caminho para mouse/toque. */}
-                {listeningKeyFor === action && (
-                  <Button variant="secondary" onClick={() => setListeningKeyFor(null)}>
-                    Cancelar
-                  </Button>
-                )}
-                {gamepadConnected && (
-                  <Button
-                    variant="secondary"
-                    disabled={listeningButtonFor !== null}
-                    onClick={() => setListeningButtonFor(action)}
-                  >
-                    {listeningButtonFor === action ? t("listeningForButton") : t("mapGamepadButton")}
-                  </Button>
-                )}
-              </div>
+      {/* Layout espacial (2026-09-08): a foto do controle no centro e os cards
+          de mapeamento agrupados por região ao redor dela, em vez da lista
+          vertical única de antes. Com 16 ações, a lista não dizia NADA sobre
+          qual peça do controle cada nome ("L3", "Cross", "l2") é — a foto diz.
+
+          **Container query (`@container`/`@4xl:`), não breakpoint de janela.**
+          O CLAUDE.md avisa que `lg:`/`xl:` medem a janela inteira; aqui isso
+          seria pior que impreciso, seria errado: este painel é montado tanto
+          em largura quase cheia (ConsoleDetailScreen, SettingsScreen) quanto
+          dentro de um card de grade de ~300px (EmulatorsScreen). Com
+          breakpoint de janela, maximizar a janela ativaria as três colunas
+          dentro do card estreito e os cards se espremeriam um no outro — que
+          é exatamente o defeito que esta rodada precisava não repetir. A
+          consulta é sobre a largura DO PAINEL: abaixo de 56rem ele volta para
+          uma coluna só, com a foto por cima da lista.
+
+          56rem (`@4xl`) e não 48rem: com 48rem cada coluna lateral fica com
+          ~190px, e "Direcional digital para cima" + dois botões não cabem sem
+          o card virar uma torre de quebras de linha. */}
+      <div className="@container">
+        <div className="grid grid-cols-1 gap-x-5 gap-y-5 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)_minmax(0,1fr)] @4xl:items-start">
+          {/* A foto vem primeiro no DOM para que, na coluna única, ela apareça
+              acima dos grupos; `order` só reposiciona ela para o meio quando
+              as três colunas existem. */}
+          <div className="order-1 flex flex-col gap-4 @4xl:order-2">
+            {/* Escondida em painel estreito (`@md`): a mesma foto que ajuda em
+                24rem vira uma miniatura ilegível dentro de um card de grade. */}
+            <div className="relative mx-auto hidden w-full max-w-sm @md:block">
+              <img src={controllerPhoto} alt="" aria-hidden="true" className="block w-full select-none" draggable={false} />
+              {/* Realce da região da ação em foco — é o que liga o card à peça
+                  física sem precisar desenhar uma seta. Durante a sequência,
+                  aponta para onde apertar em seguida. */}
+              {regiaoEmFoco &&
+                Object.entries(CONTROLLER_SPOTS)
+                  .filter(([, spot]) => spot.region === regiaoEmFoco)
+                  .map(([id, spot]) => (
+                    <div
+                      key={id}
+                      aria-hidden="true"
+                      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+                      style={{
+                        left: `${spot.x}%`,
+                        top: `${spot.y}%`,
+                        width: `${spot.w}%`,
+                        height: `${spot.h}%`,
+                        background: "var(--accent)",
+                        opacity: 0.55,
+                        boxShadow: "0 0 14px 4px var(--accent)",
+                      }}
+                    />
+                  ))}
             </div>
-          );
-        })}
+            {renderGroup("center")}
+          </div>
+
+          <div className="order-2 flex flex-col gap-4 @4xl:order-1">
+            {LEFT_COLUMN.map((region) => renderGroup(region))}
+          </div>
+
+          <div className="order-3 flex flex-col gap-4">
+            {RIGHT_COLUMN.map((region) => renderGroup(region))}
+          </div>
+        </div>
+
+        {/* Ação que nenhuma palavra-chave reconheceu (hotkey de emulador, ação
+            sem botão físico correspondente) **continua visível aqui**. O
+            palpite de região é best-effort por nome — some ação da tela seria
+            some a única forma de mapear ela. */}
+        {residuais.length > 0 && (
+          <div className="mt-5 flex flex-col gap-1.5 border-t border-line pt-4">
+            <p className="font-mono text-[11px] tracking-wider text-muted uppercase">{t("groupOther")}</p>
+            <p className="mb-1 text-xs text-muted">{t("groupOtherHint")}</p>
+            <div className="grid grid-cols-1 gap-1.5 @2xl:grid-cols-2 @5xl:grid-cols-3">
+              {residuais.map((action) => renderAction(action))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

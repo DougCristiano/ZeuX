@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { api, ApiError, type Report } from "./api";
+import { getVersion } from "@tauri-apps/api/app";
+import { api, ApiError, setAppVersionCacheKey, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { SplashScreen, hasSeenSplash } from "./components/SplashScreen";
 import { AmbientGlow, Toast } from "./components/ui";
@@ -8,7 +9,7 @@ import { useGamepad } from "./hooks/useGamepad";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import { useToast } from "./hooks/useToast";
 import { useT } from "./i18n/i18n";
-import type { LibraryGame } from "./api/types";
+import type { ConsoleEntry, LibraryGame } from "./api/types";
 import { dict } from "./App.i18n";
 import {
   AllGamesScreen,
@@ -17,6 +18,7 @@ import {
   type AllGamesViewState,
 } from "./screens/AllGamesScreen";
 import { ConsentScreen } from "./screens/ConsentScreen";
+import { ConfigureControllerScreen } from "./screens/ConfigureControllerScreen";
 import { ConsoleDetailScreen } from "./screens/ConsoleDetailScreen";
 import { ConsolesScreen } from "./screens/ConsolesScreen";
 import { ControllerTestScreen } from "./screens/ControllerTestScreen";
@@ -57,7 +59,8 @@ type Phase =
   | "games"
   | "game-detail"
   | "settings"
-  | "controller-test";
+  | "controller-test"
+  | "configure-controller";
 
 function App() {
   // Navegação por controle (Sprint L): D-pad/analógico
@@ -124,6 +127,38 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [report, setReport] = useState<Report | null>(null);
+  // GET /consoles (2026-09-08): catálogo de nome/sigla/ano por console,
+  // independente de consentimento/scan — diferente de `report.verdicts`,
+  // que só existe depois de um scan bem-sucedido. Carregado uma vez, cedo,
+  // para que quem recusou consentimento (ou ainda não passou pelo scan)
+  // tenha nome de console de verdade na Biblioteca, não `console_id` cru.
+  const [consoles, setConsoles] = useState<ConsoleEntry[]>([]);
+  useEffect(() => {
+    api
+      .getConsoles()
+      .then((res) => setConsoles(res.consoles))
+      .catch(() => {
+        // Falha aqui não é crítica: as telas caem de volta em console_id
+        // cru como último recurso, e o parecer (quando existe) continua
+        // sendo a fonte preferida de nome mesmo com este catálogo vazio.
+      });
+  }, []);
+  // Achado real, 2026-09-08 (relato do Douglas: a logo do N64 continuava
+  // com a marca antiga da iQue mesmo depois de fechar e reabrir o app,
+  // já com o servidor comprovadamente servindo os bytes corrigidos) — ver
+  // o comentário completo em `src/api/client.ts`, `setAppVersionCacheKey`.
+  // Buscado o mais cedo possível (antes de qualquer tela pintar um
+  // `<img>` de console) para que a primeira renderização já saia com a
+  // URL certa, nunca dependendo de um reload manual depois.
+  useEffect(() => {
+    getVersion()
+      .then(setAppVersionCacheKey)
+      .catch(() => {
+        // Sem versão, as imagens de console caem para o comportamento de
+        // antes (sem `av=`) — nunca pior do que já era, só sem a proteção
+        // extra contra cache entre versões.
+      });
+  }, []);
   // Emuladores (B10) não depende de consentimento — pode ser alcançado tanto
   // do parecer quanto da tela de recusa (docs/sprint-b-plano.md, B8: "recusar
   // não pode ser beco sem saída"). Guarda de onde veio para "Voltar" certo.
@@ -282,13 +317,18 @@ function App() {
   }
 
   // Q5 (docs/roadmap.md, Sprint Q): abrir o detalhe de um console a partir de
-  // uma tela de jogos, quando o emulador precisa ser instalado por fora. O
-  // nome vem do parecer, que já cobre os 33 consoles do catálogo — nunca um
-  // segundo lugar de onde tirar o nome de um console.
+  // uma tela de jogos, quando o emulador precisa ser instalado por fora.
+  // O parecer é a fonte preferida de nome (cobre os 33 consoles quando
+  // existe); sem consentimento/scan, cai no catálogo de `GET /consoles`
+  // (2026-09-08) — os dois cobrem o mesmo conjunto de consoles, só o
+  // parecer também carrega o veredito de compatibilidade.
   function abrirConsolePorID(consoleId: string) {
     const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
-    if (!verdict) return;
-    setSelectedConsole({ id: consoleId, name: verdict.name, shortName: verdict.short_name });
+    const entry = consoles.find((c) => c.console_id === consoleId);
+    const name = verdict?.name ?? entry?.name;
+    const shortName = verdict?.short_name ?? entry?.short_name;
+    if (!name || !shortName) return;
+    setSelectedConsole({ id: consoleId, name, shortName });
     setPhase("console-detail");
   }
 
@@ -378,6 +418,11 @@ function App() {
             setCameFromDeclined(true);
             setPhase("emulators");
           }}
+          // 2026-09-08: quem recusa pode usar o app inteiro do mesmo jeito
+          // que quem aceitou — só sem parecer de hardware (`report` fica
+          // `null`; as telas de biblioteca já toleram isso, ver
+          // AllGamesScreen/LibraryScreen/GamesScreen/GameDetailScreen).
+          onContinueWithoutConsent={() => setPhase("all-games")}
         />
       );
       break;
@@ -393,7 +438,8 @@ function App() {
     case "all-games":
       screen = (
         <AllGamesScreen
-          report={report!}
+          report={report ?? undefined}
+          consoleCatalog={consoles}
           onOpenLibrary={() => setPhase("library")}
           onOpenConsole={abrirConsolePorID}
           view={allGamesView}
@@ -401,7 +447,9 @@ function App() {
           scrollElementRef={mainRef}
           initialScrollTop={allGamesScrollTop}
           onOpenGame={(game, consoleName, shortName) => {
-            const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
+            const year =
+              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
+              consoles.find((c) => c.console_id === game.console_id)?.year;
             // M4: guarda a rolagem antes de trocar de fase — é a última
             // chance de ler `mainRef.current.scrollTop` com a grade ainda
             // na tela.
@@ -421,14 +469,14 @@ function App() {
           consoleName={selectedGame!.consoleName}
           shortName={selectedGame!.shortName}
           year={selectedGame!.year}
-          report={report!}
+          report={report ?? undefined}
           onBack={() => setPhase(gameDetailOrigin)}
         />
       );
       break;
 
     case "verdict":
-      screen = <VerdictScreen report={report!} />;
+      screen = <VerdictScreen report={report ?? undefined} onAuthorize={() => setPhase("consent")} />;
       break;
 
     case "consoles":
@@ -456,16 +504,13 @@ function App() {
           consoleId={selectedConsole!.id}
           report={report ?? undefined}
           onBack={() => setPhase("consoles")}
-          // "Ver jogos" só existe com parecer carregado: `GamesScreen` tira
-          // dele o preset que manda pro lançamento.
-          onOpenGames={
-            report
-              ? () => {
-                  setGamesOrigin("console-detail");
-                  setPhase("games");
-                }
-              : undefined
-          }
+          // 2026-09-08: "Ver jogos" não depende mais de parecer carregado —
+          // `GamesScreen` já lança sem preset autoconfigurado quando
+          // `report` está ausente (ver `internal/api/server.go`, `toInput`).
+          onOpenGames={() => {
+            setGamesOrigin("console-detail");
+            setPhase("games");
+          }}
         />
       );
       break;
@@ -486,7 +531,8 @@ function App() {
     case "library":
       screen = (
         <LibraryScreen
-          report={report!}
+          consoleCatalog={consoles}
+          report={report ?? undefined}
           onBack={() => setPhase("all-games")}
           onOpenGames={(id, name, shortName) => {
             setSelectedConsole({ id, name, shortName });
@@ -504,10 +550,12 @@ function App() {
           consoleName={selectedConsole!.name}
           shortName={selectedConsole!.shortName}
           onOpenConsole={() => setPhase("console-detail")}
-          report={report!}
+          report={report ?? undefined}
           onBack={() => setPhase(gamesOrigin)}
           onOpenGame={(game, consoleName, shortName) => {
-            const year = report!.verdicts.find((v) => v.console_id === game.console_id)?.year;
+            const year =
+              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
+              consoles.find((c) => c.console_id === game.console_id)?.year;
             // M5: "Voltar" do detalhe precisa devolver pra cá, não pra
             // "all-games" — diferente de AllGamesScreen, esta tela não tem
             // rolagem própria pra salvar (grade curta, sem paginação).
@@ -520,19 +568,37 @@ function App() {
       break;
 
     case "settings":
-      screen = <SettingsScreen onOpenControllerTest={() => setPhase("controller-test")} />;
+      screen = (
+        <SettingsScreen
+          onOpenControllerTest={() => setPhase("controller-test")}
+          onOpenConfigureController={() => setPhase("configure-controller")}
+        />
+      );
       break;
 
     case "controller-test":
       screen = <ControllerTestScreen onBack={() => setPhase("settings")} />;
       break;
+
+    case "configure-controller":
+      screen = <ConfigureControllerScreen onBack={() => setPhase("settings")} />;
+      break;
   }
 
-  // Sidebar (2026-08-04, Sprint 1): shell fixo para as fases pós-onboarding
-  // que já têm um parecer carregado. "emulators" alcançado a partir de
-  // DeclinedScreen (sem consentimento, sem report ainda) continua tela
-  // cheia, sem sidebar — ver EmulatorsScreen.onBack.
-  if (report && SIDEBAR_PHASES.includes(phase)) {
+  // Sidebar (2026-08-04, Sprint 1): shell fixo para as fases pós-onboarding.
+  // Até 2026-09-08 exigia `report` (parecer de hardware) — o que também
+  // travava quem recusou consentimento fora do shell inteiro, sidebar
+  // incluída (achado do Douglas: "quem não dá consentimento tem que poder
+  // fazer tudo que uma pessoa que deu consentimento pode fazer"). As telas
+  // dentro do shell já toleram `report` ausente (badge de compatibilidade
+  // some, nome de console vem de `consoles`/`GET /consoles`) — o shell não
+  // precisa mais dele para aparecer.
+  //
+  // "emulators" alcançado a partir de DeclinedScreen continua tela cheia,
+  // sem sidebar (mesmo estado de antes) — é a confirmação imediata pós-
+  // recusa, não a navegação normal; alcançado pela sidebar de verdade
+  // (cameFromDeclined=false, ver navigateSidebar) ganha o shell normalmente.
+  if (SIDEBAR_PHASES.includes(phase) && !(phase === "emulators" && cameFromDeclined)) {
     const active: NavID =
       phase === "verdict"
         ? "verdict"
@@ -540,10 +606,10 @@ function App() {
           // não um destino de sidebar próprio.
           phase === "consoles" || phase === "console-detail" || phase === "emulators"
           ? "consoles"
-          : // "controller-test" é sub-visão de Configurações, mesmo padrão de
-            // "emulators" acima — alcançada de dentro da tela, não item
-            // próprio da sidebar.
-            phase === "settings" || phase === "controller-test"
+          : // "controller-test"/"configure-controller" são sub-visão de
+            // Configurações, mesmo padrão de "emulators" acima — alcançadas
+            // de dentro da tela, não item próprio da sidebar.
+            phase === "settings" || phase === "controller-test" || phase === "configure-controller"
             ? "settings"
             : "library";
     return (
@@ -595,6 +661,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
   games: "Jogos do console",
   settings: "Configurações",
   "controller-test": "Testar controle",
+  "configure-controller": "Configurar controle",
 };
 
 const SIDEBAR_PHASES: Phase[] = [
@@ -608,6 +675,7 @@ const SIDEBAR_PHASES: Phase[] = [
   "game-detail",
   "settings",
   "controller-test",
+  "configure-controller",
 ];
 
 export default App;

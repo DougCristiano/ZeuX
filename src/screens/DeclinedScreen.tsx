@@ -7,17 +7,25 @@ import { dict } from "./DeclinedScreen.i18n";
  * recusar não pode ser beco sem saída — o app continua utilizável, e a
  * recusa pode ser revista a qualquer momento.
  *
- * Honestidade de escopo: a biblioteca (wireframe 04-05) ainda não existe
- * nesta versão (Sprint D). Emuladores (B10) já existe e não depende de
- * consentimento — instalar um emulador não lê hardware nenhum — por isso
- * "Ver emuladores" aparece aqui de verdade, não como promessa vazia.
+ * Achado real, 2026-09-08 (relato do Douglas: "quem não dá consentimento
+ * não consegue acessar a biblioteca — tem que poder fazer tudo que uma
+ * pessoa que deu consentimento pode fazer"): antes desta correção, esta
+ * tela só oferecia "Autorizar agora" ou "Ver emuladores" — sem caminho
+ * nenhum para Biblioteca/Consoles/Configurações, e as telas de biblioteca
+ * exigiam `report` não-nulo por dentro. Agora "Continuar sem autorizar"
+ * leva ao app inteiro (mesma sidebar, mesmas telas) sem nenhum parecer de
+ * hardware calculado — jogos abrem sem preset autoconfigurado (ver
+ * `internal/api/server.go`, `toInput`), e a tela de Especificações mostra
+ * por que não há parecer, com um atalho de volta para autorizar.
  */
 export function DeclinedScreen({
   onReconsider,
   onViewEmulators,
+  onContinueWithoutConsent,
 }: {
   onReconsider: () => void;
   onViewEmulators: () => void;
+  onContinueWithoutConsent: () => void;
 }) {
   const t = useT(dict);
 
@@ -38,6 +46,9 @@ export function DeclinedScreen({
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" autoFocus onClick={onReconsider}>
             {t("reconsider")}
+          </Button>
+          <Button variant="secondary" onClick={onContinueWithoutConsent}>
+            {t("continueWithoutConsent")}
           </Button>
           <Button variant="secondary" onClick={onViewEmulators}>
             {t("viewEmulators")}

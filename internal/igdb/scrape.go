@@ -14,13 +14,6 @@ import (
 	"github.com/doufl/zeux/internal/library"
 )
 
-// ErrNotConfigured é devolvido por Start quando não há credencial do IGDB
-// conectada. A camada de API mapeia isto para um erro específico e
-// acionável (400, "conecte sua conta"), nunca um erro de rede genérico —
-// sem credencial, G1 nem tenta se conectar (docs/roadmap.md, critério de
-// aceite adicional do G1).
-var ErrNotConfigured = errors.New("conecte sua conta do IGDB nas Configurações antes de buscar capas")
-
 // ErrScrapeInProgress é devolvido por Start quando já existe uma busca em
 // andamento. Só uma por vez, mesma simplicidade de internal/install.Manager.
 var ErrScrapeInProgress = errors.New("já existe uma busca de capas em andamento")
@@ -89,12 +82,17 @@ func NewScrapeManager(libraryStore *library.Store, credentials *CredentialsStore
 // gameIDs com um elemento é a busca por um jogo só (G2: reconsultar sem
 // apagar o cache inteiro).
 func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error) {
+	// Sem credencial não é mais motivo para recusar o disparo inteiro
+	// (achado de 2026-09-08, relato do Douglas: capa de PS2 sumiu de buscar
+	// mesmo depois da cobertura de libretro-thumbnails ter crescido pra 32
+	// dos 33 consoles) — libretro-thumbnails não pede conta nenhuma, e é
+	// tentado primeiro em processGame. Só o jogo que também não é achado lá
+	// é que de fato precisa do IGDB; sem credencial, esse caso vira
+	// "not_found" com a mensagem certa, em vez de barrar todo o lote antes
+	// de sequer tentar a fonte livre.
 	creds, configured, err := m.credentials.Load()
 	if err != nil {
 		return nil, fmt.Errorf("lendo a credencial do IGDB: %w", err)
-	}
-	if !configured {
-		return nil, ErrNotConfigured
 	}
 
 	// Lote (gameIDs vazio) e busca de um jogo só divergem em quem pode
@@ -133,7 +131,7 @@ func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error
 	// Contexto próprio do job, não da requisição HTTP — o lote precisa
 	// sobreviver ao fim da resposta 202 que o disparou (mesmo raciocínio de
 	// internal/install.Manager.run).
-	go m.run(job, creds, games, batch)
+	go m.run(job, creds, configured, games, batch)
 
 	return m.snapshot(job.ID), nil
 }
@@ -157,7 +155,7 @@ func (m *ScrapeManager) resolveGames(ctx context.Context, gameIDs []int64) ([]li
 	return games, nil
 }
 
-func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game, batch bool) {
+func (m *ScrapeManager) run(job *Job, creds Credentials, configured bool, games []library.Game, batch bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 
@@ -190,7 +188,7 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game, b
 	}
 
 	for _, game := range games {
-		result := m.processGame(ctx, client, root, game, batch)
+		result := m.processGame(ctx, client, configured, root, game, batch)
 
 		m.mu.Lock()
 		job.Results = append(job.Results, result)
@@ -229,7 +227,7 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, games []library.Game, b
 //     substituir a capa atual, manual ou automática — precisa continuar
 //     sobrescrevendo sem condição, senão o botão pararia de funcionar
 //     depois de uma troca manual.
-func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root string, game library.Game, batch bool) GameResult {
+func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configured bool, root string, game library.Game, batch bool) GameResult {
 	result := GameResult{GameID: game.ID, Title: game.Title}
 	destDir := emulator.GameCoverDir(root, game.ConsoleID, game.ID)
 	destPath := filepath.Join(destDir, "cover.jpg")
@@ -272,6 +270,25 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, root st
 			return result
 		}
 		result.Status = "found"
+		return result
+	}
+
+	if !configured {
+		// libretro-thumbnails não achou e não há credencial do IGDB pra
+		// tentar a segunda fonte — não é um erro deste jogo (SearchGame
+		// nunca chegou a ser chamado), é "não achamos, e por quê":
+		// conectar uma conta em Configurações destrava o restante.
+		var setErr error
+		if batch {
+			_, setErr = m.library.SetCoverStatusIfUncovered(ctx, game.ID, "not_found")
+		} else {
+			setErr = m.library.SetCoverStatus(ctx, game.ID, "not_found")
+		}
+		if setErr != nil {
+			m.logger.Error("gravando status de capa não encontrada", "jogo", game.ID, "erro", setErr)
+		}
+		result.Status = "not_found"
+		result.Message = "não encontrada em libretro-thumbnails; conecte uma conta do IGDB em Configurações para tentar também essa fonte"
 		return result
 	}
 

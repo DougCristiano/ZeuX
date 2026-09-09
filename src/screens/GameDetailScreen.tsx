@@ -19,7 +19,6 @@ import {
   SectionHeading,
   Toast,
 } from "../components/ui";
-import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -102,7 +101,9 @@ export function GameDetailScreen({
   shortName: string;
   /** Ano do console no catálogo — dado real (verdict.year), não inventado. */
   year?: number;
-  report: Report;
+  /** Ausente sem consentimento/scan — "Jogar" continua funcionando (sem
+   * preset autoconfigurado), só o card de parecer some. */
+  report?: Report;
   onBack: () => void;
 }) {
   const t = useT(dict);
@@ -110,7 +111,6 @@ export function GameDetailScreen({
   const [error, setError] = useState<string | null>(null);
   const { statusFor, launch, cancelCoreDownload, launchError, clearLaunchError } = useLaunchGame();
   const { toastMessage, showToast } = useToast();
-  const igdbConfigured = useIGDBStatus();
   // Estado próprio, não `game.cover_url` direto: o prop `game` vem de um
   // snapshot guardado no App.tsx no momento do clique e não muda sozinho
   // depois de uma busca de capa bem-sucedida nesta tela.
@@ -275,7 +275,7 @@ export function GameDetailScreen({
   }, [game.path, t]);
 
   const status = statusFor(game.id);
-  const verdict = report.verdicts.find((v) => v.console_id === game.console_id);
+  const verdict = report?.verdicts.find((v) => v.console_id === game.console_id);
   const heroCoverUrl = coverImageURL(coverUrl, coverVersion || undefined);
   const accent = consoleAccentColor(game.console_id);
 
@@ -320,19 +320,20 @@ export function GameDetailScreen({
           </Button>
           {coverChangeError && <InlineError className="mt-1">{coverChangeError}</InlineError>}
         </div>
-        {igdbConfigured && (
-          <div className="mt-2">
-            {/* `chrome` (2026-09-07): mesma variante que "Buscar capas" da
-                biblioteca — a mesma ação, em escopo de um jogo só, não
-                deveria ter outro visual. O `text-xs` que estava no
-                `className` era exatamente a correção que a variante agora
-                faz por padrão. */}
-            <Button variant="chrome" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full">
-              {scrapingCover ? t("searching") : coverUrl ? t("searchCoverAgain") : t("searchCover")}
-            </Button>
-            {coverError && <InlineError className="mt-1">{coverError}</InlineError>}
-          </div>
-        )}
+        {/* Sempre visível (2026-09-08) — ver o mesmo comentário em
+            AllGamesScreen.tsx: a busca tenta libretro-thumbnails antes do
+            IGDB, então não precisa de conta conectada pra valer a pena. */}
+        <div className="mt-2">
+          {/* `chrome` (2026-09-07): mesma variante que "Buscar capas" da
+              biblioteca — a mesma ação, em escopo de um jogo só, não
+              deveria ter outro visual. O `text-xs` que estava no
+              `className` era exatamente a correção que a variante agora
+              faz por padrão. */}
+          <Button variant="chrome" disabled={scrapingCover} onClick={handleScrapeCover} className="w-full">
+            {scrapingCover ? t("searching") : coverUrl ? t("searchCoverAgain") : t("searchCover")}
+          </Button>
+          {coverError && <InlineError className="mt-1">{coverError}</InlineError>}
+        </div>
       </div>
 
       {/* Achado #5 do critico-layout-biblioteca (2026-09-06): o hero lia como

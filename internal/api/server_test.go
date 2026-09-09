@@ -294,18 +294,29 @@ func TestLaunchMissingFieldsReturns400(t *testing.T) {
 	}
 }
 
-// Trava que lançar sem opções explícitas e sem scan prévio devolve o code
-// específico que orienta o usuário a rodar o scan, em vez de um erro genérico.
-func TestLaunchWithoutScanReturnsNoScanYet(t *testing.T) {
+// Trava a correção de 2026-09-08 (relato do Douglas: quem recusa o
+// consentimento não deveria ficar impedido de jogar) — lançar sem scan
+// prévio não recusa mais com "no_scan_yet"; toInput segue com Options no
+// zero-value e a tentativa chega até Resolve(). Sem nenhum emulador
+// instalado no ambiente de teste, a falha real é "emulador não encontrado",
+// nunca mais "sem consentimento você não pode jogar".
+func TestLaunchWithoutScanAttemptsLaunchWithoutPreset(t *testing.T) {
 	server := newTestServer(t, fakeProbe{})
-	body := map[string]string{"rom_path": "/tmp/jogo.iso", "console_id": "ps2"}
+	romPath := filepath.Join(t.TempDir(), "jogo.iso")
+	if err := os.WriteFile(romPath, []byte("rom de teste"), 0o644); err != nil {
+		t.Fatalf("escrevendo ROM de teste: %v", err)
+	}
+
+	body := map[string]string{"rom_path": romPath, "console_id": "ps2"}
 	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/games/launch", body)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, esperado 400", rec.Code)
 	}
-	if code := errorCode(decodeBody(t, rec)); code != "no_scan_yet" {
-		t.Fatalf("code = %q, esperado no_scan_yet", code)
+	// launch_failed (nenhum emulador de ps2 instalado no ambiente de teste) —
+	// nunca no_scan_yet, que travaria o lançamento por falta de consentimento.
+	if code := errorCode(decodeBody(t, rec)); code != "launch_failed" {
+		t.Fatalf("code = %q, esperado launch_failed", code)
 	}
 }
 
@@ -329,12 +340,14 @@ func TestLaunchUnknownConsoleReturns400(t *testing.T) {
 	}
 }
 
-// Trava que um console que EXISTE no catálogo, mas não alcança nenhum
-// patamar nesta máquina (level "improvavel"), devolve um code distinto de
-// "console desconhecido" — dizer "unknown_console" para o ps2 seria uma
-// mentira sobre o que o catálogo sabe, só porque o hardware não é bom o
-// bastante. Ver docs/roadmap.md, achado durante a implementação do L7.
-func TestLaunchWithoutViableTierReturnsNoPreset(t *testing.T) {
+// Trava a correção de 2026-09-08: um console que EXISTE no catálogo, mas não
+// alcança nenhum patamar nesta máquina (level "improvavel"), não recusa mais
+// o lançamento com "no_preset_available" — segue com Options no zero-value
+// (princípio 5: informar, não bloquear — hardware fraco vira "sem preset
+// autoconfigurado", nunca "sem jogo"). Sem nenhum emulador de ps2 instalado
+// no ambiente de teste, a tentativa chega até Resolve() e falha por isso,
+// não por falta de patamar.
+func TestLaunchWithoutViableTierAttemptsLaunchWithoutPreset(t *testing.T) {
 	weakHardware := hardware.HardwareInfo{
 		ScannedAt: time.Now().UTC(),
 		OS:        hardware.OSInfo{Platform: "linux", Arch: "amd64"},
@@ -349,14 +362,19 @@ func TestLaunchWithoutViableTierReturnsNoPreset(t *testing.T) {
 	doJSON(t, handler, http.MethodPost, "/api/v1/consent", map[string]bool{"granted": true})
 	doJSON(t, handler, http.MethodPost, "/api/v1/hardware/scan", nil)
 
-	body := map[string]string{"rom_path": "/tmp/jogo.iso", "console_id": "ps2"}
+	romPath := filepath.Join(t.TempDir(), "jogo.iso")
+	if err := os.WriteFile(romPath, []byte("rom de teste"), 0o644); err != nil {
+		t.Fatalf("escrevendo ROM de teste: %v", err)
+	}
+
+	body := map[string]string{"rom_path": romPath, "console_id": "ps2"}
 	rec := doJSON(t, handler, http.MethodPost, "/api/v1/games/launch", body)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, esperado 400", rec.Code)
 	}
-	if code := errorCode(decodeBody(t, rec)); code != "no_preset_available" {
-		t.Fatalf("code = %q, esperado no_preset_available (não unknown_console)", code)
+	if code := errorCode(decodeBody(t, rec)); code != "launch_failed" {
+		t.Fatalf("code = %q, esperado launch_failed (não no_preset_available nem unknown_console)", code)
 	}
 }
 

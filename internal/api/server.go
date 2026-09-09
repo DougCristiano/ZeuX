@@ -1046,6 +1046,18 @@ type launchBody struct {
 // opções a partir do catálogo quando a interface não mandou nenhuma. É o que
 // torna a autoconfiguração o caminho padrão: quem não escolhe nada recebe o
 // preset adequado ao hardware, em vez de configuração genérica.
+//
+// Achado real, 2026-09-08 (relato do Douglas: quem recusa o consentimento
+// não deveria ficar impedido de fazer o que quem aceitou pode fazer — jogar
+// incluso): sem scan (sem consentimento) ou sem patamar alcançado, esta
+// função recusava o lançamento inteiro com "no_scan"/"no_preset". Isso
+// contrariava o princípio 5 (informar, não bloquear) — falta de leitura de
+// hardware vira falta de PRESET, nunca falta de JOGO. Agora os dois casos
+// caem no mesmo caminho: `Options` fica no zero-value (sem nenhuma opção
+// aplicada) e o emulador abre com a configuração que ele já tem — Resolve
+// ainda escolhe automaticamente o primeiro emulador instalado quando
+// `EmulatorID` vem vazio (mesma ordem que `consoleReadiness.ts` usa para
+// decidir "o que o ZeuX usaria hoje").
 func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 	input := emulator.LaunchInput{
 		ROMPath:    body.ROMPath,
@@ -1061,7 +1073,7 @@ func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 
 	info, ok := s.snapshot()
 	if !ok {
-		return emulator.LaunchInput{}, fmt.Errorf("no_scan")
+		return input, nil
 	}
 
 	result, err := verdict.EvaluateConsole(s.catalog, info, body.ConsoleID)
@@ -1071,9 +1083,11 @@ func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 	// O console existe, mas nenhum patamar foi alcançado nesta máquina
 	// (level "improvavel") — diferente de console inexistente. Confundir os
 	// dois diria "console desconhecido" para um console que o catálogo
-	// conhece muito bem, só não recomenda para este hardware.
+	// conhece muito bem, só não recomenda para este hardware. Sem preset,
+	// `input` já sai com Options no zero-value, então o jogo abre mesmo
+	// assim (ver comentário acima).
 	if result.Options == nil {
-		return emulator.LaunchInput{}, fmt.Errorf("no_preset")
+		return input, nil
 	}
 
 	input.Options = *result.Options
@@ -1248,17 +1262,11 @@ func (s *Server) decodeLaunch(w http.ResponseWriter, r *http.Request) (emulator.
 
 	input, err := s.toInput(body)
 	if err != nil {
-		switch err.Error() {
-		case "no_scan":
-			s.writeError(w, http.StatusBadRequest, "no_scan_yet",
-				"Execute o scan de hardware para que o ZeuX escolha a configuração, ou envie o campo options.")
-		case "no_preset":
-			s.writeError(w, http.StatusBadRequest, "no_preset_available",
-				"Este computador não alcançou nenhum patamar de compatibilidade conhecido para este console. Envie o campo options para configurar manualmente.")
-		default:
-			s.writeError(w, http.StatusBadRequest, "unknown_console",
-				"O console informado não está no catálogo do ZeuX.")
-		}
+		// Único erro que toInput ainda devolve (2026-09-08): console fora do
+		// catálogo. Falta de scan/preset não recusa mais — ver o comentário
+		// de toInput.
+		s.writeError(w, http.StatusBadRequest, "unknown_console",
+			"O console informado não está no catálogo do ZeuX.")
 		return emulator.LaunchInput{}, false
 	}
 
@@ -1884,8 +1892,6 @@ func (s *Server) handleScrapeCovers(w http.ResponseWriter, r *http.Request) {
 	job, err := s.igdbJobs.Start(r.Context(), gameIDs)
 	if err != nil {
 		switch {
-		case errors.Is(err, igdb.ErrNotConfigured):
-			s.writeError(w, http.StatusBadRequest, "igdb_not_configured", err.Error())
 		case errors.Is(err, igdb.ErrScrapeInProgress):
 			s.writeError(w, http.StatusConflict, "scrape_in_progress", err.Error())
 		default:
@@ -1994,19 +2000,16 @@ func (s *Server) handleCoverFile(w http.ResponseWriter, r *http.Request) {
 // pode levar minutos e precisa sobreviver à resposta que o disparou, mesmo
 // raciocínio de internal/install.Manager).
 //
-// Silenciosa de propósito quanto a dois erros que não são falha real: um
-// lote já em andamento (ErrScrapeInProgress — outra varredura recente já
-// disparou o dela) e, defensivamente, ErrNotConfigured — na prática
-// inalcançável hoje (igdb.CredentialsStore.Load sempre cai na credencial de
-// teste embutida quando não há conta pessoal, ver
-// internal/igdb/credentials.go), mas Start() ainda pode devolvê-lo se essa
-// regra mudar, e nenhum dos dois foi pedido pelo usuário nesta chamada —
-// não tem "erro" para mostrar aqui. A tela de biblioteca mostra o estado
-// real de cada jogo (capa, placeholder, ou "sem capa encontrada")
-// independentemente de qual chamada disparou a busca.
+// Silenciosa de propósito quanto a um erro que não é falha real: um lote já
+// em andamento (ErrScrapeInProgress — outra varredura recente já disparou a
+// dela), que não foi pedido pelo usuário nesta chamada — não tem "erro" para
+// mostrar aqui. Desde 2026-09-08, falta de credencial do IGDB não impede
+// mais Start (libretro-thumbnails é tentado de qualquer forma); a tela de
+// biblioteca mostra o estado real de cada jogo (capa, placeholder, ou "sem
+// capa encontrada") independentemente de qual chamada disparou a busca.
 func (s *Server) autoScrapeCovers() {
 	if _, err := s.igdbJobs.Start(context.Background(), nil); err != nil {
-		if !errors.Is(err, igdb.ErrNotConfigured) && !errors.Is(err, igdb.ErrScrapeInProgress) {
+		if !errors.Is(err, igdb.ErrScrapeInProgress) {
 			s.logger.Warn("busca automática de capas não pôde iniciar", "erro", err)
 		}
 	}

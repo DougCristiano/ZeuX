@@ -3,7 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { FileX, Star } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { api, ApiError } from "../api";
-import type { ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
+import type { ConsoleEntry, ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
   Badge,
@@ -29,7 +29,6 @@ import { dict } from "./AllGamesScreen.i18n";
 import { GameHero } from "../components/GameHero";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
-import { useIGDBStatus } from "../hooks/useIGDBStatus";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -285,6 +284,7 @@ function RecentStrip({ children }: { children: ReactNode }) {
  */
 export function AllGamesScreen({
   report,
+  consoleCatalog,
   onOpenLibrary,
   onOpenGame,
   onOpenConsole,
@@ -293,7 +293,13 @@ export function AllGamesScreen({
   scrollElementRef,
   initialScrollTop,
 }: {
-  report: Report;
+  /** Ausente sem consentimento/scan — a biblioteca continua funcionando
+   * (jogos abrem sem preset autoconfigurado), só o badge de compatibilidade
+   * some. Nome/sigla de console então vêm de `consoleCatalog`. */
+  report?: Report;
+  /** `GET /consoles` — nome/sigla/ano por console, independente de scan.
+   * Fonte de nome quando `report` está ausente ou não cobre o console. */
+  consoleCatalog: ConsoleEntry[];
   onOpenLibrary: () => void;
   onOpenGame: (game: LibraryGame, consoleName: string, shortName: string) => void;
   /** Q5: leva ao detalhe do console do jogo, onde ficam as instruções de
@@ -335,7 +341,6 @@ export function AllGamesScreen({
   const { statusFor, launch, activeCoreDownload, cancelCoreDownload, launchError, clearLaunchError, retryLaunch } =
     useLaunchGame();
   const { toastMessage, showToast } = useToast();
-  const igdbConfigured = useIGDBStatus();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const columns = useGridColumns();
@@ -529,12 +534,24 @@ export function AllGamesScreen({
       .catch((err) => setScrapeError(err instanceof ApiError ? err.message : t("failedToInitiateCoverScrape")));
   }
 
+  function nameFor(consoleId: string): string {
+    return (
+      report?.verdicts.find((v) => v.console_id === consoleId)?.name ??
+      consoleCatalog.find((c) => c.console_id === consoleId)?.name ??
+      consoleId
+    );
+  }
+
   function shortNameFor(consoleId: string): string {
-    return report.verdicts.find((v) => v.console_id === consoleId)?.short_name ?? consoleId;
+    return (
+      report?.verdicts.find((v) => v.console_id === consoleId)?.short_name ??
+      consoleCatalog.find((c) => c.console_id === consoleId)?.short_name ??
+      consoleId
+    );
   }
 
   function verdictFor(consoleId: string): ConsoleVerdict | undefined {
-    return report.verdicts.find((v) => v.console_id === consoleId);
+    return report?.verdicts.find((v) => v.console_id === consoleId);
   }
 
   function adapterEntryFor(verdict: ConsoleVerdict | undefined): EmulatorEntry | undefined {
@@ -834,35 +851,36 @@ export function AllGamesScreen({
         }
         actions={
           <>
-            {/* Só aparece com conta do IGDB conectada (G1) — sem credencial,
-                a biblioteca fica exatamente como hoje, sem botão nenhum aqui
-                (docs/roadmap.md: "nunca uma tela vazia ou travada"). */}
-            {igdbConfigured && (
-              <div className="flex flex-col items-stretch gap-1">
-                {/* M15 (docs/sprint-m-plano.md, 2026-08-07): o progresso saiu
-                    do rótulo do botão (`Buscando capas… 7/30` crescia e
-                    encolhia a cada jogo, empurrando o botão vizinho) e foi
-                    pra `ProgressBar`, abaixo — mesmo componente que a
-                    instalação inline já usa. Rótulo do botão agora é fixo. */}
-                {/* `chrome`, não `secondary` (2026-09-07): buscar capa é
-                    ação sobre o acervo, não sobre o jogo em foco — e ficava
-                    a poucos pixels da régua de filtros já redesenhada, com
-                    outro canto, outro tamanho de texto e outra caixa. Ver o
-                    comentário da variante em components/ui.tsx. */}
-                <Button variant="chrome" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
-                  {scrapeJob ? t("fetchingCovers") : t("fetchCoversButton")}
-                </Button>
-                {scrapeJob && (
-                  <>
-                    <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
-                    {/* A11y 4.1.3: contador que muda sozinho — anunciado por aria-live. */}
-                    <p className="text-center text-xs text-muted" aria-live="polite">
-                      {scrapeJob.processed}/{scrapeJob.total}
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
+            {/* Sempre visível (2026-09-08) — antes só aparecia com conta do
+                IGDB conectada, mas a busca tenta libretro-thumbnails primeiro
+                (sem credencial nenhuma) e só recorre ao IGDB se essa fonte
+                não achar, então esconder o botão sem conta escondia também a
+                fonte livre. */}
+            <div className="flex flex-col items-stretch gap-1">
+              {/* M15 (docs/sprint-m-plano.md, 2026-08-07): o progresso saiu
+                  do rótulo do botão (`Buscando capas… 7/30` crescia e
+                  encolhia a cada jogo, empurrando o botão vizinho) e foi
+                  pra `ProgressBar`, abaixo — mesmo componente que a
+                  instalação inline já usa. Rótulo do botão agora é fixo. */}
+              {/* `chrome`, não `secondary` (2026-09-07): buscar capa é
+                  ação sobre o acervo, não sobre o jogo em foco — e ficava
+                  a poucos pixels da régua de filtros já redesenhada, com
+                  outro canto, outro tamanho de texto e outra caixa. Ver o
+                  comentário da variante em components/ui.tsx. */}
+              <Button variant="chrome" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
+                {scrapeJob ? t("fetchingCovers") : t("fetchCoversButton")}
+              </Button>
+              {scrapeJob && (
+                <>
+                  <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
+                  {/* A11y 4.1.3: contador que muda sozinho — anunciado por aria-live. */}
+                  <p className="text-center text-xs text-muted" aria-live="polite">
+                    {scrapeJob.processed}/{scrapeJob.total}
+                  </p>
+                </>
+              )}
+            </div>
+
             {/* Navegação de topo (Emuladores/Parecer) mudou para a sidebar
                 (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui
                 porque é sub-navegação da própria Biblioteca, não um destino
@@ -896,8 +914,7 @@ export function AllGamesScreen({
           {(() => {
             const [featured, ...rest] = recentGames;
             const featuredVerdict = verdictFor(featured.console_id);
-            const featuredConsoleName =
-              report.verdicts.find((v) => v.console_id === featured.console_id)?.name ?? featured.console_id;
+            const featuredConsoleName = nameFor(featured.console_id);
             return (
               <>
                 <GameHero
@@ -922,8 +939,7 @@ export function AllGamesScreen({
                 {rest.length > 0 && (
                   <RecentStrip>
                     {rest.map((game) => {
-                      const consoleName =
-                        report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                      const consoleName = nameFor(game.console_id);
                       const verdict = verdictFor(game.console_id);
                       const launchability = emulators
                         ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
@@ -1210,7 +1226,7 @@ export function AllGamesScreen({
 
               if (viewMode === "lista") {
                 const game = games[virtualRow.index];
-                const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                const consoleName = nameFor(game.console_id);
                 const verdict = verdictFor(game.console_id);
                 // Ausente até `emulators` responder — tile/linha aparece
                 // sem badge nesse meio-tempo, nunca com um palpite (mesma
@@ -1257,7 +1273,7 @@ export function AllGamesScreen({
                   }}
                 >
                   {rowGames.map((game) => {
-                    const consoleName = report.verdicts.find((v) => v.console_id === game.console_id)?.name ?? game.console_id;
+                    const consoleName = nameFor(game.console_id);
                     const verdict = verdictFor(game.console_id);
                     const launchability = emulators
                       ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))

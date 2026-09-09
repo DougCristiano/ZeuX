@@ -51,4 +51,19 @@ export const dict = {
     en: "Could not load hardware information.",
   },
   hz: { "pt-BR": "Hz", en: "Hz" },
+  // Achado real, 2026-09-08 (relato do Douglas): quem recusa o consentimento
+  // podia acessar esta tela através da navegação normal e via um `report!`
+  // forçado — nunca deveria ter chegado aqui sem consentimento. Em vez de
+  // travar, mostra por que o parecer não existe e como resolver (regra 4 do
+  // CLAUDE.md: dado que não pôde ser lido é declarado desconhecido, nunca
+  // escondido).
+  noReadingHeading: {
+    "pt-BR": "Sem leitura de hardware",
+    en: "No hardware reading",
+  },
+  noReadingDescription: {
+    "pt-BR": "Você optou por não autorizar a leitura deste computador. Sem essa leitura, o ZeuX não tem como calcular especificações nem o parecer de compatibilidade por console.",
+    en: "You chose not to authorize reading this computer. Without this reading, ZeuX cannot compute specifications or the per-console compatibility verdict.",
+  },
+  authorizeNow: { "pt-BR": "Autorizar agora", en: "Authorize now" },
 } satisfies Dict;

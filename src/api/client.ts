@@ -52,6 +52,28 @@ export function coverImageURL(coverUrl: string | undefined, cacheBust?: number):
   return `${API_ORIGIN}${coverUrl}${suffix}`;
 }
 
+// Achado real, 2026-09-08 (relato do Douglas: a logo do N64 continuava
+// mostrando a marca antiga da iQue mesmo depois de fechar e reabrir o app,
+// já com o servidor comprovadamente servindo os bytes certos — confirmado
+// por `curl` direto contra o `zeuxd` real dele). A logo embutida É estática
+// por versão do app (só muda quando alguém corrige o catálogo e uma nova
+// versão é instalada), mas `cacheBust` (comentário abaixo) só cobria a
+// troca manual em runtime — o app reabrir com uma logo corrigida no
+// binário, mas pedindo a mesma URL de sempre (`/consoles/n64/image`, sem
+// nenhum parâmetro), não era garantia de nada além do
+// `Cache-Control: no-store`, que só evita cache HTTP explícito, não a
+// prática comum de navegador/WebView de simplesmente não repetir a
+// requisição pro mesmo `src` de <img> que uma sessão anterior (ou até uma
+// aba/janela que nunca foi de fato destruída) já tinha resolvido.
+// `appVersionCacheKey`, ajustado uma vez por `setAppVersionCacheKey` em
+// App.tsx assim que `getVersion()` responde, garante que TODA imagem de
+// console troca de URL a cada nova versão instalada — sem depender de o
+// usuário saber que precisa fazer um "hard refresh".
+let appVersionCacheKey = "";
+export function setAppVersionCacheKey(version: string): void {
+  appVersionCacheKey = version;
+}
+
 // Mesmo motivo de coverImageURL acima: a rota é relativa, precisa da origem
 // do zeuxd. Só monta a URL quando `has_image` já confirmou que existe algo
 // pra buscar — quem chama nunca precisa tratar 404 no <img>.
@@ -61,9 +83,13 @@ export function coverImageURL(coverUrl: string | undefined, cacheBust?: number):
 // `Cache-Control: no-store` do servidor evita cache HTTP, mas o navegador
 // ainda reaproveita a última imagem carregada para o mesmo `src` de <img>.
 // Passar algo que muda (ex. Date.now() logo após trocar) força um pedido
-// novo de verdade.
+// novo de verdade. Composto com `appVersionCacheKey` (acima), nunca no
+// lugar dele: os dois invalidam motivos diferentes de a imagem ter mudado.
 export function consoleImageURL(consoleId: string, cacheBust?: number): string {
-  const suffix = cacheBust ? `?v=${cacheBust}` : "";
+  const params: string[] = [];
+  if (appVersionCacheKey) params.push(`av=${encodeURIComponent(appVersionCacheKey)}`);
+  if (cacheBust) params.push(`v=${cacheBust}`);
+  const suffix = params.length ? `?${params.join("&")}` : "";
   return `${API_ORIGIN}/api/v1/consoles/${encodeURIComponent(consoleId)}/image${suffix}`;
 }
 

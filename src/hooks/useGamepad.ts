@@ -22,6 +22,18 @@ export interface GamepadState {
    * sistema, então nada de lógica deve depender deste texto.
    */
   name?: string;
+  /**
+   * `pad.mapping` cru da Gamepad API — `"standard"` é o único valor em que a
+   * ordem de botões/eixos segue o layout padrão (A/B/X/Y em 0-3, gatilhos em
+   * 6-7 etc.) que `ControllerTestScreen`/`BTN` assumem. String vazia é o
+   * valor real da API para "sem mapeamento conhecido, ordem crua do driver"
+   * — no Linux (WebKitGTK), controles Xbox conectados por Bluetooth/adaptador
+   * já foram vistos caindo aqui (achado real, 2026-09-08, relato do Douglas:
+   * "o zeux não pegou de maneira correta o meu controle"). Regra 4 do
+   * CLAUDE.md: dado que não pôde ser confirmado é declarado desconhecido,
+   * nunca finge certeza — daí expor isto em vez de assumir "standard" sempre.
+   */
+  mapping?: string;
 }
 
 // A Gamepad API acrescenta os identificadores de fornecedor/produto e o
@@ -44,7 +56,7 @@ export function useGamepad(): GamepadState {
       // filtro, e não um `length > 0`.
       const pads = Array.from(navigator.getGamepads?.() ?? []);
       const pad = pads.find((p) => p !== null);
-      setState(pad ? { connected: true, name: nomeLegivel(pad.id) } : { connected: false });
+      setState(pad ? { connected: true, name: nomeLegivel(pad.id), mapping: pad.mapping } : { connected: false });
     }
 
     refresh();

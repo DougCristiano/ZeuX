@@ -1,2 +1,2 @@
 export * from "./types";
-export { api, ApiError, consoleImageURL, coverImageURL, isDownloadingCore } from "./client";
+export { api, ApiError, consoleImageURL, coverImageURL, isDownloadingCore, setAppVersionCacheKey } from "./client";

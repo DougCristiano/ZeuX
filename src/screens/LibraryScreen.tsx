@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Folder, FolderPlus, RefreshCw, Trash2 } from "lucide-react";
 import { api, ApiError } from "../api";
 import { consoleAccentColor } from "../lib/consoleColor";
-import type { BulkMatchedFolder, LibraryFolder, LibraryGame, Report } from "../api/types";
+import type { BulkMatchedFolder, ConsoleEntry, LibraryFolder, LibraryGame, Report } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
   BackButton,
@@ -408,9 +408,9 @@ function AddConsoleSection({
  * casam igual), então isso não precisa ser explicado campo a campo, só uma
  * vez no topo do modal.
  */
-function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: () => void }) {
+function FolderNameGuideModal({ consoles, onClose }: { consoles: ConsoleInfo[]; onClose: () => void }) {
   const t = useT(dict);
-  const consoles = [...report.verdicts].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...consoles].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -423,7 +423,7 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
           {t("folderNamesGuideText")}
         </p>
         <ul className="flex flex-col gap-2">
-          {consoles.map((c) => {
+          {sorted.map((c) => {
             // Dedup: em vários consoles o id e a sigla coincidem (ex.: n64,
             // gba) — mostrar o mesmo valor duas vezes só confundiria.
             const names = [...new Set([c.name, c.short_name, c.console_id])];
@@ -463,11 +463,18 @@ function FolderNameGuideModal({ report, onClose }: { report: Report; onClose: ()
  * 2026-08-02).
  */
 export function LibraryScreen({
+  consoleCatalog,
   report,
   onBack,
   onOpenGames,
 }: {
-  report: Report;
+  /** `GET /consoles` — nome/sigla por console, independente de scan. É a
+   * fonte de nomes desta tela; `report` só entra para o badge de
+   * compatibilidade no modal de detalhe. */
+  consoleCatalog: ConsoleEntry[];
+  /** Ausente sem consentimento/scan — a tela continua funcionando (apontar
+   * pasta, revarrer, ver jogos), só o badge de nível some do modal. */
+  report?: Report;
   onBack: () => void;
   onOpenGames: (consoleId: string, name: string, shortName: string) => void;
 }) {
@@ -508,17 +515,18 @@ export function LibraryScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // report.verdicts já cobre os 33 consoles do catálogo (Evaluate nunca
-  // filtra nenhum, mesmo "improvavel").
+  // consoleCatalog (GET /consoles) já cobre os 33 consoles do catálogo,
+  // independente de consentimento/scan — diferente de report.verdicts, que
+  // só existe depois de um scan bem-sucedido.
   const allConsoles = useMemo<ConsoleInfo[]>(() => {
-    const list = report.verdicts.map((v) => ({
-      console_id: v.console_id,
-      name: v.name,
-      short_name: v.short_name,
+    const list = consoleCatalog.map((c) => ({
+      console_id: c.console_id,
+      name: c.name,
+      short_name: c.short_name,
     }));
     list.sort((a, b) => a.name.localeCompare(b.name));
     return list;
-  }, [report]);
+  }, [consoleCatalog]);
 
   const configuredIds = useMemo(() => {
     const ids = new Set((folders ?? []).map((f) => f.console_id));
@@ -618,7 +626,7 @@ export function LibraryScreen({
 
       <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
 
-      {showNameGuide && <FolderNameGuideModal report={report} onClose={() => setShowNameGuide(false)} />}
+      {showNameGuide && <FolderNameGuideModal consoles={allConsoles} onClose={() => setShowNameGuide(false)} />}
 
       {/* Falha ao listar as pastas é erro de tela inteira (nada renderiza
           sem essa lista) — vira modal, não parágrafo vermelho solto (mesmo
@@ -712,8 +720,8 @@ export function LibraryScreen({
 
       {modalConsoleId && (
         <ConsoleInfoModal
-          verdict={report.verdicts.find((v) => v.console_id === modalConsoleId)}
-          fallbackName={modalConsoleId}
+          verdict={report?.verdicts.find((v) => v.console_id === modalConsoleId)}
+          fallbackName={allConsoles.find((c) => c.console_id === modalConsoleId)?.name ?? modalConsoleId}
           onClose={() => setModalConsoleId(null)}
         />
       )}

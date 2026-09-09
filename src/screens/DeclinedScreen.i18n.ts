@@ -13,5 +13,6 @@ export const dict = {
     en: "You can authorize at any time — nothing was read, and nothing changes until you decide.",
   },
   reconsider: { "pt-BR": "Autorizar agora", en: "Authorize now" },
+  continueWithoutConsent: { "pt-BR": "Continuar sem autorizar", en: "Continue without authorizing" },
   viewEmulators: { "pt-BR": "Ver emuladores", en: "View emulators" },
 } satisfies Dict;

@@ -249,6 +249,56 @@ func TestScrapeFallsBackToLibretroThumbnailWhenIGDBAuthFails(t *testing.T) {
 	}
 }
 
+// Trava a correção de 2026-09-08 (relato do Douglas: botão "Buscar capas"
+// sumiu e a busca de um jogo específico recusava com "conecte sua conta"
+// mesmo sem nenhuma tentativa de rede) — Start não pode mais recusar o lote
+// inteiro por falta de credencial: sem credencial pessoal NEM padrão
+// (defaultCredentials vazio — o caso real de um build local sem os ldflags
+// do release oficial), o lote roda mesmo assim. Um jogo que libretro-
+// thumbnails também não encontra vira "not_found" com uma mensagem
+// explicando o motivo, nunca "error" — SearchGame não chega a ser chamado.
+func TestScrapeRunsWithoutAnyCredentialFallingBackToNotFound(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	credsStore := newTestCredentialsStore(t) // nunca Save() — sem credencial pessoal
+	withDefaultCredentials(t, "", "")         // e sem credencial padrão embutida
+
+	game := seedGame(t, lib, "nes", "Jogo Sem Capa Em Lugar Nenhum")
+
+	// libretro-thumbnails não tem a capa deste jogo — qualquer caminho
+	// devolve 404, forçando o miss que expõe a falta de credencial do IGDB.
+	thumbMux := http.NewServeMux()
+	thumbMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	})
+	fakeLibretroThumbnailsServer(t, thumbMux)
+
+	manager := NewScrapeManager(lib, credsStore, silentLogger())
+	job, err := manager.Start(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Start sem credencial nenhuma: erro = %v, esperava rodar mesmo assim", err)
+	}
+
+	done := waitJobDone(t, manager, job.ID)
+	if done.Phase != PhaseDone {
+		t.Fatalf("Phase = %q, esperado %q — erro: %s", done.Phase, PhaseDone, done.Error)
+	}
+	if len(done.Results) != 1 || done.Results[0].Status != "not_found" {
+		t.Fatalf("Results = %+v, esperado um resultado \"not_found\"", done.Results)
+	}
+	if done.Results[0].Message == "" {
+		t.Fatal("Message deveria explicar que não há credencial do IGDB para tentar a segunda fonte")
+	}
+
+	reloaded, ok, err := lib.GameByID(context.Background(), game.ID)
+	if err != nil || !ok {
+		t.Fatalf("GameByID: ok=%v err=%v", ok, err)
+	}
+	if reloaded.CoverStatus != "not_found" {
+		t.Fatalf("cover_status = %q, esperado \"not_found\"", reloaded.CoverStatus)
+	}
+}
+
 // Trava a correção de 2026-09-08: uma capa colocada manualmente
 // (internal/api.handleSetGameCover) enquanto o lote automático já está
 // processando aquele jogo não pode ser sobrescrita quando o lote termina
