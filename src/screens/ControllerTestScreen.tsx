@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { Callout, Card, ScreenContainer, ScreenHeader, SectionHeading } from "../components/ui";
+import controllerPhoto from "../assets/controller-reference.png";
+import { Button, Callout, Card, ScreenContainer, ScreenHeader } from "../components/ui";
+import { CONTROLLER_SPOTS } from "../lib/controllerRegions";
 import { useGamepad } from "../hooks/useGamepad";
+import { resumeGamepadNavigation, suspendGamepadNavigation } from "../hooks/gamepadNavigationSuspend";
 import { useT } from "../i18n/i18n";
 import { dict } from "./ControllerTestScreen.i18n";
 
@@ -65,191 +68,145 @@ function axis(snapshot: GamepadSnapshot, index: number): number {
   return Math.abs(v) < STICK_VISUAL_DEADZONE ? 0 : v;
 }
 
-// Cores por CSS var (não classe Tailwind) porque o SVG usa `fill`/`stroke`
-// como atributo, e as duas cores trocam por estado a cada frame — variável
-// direta evita recalcular uma string de classe 60x por segundo.
-const OFF_FILL = "var(--fill)";
-const OFF_STROKE = "var(--line)";
-const ON_FILL = "var(--accent-secondary)";
-const ON_STROKE = "var(--accent-secondary)";
+/**
+ * A foto é clara (controle branco) sobre o tema escuro do app, então o realce
+ * é uma mancha ciano com halo — `--accent-secondary`, a cor que o redesenho de
+ * 2026-09-07 fixou como "aqui o sistema informa" (docs/decisoes.md). Cor por
+ * `style` e não por classe Tailwind: a opacidade muda a cada quadro
+ * (`requestAnimationFrame`), e montar string de classe 60x por segundo é
+ * desperdício — mesma razão que o SVG anterior já registrava aqui.
+ */
+const ON_COLOR = "var(--accent-secondary)";
 
-function Part({ children, label }: { children: React.ReactNode; label?: string }) {
+/**
+ * Peças que não são redondas na foto: braços do direcional, ombros, gatilhos e
+ * as pílulas de select/start. Um realce circular em cima delas vaza para fora
+ * da peça e encosta na vizinha.
+ */
+const BOXY_SPOTS = new Set([
+  "dpadUp",
+  "dpadDown",
+  "dpadLeft",
+  "dpadRight",
+  "shoulderLeft",
+  "shoulderRight",
+  "triggerLeft",
+  "triggerRight",
+  "select",
+  "start",
+]);
+
+function Spot({
+  id,
+  intensity,
+  offsetX = 0,
+  offsetY = 0,
+}: {
+  id: string;
+  /** 0 = solto, 1 = totalmente apertado. Analógico (L2/R2) usa o meio-termo. */
+  intensity: number;
+  /** Deslocamento em % do próprio marcador — só os analógicos usam, para o
+   *  realce acompanhar o eixo em vez de só acender no clique. */
+  offsetX?: number;
+  offsetY?: number;
+}) {
+  const spot = CONTROLLER_SPOTS[id];
+  const on = intensity > 0.02;
   return (
-    <g aria-label={label} style={{ transition: "fill 60ms linear, stroke 60ms linear" }}>
-      {children}
-    </g>
+    <div
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        left: `${spot.x}%`,
+        top: `${spot.y}%`,
+        width: `${spot.w}%`,
+        height: `${spot.h}%`,
+        transform: `translate(calc(-50% + ${offsetX}%), calc(-50% + ${offsetY}%))`,
+        borderRadius: BOXY_SPOTS.has(id) ? "22%" : "50%",
+        background: ON_COLOR,
+        // O halo é o que faz o realce ser visto no canto do olho enquanto a
+        // pessoa está olhando para o controle, não para a tela.
+        boxShadow: on ? `0 0 14px 4px ${ON_COLOR}` : "none",
+        opacity: on ? 0.25 + 0.5 * intensity : 0,
+        transition: "opacity 60ms linear",
+      }}
+    />
   );
 }
 
 /**
- * Desenho genérico do controle — sem "A/B/X/Y" nem "✕/○/□/△" (vocabulário de
- * fabricante, Xbox e PlayStation respectivamente; mesma regra que já mantém
- * o Nintendo Switch fora do catálogo e a logo de console fora de
- * `ConsoleIcon`, ver docs/decisoes.md). Cada parte é rotulada só pelo índice
- * que a própria Gamepad API reporta. Pesquisado antes de desenhar (2026-09-07):
- * nenhum SVG pronto encontrado servia sem essa mesma ressalva de marca ou sem
- * licença clara — ver commit desta feature.
+ * Foto de um controle real com uma camada de marcadores por cima — um por
+ * botão, posicionado em % da imagem (nunca px: a foto encolhe com a janela).
+ *
+ * **Isto substituiu, em 2026-09-08, um SVG desenhado do zero e deliberadamente
+ * sem marca** ("sem A/B/X/Y, sem ✕/○/□/△"). Duas rodadas de desenho à mão não
+ * chegaram a uma geometria que parecesse um controle de verdade, e o Douglas
+ * decidiu — perguntado e confirmado antes, ciente do risco de marca de
+ * terceiro — usar a foto como está, logo e letras A/B/X/Y inclusas. Mesmo
+ * precedente da imagem real de console em `ConsolesScreen`. O porquê completo,
+ * o risco aceito e a saída caso precise ser desfeito estão em docs/decisoes.md,
+ * "Foto de controle real no lugar do SVG desenhado à mão (2026-09-08)".
+ *
+ * A geometria mora em `lib/controllerRegions.ts`, compartilhada com o painel
+ * de mapeamento — as duas telas leem a mesma foto e não podem divergir sobre
+ * onde cada botão está.
  */
 function ControllerDiagram({ snapshot }: { snapshot: GamepadSnapshot }) {
   const lx = axis(snapshot, 0);
   const ly = axis(snapshot, 1);
   const rx = axis(snapshot, 2);
   const ry = axis(snapshot, 3);
-  const stickTravel = 10; // px que o ponto do analógico se desloca no limite
+  // 35% do próprio marcador: percurso visível sem que o realce saia da
+  // depressão do analógico na foto.
+  const travel = 35;
 
-  const dUp = pressed(snapshot, BTN.dpadUp);
-  const dDown = pressed(snapshot, BTN.dpadDown);
-  const dLeft = pressed(snapshot, BTN.dpadLeft);
-  const dRight = pressed(snapshot, BTN.dpadRight);
-
-  const triggerL = analogValue(snapshot, BTN.triggerLeft);
-  const triggerR = analogValue(snapshot, BTN.triggerRight);
+  const digital = (index: number) => (pressed(snapshot, index) ? 1 : 0);
 
   return (
-    <svg viewBox="0 0 360 220" className="mx-auto w-full max-w-xl" role="img" aria-hidden="true">
-      {/* Corpo — dois lóbulos + ponte central, formato neutro de controle
-          "genérico", sem contorno de nenhuma marca específica. */}
-      <path
-        d="M 60 90 Q 20 90 15 140 Q 10 195 45 200 Q 75 204 90 165 L 270 165 Q 285 204 315 200 Q 350 195 345 140 Q 340 90 300 90 Z"
-        fill="var(--fill)"
-        stroke="var(--line)"
-        strokeWidth="2"
+    <div className="relative mx-auto w-full max-w-xl">
+      <img
+        src={controllerPhoto}
+        alt=""
+        aria-hidden="true"
+        className="block w-full select-none"
+        draggable={false}
       />
 
-      {/* Gatilhos (analógicos: L2/R2, índices 6/7) — barra que enche
-          conforme o value (0 a 1), não só um on/off. */}
-      <Part label="L2">
-        <rect x="35" y="55" width="40" height="14" rx="4" fill="none" stroke={OFF_STROKE} strokeWidth="1.5" />
-        <rect
-          x="35"
-          y="55"
-          width={40 * triggerL}
-          height="14"
-          rx="4"
-          fill={ON_FILL}
-          opacity={triggerL > 0.05 ? 0.85 : 0}
-        />
-      </Part>
-      <Part label="R2">
-        <rect x="285" y="55" width="40" height="14" rx="4" fill="none" stroke={OFF_STROKE} strokeWidth="1.5" />
-        <rect
-          x="285"
-          y="55"
-          width={40 * triggerR}
-          height="14"
-          rx="4"
-          fill={ON_FILL}
-          opacity={triggerR > 0.05 ? 0.85 : 0}
-        />
-      </Part>
+      <Spot id="triggerLeft" intensity={analogValue(snapshot, BTN.triggerLeft)} />
+      <Spot id="triggerRight" intensity={analogValue(snapshot, BTN.triggerRight)} />
+      <Spot id="shoulderLeft" intensity={digital(BTN.shoulderLeft)} />
+      <Spot id="shoulderRight" intensity={digital(BTN.shoulderRight)} />
 
-      {/* Ombros (L1/R1, índices 4/5) — digital, on/off. */}
-      <rect
-        x="35"
-        y="72"
-        width="40"
-        height="10"
-        rx="3"
-        fill={pressed(snapshot, BTN.shoulderLeft) ? ON_FILL : OFF_FILL}
-        stroke={pressed(snapshot, BTN.shoulderLeft) ? ON_STROKE : OFF_STROKE}
-        strokeWidth="1.5"
+      <Spot id="dpadUp" intensity={digital(BTN.dpadUp)} />
+      <Spot id="dpadDown" intensity={digital(BTN.dpadDown)} />
+      <Spot id="dpadLeft" intensity={digital(BTN.dpadLeft)} />
+      <Spot id="dpadRight" intensity={digital(BTN.dpadRight)} />
+
+      <Spot id="faceTop" intensity={digital(BTN.faceTop)} />
+      <Spot id="faceLeft" intensity={digital(BTN.faceLeft)} />
+      <Spot id="faceRight" intensity={digital(BTN.faceRight)} />
+      <Spot id="faceBottom" intensity={digital(BTN.faceBottom)} />
+
+      <Spot id="select" intensity={digital(BTN.select)} />
+      <Spot id="start" intensity={digital(BTN.start)} />
+      <Spot id="home" intensity={digital(BTN.home)} />
+
+      {/* Analógico acende com o eixo, não só com o clique: mover o stick sem
+          apertar é o caso mais comum de "meu controle está com drift?", que é
+          metade do motivo desta tela existir. O clique (L3/R3) soma por cima. */}
+      <Spot
+        id="leftStick"
+        intensity={Math.max(digital(BTN.stickLeftClick), Math.min(1, Math.hypot(lx, ly)))}
+        offsetX={lx * travel}
+        offsetY={ly * travel}
       />
-      <rect
-        x="285"
-        y="72"
-        width="40"
-        height="10"
-        rx="3"
-        fill={pressed(snapshot, BTN.shoulderRight) ? ON_FILL : OFF_FILL}
-        stroke={pressed(snapshot, BTN.shoulderRight) ? ON_STROKE : OFF_STROKE}
-        strokeWidth="1.5"
+      <Spot
+        id="rightStick"
+        intensity={Math.max(digital(BTN.stickRightClick), Math.min(1, Math.hypot(rx, ry)))}
+        offsetX={rx * travel}
+        offsetY={ry * travel}
       />
-
-      {/* D-pad (12-15) — cruz de 3 retângulos, cada braço realça sozinho. */}
-      <g transform="translate(95, 118)">
-        <rect x="-8" y="-24" width="16" height="48" rx="3" fill="var(--fill)" stroke="var(--line)" strokeWidth="1.5" />
-        <rect x="-24" y="-8" width="48" height="16" rx="3" fill="var(--fill)" stroke="var(--line)" strokeWidth="1.5" />
-        <rect x="-7" y="-22" width="14" height="18" rx="2" fill={dUp ? ON_FILL : "transparent"} />
-        <rect x="-7" y="4" width="14" height="18" rx="2" fill={dDown ? ON_FILL : "transparent"} />
-        <rect x="-22" y="-7" width="18" height="14" rx="2" fill={dLeft ? ON_FILL : "transparent"} />
-        <rect x="4" y="-7" width="18" height="14" rx="2" fill={dRight ? ON_FILL : "transparent"} />
-      </g>
-
-      {/* Botões de face (0-3) — círculos neutros, só o índice como rótulo. */}
-      {(
-        [
-          [BTN.faceTop, 265, 100],
-          [BTN.faceLeft, 245, 120],
-          [BTN.faceRight, 285, 120],
-          [BTN.faceBottom, 265, 140],
-        ] as const
-      ).map(([index, cx, cy]) => {
-        const isOn = pressed(snapshot, index);
-        return (
-          <g key={index}>
-            <circle cx={cx} cy={cy} r="11" fill={isOn ? ON_FILL : "var(--fill)"} stroke={isOn ? ON_STROKE : "var(--line)"} strokeWidth="1.5" />
-            <text
-              x={cx}
-              y={cy + 4}
-              textAnchor="middle"
-              fontSize="10"
-              fill={isOn ? "var(--accent-ink)" : "var(--muted)"}
-            >
-              {index}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Select/Start (8/9) — pílulas pequenas no centro. */}
-      <rect
-        x="150"
-        y="112"
-        width="22"
-        height="10"
-        rx="5"
-        fill={pressed(snapshot, BTN.select) ? ON_FILL : "var(--fill)"}
-        stroke={pressed(snapshot, BTN.select) ? ON_STROKE : "var(--line)"}
-        strokeWidth="1.5"
-      />
-      <rect
-        x="188"
-        y="112"
-        width="22"
-        height="10"
-        rx="5"
-        fill={pressed(snapshot, BTN.start) ? ON_FILL : "var(--fill)"}
-        stroke={pressed(snapshot, BTN.start) ? ON_STROKE : "var(--line)"}
-        strokeWidth="1.5"
-      />
-      {/* Home/guide (16) — nem todo controle reporta; só aparece realçado
-          quando pressionado, sem ocupar espaço de "ausente". */}
-      {pressed(snapshot, BTN.home) && <circle cx="180" cy="95" r="6" fill={ON_FILL} stroke={ON_STROKE} strokeWidth="1.5" />}
-
-      {/* Analógicos (axes 0/1 e 2/3, clique em 10/11) — base fixa + ponto que
-          se desloca com o eixo real, realça quando clicado. */}
-      {(
-        [
-          [BTN.stickLeftClick, 130, 165, lx, ly],
-          [BTN.stickRightClick, 235, 165, rx, ry],
-        ] as const
-      ).map(([clickIndex, cx, cy, x, y]) => {
-        const clicked = pressed(snapshot, clickIndex);
-        return (
-          <g key={clickIndex}>
-            <circle cx={cx} cy={cy} r="20" fill="var(--fill)" stroke="var(--line)" strokeWidth="1.5" />
-            <circle
-              cx={cx + x * stickTravel}
-              cy={cy + y * stickTravel}
-              r="11"
-              fill={clicked ? ON_FILL : "var(--muted)"}
-              stroke={clicked ? ON_STROKE : "var(--line)"}
-              strokeWidth="1.5"
-            />
-          </g>
-        );
-      })}
-    </svg>
+    </div>
   );
 }
 
@@ -258,14 +215,22 @@ function ControllerDiagram({ snapshot }: { snapshot: GamepadSnapshot }) {
  * 2026-09-07, referência XOutput/gamepad-tester.com/Steam. Poll via
  * requestAnimationFrame igual EmulatorBindingsPanel já fazia para capturar
  * bind — aqui não para na primeira transição, lê o snapshot inteiro (botões
- * + eixos) a cada quadro enquanto a tela estiver montada.
+ * + eixos) a cada quadro enquanto o teste estiver ativo.
+ *
+ * O teste tem início e fim explícitos (e não começa sozinho ao montar) porque
+ * ele precisa desligar a navegação global por controle enquanto roda — ver
+ * `hooks/gamepadNavigationSuspend.ts`. Desligar a navegação é uma mudança de
+ * comportamento do app inteiro; sem um "Iniciar"/"Parar" visível, a pessoa não
+ * teria como saber por que o controle parou de navegar nem como retomá-lo.
  */
 export function ControllerTestScreen({ onBack }: { onBack: () => void }) {
   const t = useT(dict);
   const gamepad = useGamepad();
   const [snapshot, setSnapshot] = useState<GamepadSnapshot>(EMPTY_SNAPSHOT);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
+    if (!testing) return;
     let frame: number;
     let cancelled = false;
     function poll() {
@@ -276,27 +241,69 @@ export function ControllerTestScreen({ onBack }: { onBack: () => void }) {
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
+      // Volta ao desenho apagado: com o teste parado, marcador aceso seria a
+      // última leitura congelada, indistinguível de um botão travado.
+      setSnapshot(EMPTY_SNAPSHOT);
     };
-  }, []);
+  }, [testing]);
+
+  // Rede de segurança da desmontagem: dá para sair desta tela pelo "Voltar" do
+  // cabeçalho (mouse ou teclado) sem passar pelo "Parar teste". Sem este
+  // retomar incondicional, a navegação por controle ficaria suspensa para
+  // sempre no resto do app — o pior estado possível, porque o sintoma
+  // aparece longe daqui.
+  useEffect(() => resumeGamepadNavigation, []);
+
+  function startTest() {
+    suspendGamepadNavigation();
+    setTesting(true);
+  }
+
+  function stopTest() {
+    resumeGamepadNavigation();
+    setTesting(false);
+  }
 
   return (
     <ScreenContainer>
       <ScreenHeader back={{ label: t("back"), onClick: onBack }} title={t("title")} subtitle={t("subtitle")} />
 
       {gamepad.connected ? (
-        <p className="mb-4 text-sm text-muted">{t("connectedAs", { name: gamepad.name ?? "" })}</p>
+        <>
+          <p className="mb-4 text-sm text-muted">{t("connectedAs", { name: gamepad.name ?? "" })}</p>
+          {gamepad.mapping !== "standard" && (
+            <Callout label={t("nonStandardMappingLabel")} tone="amber" className="mb-4">
+              {t("nonStandardMapping", { mapping: gamepad.mapping || "—" })}
+            </Callout>
+          )}
+        </>
       ) : (
         <Callout label="—" className="mb-4">
           {t("noController")}
         </Callout>
       )}
 
+      {/* `flex-wrap` + `max-w-*` no texto: a linha divide espaço com a sidebar
+          e precisa quebrar em janela estreita em vez de empurrar o botão para
+          fora (CLAUDE.md, "Layout responsivo"). */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        {testing ? (
+          <Button variant="secondary" onClick={stopTest}>
+            {t("stopTest")}
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={startTest}>
+            {t("startTest")}
+          </Button>
+        )}
+        <p className="max-w-prose text-sm text-muted">{testing ? t("testingActiveHint") : t("idleHint")}</p>
+      </div>
+
       <Card>
         <ControllerDiagram snapshot={snapshot} />
       </Card>
 
-      <SectionHeading className="mt-6 mb-2">{t("faceButtons")}</SectionHeading>
-      <p className="text-sm text-muted">{t("buttonIndexNote")}</p>
+      <p className="mt-4 text-sm text-muted">{t("photoNote")}</p>
     </ScreenContainer>
   );
 }

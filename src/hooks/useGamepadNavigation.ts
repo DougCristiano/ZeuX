@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { isGamepadNavigationSuspended } from "./gamepadNavigationSuspend";
 
 // Zona morta do analógico — abaixo disso, ruído do próprio hardware não
 // deveria mover o foco sozinho.
@@ -123,6 +124,7 @@ export function useGamepadNavigation() {
     let frame: number;
     const prevButtons: Record<number, boolean> = {};
     let stickDirectionActive: Direction | null = null;
+    let wasSuspended = false;
 
     function poll() {
       if (!cancelled) frame = requestAnimationFrame(poll);
@@ -130,6 +132,30 @@ export function useGamepadNavigation() {
       const pads = navigator.getGamepads?.() ?? [];
       const pad = Array.from(pads).find((p) => p !== null);
       if (!pad) return;
+
+      // `ControllerTestScreen.tsx` precisa do controle inteiro para si: lá a
+      // pessoa aperta B só para ver se o botão funciona, e traduzir isso em
+      // "voltar" fechava a própria tela de teste. Só o processamento deste
+      // quadro é pulado — o `requestAnimationFrame` no topo já reagendou o
+      // próximo, então retomar é imediato quando o teste termina.
+      const suspended = isGamepadNavigationSuspended();
+      if (suspended) {
+        wasSuspended = true;
+        return;
+      }
+      if (wasSuspended) {
+        // `prevButtons` não foi atualizado durante a suspensão. Sem isto, um
+        // botão ainda pressionado no instante em que o teste termina (ex.:
+        // soltando B depois de clicar em "Parar teste" com o próprio B) lê
+        // como uma transição nova neste primeiro quadro e dispara a ação —
+        // repõe a base silenciosamente, sem processar navegação, e só volta
+        // a agir a partir do quadro seguinte.
+        wasSuspended = false;
+        for (let i = 0; i < pad.buttons.length; i++) {
+          prevButtons[i] = pad.buttons[i]?.pressed ?? false;
+        }
+        return;
+      }
 
       for (const [index, direction] of DPAD) {
         const pressed = pad.buttons[index]?.pressed ?? false;
