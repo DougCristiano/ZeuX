@@ -206,6 +206,20 @@ export const dict = {
     "pt-BR": "Cancelar",
     en: "Cancel",
   },
+  closeButton: {
+    "pt-BR": "Fechar",
+    en: "Close",
+  },
+  emulatorInstalledBiosNeededTitle: {
+    "pt-BR": "Emulador instalado — falta o BIOS",
+    en: "Emulator installed — BIOS still needed",
+  },
+  emulatorInstalledBiosNeededMessage: {
+    "pt-BR":
+      "{{emulator}} foi instalado. Este console precisa de um arquivo de BIOS que o ZeuX não fornece — você adiciona. Coloque o arquivo na pasta de BIOS e o jogo abre normalmente.",
+    en:
+      "{{emulator}} was installed. This console needs a BIOS file that ZeuX does not provide — you add it. Put the file in the BIOS folder and the game opens normally.",
+  },
   installAnyway: {
     "pt-BR": "Instalar mesmo assim",
     en: "Install anyway",

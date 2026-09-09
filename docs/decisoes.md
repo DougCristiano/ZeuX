@@ -756,6 +756,77 @@ mais uma superfície para manter em sincronia.
 `playtime_seconds`, a tela perde o bloco de tempo (a faixa de recentes
 continua).
 
+### O zeuxd morre junto do app, inclusive na auto-atualização (2026-09-09)
+
+Relato do Douglas: ao rodar a auto-atualização, o `zeuxd` ficava no ar e
+precisava ser morto na mão pelo Gerenciador de Tarefas. Causa: o único
+gatilho de `child.kill()` era `WindowEvent::CloseRequested`, e o
+`relaunch()` do auto-updater (`@tauri-apps/plugin-process`) sai pelo
+`RunEvent::ExitRequested`/`Exit`, sem passar por evento de janela.
+
+Duas defesas, propositalmente redundantes (`src-tauri/src/lib.rs` +
+`cmd/zeuxd/main.go`):
+
+1. **`RunEvent::ExitRequested | Exit`** também chama `kill_daemon()` (agora um
+   método idempotente de `DaemonState`). Cobre o caminho limpo — fechar a
+   janela, reiniciar pelo updater.
+2. **`--parent-stdin-watchdog`**: o app Tauri passa essa flag ao subir o
+   sidecar; o zeuxd lê o próprio stdin numa goroutine e, quando o cano fecha
+   (o que acontece assim que o processo pai morre — inclusive num kill
+   forçado ou crash, onde nenhum evento do Tauri roda), dispara o mesmo
+   encerramento gracioso do SIGTERM. Quem roda `go run ./cmd/zeuxd` num
+   terminal nunca recebe a flag (ali stdin é o teclado e não dá EOF sozinho).
+
+**O que quebra se desfizer:** volta a sobrar um `zeuxd` órfão segurando a
+porta 7777 — e, pior, na próxima abertura o app reaproveita esse órfão
+(`probe_port` vê `RunningZeuxd`), então a versão nova nem sobe o daemon dela.
+
+### Varredura esconde a faixa `.bin` atrás do `.cue` (2026-09-09)
+
+Relato do Douglas (com print): um jogo de PS1 em `.bin`+`.cue` entrava duas
+vezes na biblioteca. As extensões do PS1 no catálogo incluem `bin` e `cue`
+(além de `chd`/`pbp`), e `FindROMs` devolvia os dois arquivos como jogos
+separados. Só o `.cue` é o que o emulador abre.
+
+`filterShadowedDiscTracks` (`internal/library/scan.go`) roda depois da
+varredura: lê cada índice de disco encontrado (`.cue`/`.ccd` pela linha
+`FILE "..."`, `.m3u` pela lista de caminhos, `.gdi` pela coluna do nome) e
+tira do resultado os arquivos citados, sempre restrito à **mesma pasta**.
+Rede de segurança para um `.cue` ilegível: um `.bin` de mesmo nome-base que
+um `.cue` irmão também some. Sem nenhum índice na varredura (consoles de
+cartucho), a função devolve a lista intacta.
+
+Entradas `.bin` que já estavam no banco viram `missing` na varredura
+seguinte (não são apagadas — `SyncFolder`), e `missing` fica escondido por
+padrão desde 2026-09-08, então somem da visão normal do usuário sozinhas.
+
+**O que quebra se desfizer:** todo jogo de disco em faixas soltas volta a
+duplicar; um multi-disco com `.m3u` volta a aparecer como N jogos + a
+playlist.
+
+### "Jogar" num console cru: instala o emulador, o core, e avisa do BIOS (2026-09-09)
+
+Pedido do Douglas: clicar em "Jogar" com a ROM achada mas sem emulador devia
+resolver tudo — baixar o emulador mais compatível, o core (se for RetroArch),
+e avisar do BIOS (se o console precisar). A cadeia de instalação inline já
+existia (`useInlineInstall` → instala → lança; o 202 de `POST /games/launch`
+já baixa o core do RetroArch e relança). O que faltava era o passo do BIOS:
+depois de instalar, por exemplo, o DuckStation, o app lançava direto e o jogo
+abria numa tela preta, sem o ZeuX dizer nada.
+
+`useInlineInstall`, ao terminar a instalação do emulador, relê `GET
+/emulators` (agora com `installed: true` e o estado real de `bios_dir_empty`)
+e reavalia com `evaluateGameLaunchability`. Se cair em `bios_empty`, entra no
+estado novo `bios-after-install` — modal "Emulador instalado — falta o BIOS",
+com "Abrir pasta do BIOS" e "Jogar mesmo assim". Estado próprio, e não
+`confirm-bios`, porque a frase é outra ("instalei pra você, agora falta isto"
+vs. "você mandou jogar sem BIOS"). Renderizado nas três telas de jogo
+(GamesScreen, AllGamesScreen, GameDetailScreen).
+
+**O que quebra se desfizer:** volta a instalar o emulador e lançar num
+console que precisa de BIOS sem avisar — o jogo abre sem rodar e o usuário
+não sabe por quê.
+
 ---
 
 ## O que fica fora deste log, de propósito

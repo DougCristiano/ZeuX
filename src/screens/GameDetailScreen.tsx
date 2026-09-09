@@ -747,6 +747,41 @@ export function GameDetailScreen({
         />
       )}
 
+      {/* 2026-09-09: emulador instalado pelo clique em "Jogar", mas o console
+          precisa de BIOS — avisa em vez de abrir numa tela preta. */}
+      {install.state.kind === "bios-after-install" &&
+        (() => {
+          const s = install.state;
+          return (
+            <ConfirmModal
+              title={t("emulatorInstalledBiosNeededTitle")}
+              message={t("emulatorInstalledBiosNeededMessage", { emulator: s.adapterName })}
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    {t("cancelRemove")}
+                  </Button>
+                  {s.biosDir && (
+                    <Button variant="secondary" onClick={() => openBiosFolder(s.biosDir!)}>
+                      {t("openBiosFolder")}
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      install.setState({ kind: "idle" });
+                      launch(game);
+                    }}
+                  >
+                    {t("playAnyway")}
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
       {install.state.kind === "manual-install" && (
         <ManualInstallModal
           adapterName={install.state.adapterName}

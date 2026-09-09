@@ -2,14 +2,15 @@
 // com o núcleo do ZeuX via HTTP no zeuxd, não por comandos Tauri/Rust — por
 // isso não há nenhum #[tauri::command] de negócio aqui. O que este arquivo faz
 // é só o ciclo de vida do zeuxd como processo filho (item B5 do plano da
-// Sprint B, docs/sprint-b-plano.md): subir junto da janela, descer junto dela,
-// e não duplicar um zeuxd que já esteja no ar.
+// Sprint B, docs/sprint-b-plano.md): subir junto da janela, descer junto do
+// app (fechar a janela, reiniciar pelo auto-updater, ou o app morrer de
+// qualquer outro jeito), e não duplicar um zeuxd que já esteja no ar.
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -19,6 +20,16 @@ const ZEUXD_ADDR: &str = "127.0.0.1:7777";
 /// do app. Fica None quando reaproveitamos um zeuxd que já estava no ar — não
 /// é nosso para matar.
 struct DaemonState(Mutex<Option<CommandChild>>);
+
+impl DaemonState {
+    /// Derruba o zeuxd que este app subiu, se houver. Idempotente: depois da
+    /// primeira chamada o `Option` fica `None`.
+    fn kill_daemon(&self) {
+        if let Some(child) = self.0.lock().unwrap().take() {
+            let _ = child.kill();
+        }
+    }
+}
 
 /// Se probe_port() achou algo na porta que não é o zeuxd. Exposto por
 /// zeuxd_port_conflict() como comando, em vez de evento: um evento emitido
@@ -128,8 +139,16 @@ pub fn run() {
                         sidecar = sidecar.env("ZEUX_DEV_ORIGIN", "http://localhost:1420");
                     }
 
+                    // `--parent-stdin-watchdog`: o zeuxd encerra sozinho quando
+                    // o cano de stdin fecha, o que acontece assim que este
+                    // processo (o app) morre — inclusive num encerramento
+                    // forçado (Gerenciador de Tarefas) ou num crash, onde
+                    // nenhum evento do Tauri chega para rodarmos `child.kill()`.
+                    // O `on_run_event` abaixo cobre o caminho limpo (fechar a
+                    // janela, reiniciar pelo auto-updater); os dois juntos não
+                    // deixam o daemon órfão segurando a porta 7777.
                     let (mut events, child) = sidecar
-                        .args(["--addr", ZEUXD_ADDR])
+                        .args(["--addr", ZEUXD_ADDR, "--parent-stdin-watchdog"])
                         .spawn()
                         .expect("falha ao iniciar o processo do zeuxd");
 
@@ -155,18 +174,21 @@ pub fn run() {
             // limpo em SIGTERM) previram para quando o Tauri assumisse o
             // ciclo de vida do daemon.
             if let WindowEvent::CloseRequested { .. } = event {
-                if let Some(child) = window
-                    .app_handle()
-                    .state::<DaemonState>()
-                    .0
-                    .lock()
-                    .unwrap()
-                    .take()
-                {
-                    let _ = child.kill();
-                }
+                window.app_handle().state::<DaemonState>().kill_daemon();
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // `CloseRequested` acima cobre o usuário fechando a janela. Mas o
+            // auto-updater reinicia o app via `relaunch()`/`app.restart()`, que
+            // sai pelo `RunEvent::ExitRequested`/`Exit` sem passar por evento de
+            // janela — era esse o caminho que deixava o zeuxd rodando depois da
+            // atualização (relato do Douglas). Derrubar aqui fecha essa brecha;
+            // `kill_daemon` é idempotente, então rodar nos dois lugares é
+            // inofensivo.
+            if let RunEvent::ExitRequested { .. } | RunEvent::Exit = event {
+                app_handle.state::<DaemonState>().kill_daemon();
+            }
+        });
 }

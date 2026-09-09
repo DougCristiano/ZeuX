@@ -221,11 +221,91 @@ func toNewGames(consoleID string, paths []string) []NewGame {
 
 func writeFile(t *testing.T, path string) {
 	t.Helper()
+	writeFileContent(t, path, "x")
+}
+
+func writeFileContent(t *testing.T, path, content string) {
+	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("criando diretório para %q: %v", path, err)
 	}
-	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("criando %q: %v", path, err)
+	}
+}
+
+// Trava o caso do PS1 (achado do Douglas, 2026-09-09): um jogo em `.bin`+`.cue`
+// entrava duas vezes na biblioteca. Só o `.cue` (o que o emulador abre) deve
+// aparecer; o `.bin` citado dentro dele some.
+func TestFindROMsHidesBinTracksBehindTheirCue(t *testing.T) {
+	root := t.TempDir()
+	writeFileContent(t, filepath.Join(root, "Mega Man X4.cue"), "FILE \"Mega Man X4.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n")
+	writeFile(t, filepath.Join(root, "Mega Man X4.bin"))
+	// Multi-faixa: nomes-base diferentes, resolvidos pela leitura do .cue.
+	writeFileContent(t, filepath.Join(root, "Castlevania SOTN.cue"),
+		"FILE \"Castlevania SOTN (Track 1).bin\" BINARY\n  TRACK 01 MODE2/2352\nFILE \"Castlevania SOTN (Track 2).bin\" BINARY\n  TRACK 02 AUDIO\n")
+	writeFile(t, filepath.Join(root, "Castlevania SOTN (Track 1).bin"))
+	writeFile(t, filepath.Join(root, "Castlevania SOTN (Track 2).bin"))
+	// Um .chd solto continua valendo como jogo — não é faixa de nada.
+	writeFile(t, filepath.Join(root, "Crash Bandicoot.chd"))
+
+	found, err := FindROMs(root, []string{"cue", "chd", "pbp", "bin"})
+	if err != nil {
+		t.Fatalf("FindROMs: %v", err)
+	}
+
+	names := map[string]bool{}
+	for _, p := range found {
+		names[filepath.Base(p)] = true
+	}
+	want := map[string]bool{"Mega Man X4.cue": true, "Castlevania SOTN.cue": true, "Crash Bandicoot.chd": true}
+	if len(names) != len(want) {
+		t.Fatalf("FindROMs = %v, esperava só os 3 índices/imagens (%v)", names, want)
+	}
+	for n := range want {
+		if !names[n] {
+			t.Fatalf("faltou %q em %v", n, names)
+		}
+	}
+}
+
+// `.m3u` de multi-disco é a entrada única: os `.cue` que ele lista somem.
+func TestFindROMsHidesCuesListedInAnM3U(t *testing.T) {
+	root := t.TempDir()
+	writeFileContent(t, filepath.Join(root, "Final Fantasy VII.m3u"),
+		"Final Fantasy VII (Disc 1).cue\nFinal Fantasy VII (Disc 2).cue\nFinal Fantasy VII (Disc 3).cue\n")
+	for i := 1; i <= 3; i++ {
+		writeFileContent(t, filepath.Join(root, fmt.Sprintf("Final Fantasy VII (Disc %d).cue", i)),
+			fmt.Sprintf("FILE \"Final Fantasy VII (Disc %d).bin\" BINARY\n", i))
+		writeFile(t, filepath.Join(root, fmt.Sprintf("Final Fantasy VII (Disc %d).bin", i)))
+	}
+
+	found, err := FindROMs(root, []string{"m3u", "cue", "chd", "bin"})
+	if err != nil {
+		t.Fatalf("FindROMs: %v", err)
+	}
+	if len(found) != 1 || filepath.Base(found[0]) != "Final Fantasy VII.m3u" {
+		names := []string{}
+		for _, p := range found {
+			names = append(names, filepath.Base(p))
+		}
+		t.Fatalf("FindROMs = %v, esperava só o .m3u", names)
+	}
+}
+
+// Sem nenhum índice de disco na varredura, nada é filtrado — consoles que não
+// usam disco não pagam pela regra.
+func TestFindROMsLeavesNonDiscConsolesAlone(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "Sonic.md"))
+	writeFile(t, filepath.Join(root, "Streets of Rage 2.bin"))
+
+	found, err := FindROMs(root, []string{"md", "gen", "bin", "smd"})
+	if err != nil {
+		t.Fatalf("FindROMs: %v", err)
+	}
+	if len(found) != 2 {
+		t.Fatalf("FindROMs = %v, esperava os 2 arquivos (Mega Drive não usa índice)", found)
 	}
 }
 

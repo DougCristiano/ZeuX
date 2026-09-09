@@ -393,6 +393,42 @@ export function GamesScreen({
           );
         })()}
 
+      {/* 2026-09-09: o emulador foi instalado automaticamente pelo clique em
+          "Jogar", mas este console precisa de BIOS. Avisa em vez de abrir numa
+          tela preta. */}
+      {install.state.kind === "bios-after-install" &&
+        (() => {
+          const s = install.state;
+          return (
+            <ConfirmModal
+              title={t("emulatorInstalledBiosNeededTitle")}
+              message={t("emulatorInstalledBiosNeededMessage", { emulator: s.adapterName })}
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    {t("close")}
+                  </Button>
+                  {s.biosDir && (
+                    <Button variant="secondary" onClick={() => openBiosFolder(s.biosDir!)}>
+                      {t("openBiosFolder")}
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      install.setState({ kind: "idle" });
+                      doLaunch(s.pendingGamePath);
+                    }}
+                  >
+                    {t("playAnyway")}
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
       {/* B9 (achado do critico-design, 2026-08-18): mesma posição que
           GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
           (era ao lado do h1, à direita). */}

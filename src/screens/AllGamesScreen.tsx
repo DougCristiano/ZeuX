@@ -744,6 +744,42 @@ export function AllGamesScreen({
           );
         })()}
 
+      {/* 2026-09-09: emulador instalado pelo clique em "Jogar", mas o console
+          precisa de BIOS — avisa em vez de abrir numa tela preta. */}
+      {install.state.kind === "bios-after-install" &&
+        (() => {
+          const s = install.state;
+          const pendingGame = games?.find((g) => g.path === s.pendingGamePath);
+          return (
+            <ConfirmModal
+              title={t("emulatorInstalledBiosNeededTitle")}
+              message={t("emulatorInstalledBiosNeededMessage", { emulator: s.adapterName })}
+              onClose={() => install.setState({ kind: "idle" })}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                    {t("closeButton")}
+                  </Button>
+                  {s.biosDir && (
+                    <Button variant="secondary" onClick={() => openBiosFolder(s.biosDir!)}>
+                      {t("openBiosFolder")}
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      install.setState({ kind: "idle" });
+                      if (pendingGame) launch(pendingGame);
+                    }}
+                  >
+                    {t("playAnyway")}
+                  </Button>
+                </>
+              }
+            />
+          );
+        })()}
+
       {/*
        * Painel flutuante, não modal — instalar não deveria travar o resto
        * da tela (o usuário pode continuar rolando/buscando enquanto baixa).

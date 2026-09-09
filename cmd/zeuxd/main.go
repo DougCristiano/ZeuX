@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -30,6 +31,13 @@ func main() {
 	// que roda na mesma máquina e não tem motivo para aceitar conexões externas.
 	addr := flag.String("addr", "127.0.0.1:7777", "endereço de escuta do daemon")
 	debug := flag.Bool("debug", false, "ativa log detalhado de requisições")
+	// Ligado pelo app Tauri (src-tauri/src/lib.rs) ao subir o zeuxd como
+	// processo filho: quando o cano de stdin fecha — o que acontece assim que
+	// o app morre, inclusive num kill forçado ou crash —, o daemon encerra
+	// sozinho em vez de ficar órfão segurando a porta. Nunca passado por quem
+	// roda `go run ./cmd/zeuxd` num terminal (ali stdin é o teclado e nunca
+	// dá EOF sozinho).
+	parentStdinWatchdog := flag.Bool("parent-stdin-watchdog", false, "encerra o daemon quando o stdin fecha (o app pai morreu)")
 	flag.Parse()
 
 	level := slog.LevelInfo
@@ -38,13 +46,13 @@ func main() {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 
-	if err := run(*addr, logger); err != nil {
+	if err := run(*addr, *parentStdinWatchdog, logger); err != nil {
 		logger.Error("daemon encerrado com erro", "erro", err)
 		os.Exit(1)
 	}
 }
 
-func run(addr string, logger *slog.Logger) error {
+func run(addr string, parentStdinWatchdog bool, logger *slog.Logger) error {
 	catalog, err := verdict.LoadCatalog()
 	if err != nil {
 		return err
@@ -129,8 +137,22 @@ func run(addr string, logger *slog.Logger) error {
 	// Encerramento limpo no Ctrl+C: importante porque a interface Tauri vai
 	// gerenciar este processo como filho e precisa que ele morra sem deixar a
 	// porta presa.
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Encerramento também quando o app pai fecha o stdin (ver a flag). Um
+	// contexto derivado deixa os dois gatilhos — sinal e stdin — caírem no
+	// mesmo `<-ctx.Done()` do select abaixo.
+	ctx, cancel := context.WithCancel(signalCtx)
+	defer cancel()
+	if parentStdinWatchdog {
+		go func() {
+			// io.Copy bloqueia até o stdin dar EOF (cano fechado) ou erro.
+			_, _ = io.Copy(io.Discard, os.Stdin)
+			logger.Info("stdin fechou — o app pai encerrou, derrubando o daemon")
+			cancel()
+		}()
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
