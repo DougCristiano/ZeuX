@@ -619,6 +619,10 @@ export function AllGamesScreen({
   // (deixa o erro real do servidor aparecer, em vez de esconder o botão) —
   // mesma escolha de GamesScreen.
   function playHandlerFor(game: LibraryGame): (() => void) | undefined {
+    // Sem a lista de `GET /emulators`, `adapterEntryFor` devolve indefinido e
+    // um clique cairia num launch cru que falha com "emulador não encontrado"
+    // em vez de instalar — segura o clique até ela chegar (piscar rápido).
+    if (emulators === null) return undefined;
     const launchStatus = statusFor(game.id).kind;
     if (launchStatus === "launching" || launchStatus === "downloading-core") return undefined;
     if (isPendingInstallFor(game.path)) return undefined;

@@ -398,8 +398,19 @@ export function GameDetailScreen({
       install.state.kind === "confirm-hardware" ||
       install.state.kind === "confirm-bios") &&
     install.state.pendingGamePath === game.path;
+  // `emulators === null`: a lista de emuladores ainda não chegou de
+  // `GET /emulators`, então `adapterEntry` está indefinido e
+  // `evaluateGameLaunchability` não tem como distinguir "emulador instalado"
+  // de "emulador faltando" — clicar agora cairia num launch cru que falha com
+  // "emulador não encontrado" em vez de instalar. É um piscar (a chamada é
+  // local e rápida); manter o botão desabilitado até ela voltar troca o erro
+  // por uma espera imperceptível.
   const playBusy =
-    game.missing || status.kind === "launching" || status.kind === "downloading-core" || pendingInstall;
+    game.missing ||
+    emulators === null ||
+    status.kind === "launching" ||
+    status.kind === "downloading-core" ||
+    pendingInstall;
 
   async function openBiosFolder(dir: string) {
     try {

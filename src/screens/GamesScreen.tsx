@@ -648,7 +648,16 @@ export function GamesScreen({
                 install.state.kind === "confirm-hardware" ||
                 install.state.kind === "confirm-bios") &&
               install.state.pendingGamePath === game.path;
-            const canPlay = status.kind !== "launching" && status.kind !== "downloading-core" && !isPendingInstall;
+            // `emulators !== null`: sem a lista de `GET /emulators`,
+            // `adapterEntry` fica indefinido e um clique cairia num launch cru
+            // que falha com "emulador não encontrado" em vez de instalar. A
+            // chamada é local e rápida — segurar o clique até ela voltar é um
+            // piscar imperceptível.
+            const canPlay =
+              emulators !== null &&
+              status.kind !== "launching" &&
+              status.kind !== "downloading-core" &&
+              !isPendingInstall;
             // M8: mesma regra nas duas telas — só varia o que cada uma tem
             // à mão (aqui, adapterEntry já vem carregado desde sempre).
             const launchability = evaluateGameLaunchability(game, verdict, adapterEntry);
