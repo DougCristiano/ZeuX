@@ -10,6 +10,7 @@ import {
   PartialNotice,
   ScreenContainer,
   ScreenHeader,
+  SectionHeading,
 } from "../components/ui";
 import { useT } from "../i18n/i18n";
 import { dict } from "./VerdictScreen.i18n";
@@ -244,7 +245,7 @@ export function VerdictScreen({ report, onAuthorize }: { report?: Report; onAuth
     // o mesmo teto/espaçamento de listagem do resto do app
     // (`ScreenContainer`, que já herda o teto escalonado que o O5 validou).
     <ScreenContainer variant="listing">
-      <ScreenHeader title={t("specifications")} />
+      <ScreenHeader title={t("specifications")} subtitle={t("specificationsSubtitle")} />
 
       {!report ? (
         // 2026-09-08: sem consentimento, `GET /hardware` (que `SpecsPanel`
@@ -265,6 +266,10 @@ export function VerdictScreen({ report, onAuthorize }: { report?: Report; onAuth
             </div>
           )}
 
+          {/* Redesenho arcade/CRT (2026-09-09): degrau de seção em ciano
+              ("aqui o sistema informa") entre o `<h1>` e a grade de cards — o
+              mesmo `SectionHeading` que Configurações/Emuladores já usam. */}
+          <SectionHeading className="mb-3">{t("componentsHeading")}</SectionHeading>
           <SpecsPanel />
         </>
       )}

@@ -11,6 +11,8 @@ import {
   Callout,
   Card,
   CardSkeleton,
+  CHROME_TINT_DANGER,
+  CHROME_TINT_INFO,
   ConfirmModal,
   ConsoleIcon,
   ConsoleInfoModal,
@@ -277,7 +279,7 @@ function ConfiguredConsoleRow({
                 variant="chrome"
                 disabled={busy}
                 onClick={() => onRescan(folder.id)}
-                className="border-accent-secondary/50! text-accent-secondary! hover:border-accent-secondary! hover:bg-accent-secondary/10! hover:shadow-[0_0_14px_-4px_var(--accent-secondary),inset_0_1px_0_0_rgba(255,255,255,0.06)]!"
+                className={CHROME_TINT_INFO}
               >
                 <RefreshCw size={12} aria-hidden="true" className={busy ? "animate-spin" : ""} />
                 {t("rescan")}
@@ -292,7 +294,7 @@ function ConfiguredConsoleRow({
                 variant="chrome"
                 disabled={busy}
                 onClick={() => setConfirmingRemove(folder.id)}
-                className="border-danger/50! text-danger! hover:border-danger! hover:bg-danger/10! hover:shadow-[0_0_14px_-4px_var(--danger),inset_0_1px_0_0_rgba(255,255,255,0.06)]!"
+                className={CHROME_TINT_DANGER}
               >
                 <Trash2 size={12} aria-hidden="true" />
                 {t("remove")}

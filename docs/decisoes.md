@@ -162,6 +162,42 @@ visual — telas restantes".
 migradas quebra a consistência que motivou o pedido — o achado original foi
 justamente "os botões estão destoando".
 
+### Redesenho arcade/CRT estendido às telas do início e a Configurações (2026-09-09)
+
+A rodada de 2026-09-07 parou nas telas de biblioteca/consoles/emuladores. Esta
+fechou o resto, sem inventar vocabulário novo — só aplicando o que `ui.tsx` e
+`index.css` já expõem:
+
+- **Telas de onboarding** (`ConsentScreen`, `DeclinedScreen`, `StatusScreen`):
+  kicker monoespaçado em `--accent-secondary` (ciano = "aqui o sistema
+  informa" — um pedido de consentimento e um estado de conexão são o sistema
+  declarando algo, não o usuário agindo), linhas de CRT decorativas
+  (`.zeux-scanlines`) a ~8% de tela cheia ou 60% recortadas no logo (mesmo uso
+  do `SplashScreen`). Botões que não são ação-sobre-conteúdo ("Agora não",
+  "Continuar sem autorizar", "Ver emuladores") desceram de `secondary` para
+  `chrome`; só "Autorizar leitura"/"Autorizar agora" ficam em `primary`. O
+  `ConsentScreen` continua exibindo o `policy_text` do servidor **literalmente**
+  (princípio 1). `ErrorScreen` troca o `<p>` vermelho solto pelo `InlineError`
+  do app.
+- **`VerdictScreen`**: subtítulo no `ScreenHeader` + `SectionHeading`
+  ("Componentes") antes da grade de specs — o degrau ciano que faltava entre o
+  `<h1>` e os cards. Nenhuma mudança no texto de hardware (continua descritivo,
+  princípios 2/3) nem no aviso `parcial` (princípio 4).
+- **`SettingsScreen`**: passada completa. Todo `secondary` que era chrome de app
+  (procurar atualização, testar controle, abrir desinstalação, mapear controle,
+  abrir/verificar no fluxo guiado, "tentar de novo") virou `chrome`;
+  "Desconectar" ganhou `CHROME_TINT_DANGER` (destrutivo sinalizado antes do
+  clique, com `ConfirmModal` mantido); os subtítulos `<h3 text-primary>`
+  viraram kicker monoespaçado (roxo é reservado a ação). `primary` continua só
+  em "Baixar e instalar" e "Conectar".
+- **`ControllerTestScreen`**: já estava alinhada (refeita em 2026-09-08). Só o
+  "Parar teste" solto em `secondary` virou `chrome`.
+- **Limpeza:** `LibraryScreen` passou a usar `CHROME_TINT_INFO`/
+  `CHROME_TINT_DANGER` de `ui.tsx` no lugar das strings de tingimento inline.
+
+**O que quebra se desfizer:** mesmo risco da entrada acima — `secondary`/cor
+solta reintroduzida quebra a consistência entre telas.
+
 ### Configuração de emulador dentro do ZeuX, não overlay in-game
 
 O pedido original admitia duas leituras: uma tela do ZeuX que edita a

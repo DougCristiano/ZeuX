@@ -1,6 +1,7 @@
 import type { Dict } from "../i18n/i18n";
 
 export const dict = {
+  kicker: { "pt-BR": "Consentimento", en: "Consent" },
   heading: { "pt-BR": "Antes de começar", en: "Before we begin" },
   revokeNote: {
     "pt-BR": "Você pode revogar essa autorização depois, a qualquer momento.",

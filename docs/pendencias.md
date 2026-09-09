@@ -135,25 +135,27 @@ implementar.
 
 ## Redesenho visual — telas restantes
 
-**Origem:** o redesenho arcade/CRT de 2026-09-07 (`decisoes.md`) cobriu 7
-telas; estas continuam no visual anterior (`secondary`/cores soltas, sem o
-vocabulário `chrome`/`h-9`/blur pesado):
+**Concluído em 2026-09-09** (ver `decisoes.md`, "Redesenho arcade/CRT
+estendido às telas do início e a Configurações"). O redesenho de 2026-09-07
+cobriu 7 telas; esta rodada terminou o restante:
 
-- `ConsentScreen.tsx`, `DeclinedScreen.tsx`, `StatusScreen.tsx` — telas do
-  início do app, antes da biblioteca.
-- `VerdictScreen.tsx` — parecer geral de hardware.
-- `SettingsScreen.tsx` — preferências do app (só recebeu ajuste pontual de
-  botão, não uma passada completa).
-- `ControllerTestScreen.tsx` — não confirmado se precisa: já foi desenhada
-  do zero recentemente (ver commit "tela de teste visual do controle"),
-  pode já estar alinhada; conferir antes de mexer.
+- ~~`ConsentScreen.tsx`, `DeclinedScreen.tsx`, `StatusScreen.tsx`~~ — kicker
+  monoespaçado em ciano, linhas de CRT decorativas, "Agora não"/"Continuar
+  sem autorizar"/"Ver emuladores" descidos para `chrome`, erro de conexão
+  agora no `InlineError` do app.
+- ~~`VerdictScreen.tsx`~~ — subtítulo no cabeçalho e `SectionHeading`
+  ("Componentes") antes da grade de specs; texto de hardware continua
+  descritivo e o aviso `parcial` intacto.
+- ~~`SettingsScreen.tsx`~~ — passada completa: todo `secondary` de chrome de
+  app virou `chrome`, subtítulos `text-primary` viraram kicker monoespaçado,
+  "Desconectar" ganhou `CHROME_TINT_DANGER`.
+- ~~`ControllerTestScreen.tsx`~~ — já estava no vocabulário novo (refeita em
+  2026-09-08 com foto real + realce ciano); só o botão "Parar teste" solto em
+  `secondary` virou `chrome`.
 
-**Limpeza pendente, não é tela nova:** `LibraryScreen.tsx` ainda escreve o
-tingimento de `chrome` ciano/vermelho inline (`border-accent-secondary/50!
-text-accent-secondary! hover:...`) em vez de usar `CHROME_TINT_INFO`/
-`CHROME_TINT_DANGER` (`ui.tsx`), criados numa rodada posterior
-(`EmulatorsScreen.tsx`) exatamente pra esse padrão. Troca mecânica, sem
-mudança visual.
+**Limpeza feita junto:** `LibraryScreen.tsx` passou a importar
+`CHROME_TINT_INFO`/`CHROME_TINT_DANGER` de `ui.tsx` no lugar das duas strings
+de tingimento inline (sem mudança visual).
 
 **Depende de:** nada · **Bloqueia:** nada
 

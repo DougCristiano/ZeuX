@@ -2,6 +2,11 @@ import type { Dict } from "../i18n/i18n";
 
 export const dict = {
   specifications: { "pt-BR": "Especificações", en: "Specifications" },
+  specificationsSubtitle: {
+    "pt-BR": "O retrato desta máquina, como o ZeuX a leu.",
+    en: "This machine's readout, as ZeuX scanned it.",
+  },
+  componentsHeading: { "pt-BR": "Componentes", en: "Components" },
   system: { "pt-BR": "Sistema", en: "System" },
   processor: { "pt-BR": "Processador", en: "Processor" },
   memory: { "pt-BR": "Memória", en: "Memory" },

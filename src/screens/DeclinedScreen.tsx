@@ -17,6 +17,12 @@ import { dict } from "./DeclinedScreen.i18n";
  * hardware calculado — jogos abrem sem preset autoconfigurado (ver
  * `internal/api/server.go`, `toInput`), e a tela de Especificações mostra
  * por que não há parecer, com um atalho de volta para autorizar.
+ *
+ * Redesenho arcade/CRT estendido a esta tela (2026-09-09, ver docs/decisoes.md):
+ * kicker monoespaçado em ciano (o sistema informando o estado — sem leitura de
+ * hardware), linhas de CRT decorativas, e só "Autorizar agora" fica em
+ * `primary`. "Continuar sem autorizar" e "Ver emuladores" são navegação e
+ * descem para `chrome` — nada de `secondary` solto.
  */
 export function DeclinedScreen({
   onReconsider,
@@ -35,7 +41,12 @@ export function DeclinedScreen({
     // do comentário em AmbientGlow (src/components/ui.tsx).
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6">
       <AmbientGlow />
+      {/* Linhas de CRT bem apagadas (~8%) — mesmo material do `SplashScreen`/
+          `GameHero`; o texto por cima é `--ink`/`--muted` sobre `--paper`, com
+          folga de contraste de sobra. */}
+      <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-[0.08]" />
       <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
+        <p className="font-mono text-xs tracking-wider text-accent-secondary uppercase">{t("kicker")}</p>
         <h1 className="text-2xl font-semibold text-ink">{t("heading")}</h1>
         <p className="text-base text-ink">
           {t("description")}
@@ -47,10 +58,10 @@ export function DeclinedScreen({
           <Button variant="primary" autoFocus onClick={onReconsider}>
             {t("reconsider")}
           </Button>
-          <Button variant="secondary" onClick={onContinueWithoutConsent}>
+          <Button variant="chrome" onClick={onContinueWithoutConsent}>
             {t("continueWithoutConsent")}
           </Button>
-          <Button variant="secondary" onClick={onViewEmulators}>
+          <Button variant="chrome" onClick={onViewEmulators}>
             {t("viewEmulators")}
           </Button>
         </div>

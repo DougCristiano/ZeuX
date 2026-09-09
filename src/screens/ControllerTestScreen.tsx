@@ -288,7 +288,7 @@ export function ControllerTestScreen({ onBack }: { onBack: () => void }) {
           fora (CLAUDE.md, "Layout responsivo"). */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {testing ? (
-          <Button variant="secondary" onClick={stopTest}>
+          <Button variant="chrome" onClick={stopTest}>
             {t("stopTest")}
           </Button>
         ) : (

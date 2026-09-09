@@ -7,7 +7,7 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
-import { Badge, Button, Card, ConfirmModal, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
+import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
@@ -294,7 +294,7 @@ export function SettingsScreen({
         {updateState.kind === "error" && <InlineError className="mb-3">{updateState.message}</InlineError>}
 
         <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" disabled={updateState.kind === "checking" || updateState.kind === "installing"} onClick={checkForUpdates}>
+          <Button variant="chrome" disabled={updateState.kind === "checking" || updateState.kind === "installing"} onClick={checkForUpdates}>
             {updateState.kind === "checking" ? t("checkingUpdates") : t("checkUpdates")}
           </Button>
           {updateState.kind === "available" && (
@@ -313,7 +313,7 @@ export function SettingsScreen({
           <Button variant="primary" className="w-fit" onClick={onOpenConfigureController}>
             {t("configureControllerButton")}
           </Button>
-          <Button variant="secondary" className="w-fit" onClick={onOpenControllerTest}>
+          <Button variant="chrome" className="w-fit" onClick={onOpenControllerTest}>
             {t("testControllerButton")}
           </Button>
         </div>
@@ -326,7 +326,10 @@ export function SettingsScreen({
             if (checkable.length > 0) {
               return (
                 <div className="mb-6">
-                  <h3 className="mb-2 text-sm font-semibold text-primary">{t("guidedSetupHeading")}</h3>
+                  {/* Redesenho arcade/CRT (2026-09-09): subtítulo de bloco no mesmo
+              vocabulário de kicker monoespaçado do resto do app, no lugar do
+              `text-primary` (roxo reservado a ação). */}
+          <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("guidedSetupHeading")}</h3>
                   <GamepadStatusLine />
                   <div className="mt-3 flex flex-col gap-3">
                     {checkable.map((emulator) => (
@@ -347,12 +350,12 @@ export function SettingsScreen({
             }
             return (
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-primary">{t("manualMappingHeading")}</h3>
+                <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("manualMappingHeading")}</h3>
                 <div className="flex flex-col gap-3">
                   {bindable.map((emulator) => (
                     <div key={emulator.adapter_id}>
                       <Button
-                        variant="secondary"
+                        variant="chrome"
                         className="w-fit"
                         onClick={() =>
                           setExpandedAdapterId((id) => (id === emulator.adapter_id ? null : emulator.adapter_id))
@@ -406,7 +409,7 @@ export function SettingsScreen({
               {t("uninstallWindowsDescription")}
             </p>
             {uninstallError && <InlineError>{uninstallError}</InlineError>}
-            <Button variant="secondary" onClick={openWindowsUninstall} className="w-fit">
+            <Button variant="chrome" onClick={openWindowsUninstall} className="w-fit">
               {t("openWindowsUninstall")}
             </Button>
           </div>
@@ -437,7 +440,7 @@ export function SettingsScreen({
         {state.kind === "error" && (
           <div>
             <InlineError className="mb-2">{state.message}</InlineError>
-            <Button variant="secondary" onClick={loadStatus}>
+            <Button variant="chrome" onClick={loadStatus}>
               {t("tryAgain")}
             </Button>
           </div>
@@ -466,7 +469,16 @@ export function SettingsScreen({
                 }
               />
             ) : (
-              <Button variant="secondary" onClick={() => setConfirmingDisconnect(true)}>
+              // Vermelho já em repouso (mesmo padrão de "Remover" em
+              // Emuladores/Biblioteca): desconectar apaga a credencial pessoal.
+              // A cor não é o único sinal — o rótulo diz "Desconectar" e o
+              // `ConfirmModal` confirma —, então não viola 1.4.1.
+              <Button
+                type="button"
+                variant="chrome"
+                className={CHROME_TINT_DANGER}
+                onClick={() => setConfirmingDisconnect(true)}
+              >
                 {t("disconnect")}
               </Button>
             )}
@@ -584,13 +596,13 @@ function GuidedControllerSetupStep({ emulator }: { emulator: EmulatorEntry }) {
 
   return (
     <Card filled dense>
-      <p className="mb-2 font-medium text-primary">{emulator.name}</p>
+      <p className="mb-2 font-semibold text-ink">{emulator.name}</p>
       {instructionKey && <p className="mb-3 text-sm text-muted">{t(instructionKey)}</p>}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="secondary" disabled={opening} onClick={openEmulator}>
+        <Button variant="chrome" disabled={opening} onClick={openEmulator}>
           {opening ? t("guidedSetupOpening") : t("guidedSetupOpenButton", { emulator: emulator.name })}
         </Button>
-        <Button variant="secondary" disabled={verify.kind === "checking"} onClick={verifyStatus}>
+        <Button variant="chrome" disabled={verify.kind === "checking"} onClick={verifyStatus}>
           {verify.kind === "checking" ? t("guidedSetupVerifying") : t("guidedSetupVerifyButton")}
         </Button>
         {verify.kind === "done" &&
