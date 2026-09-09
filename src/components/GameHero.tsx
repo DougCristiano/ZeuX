@@ -192,10 +192,16 @@ export function GameHero({
                 mas ali o rótulo é um ícone e não promete nada — aqui é uma
                 palavra escrita, e "Continuar" num jogo que ainda não abre
                 seria uma promessa falsa. */}
+            {/* `data-gamepad-start`: onde o cursor do controle pousa ao
+                entrar nesta tela (useGamepadNavigation.ts, `landingTarget`).
+                Sem isto o pouso seria o primeiro focável por posição de
+                tela — que aqui é chrome de navegação, não a ação que a
+                pessoa veio fazer. O spread de objeto é o que permite um
+                `data-*` num componente React sem alargar `ButtonProps`. */}
             {blocked &&
             onInstall &&
             (launchability!.reason === "not_installed" || launchability!.reason === "install_manual") ? (
-              <Button variant="primary" onClick={onInstall}>
+              <Button variant="primary" onClick={onInstall} {...{ "data-gamepad-start": "" }}>
                 {launchability!.badge}
               </Button>
             ) : blocked &&
@@ -205,13 +211,13 @@ export function GameHero({
               // abre assim mesmo (na config padrão do emulador). "Continuar"
               // aqui prometeria retomar de onde parou; "jogar assim mesmo"
               // não. O motivo do bloqueio já está escrito acima (`blocked`).
-              <Button variant="primary" onClick={onPlay} className="gap-2">
+              <Button variant="primary" onClick={onPlay} className="gap-2" {...{ "data-gamepad-start": "" }}>
                 <Play size={15} fill="currentColor" aria-hidden="true" />
                 {t("playAnyway")}
               </Button>
             ) : (
               onPlay && (
-                <Button variant="primary" onClick={onPlay} className="gap-2">
+                <Button variant="primary" onClick={onPlay} className="gap-2" {...{ "data-gamepad-start": "" }}>
                   <Play size={15} fill="currentColor" aria-hidden="true" />
                   {t("resume")}
                 </Button>

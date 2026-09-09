@@ -449,7 +449,73 @@ textarea {
  * possivelmente perto de invisível) — trocam o pulso por uma opacidade
  * estática ainda perceptível.
  */
+/*
+ * Cursor da navegação por controle (`[data-gamepad-focused]`, marcado por
+ * `src/hooks/useGamepadNavigation.ts`).
+ *
+ * Por que não reaproveitar `:focus-visible` (o `FOCUS_RING` de ui.tsx):
+ * relato do Douglas com controle real na v0.1.22 — "não estou conseguindo ver
+ * ONDE estou". A navegação foca por script (`.focus()`), e no Chromium
+ * (WebView2, motor do Tauri no Windows) o `:focus-visible` programático não é
+ * garantido; todo o realce do app estava escrito em `focus-visible:`, então o
+ * foco andava invisível. Marcar o elemento é determinístico.
+ *
+ * Fora de `@layer` de propósito: precisa vencer as utilities do Tailwind que
+ * pintam borda/sombra no mesmo elemento (mesma armadilha de cascade layer
+ * documentada no bloco de `.game-cover` acima) — aqui, ao contrário daquele
+ * caso, vencer é o objetivo.
+ *
+ * É "cursor de menu de console", não anel de formulário: 3px na cor de
+ * interação (`--console-accent` quando o elemento pertence a um console,
+ * roxo da marca fora disso), halo por fora e por dentro, e uma respiração
+ * lenta do halo para o olho achar a posição de longe.
+ */
+[data-gamepad-focused] {
+  outline: 3px solid var(--console-accent, var(--accent));
+  outline-offset: 3px;
+  border-radius: var(--radius);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--console-accent, var(--accent)) 60%, transparent),
+    0 0 24px color-mix(in srgb, var(--console-accent, var(--accent)) 55%, transparent);
+  animation: zeux-cursor-respira 1.8s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes zeux-cursor-respira {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--console-accent, var(--accent)) 60%, transparent),
+      0 0 24px color-mix(in srgb, var(--console-accent, var(--accent)) 55%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--console-accent, var(--accent)) 60%, transparent),
+      0 0 34px color-mix(in srgb, var(--console-accent, var(--accent)) 85%, transparent);
+  }
+}
+
+/* A capa dentro do elemento marcado acende junto — o mesmo tratamento que
+   `GameCover` já dá ao `group-focus-visible`, que pelo motivo acima nunca
+   dispara na navegação por controle. */
+[data-gamepad-focused] .game-cover {
+  border-color: var(--console-accent, var(--accent));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--console-accent, var(--accent)) 45%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  /* A respiração do halo some, mas o realce continua inteiro: o `!important`
+     genérico acima só zeraria a duração, congelando o cursor num quadro
+     arbitrário do keyframe. Aqui o estado estático é o mais forte dos dois,
+     não um meio-termo. */
+  [data-gamepad-focused] {
+    animation: none !important;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--console-accent, var(--accent)) 60%, transparent),
+      0 0 30px color-mix(in srgb, var(--console-accent, var(--accent)) 70%, transparent);
+  }
+
   *,
   *::before,
   *::after {

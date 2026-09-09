@@ -34,6 +34,14 @@ export function PlayIcon({ size = 14, className = "" }: { size?: number; classNa
 
 // O anel de foco usa --accent (src/index.css) — a mesma cor de interação em
 // toda a interface, não uma cor de foco genérica fixa.
+//
+// Este anel é do TECLADO. A navegação por controle não passa por aqui: ela
+// foca por script, e `:focus-visible` programático não é confiável no
+// WebView2 (ver `useGamepadNavigation.ts` e o bloco
+// `[data-gamepad-focused]` em src/index.css). Onde um componente reage ao
+// foco com mais do que o anel — o glow da capa, o overlay de play — a
+// variante `[[data-gamepad-focused]_&]:` acompanha o `group-focus-visible:`
+// para que o controle acenda a mesma coisa que o teclado acende.
 export const FOCUS_RING =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
@@ -843,7 +851,7 @@ export function GameCover({
               clique continua indo para o wrapper `role="button"` por baixo. */}
           {hoverInfo && (
             <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black/85 via-black/70 to-transparent px-2 pt-5 pb-1.5 opacity-0 transition-[transform,opacity] duration-150 ease-in-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
+              className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black/85 via-black/70 to-transparent px-2 pt-5 pb-1.5 opacity-0 transition-[transform,opacity] duration-150 ease-in-out group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 [[data-gamepad-focused]_&]:translate-y-0 [[data-gamepad-focused]_&]:opacity-100"
               aria-hidden="true"
             >
               <p className="line-clamp-2 text-[11px] leading-tight text-white/90">{hoverInfo}</p>
@@ -944,7 +952,7 @@ export function GameCover({
             // baixo. O wrapper continua `pointer-events-none`: só o círculo
             // (quando `onPlay` existe) reativa clique, o resto da capa
             // continua abrindo o detalhe por baixo (M1).
-            <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/60 group-hover:flex group-focus-visible:flex">
+            <div className="pointer-events-none absolute inset-0 hidden items-center justify-center bg-black/60 group-hover:flex group-focus-visible:flex [[data-gamepad-focused]_&]:flex">
               {onPlay ? (
                 // M1 (docs/sprint-m-plano.md): botão real, não mais
                 // decorativo. `tabIndex={-1}` tira este botão da ordem

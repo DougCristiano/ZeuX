@@ -107,7 +107,7 @@ function ConsoleTile({
         // classe, nunca do `style` inline: inline venceria o `group-hover:`
         // por especificidade e o halo nunca apareceria — só o
         // `backgroundColor` branco (que não conflita) continua inline.
-        className={`relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border font-pixel text-[11px] leading-none transition duration-150 group-hover:border-[var(--console-accent)] group-hover:brightness-110 group-hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent)_45%,transparent)] group-focus-visible:border-[var(--console-accent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent)_45%,transparent)] ${
+        className={`relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border font-pixel text-[11px] leading-none transition duration-150 group-hover:border-[var(--console-accent)] group-hover:brightness-110 group-hover:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent)_45%,transparent)] group-focus-visible:border-[var(--console-accent)] group-focus-visible:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent)_45%,transparent)] [[data-gamepad-focused]_&]:border-[var(--console-accent)] [[data-gamepad-focused]_&]:shadow-[0_0_16px_color-mix(in_srgb,var(--console-accent)_45%,transparent)] ${
           ready
             ? "border-[var(--console-accent)]"
             : "border-[color-mix(in_srgb,var(--console-accent)_40%,transparent)]"

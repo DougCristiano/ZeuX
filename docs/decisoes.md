@@ -827,6 +827,42 @@ vs. "você mandou jogar sem BIOS"). Renderizado nas três telas de jogo
 console que precisa de BIOS sem avisar — o jogo abre sem rodar e o usuário
 não sabe por quê.
 
+### Cursor do controle por atributo, não por `:focus-visible` (2026-09-09)
+
+Relato do Douglas testando a v0.1.22 com controle real: "não estou
+conseguindo ver ONDE estou com o controle. Ele funciona — o foco anda — mas
+não vejo um seletor no campo exato onde estou".
+
+Causa: `useGamepadNavigation` move o foco com `.focus()` **programático**, e
+no Chromium (WebView2, o motor do Tauri no Windows) `.focus()` chamado por
+script não satisfaz de forma confiável a heurística de `:focus-visible` —
+que é justamente onde todo o realce do app estava escrito (`FOCUS_RING` em
+`ui.tsx`, `group-focus-visible:` em `GameCover`). O foco andava, invisível.
+Não existe forma de "forçar" `:focus-visible`: é decisão do motor.
+
+Decisão: o laço de navegação marca o elemento atual com
+`data-gamepad-focused` (e limpa do anterior), e `src/index.css` estiliza esse
+seletor com um realce forte — contorno de 3px na cor de interação
+(`--console-accent` quando há uma), halo por fora e por dentro, respiração
+lenta do halo (desligada sob `prefers-reduced-motion`, com o estado estático
+mais forte no lugar). O bloco fica **fora de `@layer`** de propósito, para
+vencer as utilities do Tailwind que pintam borda/sombra no mesmo elemento.
+Onde um componente reage ao foco com mais que o anel — o glow da capa, o
+overlay de play, a logo do console —, a variante
+`[[data-gamepad-focused]_&]:` acompanha o `group-focus-visible:` existente.
+
+Dois efeitos vieram junto, porque sem eles o realce ainda deixaria buracos:
+o cursor **pousa sozinho** quando não há nenhum (ao conectar o controle e a
+cada troca de tela, quando o elemento focado desmonta), preferindo o
+`data-gamepad-start` que a tela declarar; e o cursor **é exclusivo do
+controle** — o primeiro `pointerdown` ou Tab/seta o apaga, para não haver
+dois indicadores de "onde estou" ao mesmo tempo.
+
+**O que quebra se desfizer:** reescrever o realce em `focus-visible:` devolve
+o bug original — navegação por controle funcionando e invisível. Se o
+`data-gamepad-focused` deixar de ser limpo em `pointerdown`, quem usa mouse
+passa a ver um cursor de controle preso num elemento qualquer.
+
 ---
 
 ## O que fica fora deste log, de propósito

@@ -128,6 +128,16 @@ grade, "próximo" é posição na tela). Botão A confirma, abre o jogo. Botão 
 tenta voltar — mas só funciona se a tela atual tiver um botão de "Voltar"
 reconhecível; nem toda tela tem.
 
+**Dá para ver onde o foco está.** Enquanto o controle está conectado, o item
+sob o cursor fica com um contorno grosso e um halo na cor de interação — na
+cor do console, quando o item pertence a um; é um cursor de menu de console,
+não um contorno fino de formulário. E existe sempre um: ao plugar o controle
+e a cada troca de tela o cursor pousa sozinho num item sensato (a ação
+principal da tela, ou o primeiro item da área de conteúdo), em vez de a tela
+ficar sem nenhum ponto de partida até alguém apertar uma direção no escuro.
+O cursor é exclusivo do controle: quem encosta no mouse ou no teclado o vê
+sumir na hora, e a interface volta ao realce discreto de sempre.
+
 Assim que um controle é plugado, um rodapé fino aparece na base da tela com
 os prompts do que os botões fazem — **Ⓐ Selecionar** sempre, e **Ⓑ Voltar**
 só nas telas que têm um botão de voltar de verdade (o prompt some quando não
