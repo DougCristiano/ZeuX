@@ -97,4 +97,29 @@ export const dict = {
   playtime: { "pt-BR": "Tempo jogado", en: "Playtime" },
   lastPlayed: { "pt-BR": "Última vez", en: "Last played" },
   sessions: { "pt-BR": "Sessões", en: "Sessions" },
+  // "Remover da biblioteca" (2026-09-09). O texto deixa claro que o arquivo
+  // no disco não é tocado — só a entrada na biblioteca some.
+  removeHeading: { "pt-BR": "Remover da biblioteca", en: "Remove from library" },
+  removeFromLibraryHelp: {
+    "pt-BR": "Esconde este jogo da biblioteca. O arquivo continua no seu computador, intacto — só some da lista, e não volta na próxima varredura. Para trazer de volta, use o filtro \"Ocultos\" em Todos os jogos.",
+    en: "Hides this game from the library. The file stays on your computer, untouched — it just leaves the list, and won't come back on the next scan. To bring it back, use the \"Hidden\" filter in All games.",
+  },
+  removeFromLibrary: { "pt-BR": "Remover da biblioteca", en: "Remove from library" },
+  removing: { "pt-BR": "Removendo…", en: "Removing…" },
+  removeFromLibraryTitle: { "pt-BR": "Remover da biblioteca?", en: "Remove from library?" },
+  removeFromLibraryConfirm: {
+    "pt-BR": "\"{{title}}\" some da biblioteca. O arquivo no disco não é apagado, e você pode trazer o jogo de volta pelo filtro \"Ocultos\".",
+    en: "\"{{title}}\" leaves the library. The file on disk is not deleted, and you can bring the game back through the \"Hidden\" filter.",
+  },
+  cancelRemove: { "pt-BR": "Cancelar", en: "Cancel" },
+  restoreHeading: { "pt-BR": "Trazer de volta", en: "Bring back" },
+  restoreToLibrary: { "pt-BR": "Trazer de volta à biblioteca", en: "Bring back to library" },
+  restoreToLibraryHelp: {
+    "pt-BR": "Este jogo está oculto. Trazer de volta faz ele reaparecer na biblioteca normalmente.",
+    en: "This game is hidden. Bringing it back makes it show up in the library again.",
+  },
+  errorRemovingFromLibrary: {
+    "pt-BR": "Não foi possível remover o jogo da biblioteca.",
+    en: "Could not remove the game from the library.",
+  },
 } satisfies Dict;

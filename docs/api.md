@@ -113,8 +113,11 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `GET /library/folders` | Lista pastas apontadas. |
 | `DELETE /library/folders/{id}` | Remove uma pasta apontada (não apaga arquivo nenhum — é só a referência). |
 | `POST /library/folders/{id}/scan` | Revarre uma pasta específica. |
-| `GET /library/games` | Lista jogos encontrados. Aceita `?sort=` — valores em **português** de propósito (`recentes`/`titulo`/`tempo_jogado`), exceção deliberada registrada no `CLAUDE.md`: preferência de tela consumida só pela própria UI do ZeuX. Sem `console_id` (modo "todos os jogos"), `?favorite=true` restringe aos favoritos e `?missing=true` (2026-09-08) inverte o filtro de ausência — por padrão um jogo com arquivo não achado na última varredura fica fora da lista; com esse parâmetro aparecem só eles, nunca misturados com o resto. |
+| `GET /library/games` | Lista jogos encontrados. Aceita `?sort=` — valores em **português** de propósito (`recentes`/`titulo`/`tempo_jogado`), exceção deliberada registrada no `CLAUDE.md`: preferência de tela consumida só pela própria UI do ZeuX. Sem `console_id` (modo "todos os jogos"): `?favorite=true` restringe aos favoritos; `?missing=true` (2026-09-08) inverte o filtro de ausência — por padrão um jogo com arquivo não achado na última varredura fica fora da lista, com esse parâmetro aparecem só eles; `?excluded=true` (2026-09-09) inverte o filtro de "Remover da biblioteca" — jogos escondidos ficam fora por padrão, com esse parâmetro aparecem só eles; `?played=true` (2026-09-09) devolve só os jogos já abertos ao menos uma vez (`playtime_seconds > 0`). No modo por console, jogos escondidos também são omitidos. |
 | `POST/DELETE /library/games/{id}/favorite` | Marca/desmarca favorito. |
+| `POST/DELETE /library/games/{id}/exclude` | Esconde/revela o jogo na biblioteca (2026-09-09). Não toca o arquivo no disco — só a entrada. A flag sobrevive à varredura seguinte; `DELETE` (ou o filtro `?excluded=true` na tela) é o caminho de volta. `404 not_found` para id inexistente. |
+
+`GET /consoles` devolve o catálogo em **ordem alfabética por nome** (2026-09-09). `GET /consoles/verdicts` ordena por prontidão (console mais viável primeiro) de propósito — catálogo não é parecer.
 
 ## 9. Capas de jogo (IGDB)
 

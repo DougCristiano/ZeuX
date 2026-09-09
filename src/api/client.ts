@@ -296,13 +296,26 @@ export const api = {
   // página/plataforma. `missingOnly` (2026-09-08) inverte o filtro de
   // ausência: por padrão jogos sem arquivo ficam fora da lista; com
   // `missing=true` a resposta traz só eles, nunca misturado com o resto.
+  // `playedOnly` (2026-09-09) manda `played=true`: só jogos já abertos ao
+  // menos uma vez (playtime > 0), filtrado no servidor depois da junção com
+  // as sessões. `excludedOnly` manda `excluded=true`: inverte o filtro de
+  // "Remover da biblioteca" — por padrão os jogos escondidos ficam fora,
+  // ligado traz só eles (o caminho de volta para revelar).
   getAllLibraryGames: (
     page: number,
     pageSize: number,
-    opts: { query?: string; favoriteOnly?: boolean; missingOnly?: boolean; platform?: string; sort?: string } = {},
+    opts: {
+      query?: string;
+      favoriteOnly?: boolean;
+      missingOnly?: boolean;
+      excludedOnly?: boolean;
+      playedOnly?: boolean;
+      platform?: string;
+      sort?: string;
+    } = {},
   ) =>
     request<{ games: LibraryGame[]; total: number; page: number; page_size: number; consoles: string[] }>(
-      `/library/games?page=${page}&page_size=${pageSize}${opts.query ? `&q=${encodeURIComponent(opts.query)}` : ""}${opts.favoriteOnly ? "&favorite=true" : ""}${opts.missingOnly ? "&missing=true" : ""}${opts.platform ? `&platform=${encodeURIComponent(opts.platform)}` : ""}${opts.sort ? `&sort=${encodeURIComponent(opts.sort)}` : ""}`,
+      `/library/games?page=${page}&page_size=${pageSize}${opts.query ? `&q=${encodeURIComponent(opts.query)}` : ""}${opts.favoriteOnly ? "&favorite=true" : ""}${opts.missingOnly ? "&missing=true" : ""}${opts.excludedOnly ? "&excluded=true" : ""}${opts.playedOnly ? "&played=true" : ""}${opts.platform ? `&platform=${encodeURIComponent(opts.platform)}` : ""}${opts.sort ? `&sort=${encodeURIComponent(opts.sort)}` : ""}`,
     ),
   // G4: favoritar/desfavoritar — resposta idêntica nas duas, só o valor
   // gravado muda.
@@ -310,6 +323,12 @@ export const api = {
     request<{ id: number; favorite: boolean }>(`/library/games/${id}/favorite`, { method: "POST" }),
   unfavoriteGame: (id: number) =>
     request<{ id: number; favorite: boolean }>(`/library/games/${id}/favorite`, { method: "DELETE" }),
+  // "Remover da biblioteca" (2026-09-09): esconde/revela o jogo. Nunca toca o
+  // arquivo no disco — só a flag no banco. POST esconde, DELETE revela.
+  excludeGame: (id: number) =>
+    request<{ id: number; excluded: boolean }>(`/library/games/${id}/exclude`, { method: "POST" }),
+  unexcludeGame: (id: number) =>
+    request<{ id: number; excluded: boolean }>(`/library/games/${id}/exclude`, { method: "DELETE" }),
 
   // --- Scraper de metadados IGDB (G1) ---
   getIGDBCredentials: () => request<IGDBCredentialsStatus>("/igdb/credentials"),

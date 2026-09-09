@@ -546,6 +546,45 @@ sem DevTools expostos, pode não ter um caminho óbvio nenhum.
 
 ---
 
+### "Remover jogo da biblioteca" é uma flag, não um DELETE (2026-09-09)
+
+O Douglas pediu a opção de remover um jogo da biblioteca. A implementação
+óbvia — apagar a linha de `library_games` — não funciona: `SyncFolder`
+regrava todo caminho encontrado na varredura seguinte (e a tela "Todos os
+jogos" revarre sozinha ao abrir, `rescanAllFoldersIfStale`), então o jogo
+voltaria minutos depois sem o usuário entender por quê.
+
+Escolha: coluna `excluded INTEGER NOT NULL DEFAULT 0` (migração 0008), no
+mesmo espírito de `missing` (0003). `ListAllGames`/`ListGames`/`UncoveredGames`
+filtram `excluded = 0` por padrão; `POST /library/games/{id}/exclude`
+esconde, `DELETE` revela, e a tela expõe o `DELETE` pelo filtro "Ocultos"
+(`?excluded=true`) — mesmo par de caminhos que "Ausentes". A varredura só
+mexe em `missing`, nunca em `excluded`, então esconder é durável.
+
+O arquivo no disco **nunca** é tocado — a regra 6 do `CLAUDE.md` vale aqui
+igual: o `rom_path` aponta para algo que já era do usuário, o ZeuX não
+apaga, não move, não copia. O texto da tela deixa isso explícito
+("O arquivo continua no seu computador, intacto").
+
+**O que quebra se desfizer:** um jogo "removido" volta a reaparecer a cada
+revarredura; ou, se a remoção virar um DELETE de verdade, o histórico de
+tempo de jogo (que referencia o jogo pelo caminho) perde a âncora.
+
+### "Continue jogando" mostra só um jogo (2026-09-09)
+
+A seção tinha o `GameHero` de destaque **mais** um carrossel (`RecentStrip`)
+com os outros jogos recentes. O Douglas pediu para ficar só o destaque. Faz
+sentido: a grade principal logo abaixo já é ordenada por "jogado por último"
+por padrão, então o carrossel repetia exatamente os mesmos jogos, na mesma
+ordem, a poucos pixels de distância. `RecentStrip` foi removido inteiro (não
+só o uso), e o fetch caiu de `getAllLibraryGames(1, 8)` para `(1, 1)`.
+
+**O que quebra se desfizer:** nada funcional — é escolha de densidade da
+tela de entrada. Reintroduzir o carrossel volta a duplicar visualmente os
+recentes.
+
+---
+
 ## O que fica fora deste log, de propósito
 
 - Decisões de produto puras (o que o app faz, pra quem, princípios de

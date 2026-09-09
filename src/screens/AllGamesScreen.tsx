@@ -1,7 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { FileX, Star } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { Clock, EyeOff, FileX, Star } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleEntry, ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
@@ -75,6 +75,14 @@ export interface AllGamesViewState {
   // só os ausentes, nunca os dois juntos — mesmo filtro que `favoriteOnly`,
   // resolvido no servidor (ver ListAllGames em internal/library/library.go).
   missingOnly: boolean;
+  // 2026-09-09, a pedido do Douglas: "filtro por hora de jogo". Ligado, mostra
+  // só os jogos já abertos ao menos uma vez (playtime > 0) — resolvido no
+  // servidor (`?played=true`), depois da junção com as sessões.
+  playedOnly: boolean;
+  // 2026-09-09: contrapartida de "Remover da biblioteca". Por padrão os jogos
+  // que o usuário escondeu ficam fora da lista; ligado, mostra só eles — o
+  // caminho para revelar de volta (mesma mecânica de `missingOnly`).
+  excludedOnly: boolean;
   sort: SortValue;
   viewMode: ViewMode;
 }
@@ -85,6 +93,8 @@ export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
   platformFilter: null,
   favoriteOnly: false,
   missingOnly: false,
+  playedOnly: false,
+  excludedOnly: false,
   sort: "recentes",
   viewMode: "grade",
 };
@@ -170,89 +180,6 @@ function useGridColumns(): number {
 }
 
 /**
- * Carrossel dos recentes que não viraram destaque.
- *
- * Faixa horizontal, não grade: mesma técnica que Steam/Epic/GOG usam para
- * "recentes", com largura própria por item (`shrink-0`) para não encolher
- * junto com a janela como a grade faz. `overflow-x-auto` só nesta faixa — a
- * regra de "nunca scroll horizontal na página inteira" (CLAUDE.md) é sobre o
- * body, não sobre um carrossel que existe justamente para rolar de lado.
- *
- * A máscara nas bordas (2026-09-07) é o que faltava: sem ela, o último tile
- * era cortado em seco na beira do container e lia como bug de layout em vez
- * de "tem mais para o lado". `mask-image` desvanece os últimos 40px do lado
- * que ainda tem conteúdo escondido — puramente visual, não esconde nem torna
- * inalcançável nada (o tile continua rolável, focável e clicável por baixo
- * da máscara).
- *
- * Achado do Douglas testando o app (2026-09-07): com poucos itens (a faixa
- * inteira cabe no container, sem nada pra rolar), a máscara antiga desbotava
- * os dois lados incondicionalmente — o gradiente do lado esquerdo caía direto
- * em cima do primeiro tile (o "Continue jogando" seguinte na fila) e lia como
- * uma sombra malfeita sobre a capa, não como affordance de scroll. Agora mede
- * de verdade quanto dá pra rolar pra cada lado (`scrollWidth` vs `clientWidth`
- * e a posição atual) e só acende a máscara do lado que tem algo atrás dela.
- */
-function RecentStrip({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [fade, setFade] = useState({ left: false, right: false });
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const update = () => {
-      const scrollable = el.scrollWidth > el.clientWidth + 1;
-      setFade({
-        left: scrollable && el.scrollLeft > 1,
-        right: scrollable && el.scrollLeft < el.scrollWidth - el.clientWidth - 1,
-      });
-    };
-
-    update();
-    el.addEventListener("scroll", update, { passive: true });
-    // ResizeObserver, não só `resize` da janela: o conteúdo (capas
-    // carregando, favoritos entrando/saindo) muda `scrollWidth` sem a janela
-    // mudar de tamanho.
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => {
-      el.removeEventListener("scroll", update);
-      observer.disconnect();
-    };
-  }, [children]);
-
-  const maskStops: string[] = [];
-  maskStops.push(fade.left ? "transparent 0" : "#000 0");
-  if (fade.left) maskStops.push("#000 40px");
-  if (fade.right) maskStops.push("#000 calc(100% - 40px)");
-  maskStops.push(fade.right ? "transparent 100%" : "#000 100%");
-  const mask = `linear-gradient(to right, ${maskStops.join(", ")})`;
-
-  return (
-    <div
-      ref={ref}
-      className="flex gap-3 overflow-x-auto pt-4 pb-2"
-      style={{
-        // Sem isto, o `scrollIntoView` implícito do foco (Tab ou D-pad, via
-        // `findNextFocus`) para o tile exatamente na borda do scrollport —
-        // isto é, dentro dos 40px que a máscara acima desbota quando ativa. O
-        // recuo é o mesmo tamanho do desvanecido, com folga; inofensivo
-        // quando a máscara está desligada.
-        scrollPaddingInline: "48px",
-        // `WebkitMaskImage` junto: o WKWebView do macOS (o WebView que o Tauri
-        // usa lá) ainda exige o prefixo; sem ele a faixa perde o desvanecido
-        // exatamente no SO em que ninguém do projeto testa ao vivo.
-        WebkitMaskImage: mask,
-        maskImage: mask,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/**
  * Tela "Todos os jogos" (2026-08-04, a pedido do Douglas): landing page
  * depois do parecer, junta jogos de qualquer console numa lista só, sem
  * precisar escolher o console primeiro — "clicar direto e começar a jogar".
@@ -327,7 +254,7 @@ export function AllGamesScreen({
   initialScrollTop: number;
 }) {
   const t = useT(dict);
-  const { page, search, platformFilter, favoriteOnly, missingOnly, sort, viewMode } = view;
+  const { page, search, platformFilter, favoriteOnly, missingOnly, playedOnly, excludedOnly, sort, viewMode } = view;
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [total, setTotal] = useState(0);
   // Consoles presentes no resultado completo (M4) — vem do servidor, não é
@@ -370,7 +297,7 @@ export function AllGamesScreen({
 
   useEffect(() => {
     api
-      .getAllLibraryGames(1, 8)
+      .getAllLibraryGames(1, 1)
       .then((res) => setRecentGames(res.games.filter((g) => g.playtime_seconds > 0)))
       .catch(() => setRecentGames([]));
   }, []);
@@ -394,7 +321,7 @@ export function AllGamesScreen({
     }
     onViewChange({ page: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, favoriteOnly, missingOnly]);
+  }, [debouncedSearch, favoriteOnly, missingOnly, playedOnly, excludedOnly]);
 
   // M4: restaura a rolagem uma vez só, na primeira vez que `games` chega
   // depois do mount — depois disso, `restoredScrollRef` trava, pra não
@@ -433,6 +360,8 @@ export function AllGamesScreen({
           query: debouncedSearch || undefined,
           favoriteOnly,
           missingOnly,
+          playedOnly,
+          excludedOnly,
           platform: platformFilter ?? undefined,
           sort,
         }),
@@ -455,7 +384,7 @@ export function AllGamesScreen({
       .finally(() => setLoadingMore(false));
   }
 
-  useEffect(loadGames, [page, debouncedSearch, favoriteOnly, missingOnly, platformFilter, sort]);
+  useEffect(loadGames, [page, debouncedSearch, favoriteOnly, missingOnly, playedOnly, excludedOnly, platformFilter, sort]);
 
   // Auto-rescan (2026-09-06): "Todos os jogos" é a tela de entrada mais
   // comum do app (ver comentário de App.tsx sobre a fase "all-games") — é
@@ -902,69 +831,40 @@ export function AllGamesScreen({
       )}
 
       {recentGames && recentGames.length > 0 && (
-        // Redesenho de 2026-09-07 (pedido do Douglas: "a tela mais impactante
-        // do app"): o primeiro item de "Continue jogando" sobe para uma faixa
-        // de destaque (`GameHero`) e o resto continua no carrossel de sempre.
-        // Nenhum dado novo e nenhuma requisição nova — é a mesma lista de
-        // `getAllLibraryGames(1, 8)` filtrada por `playtime_seconds > 0`, só
-        // com hierarquia entre o primeiro e os demais. O motivo está no doc
-        // comment de `GameHero`.
+        // 2026-09-09 (pedido do Douglas): a seção "Continue jogando" mostra
+        // só UM jogo — o último jogado — num `GameHero` de destaque. Antes
+        // trazia o carrossel dos outros recentes abaixo do hero (`RecentStrip`,
+        // removido): a grade principal, logo abaixo, já é ordenada por último
+        // jogado por padrão, então o carrossel repetia os mesmos jogos duas
+        // vezes na mesma tela. `getAllLibraryGames(1, 1)` filtrada por
+        // `playtime_seconds > 0` — nenhum dado novo, só menos. O motivo do
+        // destaque está no doc comment de `GameHero`.
         <div className="mb-8">
           <SectionHeading className="mb-3">{t("continuePlaying")}</SectionHeading>
           {(() => {
-            const [featured, ...rest] = recentGames;
+            const [featured] = recentGames;
             const featuredVerdict = verdictFor(featured.console_id);
             const featuredConsoleName = nameFor(featured.console_id);
             return (
-              <>
-                <GameHero
-                  game={featured}
-                  shortName={shortNameFor(featured.console_id)}
-                  onOpenDetail={() =>
-                    onOpenGame(featured, featuredConsoleName, shortNameFor(featured.console_id))
-                  }
-                  onPlay={playHandlerFor(featured)}
-                  onToggleFavorite={() => toggleFavorite(featured)}
-                  launchability={
-                    emulators
-                      ? evaluateGameLaunchability(featured, featuredVerdict, adapterEntryFor(featuredVerdict))
-                      : undefined
-                  }
-                  onInstall={
-                    featuredVerdict?.adapter_id
-                      ? () => install.handlePlay(featured, featuredVerdict, adapterEntryFor(featuredVerdict))
-                      : undefined
-                  }
-                />
-                {rest.length > 0 && (
-                  <RecentStrip>
-                    {rest.map((game) => {
-                      const consoleName = nameFor(game.console_id);
-                      const verdict = verdictFor(game.console_id);
-                      const launchability = emulators
-                        ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
-                        : undefined;
-                      return (
-                        <div key={game.id} className="w-36 shrink-0 sm:w-40">
-                          <GameTile
-                            game={game}
-                            shortName={shortNameFor(game.console_id)}
-                            onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
-                            onPlay={playHandlerFor(game)}
-                            onToggleFavorite={() => toggleFavorite(game)}
-                            launchability={launchability}
-                            onInstall={
-                              verdict?.adapter_id
-                                ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict))
-                                : undefined
-                            }
-                          />
-                        </div>
-                      );
-                    })}
-                  </RecentStrip>
-                )}
-              </>
+              <GameHero
+                game={featured}
+                shortName={shortNameFor(featured.console_id)}
+                onOpenDetail={() =>
+                  onOpenGame(featured, featuredConsoleName, shortNameFor(featured.console_id))
+                }
+                onPlay={playHandlerFor(featured)}
+                onToggleFavorite={() => toggleFavorite(featured)}
+                launchability={
+                  emulators
+                    ? evaluateGameLaunchability(featured, featuredVerdict, adapterEntryFor(featuredVerdict))
+                    : undefined
+                }
+                onInstall={
+                  featuredVerdict?.adapter_id
+                    ? () => install.handlePlay(featured, featuredVerdict, adapterEntryFor(featuredVerdict))
+                    : undefined
+                }
+              />
             );
           })()}
         </div>
@@ -1068,6 +968,33 @@ export function AllGamesScreen({
           <FileX size={11} aria-hidden="true" />
           {t("missingLabel")}
         </button>
+        {/* 2026-09-09, a pedido do Douglas: "filtro por hora de jogo" — só os
+            jogos já abertos alguma vez. Mesmo vocabulário de toggle de
+            Favoritos/Ausentes. */}
+        <button
+          type="button"
+          onClick={() => onViewChange({ playedOnly: !playedOnly })}
+          aria-pressed={playedOnly}
+          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
+            playedOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
+          }`}
+        >
+          <Clock size={11} aria-hidden="true" />
+          {t("playedLabel")}
+        </button>
+        {/* 2026-09-09: contrapartida de "Remover da biblioteca" — revela os
+            jogos escondidos para poder trazê-los de volta. */}
+        <button
+          type="button"
+          onClick={() => onViewChange({ excludedOnly: !excludedOnly })}
+          aria-pressed={excludedOnly}
+          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
+            excludedOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
+          }`}
+        >
+          <EyeOff size={11} aria-hidden="true" />
+          {t("excludedLabel")}
+        </button>
         {platformOptions.length > 1 && (
           <div className="flex flex-wrap gap-1.5">
             <button
@@ -1158,7 +1085,8 @@ export function AllGamesScreen({
           // estados vazios continuam distintos entre si, não colapsam num
           // só). Só este ganha painel + ação principal, porque só este é a
           // primeira tela real de um usuário novo (docs/roadmap.md).
-          const trulyEmpty = !debouncedSearch && !platformFilter && !favoriteOnly && !missingOnly;
+          const trulyEmpty =
+            !debouncedSearch && !platformFilter && !favoriteOnly && !missingOnly && !playedOnly && !excludedOnly;
           if (trulyEmpty) {
             return (
               <EmptyState
@@ -1197,12 +1125,24 @@ export function AllGamesScreen({
                     ? t("noGamesForPlatform", { platformName: shortNameFor(platformFilter) })
                     : missingOnly
                       ? t("noMissingGames")
-                      : t("noFavoritedGames")}
+                      : playedOnly
+                        ? t("noPlayedGames")
+                        : excludedOnly
+                          ? t("noExcludedGames")
+                          : t("noFavoritedGames")}
               </p>
               <Button
                 variant="secondary"
                 onClick={() =>
-                  onViewChange({ search: "", platformFilter: null, favoriteOnly: false, missingOnly: false, page: 1 })
+                  onViewChange({
+                    search: "",
+                    platformFilter: null,
+                    favoriteOnly: false,
+                    missingOnly: false,
+                    playedOnly: false,
+                    excludedOnly: false,
+                    page: 1,
+                  })
                 }
               >
                 {t("clearFilters")}

@@ -428,6 +428,89 @@ func TestLibraryGamesFilterByFavorite(t *testing.T) {
 	}
 }
 
+// Trava "Remover da biblioteca" (2026-09-09): POST .../exclude esconde o jogo
+// do modo "todos os jogos" e do modo por console, ?excluded=true traz só ele,
+// e DELETE .../exclude revela de volta. O arquivo no disco nunca é tocado (o
+// teste não verifica o disco de propósito — o handler não tem código que o
+// alcance).
+func TestExcludeGameHidesFromListingAndCanBeRestored(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	dir := t.TempDir()
+	for _, name := range []string{"a.nes", "b.nes"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatalf("criando ROM %s: %v", name, err)
+		}
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+
+	all := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10", nil))["games"].([]any)
+	if len(all) != 2 {
+		t.Fatalf("setup: esperava 2 jogos, veio %d", len(all))
+	}
+	id := int64(all[0].(map[string]any)["id"].(float64))
+	if exc, ok := all[0].(map[string]any)["excluded"]; !ok || exc != false {
+		t.Fatalf("excluded = %v (presente=%v), esperado false sempre presente", exc, ok)
+	}
+
+	excRec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/games/"+strconv.FormatInt(id, 10)+"/exclude", nil)
+	if excRec.Code != http.StatusOK {
+		t.Fatalf("status ao esconder = %d, corpo: %s", excRec.Code, excRec.Body.String())
+	}
+	if exc, _ := decodeBody(t, excRec)["excluded"].(bool); !exc {
+		t.Fatal("resposta de POST .../exclude deveria trazer excluded=true")
+	}
+
+	visible := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10", nil))["games"].([]any)
+	if len(visible) != 1 || int64(visible[0].(map[string]any)["id"].(float64)) == id {
+		t.Fatalf("modo todos os jogos ainda mostra o jogo escondido: %+v", visible)
+	}
+	perConsole := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?console_id=nes", nil))["games"].([]any)
+	if len(perConsole) != 1 {
+		t.Fatalf("modo por console = %d jogos, esperava 1 (o escondido some)", len(perConsole))
+	}
+
+	onlyHidden := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10&excluded=true", nil))["games"].([]any)
+	if len(onlyHidden) != 1 || int64(onlyHidden[0].(map[string]any)["id"].(float64)) != id {
+		t.Fatalf("?excluded=true = %+v, esperava só o jogo escondido", onlyHidden)
+	}
+
+	doJSON(t, server.Routes(), http.MethodDelete, "/api/v1/library/games/"+strconv.FormatInt(id, 10)+"/exclude", nil)
+	restored := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10", nil))["games"].([]any)
+	if len(restored) != 2 {
+		t.Fatalf("depois de revelar = %d jogos, esperava 2 de volta", len(restored))
+	}
+}
+
+// Trava ?played=true: só os jogos já abertos ao menos uma vez (playtime > 0).
+func TestLibraryGamesFilterByPlayed(t *testing.T) {
+	server, db := newTestServerWithDB(t, fakeProbe{})
+	dir := t.TempDir()
+	pathJogado := filepath.Join(dir, "jogado.nes")
+	pathNovo := filepath.Join(dir, "novo.nes")
+	for _, p := range []string{pathJogado, pathNovo} {
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatalf("criando ROM %s: %v", p, err)
+		}
+	}
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "nes",
+		"path":       dir,
+	})
+	sessions := emulator.NewSQLiteSessions(db)
+	insertClosedSession(t, sessions, "nes", pathJogado, time.Now().Add(-10*time.Minute), 60*time.Second)
+
+	played := decodeBody(t, doJSON(t, server.Routes(), http.MethodGet, "/api/v1/library/games?page=1&page_size=10&played=true", nil))["games"].([]any)
+	if len(played) != 1 {
+		t.Fatalf("?played=true = %d jogos, esperava 1", len(played))
+	}
+	if title, _ := played[0].(map[string]any)["title"].(string); title != "jogado" {
+		t.Fatalf("jogo com ?played=true = %q, esperado \"jogado\"", title)
+	}
+}
+
 // Trava o critério central do M4 (docs/sprint-m-plano.md): o campo
 // `consoles` da resposta reflete o resultado COMPLETO (antes de `?platform=`
 // e da paginação), e `?platform=<console_id>` pagina só dentro daquele

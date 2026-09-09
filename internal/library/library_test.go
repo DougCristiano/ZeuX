@@ -208,7 +208,7 @@ func TestListAllGamesIncludesEveryConsole(t *testing.T) {
 		t.Fatalf("SaveGames n64: %v", err)
 	}
 
-	all, err := s.ListAllGames(ctx, "", false, false)
+	all, err := s.ListAllGames(ctx, "", false, false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestListAllGamesFiltersByTitleCaseInsensitive(t *testing.T) {
 		t.Fatalf("SaveGames: %v", err)
 	}
 
-	found, err := s.ListAllGames(ctx, "chrono", false, false)
+	found, err := s.ListAllGames(ctx, "chrono", false, false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestListAllGamesFiltersByTitleCaseInsensitive(t *testing.T) {
 
 	// "%" no termo de busca não pode virar curinga solto — sem escapar,
 	// "100%" casaria com qualquer título que comece com "100".
-	percentMatch, err := s.ListAllGames(ctx, "100%", false, false)
+	percentMatch, err := s.ListAllGames(ctx, "100%", false, false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestListAllGamesFiltersByFavorite(t *testing.T) {
 		t.Fatalf("SaveGames: %v", err)
 	}
 
-	all, err := s.ListAllGames(ctx, "", false, false)
+	all, err := s.ListAllGames(ctx, "", false, false, false)
 	if err != nil || len(all) != 2 {
 		t.Fatalf("ListAllGames setup: %v / %+v", err, all)
 	}
@@ -361,7 +361,7 @@ func TestListAllGamesFiltersByFavorite(t *testing.T) {
 		t.Fatalf("SetFavorite: %v", err)
 	}
 
-	favorites, err := s.ListAllGames(ctx, "", true, false)
+	favorites, err := s.ListAllGames(ctx, "", true, false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames(favoriteOnly): %v", err)
 	}
@@ -396,7 +396,7 @@ func TestListAllGamesHidesMissingByDefault(t *testing.T) {
 		t.Fatalf("SyncFolder: %v", err)
 	}
 
-	visible, err := s.ListAllGames(ctx, "", false, false)
+	visible, err := s.ListAllGames(ctx, "", false, false, false)
 	if err != nil {
 		t.Fatalf("ListAllGames: %v", err)
 	}
@@ -404,11 +404,80 @@ func TestListAllGamesHidesMissingByDefault(t *testing.T) {
 		t.Fatalf("ListAllGames(missingOnly=false) = %+v, esperava só o jogo presente", visible)
 	}
 
-	missing, err := s.ListAllGames(ctx, "", false, true)
+	missing, err := s.ListAllGames(ctx, "", false, true, false)
 	if err != nil {
 		t.Fatalf("ListAllGames(missingOnly): %v", err)
 	}
 	if len(missing) != 1 || missing[0].Path != "/jogos/ps1/b.bin" {
 		t.Fatalf("ListAllGames(missingOnly=true) = %+v, esperava só o jogo ausente", missing)
+	}
+}
+
+// Trava a regra de "Remover da biblioteca": um jogo escondido some da
+// listagem padrão, só aparece com excludedOnly=true, e uma revarredura que
+// reencontra o arquivo NÃO o traz de volta sozinho (SyncFolder só mexe em
+// `missing`).
+func TestListAllGamesHidesExcludedAndScanKeepsItHidden(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "ps1", "/jogos/ps1")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	if err := s.SaveGames(ctx, folder.ID, []NewGame{
+		{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"},
+		{ConsoleID: "ps1", Path: "/jogos/ps1/b.bin", Title: "B"},
+	}); err != nil {
+		t.Fatalf("SaveGames: %v", err)
+	}
+
+	all, err := s.ListAllGames(ctx, "", false, false, false)
+	if err != nil || len(all) != 2 {
+		t.Fatalf("ListAllGames setup: %v / %+v", err, all)
+	}
+	hidden := all[0]
+	if err := s.SetExcluded(ctx, hidden.ID, true); err != nil {
+		t.Fatalf("SetExcluded: %v", err)
+	}
+
+	visible, err := s.ListAllGames(ctx, "", false, false, false)
+	if err != nil {
+		t.Fatalf("ListAllGames: %v", err)
+	}
+	if len(visible) != 1 || visible[0].ID == hidden.ID {
+		t.Fatalf("ListAllGames(excludedOnly=false) = %+v, esperava sem o jogo escondido", visible)
+	}
+
+	onlyHidden, err := s.ListAllGames(ctx, "", false, false, true)
+	if err != nil {
+		t.Fatalf("ListAllGames(excludedOnly): %v", err)
+	}
+	if len(onlyHidden) != 1 || onlyHidden[0].ID != hidden.ID || !onlyHidden[0].Excluded {
+		t.Fatalf("ListAllGames(excludedOnly=true) = %+v, esperava só o jogo escondido", onlyHidden)
+	}
+
+	// Revarredura acha os dois arquivos de novo — o escondido continua fora.
+	if err := s.SyncFolder(ctx, folder.ID, []NewGame{
+		{ConsoleID: "ps1", Path: "/jogos/ps1/a.bin", Title: "A"},
+		{ConsoleID: "ps1", Path: "/jogos/ps1/b.bin", Title: "B"},
+	}); err != nil {
+		t.Fatalf("SyncFolder: %v", err)
+	}
+	afterScan, err := s.ListAllGames(ctx, "", false, false, false)
+	if err != nil {
+		t.Fatalf("ListAllGames pós-scan: %v", err)
+	}
+	if len(afterScan) != 1 || afterScan[0].ID == hidden.ID {
+		t.Fatalf("varredura trouxe o jogo escondido de volta: %+v", afterScan)
+	}
+
+	// Revelar desfaz.
+	if err := s.SetExcluded(ctx, hidden.ID, false); err != nil {
+		t.Fatalf("SetExcluded(false): %v", err)
+	}
+	revealed, err := s.ListAllGames(ctx, "", false, false, false)
+	if err != nil || len(revealed) != 2 {
+		t.Fatalf("ListAllGames após revelar = %+v (err %v), esperava os 2 de volta", revealed, err)
 	}
 }

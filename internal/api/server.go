@@ -182,6 +182,12 @@ func (s *Server) Routes() http.Handler {
 	// contrato mais genérico ainda não usado por mais nada.
 	mux.HandleFunc("POST /api/v1/library/games/{id}/favorite", s.handleFavoriteGame)
 	mux.HandleFunc("DELETE /api/v1/library/games/{id}/favorite", s.handleUnfavoriteGame)
+	// "Remover da biblioteca" (2026-09-09): esconde o jogo da lista sem tocar
+	// o arquivo no disco. POST esconde, DELETE revela (o filtro "mostrar
+	// ocultos" da tela usa o DELETE). Rota própria pelo mesmo motivo de
+	// favorite — um campo só, sem PATCH genérico.
+	mux.HandleFunc("POST /api/v1/library/games/{id}/exclude", s.handleExcludeGame)
+	mux.HandleFunc("DELETE /api/v1/library/games/{id}/exclude", s.handleUnexcludeGame)
 
 	// G1 (docs/roadmap.md, Sprint G): scraper de metadados IGDB. Credencial
 	// é por usuário — sem ela, estas rotas de busca simplesmente recusam
@@ -311,6 +317,15 @@ func (s *Server) handleConsoles(w http.ResponseWriter, _ *http.Request) {
 			HasImage:             verdict.HasConsoleImage(console.ID),
 		})
 	}
+
+	// Ordem alfabética por nome (2026-09-09, a pedido do Douglas). Esta rota é
+	// o catálogo cru — a tela de Consoles lista nesta ordem, e "Todos os
+	// jogos" já ordena os chips de plataforma pelo nome exibido. Diferente de
+	// GET /consoles/verdicts, que ordena por prontidão de propósito (console
+	// mais viável primeiro, ver verdict.Evaluate) — catálogo não é parecer.
+	sort.SliceStable(consoles, func(i, j int) bool {
+		return strings.ToLower(consoles[i].Name) < strings.ToLower(consoles[j].Name)
+	})
 
 	writeJSON(w, http.StatusOK, map[string]any{"consoles": consoles})
 }
@@ -1617,7 +1632,7 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		// de ausência (2026-09-08): por padrão jogos cujo arquivo sumiu
 		// ficam fora da lista; só aparecem, e só eles, quando a tela liga
 		// esse filtro explicitamente.
-		games, err = s.library.ListAllGames(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("favorite") == "true", r.URL.Query().Get("missing") == "true")
+		games, err = s.library.ListAllGames(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("favorite") == "true", r.URL.Query().Get("missing") == "true", r.URL.Query().Get("excluded") == "true")
 	} else {
 		games, err = s.library.ListGames(r.Context(), consoleID)
 	}
@@ -1673,6 +1688,22 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		}
 		return result[i].LastPlayedAt > result[j].LastPlayedAt
 	})
+
+	// ?played=true (2026-09-09, a pedido do Douglas): só os jogos que já
+	// foram abertos ao menos uma vez. O tempo de jogo vem da junção com as
+	// sessões feita logo acima (o launcher não conhece a biblioteca), então
+	// este filtro só é possível aqui, depois da junção — não em ListAllGames.
+	// Combina com ?q=/?favorite=/?platform=; é o toggle "já joguei" da barra
+	// de "Todos os jogos".
+	if r.URL.Query().Get("played") == "true" {
+		played := make([]gameWithStats, 0, len(result))
+		for _, g := range result {
+			if g.PlaytimeSeconds > 0 {
+				played = append(played, g)
+			}
+		}
+		result = played
+	}
 
 	response := map[string]any{"games": result}
 
@@ -1798,6 +1829,41 @@ func (s *Server) setFavorite(w http.ResponseWriter, r *http.Request, favorite bo
 	}
 
 	writeJSON(w, http.StatusOK, favoriteResponse{ID: id, Favorite: favorite})
+}
+
+// excludeResponse é a resposta comum de handleExcludeGame/handleUnexcludeGame.
+type excludeResponse struct {
+	ID       int64 `json:"id"`
+	Excluded bool  `json:"excluded"`
+}
+
+func (s *Server) handleExcludeGame(w http.ResponseWriter, r *http.Request) {
+	s.setExcluded(w, r, true)
+}
+
+func (s *Server) handleUnexcludeGame(w http.ResponseWriter, r *http.Request) {
+	s.setExcluded(w, r, false)
+}
+
+// setExcluded implementa as duas rotas (POST esconde, DELETE revela) — mesmo
+// desenho de setFavorite, o corpo só difere no valor gravado.
+func (s *Server) setExcluded(w http.ResponseWriter, r *http.Request, excluded bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id", "O identificador do jogo deve ser numérico.")
+		return
+	}
+
+	if err := s.library.SetExcluded(r.Context(), id, excluded); err != nil {
+		if errors.Is(err, library.ErrGameNotFound) {
+			s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum jogo com o id %d.", id))
+			return
+		}
+		s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, excludeResponse{ID: id, Excluded: excluded})
 }
 
 // handleGetIGDBCredentials nunca ecoa client_secret de volta — mesmo

@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmModal,
   ConsoleVerdictCard,
   ErrorModal,
   FavoriteToggle,
@@ -142,6 +143,45 @@ export function GameDetailScreen({
   const [rescanState, setRescanState] = useState<
     { kind: "idle" } | { kind: "rescanning" } | { kind: "done"; gamesFound: number } | { kind: "error"; message: string }
   >({ kind: "idle" });
+  // "Remover da biblioteca" (2026-09-09, a pedido do Douglas): esconde o jogo
+  // da biblioteca sem tocar o arquivo no disco (regra 6 do CLAUDE.md — o ZeuX
+  // nunca mexe na ROM) e sem que ele volte no próximo rescan. Reversível pelo
+  // filtro "Ocultos" de "Todos os jogos". Confirmação porque some da tela;
+  // `danger` porque é a ação mais destrutiva desta tela.
+  const [confirmingExclude, setConfirmingExclude] = useState(false);
+  const [excluding, setExcluding] = useState(false);
+  const [excludeError, setExcludeError] = useState<string | null>(null);
+  // `game.excluded` vem do snapshot em App.tsx: `true` quando a tela foi
+  // aberta a partir do filtro "Ocultos" de Todos os jogos. Nesse caso a ação
+  // é o inverso — "Trazer de volta" — e não precisa de confirmação (revelar
+  // não some com nada).
+  const excluded = game.excluded;
+
+  async function excludeFromLibrary() {
+    setExcluding(true);
+    setExcludeError(null);
+    try {
+      await api.excludeGame(game.id);
+      // Volta para a lista — o jogo já não aparece mais lá (a tela remonta e
+      // rebusca). Não há para onde "ficar": a tela é deste jogo específico.
+      onBack();
+    } catch (err) {
+      setExcludeError(err instanceof ApiError ? err.message : t("errorRemovingFromLibrary"));
+      setExcluding(false);
+    }
+  }
+
+  async function restoreToLibrary() {
+    setExcluding(true);
+    setExcludeError(null);
+    try {
+      await api.unexcludeGame(game.id);
+      onBack();
+    } catch (err) {
+      setExcludeError(err instanceof ApiError ? err.message : t("errorRemovingFromLibrary"));
+      setExcluding(false);
+    }
+  }
 
   useEffect(() => {
     setCoverUrl(game.cover_url);
@@ -434,6 +474,30 @@ export function GameDetailScreen({
           colados no botão que falhou (favoritar, buscar capa, abrir pasta),
           não soltos pela tela. */}
       {toastMessage && <Toast message={toastMessage} />}
+      {confirmingExclude && (
+        <ConfirmModal
+          title={t("removeFromLibraryTitle")}
+          message={t("removeFromLibraryConfirm", { title: game.title })}
+          onClose={() => setConfirmingExclude(false)}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setConfirmingExclude(false)}>
+                {t("cancelRemove")}
+              </Button>
+              <Button
+                variant="danger"
+                autoFocus
+                onClick={() => {
+                  setConfirmingExclude(false);
+                  void excludeFromLibrary();
+                }}
+              >
+                {t("removeFromLibrary")}
+              </Button>
+            </>
+          }
+        />
+      )}
       {launchError ? (
         <ErrorModal title={t("errorOpeningGame")} message={launchError} onClose={clearLaunchError} />
       ) : (
@@ -599,6 +663,45 @@ export function GameDetailScreen({
                 <p className="truncate font-mono text-xs text-muted" title={game.path}>
                   {game.path}
                 </p>
+              </div>
+            </Card>
+          </section>
+
+          {/* "Remover da biblioteca" (2026-09-09): esconde este jogo da lista.
+              O arquivo continua no disco — o ZeuX nunca o toca (regra 6). Fica
+              numa seção própria, longe de "Jogar", com o botão em `danger`
+              já em repouso: é a única ação irreversível-na-prática da tela
+              (dá pra desfazer pelo filtro "Ocultos", mas o usuário não sabe
+              disso no momento do clique). */}
+          <section>
+            <SectionHeading className="mb-3">
+              {excluded ? t("restoreHeading") : t("removeHeading")}
+            </SectionHeading>
+            <Card>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-muted">
+                  {excluded ? t("restoreToLibraryHelp") : t("removeFromLibraryHelp")}
+                </p>
+                {excluded ? (
+                  <Button
+                    variant="chrome"
+                    disabled={excluding}
+                    onClick={() => void restoreToLibrary()}
+                    className="w-fit"
+                  >
+                    {excluding ? t("removing") : t("restoreToLibrary")}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="danger"
+                    disabled={excluding}
+                    onClick={() => setConfirmingExclude(true)}
+                    className="w-fit"
+                  >
+                    {excluding ? t("removing") : t("removeFromLibrary")}
+                  </Button>
+                )}
+                {excludeError && <InlineError>{excludeError}</InlineError>}
               </div>
             </Card>
           </section>

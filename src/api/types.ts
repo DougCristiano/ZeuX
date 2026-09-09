@@ -513,6 +513,11 @@ export type LibraryGame = {
    * presente, nunca ausente mesmo quando `false` — diferente de `cover_url`,
    * não representa um dado que pode não ter sido resolvido ainda. */
   favorite: boolean;
+  /** Marcado por POST/DELETE /library/games/{id}/exclude (2026-09-09) — o
+   * usuário escondeu este jogo da biblioteca. Some da listagem padrão do modo
+   * "todos os jogos"; só aparece, isolado, com `?excluded=true`. No modo por
+   * console também é filtrado no servidor. Sempre presente, nunca ausente. */
+  excluded: boolean;
   /** Soma de todas as sessões deste jogo (L11). `0` quando nunca foi jogado —
    * sempre presente, nunca ausente. */
   playtime_seconds: number;

@@ -62,6 +62,24 @@ export const dict = {
     "pt-BR": "Nenhum jogo ausente — todos os arquivos apontados estão no lugar.",
     en: "No missing games — every pointed file is where it should be.",
   },
+  // 2026-09-09: chip "filtro por hora de jogo" — só os jogos já abertos alguma vez.
+  playedLabel: {
+    "pt-BR": "JÁ JOGUEI",
+    en: "PLAYED",
+  },
+  noPlayedGames: {
+    "pt-BR": "Nenhum jogo com tempo de jogo registrado ainda.",
+    en: "No games with recorded playtime yet.",
+  },
+  // 2026-09-09: chip que revela os jogos removidos da biblioteca, para trazê-los de volta.
+  excludedLabel: {
+    "pt-BR": "OCULTOS",
+    en: "HIDDEN",
+  },
+  noExcludedGames: {
+    "pt-BR": "Nenhum jogo removido da biblioteca.",
+    en: "No games removed from the library.",
+  },
   allPlatforms: {
     "pt-BR": "TODOS",
     en: "ALL",

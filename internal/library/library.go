@@ -68,6 +68,13 @@ type Game struct {
 	// simples, sempre presente, nunca ausente mesmo quando `false` — quem
 	// tem 300 ROMs e joga 8 precisa distinguir "não favoritei" de "não sei".
 	Favorite bool `json:"favorite"`
+
+	// Excluded (2026-09-09) — o usuário escondeu este jogo da biblioteca. O
+	// arquivo continua no disco e a linha continua no banco (o tempo de jogo
+	// já registrado referencia o jogo pelo caminho, igual a Missing); a
+	// varredura seguinte não desfaz a flag (ver SyncFolder). Sempre presente
+	// no JSON mesmo quando `false`, mesmo motivo de Favorite.
+	Excluded bool `json:"excluded"`
 }
 
 // NewGame é o que a varredura (L2) precisa fornecer para gravar uma entrada;
@@ -338,9 +345,14 @@ func (s *Store) SyncFolder(ctx context.Context, folderID int64, found []NewGame)
 // devolve só os ausentes — é o modo que a tela liga ao clicar no filtro
 // "mostrar ausentes", pra achar e reapontar a pasta certa. A linha nunca é
 // apagada (ver SyncFolder), só escondida por padrão.
-func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly bool, missingOnly bool) ([]Game, error) {
-	conditions := make([]string, 0, 3)
-	args := make([]any, 0, 3)
+//
+// excludedOnly (2026-09-09) segue a mesma lógica de missingOnly para os jogos
+// que o usuário escondeu à mão ("Remover da biblioteca" em GameDetailScreen):
+// por padrão ficam FORA da lista, e a tela só os traz — e só eles — quando
+// liga o filtro "mostrar ocultos", o caminho de volta para desfazer.
+func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly bool, missingOnly bool, excludedOnly bool) ([]Game, error) {
+	conditions := make([]string, 0, 4)
+	args := make([]any, 0, 4)
 
 	if query != "" {
 		conditions = append(conditions, `title LIKE ? ESCAPE '\'`)
@@ -354,8 +366,13 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 	} else {
 		conditions = append(conditions, `missing = 0`)
 	}
+	if excludedOnly {
+		conditions = append(conditions, `excluded = 1`)
+	} else {
+		conditions = append(conditions, `excluded = 0`)
+	}
 
-	sqlQuery := `SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite FROM library_games`
+	sqlQuery := `SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded FROM library_games`
 	if len(conditions) > 0 {
 		sqlQuery += " WHERE " + strings.Join(conditions, " AND ")
 	}
@@ -374,8 +391,9 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 			addedAt  string
 			missing  int
 			favorite int
+			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -385,6 +403,7 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 		game.AddedAt = parsed
 		game.Missing = missing != 0
 		game.Favorite = favorite != 0
+		game.Excluded = excluded != 0
 		games = append(games, game)
 	}
 
@@ -405,9 +424,9 @@ func escapeLike(s string) string {
 // antigos.
 func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games
-		WHERE console_id = ?
+		WHERE console_id = ? AND excluded = 0
 		ORDER BY id DESC
 	`, consoleID)
 	if err != nil {
@@ -422,8 +441,9 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 			addedAt  string
 			missing  int
 			favorite int
+			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -433,6 +453,7 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 		game.AddedAt = parsed
 		game.Missing = missing != 0
 		game.Favorite = favorite != 0
+		game.Excluded = excluded != 0
 		games = append(games, game)
 	}
 
@@ -444,7 +465,7 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 // título antes de disparar a consulta ao IGDB.
 func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games WHERE id = ?
 	`, id)
 
@@ -453,8 +474,9 @@ func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 		addedAt  string
 		missing  int
 		favorite int
+		excluded int
 	)
-	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 		if err == sql.ErrNoRows {
 			return Game{}, false, nil
 		}
@@ -468,6 +490,7 @@ func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 	game.AddedAt = parsed
 	game.Missing = missing != 0
 	game.Favorite = favorite != 0
+	game.Excluded = excluded != 0
 
 	return game, true, nil
 }
@@ -478,7 +501,7 @@ func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 // conseguir consultá-las.
 func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games
 		WHERE folder_id = ?
 	`, folderID)
@@ -494,8 +517,9 @@ func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, erro
 			addedAt  string
 			missing  int
 			favorite int
+			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -505,6 +529,7 @@ func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, erro
 		game.AddedAt = parsed
 		game.Missing = missing != 0
 		game.Favorite = favorite != 0
+		game.Excluded = excluded != 0
 		games = append(games, game)
 	}
 
@@ -518,9 +543,9 @@ func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, erro
 // específico via ClearCover.
 func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite
+		SELECT id, folder_id, console_id, path, title, added_at, missing, cover_path, cover_status, favorite, excluded
 		FROM library_games
-		WHERE cover_path = '' AND cover_status = ''
+		WHERE cover_path = '' AND cover_status = '' AND excluded = 0
 		ORDER BY id
 	`)
 	if err != nil {
@@ -535,8 +560,9 @@ func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 			addedAt  string
 			missing  int
 			favorite int
+			excluded int
 		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite); err != nil {
+		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
 			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -546,6 +572,7 @@ func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 		game.AddedAt = parsed
 		game.Missing = missing != 0
 		game.Favorite = favorite != 0
+		game.Excluded = excluded != 0
 		games = append(games, game)
 	}
 
@@ -647,6 +674,23 @@ func (s *Store) SetFavorite(ctx context.Context, gameID int64, favorite bool) er
 	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET favorite = ? WHERE id = ?`, value, gameID)
 	if err != nil {
 		return fmt.Errorf("gravando favorito do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+// SetExcluded esconde ou revela um jogo na biblioteca (2026-09-09). Não toca
+// o arquivo no disco nem apaga a linha: o histórico de tempo de jogo continua
+// referenciando o jogo pelo caminho, e a varredura seguinte não desfaz a flag
+// (SyncFolder só mexe em `missing`). Um jogo escondido continua favoritável e
+// reaparece nas listas assim que `excluded` volta a `false`.
+func (s *Store) SetExcluded(ctx context.Context, gameID int64, excluded bool) error {
+	value := 0
+	if excluded {
+		value = 1
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET excluded = ? WHERE id = ?`, value, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando exclusão do jogo %d: %w", gameID, err)
 	}
 	return checkAffected(result, gameID)
 }

@@ -3,6 +3,8 @@ package api_test
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -50,6 +52,22 @@ func getConsoles(t *testing.T) []consoleEntry {
 // (docs/sprint-b-plano.md, B8: "recusar não pode ser beco sem saída").
 func TestConsolesNaoExigeConsentimento(t *testing.T) {
 	getConsoles(t)
+}
+
+// Trava a ordem alfabética por nome (2026-09-09, a pedido do Douglas): a tela
+// de Consoles lista nesta ordem. Diferente de /consoles/verdicts, que ordena
+// por prontidão de propósito — este teste garante que ninguém "conserte" a
+// ordem daqui achando que deveria acompanhar aquela.
+func TestConsolesVemEmOrdemAlfabetica(t *testing.T) {
+	consoles := getConsoles(t)
+
+	names := make([]string, len(consoles))
+	for i, c := range consoles {
+		names[i] = strings.ToLower(c.Name)
+	}
+	if !sort.StringsAreSorted(names) {
+		t.Fatalf("GET /consoles não veio em ordem alfabética por nome: %v", names)
+	}
 }
 
 // Trava o contrato entre o catálogo (internal/verdict/data/consoles.json) e a
