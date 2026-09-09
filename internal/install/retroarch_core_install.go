@@ -279,8 +279,14 @@ type coreHashMismatchError struct {
 }
 
 func (e *coreHashMismatchError) Error() string {
+	// A causa mais comum não é corrupção: o buildbot reconstrói o nightly
+	// depois que alguém rodou cmd/generate-retroarch-manifest, e o hash
+	// fixado no manifesto embutido fica desatualizado (ver docs/decisoes.md,
+	// "RetroArch: cores baixados sob demanda"). Nada foi instalado — mesma
+	// dica de saída da mensagem de "generated: false" em StartCore, pra não
+	// deixar o jogador sem alternativa até uma nova versão do ZeuX sair.
 	return fmt.Sprintf(
-		"o core %q foi baixado, mas o arquivo recebido não confere com o SHA256 esperado (esperado %s, recebido %s) — nada foi instalado",
+		"o core %q foi baixado, mas o arquivo recebido não confere com o SHA256 esperado (esperado %s, recebido %s) — nada foi instalado. Isso costuma acontecer quando o core foi atualizado no servidor de origem depois desta versão do ZeuX; enquanto isso, dá para instalá-lo pelo Online Updater, dentro do próprio RetroArch",
 		e.core, e.expected, e.got)
 }
 

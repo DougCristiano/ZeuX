@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-06T23:47:17Z",
+  "generated_at": "2026-09-08T21:13:46Z",
   "hash_source": "Nenhum hash oficial publicado pelo buildbot foi confirmado (host bloqueado no ambiente de desenvolvimento desde 2026-08-02, ver ADR 0015). O SHA256 abaixo é medido pelo próprio ZeuX no momento da geração, não conferido contra uma soma publicada pela origem.",
   "cores": {
     "beetle cygne": {
@@ -24,21 +24,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_wswan_libretro.so.zip",
           "filename": "mednafen_wswan_libretro.so.zip",
           "size": 130140,
-          "sha256": "10e3f455902625e66f59f9387a76e811b78410a2f421986dc460a0fb10acd159",
+          "sha256": "e46f68692a7622a2f5a92ba7894de2acf83a4b20afc926aa80cc2c430cba4ab2",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_wswan_libretro.so.zip",
           "filename": "mednafen_wswan_libretro.so.zip",
           "size": 137200,
-          "sha256": "789b688c8a796fdf4507085871ed0eccea523332ae3981bf776fcad161e93a86",
+          "sha256": "3a354ee2945174331bf201f40ce1a3e379737c7d147e12bc375d72ccb82dce64",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_wswan_libretro.dll.zip",
           "filename": "mednafen_wswan_libretro.dll.zip",
-          "size": 114709,
-          "sha256": "8987aa0d5d7c3ecbc4d20d7f9b237168d3c30b574bd9062854c90e42b1c7fb20",
+          "size": 114708,
+          "sha256": "fd368050b886b84cd501b64eacdc26e78a06f45ff3012ec49325d0acc1449875",
           "generated": true
         }
       }
@@ -64,21 +64,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_ngp_libretro.so.zip",
           "filename": "mednafen_ngp_libretro.so.zip",
           "size": 104482,
-          "sha256": "5874b1608d127297d2135254250b27bccf632b980bc4ff0e9c5a142549cc4e1c",
+          "sha256": "c81126c96eeb13123ae12f48c87c5aec99aef43c38b226725270ba6e768d09bb",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_ngp_libretro.so.zip",
           "filename": "mednafen_ngp_libretro.so.zip",
           "size": 100879,
-          "sha256": "569988ef8d430f547c12f9638b42d4a8d12d2fb45541456a3ed3ad7a08a1439e",
+          "sha256": "ef40d37992f8eaa7199a717e5fbf81d990ad161db4b376bdcca5c5e71a506ed6",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_ngp_libretro.dll.zip",
           "filename": "mednafen_ngp_libretro.dll.zip",
           "size": 201804,
-          "sha256": "c6f78063d04e933f52f733aea21fbd055a9065364a5dda9041a458afd013498e",
+          "sha256": "fbf9d3c28274717a921867b5c6e034b3ac179064349e02a51dae39bb6dc75a3b",
           "generated": true
         }
       }
@@ -104,21 +104,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_pce_libretro.so.zip",
           "filename": "mednafen_pce_libretro.so.zip",
           "size": 659234,
-          "sha256": "20f7f6438f5194040ddae4cda5f9ee03c0f43ced76a8d94998b179b2fc0afb36",
+          "sha256": "388ba8ab91f32a05e5a98367ceb6074eb860d8afa4f3ff88a79398ba9ebbfd9f",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_pce_libretro.so.zip",
           "filename": "mednafen_pce_libretro.so.zip",
           "size": 663969,
-          "sha256": "a99bb1fcce474b064eae59bf831082d9fc748fa649552887c5c9e2faecb7d658",
+          "sha256": "4bd4f25894eb02b668542762c3e12a3b94fbe879ded25ab4624c4b87a3bdc10c",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_pce_libretro.dll.zip",
           "filename": "mednafen_pce_libretro.dll.zip",
-          "size": 656239,
-          "sha256": "6f05c1ff3ca31aaf6b138e88d1fc62f0dbb3a9f299fc63d8c1027a850d933bf5",
+          "size": 656238,
+          "sha256": "12b353e18fa5f0a0dfa0f7b87046a4896e4d1d12a1a8219d2d4abdddc1132be1",
           "generated": true
         }
       }
@@ -143,22 +143,22 @@
         "linux/amd64": {
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_psx_hw_libretro.so.zip",
           "filename": "mednafen_psx_hw_libretro.so.zip",
-          "size": 3115433,
-          "sha256": "8027fa919da63ddda63336a8514431121773a52d8dad965bd5b4479208fe5796",
+          "size": 3119302,
+          "sha256": "ea22aa6bcd32df90b9ebab5e8dd2c326242bf45c16bda2be3904596b4317b1ab",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_psx_hw_libretro.so.zip",
           "filename": "mednafen_psx_hw_libretro.so.zip",
-          "size": 2959852,
-          "sha256": "987e72c7a22d6498896b52cebda808d2be1365128540d6af19ee661af6218ccc",
+          "size": 2968714,
+          "sha256": "be458cc3e640b5cb91e31ca95fc117e48dfe823936d4cf689c890c94d8d74e1e",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_psx_hw_libretro.dll.zip",
           "filename": "mednafen_psx_hw_libretro.dll.zip",
-          "size": 2844584,
-          "sha256": "33349b0fe2b134c7bdcee72fb43fc291eeb401a9e553165be1162ae2fff7be11",
+          "size": 2849553,
+          "sha256": "9b9baa1e325feafacf28c0c2a497b7465f913803181a65ad1f7e7b5a244cf857",
           "generated": true
         }
       }
@@ -184,21 +184,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_saturn_libretro.so.zip",
           "filename": "mednafen_saturn_libretro.so.zip",
           "size": 2285919,
-          "sha256": "6ca998784653e593a5995a3a3ffd5f15226cb75ed09ba4ded15e2880144a56c1",
+          "sha256": "ab2e93ba7a11dd2165d1bb0469fd365d0d320bb3ef5a1b0a7ed2ae49f3eee4ed",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_saturn_libretro.so.zip",
           "filename": "mednafen_saturn_libretro.so.zip",
           "size": 1694107,
-          "sha256": "7e0b60878b7ed812e19f139cb96b1411134b6f3c310b11ace8c421e87c9fb6dd",
+          "sha256": "4de258db893dbedda70d3b7a7ca8a7346c967792a097f77ae453a7cd28c1cdaa",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_saturn_libretro.dll.zip",
           "filename": "mednafen_saturn_libretro.dll.zip",
           "size": 1726197,
-          "sha256": "1dbc2288591f467d6bad79f9f7da1bf6efd3a41b3eaf40aed210f98f87c4d241",
+          "sha256": "3fedabce102fb3ca8381a63ed9b169b09a5aafed754ee76ee151bd99da02609c",
           "generated": true
         }
       }
@@ -224,21 +224,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mednafen_vb_libretro.so.zip",
           "filename": "mednafen_vb_libretro.so.zip",
           "size": 68521,
-          "sha256": "7c9f31331c9357bcbc18ff1cc9d30dee9456c196d2e4f1d2b21f6a302548675a",
+          "sha256": "9a565efe290bd6dfd9c891d320ad427ce4ef80059f0caac713b7898152e835ee",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mednafen_vb_libretro.so.zip",
           "filename": "mednafen_vb_libretro.so.zip",
           "size": 70655,
-          "sha256": "3257ee4448cb1742cb40e2a3625e8ad9298a8ac35f49f378830ae8b84d3354e0",
+          "sha256": "7a41767f705ad0916fe86eed6975fe2f4c8a053ab0fdeb27b5dbffb6d7fc9e26",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mednafen_vb_libretro.dll.zip",
           "filename": "mednafen_vb_libretro.dll.zip",
-          "size": 157836,
-          "sha256": "e3cc7c8997e1ea8429f60116d31b71c66a3738f91e129a0cf01b6d510881bdc3",
+          "size": 157837,
+          "sha256": "bc1e93e1ff9ba3177c8d7baa7e3913e587ec328871584c1c88a47996a8cdb6a3",
           "generated": true
         }
       }
@@ -264,21 +264,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/bsnes_libretro.so.zip",
           "filename": "bsnes_libretro.so.zip",
           "size": 1016431,
-          "sha256": "ef452cb08f09a0d07830939d59859611b191d43f45ad0a50d0b2ea4adccf7043",
+          "sha256": "11b1c4cda9686d4d3b6ae607853476122321d6f4e3225549048f3fa6c8102c2d",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/bsnes_libretro.so.zip",
           "filename": "bsnes_libretro.so.zip",
           "size": 988564,
-          "sha256": "898b19a4ae1d17eaab809e17b23462f3ae8248f3b9ffc2d3ef9bca59a63d1ad6",
+          "sha256": "fcb3de2107dd0e5922a00582fc05bf64bcc3abe11c38e1b3ab214940faa22da7",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/bsnes_libretro.dll.zip",
           "filename": "bsnes_libretro.dll.zip",
-          "size": 1056730,
-          "sha256": "9c6d8485ddda5aa8e647663d69772f85ebcd2b8d78e6679341aa4f36d60b3749",
+          "size": 1056731,
+          "sha256": "f3c11cd47b879a974e738dab8e705c3512779ec4da0f0f42f4b15c4bc88b3b72",
           "generated": true
         }
       }
@@ -304,21 +304,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/fbneo_libretro.so.zip",
           "filename": "fbneo_libretro.so.zip",
           "size": 20825886,
-          "sha256": "49a7ca6f496e0c0667629185748fcef8ff47a9b640105079cc06ba9f8adc4329",
+          "sha256": "d750e22a4be6d5f4d84d6a2dcd22501c3f69b74771ef2bfb7d718f602df5e2c9",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/fbneo_libretro.so.zip",
           "filename": "fbneo_libretro.so.zip",
           "size": 19407491,
-          "sha256": "20095fbe6ccaa86c304efba33fefc41e427c3b99a572f2c9647300b6c5ca2234",
+          "sha256": "ceacf2f538ae1e4246d5847caa4bac7f1b2cda6ec5b90f2526ddc7db8bb6ff03",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/fbneo_libretro.dll.zip",
           "filename": "fbneo_libretro.dll.zip",
           "size": 17334073,
-          "sha256": "ba3ab3c157e1819ad2fcf848eab9d7e42d189f2c2ce6f611562c1f5326857907",
+          "sha256": "bba4915c1fd1075bf5a02ab0686171237dc6fd4c7261971e81c07f2e5a15422b",
           "generated": true
         }
       }
@@ -343,22 +343,22 @@
         "linux/amd64": {
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/flycast_libretro.so.zip",
           "filename": "flycast_libretro.so.zip",
-          "size": 6280279,
-          "sha256": "c8bec6b8a25a14a08263cecb320ea5537c565e649e3e97fef628b9e40b1eb807",
+          "size": 6280187,
+          "sha256": "624dee352e4b39b53891f64f3307b76571c71f7778199579f7243497e6de8822",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/flycast_libretro.so.zip",
           "filename": "flycast_libretro.so.zip",
-          "size": 6201701,
-          "sha256": "5a48fde49a00399656a3e08fd4d9130fafeeb295a2a7d51ea46352f6f6cda728",
+          "size": 6201635,
+          "sha256": "fc4024890ebc5b4341e5a9bf6996db42505ad56dd9735313968e74dfcd5e59bc",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/flycast_libretro.dll.zip",
           "filename": "flycast_libretro.dll.zip",
-          "size": 6129546,
-          "sha256": "69a3e8d46d8110d85ec2c6610dfc4af7be64d524e0496a460bd8a9cd60f5d318",
+          "size": 6129615,
+          "sha256": "11e0ac6e8696fd08435bb4cfd4c48631aca82499e51e1f85523c9dc45247f280",
           "generated": true
         }
       }
@@ -384,21 +384,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/gambatte_libretro.so.zip",
           "filename": "gambatte_libretro.so.zip",
           "size": 528013,
-          "sha256": "21c5b7fa0f84d28eba530552d1061be7e3153df08ff80b53e06293b2f519d1b5",
+          "sha256": "c94c88aa993ea2678602b8289e0e338ba03ddec9602269ed95dbb14f0d056006",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/gambatte_libretro.so.zip",
           "filename": "gambatte_libretro.so.zip",
           "size": 519831,
-          "sha256": "a41037c51947f85da97dd64b3a2414dc1f26cf8f5730a0ef166303685a1f5242",
+          "sha256": "c1de8a98c46ce88b70944a930ad1e4310f74336f0ad7647222bbe9c398897c61",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/gambatte_libretro.dll.zip",
           "filename": "gambatte_libretro.dll.zip",
-          "size": 452692,
-          "sha256": "2a938c1642670a50b4ed1cc0acde0e851f54c5f637a9b6ad4a44987b4ebe43d5",
+          "size": 452691,
+          "sha256": "17578cf60fc5a963ec5a0e4a27da119ab738ec890216535fadd80ba1e71ccb85",
           "generated": true
         }
       }
@@ -424,21 +424,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/genesis_plus_gx_libretro.so.zip",
           "filename": "genesis_plus_gx_libretro.so.zip",
           "size": 1307893,
-          "sha256": "06c3d6370b5d5a3324955ec90bbbe2ca75704a11a78058f0f7738eec54e87b03",
+          "sha256": "26cbc3832edd7de4311f1ffeb010c9c079a2807bafb6ecc58ac3c8067bf974f4",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/genesis_plus_gx_libretro.so.zip",
           "filename": "genesis_plus_gx_libretro.so.zip",
           "size": 1242746,
-          "sha256": "48a4e03c9e83622f318975f2d76d8e499527e6aa5101147af7d62a4e4974317c",
+          "sha256": "1d0f77a87c5aae6869e9d09e2eb7c6e531ece880151819ceb5a99f09e32f49ed",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/genesis_plus_gx_libretro.dll.zip",
           "filename": "genesis_plus_gx_libretro.dll.zip",
-          "size": 926658,
-          "sha256": "1cb039a7d2e9522c5b8c02742d3c0b928c2f335dda625c0fa3e902534db76278",
+          "size": 926656,
+          "sha256": "74adcb643158b683a2daf0af98243b281fe51ad120b4e2d2ef480ccfd05af338",
           "generated": true
         }
       }
@@ -464,21 +464,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mame_libretro.so.zip",
           "filename": "mame_libretro.so.zip",
           "size": 116296697,
-          "sha256": "06cfa6586c51e10d6c5fa1848d651ad0415cce5dd01dc4f95fa6ce83ed2d3998",
+          "sha256": "8813e3d57705647105b7655c5d74aac4dd1fddf29b6ad9926949db82f7490230",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mame_libretro.so.zip",
           "filename": "mame_libretro.so.zip",
           "size": 112607439,
-          "sha256": "0beb4c9daf131af783842302940f608c9b5064fedf4b40de7a79e9479a44ee31",
+          "sha256": "087682d8e3b272fcb5c0fbd1daf3aaf63f54ea402da5e55238324383ad9855c6",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mame_libretro.dll.zip",
           "filename": "mame_libretro.dll.zip",
           "size": 107980161,
-          "sha256": "b1edce61036e4ef10ca2a79f5347da1bbf027b4988fd3eecae0bd8bca8a0b34b",
+          "sha256": "cbe11e3969e025cf1a119ccc1de3cc633397951df8c15a98be8a9980f28e1d12",
           "generated": true
         }
       }
@@ -504,21 +504,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/melonds_libretro.so.zip",
           "filename": "melonds_libretro.so.zip",
           "size": 897960,
-          "sha256": "584b78902b4ea12bed72d636266cdcdbfa3dee26332f7d0513bd1c0cfc52374a",
+          "sha256": "8aa58bc96d6d0356d75fdb7c993d88fe5cb69897b95406535e8242602f6a7b76",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/melonds_libretro.so.zip",
           "filename": "melonds_libretro.so.zip",
           "size": 808015,
-          "sha256": "f4b48e5f4f2c36d870c8e7c56f6d6d5b3ee17e0faa0335e5e70f771e82d1fd0f",
+          "sha256": "133b2d9c70657afe7c116c0ea3d6f1cbae98ecb61d8e13d33932680124303b9d",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/melonds_libretro.dll.zip",
           "filename": "melonds_libretro.dll.zip",
           "size": 1201079,
-          "sha256": "c907e7f74ac33ca159f2a772b52d46d4dccbc40be2788d203427873ae60311e4",
+          "sha256": "9a5d001f54bc3f4616f95c7086462e54e724b2ad74b8fd6d85e3f3f42f7cde3d",
           "generated": true
         }
       }
@@ -544,21 +544,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mesen_libretro.so.zip",
           "filename": "mesen_libretro.so.zip",
           "size": 1069140,
-          "sha256": "9f407653db08d4bd8833aca1345dceb4d58d5b6c80239699ac9d0a54426704b4",
+          "sha256": "1b5a8b4642f4449f1aff18be18f3b653ae69c40407ea3fbf9b006a322899be31",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mesen_libretro.so.zip",
           "filename": "mesen_libretro.so.zip",
           "size": 1022011,
-          "sha256": "dac7a65ef697540c1fe612f98bf025fe5a126ea92b351a4ce991d2aa76fe9487",
+          "sha256": "4dbd27971b2d3639a97e4066528f834267266cba65b43f1942b31f28a0188ae6",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mesen_libretro.dll.zip",
           "filename": "mesen_libretro.dll.zip",
-          "size": 1237156,
-          "sha256": "864d141546d60c0845fe830069f7fcdca0a4095fc47343249f9edd77ec882d65",
+          "size": 1237155,
+          "sha256": "86f6336d9df1148b810c43f3f21a5786c8a729d91ed992f70b602bf9f7345a88",
           "generated": true
         }
       }
@@ -584,21 +584,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mgba_libretro.so.zip",
           "filename": "mgba_libretro.so.zip",
           "size": 524281,
-          "sha256": "a35af6a9e05847ff8f58cd995ef148f31639d15c4e581f7f56e21d51330782ee",
+          "sha256": "bbb4d888a3ebec1b83de9d06f62ed433961f31d6d6db5031aeb7cd3992d1e60b",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/mgba_libretro.so.zip",
           "filename": "mgba_libretro.so.zip",
           "size": 524828,
-          "sha256": "bfedd63e82b6c4c79abffd310fd3e6e90a83e2947e236bf9d8a8d296b42bc96b",
+          "sha256": "f1e48014825240091f8a829bcee42910af69ecf3fd013baeed074b072287d0dc",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mgba_libretro.dll.zip",
           "filename": "mgba_libretro.dll.zip",
-          "size": 529881,
-          "sha256": "77edb521d1b9f277dba00e9bc7ccc898b9ce512311a0eb3f4b0876ed2f851913",
+          "size": 529880,
+          "sha256": "46437fdc7840b4d75390069ac0eecafda980b56cb887e52ad6421b72a8b0f780",
           "generated": true
         }
       }
@@ -624,7 +624,7 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/mupen64plus_next_libretro.so.zip",
           "filename": "mupen64plus_next_libretro.so.zip",
           "size": 2710754,
-          "sha256": "510217dd0a043c26d1b9eb260862032eb4734871aa006e213ee64277827198c1",
+          "sha256": "851e314169228f20f712f1300c426af4c39d1a19586617c33793cf0594328b49",
           "generated": true
         },
         "linux/arm64": {
@@ -638,7 +638,7 @@
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/mupen64plus_next_libretro.dll.zip",
           "filename": "mupen64plus_next_libretro.dll.zip",
           "size": 2892985,
-          "sha256": "e7a8bec906bee436051866d92033ccf2872fc53dc31a83f178f9aeb42015e390",
+          "sha256": "c7de94b8aa93931b6ae7fca94f103dfc0005cf0ad9a0b8d7b541b4e8da54d06f",
           "generated": true
         }
       }
@@ -664,21 +664,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/opera_libretro.so.zip",
           "filename": "opera_libretro.so.zip",
           "size": 239221,
-          "sha256": "fbcb081b21a4085f1908add84b2644f55d91e5d16f5e57aad013be401d85e879",
+          "sha256": "abe20556f444c24272209d327bd086564c19d78a806c9c5fc543080885e0f6d8",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/opera_libretro.so.zip",
           "filename": "opera_libretro.so.zip",
           "size": 238188,
-          "sha256": "716da5ce5ec9e669800173e1668ec4f42c8daf916738d954e5323ea86d3cd1b4",
+          "sha256": "b15fcf690aa49e165d134afaa54abe8e79d4ffe6ef95203e94e13f88702afe78",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/opera_libretro.dll.zip",
           "filename": "opera_libretro.dll.zip",
           "size": 259437,
-          "sha256": "153e39134b8998566db5bb52892223accd593f3e1a3a8309f046d9e35801a982",
+          "sha256": "c76f7acfff302543573283f6e95d2b715b06de1888116cf4152a1c7307d36677",
           "generated": true
         }
       }
@@ -703,22 +703,22 @@
         "linux/amd64": {
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/parallel_n64_libretro.so.zip",
           "filename": "parallel_n64_libretro.so.zip",
-          "size": 3045505,
-          "sha256": "54266ec1099ecf6aa698c710572486663ad9f0cbfda7b3a6416712b6c09d070b",
+          "size": 3045504,
+          "sha256": "b446aa3034b07afcdbe9aa6e9fc996eb5c3b9088e14d5ba12e44dd4ae71d9d02",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/parallel_n64_libretro.so.zip",
           "filename": "parallel_n64_libretro.so.zip",
-          "size": 2960772,
-          "sha256": "a29c9bd63b22cf2a5351183533727a0ee7ba16b7494442284d45414e41ab7805",
+          "size": 2960769,
+          "sha256": "0e488ef37d3c2d302df8a36bdc5bedcec1f99f270c0ebe3fc0adae66588e7e89",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/parallel_n64_libretro.dll.zip",
           "filename": "parallel_n64_libretro.dll.zip",
-          "size": 3307687,
-          "sha256": "5400ff4ba8aaef8ed040c851cd84f900da70be65951633023072afb730a3ceb9",
+          "size": 3307688,
+          "sha256": "b839e562f327084a44f74b98292108a45fee8f230c90ff8f7aa94a97cfcd696c",
           "generated": true
         }
       }
@@ -744,21 +744,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/picodrive_libretro.so.zip",
           "filename": "picodrive_libretro.so.zip",
           "size": 864823,
-          "sha256": "d68988b36d4eb01ae30defa7c43bf2d2e9831d751ca00d54da1eada4d7a37be2",
+          "sha256": "5bc3ae972d5bb63ef31bf6054d320e3c05ce94e9b0e6920378ac9822438d9345",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/picodrive_libretro.so.zip",
           "filename": "picodrive_libretro.so.zip",
           "size": 813718,
-          "sha256": "2b26ba5ee67b0f7902ae5378a27fd82b8db0a01ffd3deec396d8375403ae483f",
+          "sha256": "d0731e8b5e25f0d2bde80e5bea7ba496b21204945be6bab6199128ad0f4b340d",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/picodrive_libretro.dll.zip",
           "filename": "picodrive_libretro.dll.zip",
           "size": 935367,
-          "sha256": "46bf0547c1155b8c5acc2aeb20c5d8e732617e2a331d1bd50612a2c02363be7f",
+          "sha256": "24a52d78b25521ae4837c8594bd44069bc7e50b38e25fb6ff6ca2a743292cb50",
           "generated": true
         }
       }
@@ -783,22 +783,22 @@
         "linux/amd64": {
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/ppsspp_libretro.so.zip",
           "filename": "ppsspp_libretro.so.zip",
-          "size": 8579856,
-          "sha256": "3bd5cfdbf816e3af58bbaeec921a204b350371a2ed350641bc316046160cdfcb",
+          "size": 8616883,
+          "sha256": "644bb8225caa344413c9dc329d7f38287221df9d01f9eb7ba8befcf63347440c",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/ppsspp_libretro.so.zip",
           "filename": "ppsspp_libretro.so.zip",
-          "size": 8320060,
-          "sha256": "348bf76e106a8fcd904721f4f7281ec31001775ad76b40f7a9c63da533c10727",
+          "size": 8353180,
+          "sha256": "8586b5623755788b9dbed2bd0108c6bf07a6d9b69a13452ee6cad63a1e8f0669",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/ppsspp_libretro.dll.zip",
           "filename": "ppsspp_libretro.dll.zip",
-          "size": 6520287,
-          "sha256": "26e0ca54b4150fa1332ee7820158f1c98a74933e9b2b70c7bbb5d61ff4489b12",
+          "size": 6542760,
+          "sha256": "263007857e3664930019580935300ea9e6ead54bbb53f1b93e62f40e9c4b13e2",
           "generated": true
         }
       }
@@ -824,7 +824,7 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/sameboy_libretro.so.zip",
           "filename": "sameboy_libretro.so.zip",
           "size": 116378,
-          "sha256": "bced2f367ea35bd2ffc6148c451e7159e21461c7535e94bb1140cb3ffcee9749",
+          "sha256": "104b906de380f2fa82b8b21d6122e377bf7d0947d41e829d957dc02abb09ea1c",
           "generated": true
         },
         "linux/arm64": {
@@ -838,7 +838,7 @@
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/sameboy_libretro.dll.zip",
           "filename": "sameboy_libretro.dll.zip",
           "size": 127315,
-          "sha256": "839be19f7c7e0c10e4f270876d60d76ce839e5ea5e3805eeed35753c9e30cecf",
+          "sha256": "a4e48f20015e97b43d7f6ff660f1b5dc9fb5f7b74b6109e5a2a467ba0a1f373a",
           "generated": true
         }
       }
@@ -864,21 +864,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/snes9x_libretro.so.zip",
           "filename": "snes9x_libretro.so.zip",
           "size": 1179030,
-          "sha256": "bd7e09929ec97478ea1a07190a9fe4560c620bf0d48c28259b348f899c71a3a1",
+          "sha256": "348d5f2d0d754b5f30653d7b63887ffdac85caaa3c931749fa36d488398ad366",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/snes9x_libretro.so.zip",
           "filename": "snes9x_libretro.so.zip",
           "size": 1015184,
-          "sha256": "76d0e970350b3392bebcc4129d6f792484bf664161ed2f16a2c767e6c6aa8cec",
+          "sha256": "f5e5d284613c1ad7ebd2f1f4a7a7b94bb776c895080e5da18dd20aecd9fa9eee",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/snes9x_libretro.dll.zip",
           "filename": "snes9x_libretro.dll.zip",
-          "size": 1275758,
-          "sha256": "7557e918eb6f09d63e38611feb1d60885c67517ba12393f8188d464cfb97ea09",
+          "size": 1275759,
+          "sha256": "a2fcd3635e61526acdeb755864fd21721961f32d06d4e76ac235133066736886",
           "generated": true
         }
       }
@@ -904,21 +904,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/stella_libretro.so.zip",
           "filename": "stella_libretro.so.zip",
           "size": 1893566,
-          "sha256": "52280af6bc42790cb2414621553fbe99aed5ba0b08c6311a95680bb8e1b6f95f",
+          "sha256": "8a354a6d66bf5bad0467729a85af09db2bef09a5f9feb0318d1dab26f8528dc0",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/stella_libretro.so.zip",
           "filename": "stella_libretro.so.zip",
           "size": 1893566,
-          "sha256": "90abb73a830b9511b860a34c703e80bf7d60ba19586fc81d45d15a71087a40a0",
+          "sha256": "0e1ef2bffb28a4dd0c476bfa9a4a90bbc9045364543025c6577b777fd62b39c5",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/stella_libretro.dll.zip",
           "filename": "stella_libretro.dll.zip",
-          "size": 1820007,
-          "sha256": "ed118b9172e8ec3c35b91a3fe862309a9e097f0e472babafe5914fb654b0385a",
+          "size": 1820006,
+          "sha256": "ea2c57768feff4bc7b4a7c4ab84784ceaa83f42856a4c72d5b75c47797f21da1",
           "generated": true
         }
       }
@@ -944,21 +944,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/swanstation_libretro.so.zip",
           "filename": "swanstation_libretro.so.zip",
           "size": 1561905,
-          "sha256": "601f1fd803037807bb10287face6fd8ff210977582304504da91f3dcbd827032",
+          "sha256": "11f91c50ab731c303fbf75e1047dfd7e049fac23c10cc36347c2e59ec8991acd",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/swanstation_libretro.so.zip",
           "filename": "swanstation_libretro.so.zip",
           "size": 1476661,
-          "sha256": "4a99b6dc790324482c1df7566b608220772ae31a161d67e52811d798cb2f48ff",
+          "sha256": "2f9c4ac68b7b1cc0ff05efa668f51225981b5878d7f3c0ddb595b6ab70f92591",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/swanstation_libretro.dll.zip",
           "filename": "swanstation_libretro.dll.zip",
-          "size": 3076386,
-          "sha256": "1b974444abf56ceb622720cf7f2f31c9f770883e857bc6f656cf0718849127bc",
+          "size": 3076388,
+          "sha256": "6666bbcf116769729bf6b7ceb9d58a804ff04d4d36171abdbdbb83eaa1648bab",
           "generated": true
         }
       }
@@ -984,21 +984,21 @@
           "url": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/yabause_libretro.so.zip",
           "filename": "yabause_libretro.so.zip",
           "size": 525127,
-          "sha256": "d8d73e8752fb772f4a0ccb943695bf41b5c2f430669c69d1784ad0b8a7faf56b",
+          "sha256": "490a130ff0c678e2a0d82b3cda3b3ac7dfed1bdfbe01a7cafe331881072e989c",
           "generated": true
         },
         "linux/arm64": {
           "url": "https://buildbot.libretro.com/nightly/linux/aarch64/latest/yabause_libretro.so.zip",
           "filename": "yabause_libretro.so.zip",
           "size": 510254,
-          "sha256": "a955af92cb4e9f65a57e02dd53d1f775929ff7982c426b07a21b18c8aa23c743",
+          "sha256": "cea85f4489131fca3617cb16f8bb4c5f440542962391a6ea965a4035ef4172cd",
           "generated": true
         },
         "windows/amd64": {
           "url": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/yabause_libretro.dll.zip",
           "filename": "yabause_libretro.dll.zip",
-          "size": 544181,
-          "sha256": "aa6391325f3904eb2d170abf4afc88965f649af46f214074ef5cbf675ee916a9",
+          "size": 544182,
+          "sha256": "de371f47ff59e8eaf0edf8ed3b10d16725d628a87be98d3c17c9535587cb401e",
           "generated": true
         }
       }
