@@ -1,7 +1,7 @@
 # Pendências
 
 Trabalho **planejado, mas ainda não implementado** — confirmado por leitura
-do código em 2026-09-07, não por suposição. Backlog honesto: se alguma coisa
+do código em 2026-09-07 (itens O1 e B2b: 2026-09-09), não por suposição. Backlog honesto: se alguma coisa
 aqui já tiver sido feita quando você ler isto, o documento está desatualizado
 — confira contra o código antes de confiar.
 
@@ -190,6 +190,113 @@ do app. E o `ManualEmulatorForm` está a 4 cliques, no rodapé de uma tela
 - [ ] `ErrorModal` aceita uma ação extra sem quebrar as chamadas atuais.
 
 **Depende de:** nada · **Bloqueia:** nada
+
+### B2b — Ponto de entrada explícito para emulador que o ZeuX não conhece (P + decisão)
+
+**Origem:** pedido do Douglas em 2026-09-09 — *"quero um local que deixe mais
+explícito que se eu quiser tentar add um emulador de PS4 por exemplo, eu
+posso fazer"*. **Vizinho do B2, mas não é o mesmo item:** B2 é "já tenho o
+emulador **do console que o ZeuX conhece**, num drive que a varredura não
+alcança". Este é "quero usar um emulador de um sistema que **não está no
+catálogo**".
+
+**O que já existe (verificado no código, 2026-09-09):**
+
+- `internal/emulator/custom.go` foi escrito exatamente para isto, e o doc
+  comment diz: *"Nada de lista de emuladores permitidos, nada de exigir que o
+  console exista no catálogo."* `Validate` só exige id, nome, ao menos um
+  console, caminho do executável e `{rom}` nos argumentos.
+- `ManualEmulatorForm.tsx` já cobre nome, consoles (texto livre, separado por
+  vírgula), executável (com seletor de arquivo), template de argumentos e
+  notas.
+- **A única porta é o rodapé de `EmulatorsScreen.tsx`** (linha ~1207), abaixo
+  da grade paginada e de tudo o mais, atrás de um botão `ghost` cujo rótulo
+  é `addEmulatorManuallyButton`. Uma tela que a sidebar despromoveu de
+  propósito, com a porta no fim dela.
+
+**O achado que muda o escopo — leia antes de estimar:** cadastrar um emulador
+de PS4 hoje **funciona pela metade, e o app não avisa**. O `POST
+/custom-emulators` aceita `"consoles": ["ps4"]` sem reclamar, e o emulador
+passa a aparecer na lista. Mas `POST /library/folders` responde **400
+`unknown_console`** ("O console informado não está no catálogo do ZeuX",
+`server.go:1378`) — então não existe caminho na UI para apontar a pasta de
+jogos desse sistema, nem para lançar. `syncLibraryFolder` varre por
+`console.Extensions` do catálogo (`server.go:2187`), que não existem para um
+console fora dele.
+
+Ou seja: tornar o caminho mais visível **sem tratar isso** é promover um beco
+sem saída de 4 cliques para um beco sem saída de 1 clique. Isso piora a
+experiência, não melhora.
+
+> **Feito (2026-09-09).** Partes 1 e 2 implementadas.
+> - `ManualEmulatorForm` ganhou, no topo, a nota de que o ZeuX não valida flag
+>   nem hardware, e sob o campo de consoles a frase `consolesHint` declarando o
+>   limite de biblioteca para console fora do catálogo (pt-BR + en).
+> - `EmulatorsScreen`: a porta de cadastro manual saiu do rodapé e virou um
+>   bloco tracejado no topo (kicker + título + texto descritivo + botão
+>   `chrome` com `data-gamepad-start`), acima da grade e visível sem rolar. O
+>   bloco também hospeda o formulário aberto (novo ou em edição). O
+>   `Button variant="ghost"` do rodapé foi removido.
+> - **Backend: escolha conservadora.** O item deixa "adicionar console novo ao
+>   catálogo" fora de escopo — e essa é a única forma de a pasta de jogos
+>   funcionar para um sistema fora do catálogo. Então o backend não mudou de
+>   comportamento; só a mensagem de `unknown_console` em
+>   `POST /library/folders` (`handleAddLibraryFolder`) virou frase completa:
+>   explica que o console não está no catálogo, que por isso a indexação de
+>   pasta não está disponível, e que o emulador segue cadastrável/lançável à
+>   mão. As outras ocorrências de `unknown_console` (preview, launch) ficaram
+>   como estavam — contexto diferente.
+> - **Resta:** nada desta rodada. "Adicionar console ao catálogo" (item G)
+>   continua fora, como o item já previa.
+
+**Escopo mínimo, em duas partes — a ordem importa:**
+
+1. **Dizer a verdade sobre o limite (obrigatório, é o que destrava o resto).**
+   O `ManualEmulatorForm` ganha, no campo de consoles, uma frase descritiva:
+   *"Consoles fora do catálogo do ZeuX (por exemplo, `ps4`) são aceitos: o
+   emulador fica cadastrado e você pode lançá-lo. O que ainda não existe é
+   apontar uma pasta de jogos para um console que o ZeuX não conhece — a
+   biblioteca só varre os consoles do catálogo."* Tom descritivo, sem
+   julgar a escolha (o próprio `custom.go` já estabeleceu esse tom: *"o ZeuX
+   não julga a escolha, só executa"*).
+2. **Tornar a porta visível.** Uma faixa/card no **topo** de
+   `EmulatorsScreen`, não no rodapé: *"Usa um emulador que o ZeuX não conhece?
+   Aponte o executável e ele entra na lista."* + o botão que abre o form.
+   O rodapé atual some (uma porta só, não duas).
+
+**Alternativa de 80% que eu cortaria, se o item crescer:** parte 1 sozinha já
+resolve o pior problema (a promessa quebrada), e custa minutos. A parte 2 é
+posicionamento de UI, barata. Nada além disso deveria entrar nesta rodada.
+
+**Critério de aceite:**
+- [ ] `EmulatorsScreen` mostra a porta de cadastro manual **acima** da grade,
+      visível sem rolar, e não há mais a versão do rodapé.
+- [ ] O texto do form declara o limite de biblioteca para console fora do
+      catálogo, em pt-BR e en.
+- [ ] Cadastrar `{"consoles":["ps4"], ...}` pelo form salva sem erro e o
+      emulador aparece em `GET /custom-emulators` e na lista da tela
+      (comportamento atual do backend, agora com a expectativa certa na tela).
+- [ ] Nenhum texto diz que o emulador "vai funcionar" — o ZeuX não valida
+      flags de terceiros (regra do CLAUDE.md sobre não afirmar que as flags
+      dos adapters funcionam vale mais ainda aqui).
+- [ ] Nenhum texto julga a escolha do usuário nem sugere onde obter o
+      emulador ou o jogo.
+- [ ] Alcançável pelo controle (`data-gamepad-focused`).
+
+**Fica de fora (de propósito):**
+- **Adicionar console novo ao catálogo por essa via** (um "cadastrar console"
+  com extensões, patamares de hardware e parecer). É item G, mexe em
+  `consoles.json`, no motor de parecer e na biblioteca — e é a única forma de
+  fazer a pasta de jogos funcionar para um sistema fora do catálogo. Se o
+  Douglas quiser isso, é uma pendência própria, não um crescimento desta.
+- Nintendo Switch, Yuzu, Ryujinx — fora do catálogo por decisão registrada, e
+  esta porta não é rota de contorno disso. O texto da tela não cita nenhum
+  console fora do catálogo como sugestão; `ps4` aparece só como exemplo de
+  formato de id.
+- Validar o binário apontado executando-o para descobrir versão/compatibilidade.
+
+**Depende de:** nada (B2 mexe nas mesmas telas — fazer os dois na mesma
+rodada evita retrabalho) · **Bloqueia:** nada
 
 ### B3 — Frases de tradução no ponto de uso
 
@@ -476,27 +583,118 @@ console alcança · clique no jogo. Ver `decisoes.md`. O que **continua em
 aberto**: o modo tutorial/wizard dedicado e as perguntas de quando exibir /
 onde entra na máquina de estados de `App.tsx` / console de exemplo.
 
-**Ideia levantada, não desenhada ainda:** um modo tutorial/passo-a-passo
-logo após a instalação (ou logo após o consentimento, antes do scan) que
-explique o que o app faz, sem story vazio. Nada disto foi decidido:
+O que continuava sem especificação — o modo tutorial dedicado — virou o item
+O1 abaixo (pedido do Douglas em 2026-09-09: *"quero telas com prints
+explicando o que é cada coisa"*).
 
-- Quando exibir: só na primeira execução (mesmo padrão do splash,
-  `localStorage`), ou sempre que a biblioteca estiver vazia (repete se a
-  pessoa remover todas as pastas depois)?
-- Conteúdo: um carrossel/wizard curto explicando consentimento → scan →
-  apontar pasta → parecer → jogar? Ou só uma versão mais rica do
-  `EmptyState` atual, com passos numerados em vez de um botão solto?
-- Onde entra na máquina de estados de `App.tsx` (mesmo cuidado do splash:
-  não pode atrasar quem já tem pasta apontada, e não pode ser uma `Phase`
-  que soma tempo ao boot de quem só quer abrir o jogo de sempre).
-- Vale mostrar um console de exemplo (sem jogo de verdade — nunca ROM) só
-  pra ilustrar como fica um card "pronto pra jogar" vs. "falta componente
-  X"? Isso pode ler como dado falso se não ficar claro que é ilustrativo —
-  cuidado editorial, não só técnico.
+### O1 — Tour de primeira execução (M)
 
-**Depende de:** nada · **Bloqueia:** nada. Não teve critério de aceite
-desenhado ainda — é ideia registrada, não especificação pronta para
-implementar.
+> **Feito (2026-09-09).** `src/components/TourOverlay.tsx` (+ `.i18n.ts`):
+> sobreposição no molde do `SplashScreen`, fora do `switch (phase)`, marca
+> `zeux.tour-seen` no `localStorage`. Aparece quando `phase` entra em
+> `all-games` ou `declined` e o tour ainda não foi visto (efeito em
+> `App.tsx`); "Pular" em toda tela, `Escape`/setas navegam, botão "Próximo"
+> com `data-gamepad-start`. Quatro telas (autoconfiguração · parecer honesto ·
+> biblioteca local · camada social — esta última diz por texto que save
+> state/texture pack/perfil de controle/netplay se compartilham e a ROM
+> nunca). Ilustrações: SVG esquemático em tokens do tema (janela de emulador,
+> medidor segmentado com a chave apontando o componente que barra, pasta →
+> grade de capas, nós da rede + cartucho riscado), sem texto embutido, sem
+> número de hardware inventado. Transição entre telas usa keyframe já
+> existente, zerada pelo bloco global de `prefers-reduced-motion`.
+> Reabertura: Configurações → "Rever apresentação" (`onReplayTour`), card novo
+> no topo de `SettingsScreen`. **Resta:** nada do escopo mínimo. Não foi feito
+> teste com máquina limpa de verdade (nenhuma sessão de IA tem o app rodando);
+> a lógica de `localStorage` espelha a do splash, que já roda em produção.
+
+
+
+**O problema:** o percurso de um usuário novo hoje é consentimento → scan →
+app (`App.tsx`: `handleConsent` termina em `setPhase("all-games")`, linha
+291). Em nenhum momento alguém diz o que o ZeuX **faz** — o usuário concorda
+com um scan de hardware e cai numa grade de jogos sem saber que o app
+autoconfigura emulador, que o parecer nomeia o componente que barra, ou que
+existe camada social. Quem nunca emulou não tem como inferir isso da tela.
+
+**Escopo mínimo (4 telas, overlay, não `Phase`):** um `TourOverlay` no mesmo
+molde do `SplashScreen` — componente de sobreposição, **fora do `switch (phase)`**,
+com marca de "já vi" em `localStorage`. Esta escolha não é detalhe de
+implementação: uma `Phase` nova soma tempo ao boot de quem só quer abrir o
+jogo de sempre, e o `SplashScreen` já resolveu esse mesmo problema desse
+mesmo jeito (ver o doc comment dele).
+
+Conteúdo, uma tela por pilar, alinhado a `visao-do-produto.md`:
+
+1. **O ZeuX configura o emulador por você** — você aponta o jogo, ele escolhe
+   emulador e preset.
+2. **Ele diz a verdade sobre esta máquina** — números e o componente que
+   barra, sem nota opaca (princípios 2 e 3).
+3. **Sua biblioteca é sua** — as ROMs que já estão no seu disco; o ZeuX só lê
+   a pasta.
+4. **A camada social** — save states, texture packs, perfis de controle e
+   lobby de netplay. **Dizer explicitamente que jogo não se compartilha** —
+   esta tela é o único lugar do app onde a regra 6 aparece como promessa ao
+   usuário, e não só como ausência de funcionalidade.
+
+**Decisões tomadas (não reabrir sem motivo):**
+
+- **Depois do scan, antes da primeira tela do app.** Antes do consentimento,
+  quatro telas vendendo o produto viram pressão para consentir — e o
+  consentimento precisa ser um "sim" frio. Depois do scan, o tour é
+  apresentação, não persuasão.
+- **Só na primeira execução**, `localStorage` (mesmo critério do splash), com
+  **"Pular" visível em toda tela** e reabertura por Configurações → "Ver a
+  apresentação de novo". Não reaparece por biblioteca vazia: quem esvaziou a
+  biblioteca já conhece o app.
+- **Quem recusou o consentimento também vê** (a partir de `DeclinedScreen`),
+  porque é justamente quem tem menos contexto sobre o que o app faz.
+
+**Sobre os "prints": corte proposto.** O escopo mínimo usa **arte esquemática**
+(blocos/wireframe no vocabulário visual do app), não captura de tela real.
+Motivo medido, não estético: o visual foi refeito duas vezes em três dias
+(`decisoes.md`, redesenho de 2026-09-07 e a extensão de 2026-09-09) — print
+real envelhece sozinho e passa a mentir sobre o app, o que é pior que não ter
+print. E print tem texto de UI embutido, ou seja, precisaria de um jogo de
+imagens por idioma (`pt-BR`/`en`), dobrando o peso no binário e o trabalho de
+manutenção. Arte esquemática não tem texto dentro: a legenda vem do i18n.
+
+Se o Douglas mantiver captura real (é decisão dele), o custo vem junto:
+`src/assets/tour/`, um jogo por idioma, e um procedimento de recaptura
+registrado em `decisoes.md` para rodar a cada redesenho — senão o item volta
+como dívida.
+
+**Critério de aceite:**
+- [ ] Primeira execução em máquina limpa (`localStorage` vazio): depois do
+      scan, o tour aparece antes de `all-games`; ao terminar ou pular, cai em
+      `all-games`.
+- [ ] Segunda execução: o tour **não** aparece — o app vai direto do scan à
+      biblioteca.
+- [ ] Configurações tem "Ver a apresentação de novo" e o tour reabre por ali,
+      em qualquer execução.
+- [ ] "Pular" está visível nas 4 telas e é alcançável só pelo controle
+      (`data-gamepad-start` + cursor de `data-gamepad-focused`).
+- [ ] Nenhuma `Phase` nova em `App.tsx`; o tour é overlay (mesmo padrão de
+      `SplashScreen`), e o boot de quem já viu não ganha nenhuma requisição
+      nem espera adicional.
+- [ ] A tela da camada social diz, em texto, que save state / texture pack /
+      perfil de controle / netplay são compartilháveis e **jogo não é**.
+- [ ] Nenhum texto do tour julga hardware, e nenhum número de hardware
+      inventado aparece nas ilustrações (nada de "RTX 4090 · Ótimo" de
+      exemplo, que lê como parecer real).
+- [ ] i18n pt-BR/en; nenhuma frase embutida em imagem.
+- [ ] `prefers-reduced-motion` zera a transição entre telas.
+
+**Fica de fora (de propósito):**
+- Console/jogo de exemplo com dado plausível — a preocupação já registrada
+  acima: lê como dado falso. Ilustração esquemática não corre esse risco.
+- Tour contextual por tela ("dicas" que aparecem na primeira visita a cada
+  tela). É outro produto, e multiplica a superfície de manutenção.
+- Vídeo, animação de produto, narração.
+- Repetir o tour por biblioteca vazia — isso já é coberto pelo `EmptyState`
+  com passos numerados, entregue em 2026-09-09.
+
+**Depende de:** nada · **Bloqueia:** nada (A1, a home, encosta neste item: se
+a `home` ganhar estado de boas-vindas, os dois textos precisam concordar)
 
 ## Redesenho visual — telas restantes
 
@@ -521,6 +719,59 @@ cobriu 7 telas; esta rodada terminou o restante:
 **Limpeza feita junto:** `LibraryScreen.tsx` passou a importar
 `CHROME_TINT_INFO`/`CHROME_TINT_DANGER` de `ui.tsx` no lugar das duas strings
 de tingimento inline (sem mudança visual).
+
+**Depende de:** nada · **Bloqueia:** nada
+
+## Rodada retrô/pixelada multiagente (2026-09-09)
+
+**Concluído em 2026-09-09** (ver `decisoes.md`, "Direção visual retrô/pixelada,
+e o layout das telas deixa de ser lei"). Quatro frentes, todas no mesmo commit:
+
+- ~~**Fundação de tema**~~ — `--font-mono` real (IBM Plex Mono embutida; o
+  `@theme` nunca a declarava e ~40 elementos de identidade caíam na mono do
+  SO), componente `ZeuXMark` com `image-rendering: pixelated` + asset só-Zeus
+  (`logo-zeux-mark.png`), wordmark pixel na sidebar expandida, `EmptyState`
+  reescrito com hierarquia + marca CRT e propagado a 9 telas, chips de filtro
+  padronizados em roxo via constantes compartilhadas (`FILTER_CHIP_*` em
+  `ui.tsx`), contraste WCAG do estado OFF corrigido.
+- ~~**Consoles**~~ — 3 faixas por engajamento (Prontos para jogar / Falta
+  configurar / Catálogo), `ConsoleCard` novo tratado como arte de sistema,
+  `consoleFamily()` em `consoleColor.ts` como fonte única de cor e
+  agrupamento, régua de filtros fabricante/época/"tenho jogos", paginação
+  removida, core de-aninhado no `ConsoleDetailScreen`.
+- ~~**Biblioteca**~~ — `LibraryToolbar` compartilhada entre `AllGamesScreen` e
+  `GamesScreen` (busca, ordenação, grade/lista, densidade de capa P/M/G
+  persistida), `GameListRow` com miniatura + colunas alinhadas, `GameTile`
+  com rodapé de altura fixa e badge de bloqueio sobre a capa, `LibraryScreen`
+  achatada em linhas de gerência (fim do card-dentro-de-card).
+- ~~**Onboarding + emulador**~~ — `TourOverlay` de 4 telas (overlay pós-scan,
+  `localStorage` `zeux.tour-seen`, reabre em Configurações), frase honesta no
+  `ManualEmulatorForm`, bloco "emulador fora da lista" visível na
+  `EmulatorsScreen`, mensagem `unknown_console` do `POST /library/folders`
+  virou frase completa. Itens `O1` e `B2b` fechados.
+
+### Ajustes de polimento notados rodando o app — abertos
+
+Vistos em screenshots reais do build de dev (2026-09-09), não tratados nesta
+rodada:
+
+- [ ] **Fonte pixel sem glifo acentuado.** `Press Start 2P` não tem `á/é/í/ó/ú`
+      — rótulos como "MEMÓRIA", "VÍDEO", "PARÂMETROS" em `SpecsPanel` /
+      `SectionHeading` caem no fallback no meio da palavra e ficam feios.
+      Opção A: caixa-alta sem acento nesses rótulos (mesma lógica de
+      `level: "otimo"`). Opção B: trocar a fonte só dos rótulos. Decidir com
+      o Douglas — é escolha de identidade.
+- [ ] **`GameTile` sem capa mostra o título duas vezes.** O placeholder de
+      `GameCover` desenha título (em fonte pixel) + sigla do console grande
+      sobre a arte, e o rodapé do tile repete o título. Poluído. Placeholder
+      deveria mostrar só a sigla do console e deixar o título para o rodapé.
+- [ ] **`GameListRow`: coluna da miniatura solta.** Gap grande entre a
+      miniatura de 40px e o badge de plataforma; a coluna parece descolada.
+      Ajuste fino de `grid-template-columns` / alinhamento.
+- [ ] **`ZeuXMark` pequeno fica denso.** Em ~32px (tela "lendo o
+      consentimento…") o recorte automático de `logo-zeux-mark.png` embola.
+      Pede uma pixel art própria simplificada — o componente já aceita o novo
+      PNG sem mudança de código.
 
 **Depende de:** nada · **Bloqueia:** nada
 

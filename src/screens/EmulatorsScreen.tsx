@@ -24,7 +24,11 @@ import {
   ConsoleInfoModal,
   ConsoleMoreBadge,
   CardSkeleton,
+  EmptyState,
   ErrorModal,
+  FILTER_CHIP_BASE,
+  FILTER_CHIP_OFF,
+  FILTER_CHIP_ON,
   FOCUS_RING,
   InlineError,
   InlineWarning,
@@ -59,23 +63,9 @@ const MAX_CONSOLE_ICONS = 6;
 // docs/roadmap.md), então `consoleFilter` continua "" pro resto da tela.
 const ALL_CONSOLES = "__all__";
 
-/**
- * Régua de filtros no mesmo acabamento de `ConsolesScreen`/`AllGamesScreen`
- * (2026-09-07): 36px de altura, canto reto, rótulo miúdo em caixa alta,
- * borda que acende no roxo. Copiado de propósito em vez de importado — as
- * três telas hoje declaram a régua localmente, e transformar isso num
- * componente compartilhado é uma refatoração das três, não desta.
- *
- * Roxo no ativo, nunca ciano: filtrar é ação do usuário, e a paleta
- * (src/index.css) reserva `--accent-secondary` para o que o sistema informa —
- * que aqui é o selo "instalado" do card, não o filtro.
- */
-const FILTER_CHIP_BASE =
-  "inline-flex h-9 items-center gap-1.5 rounded-sm border-[1.5px] px-3 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none";
-const FILTER_CHIP_ON =
-  "border-accent bg-accent/10 text-ink shadow-[0_0_14px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.06)]";
-const FILTER_CHIP_OFF =
-  "border-control-border text-muted hover:border-accent hover:bg-accent/10 hover:text-ink";
+// A régua de chips (`FILTER_CHIP_*`) mora em `components/ui` desde 2026-09-09
+// — as três telas que a usavam declaravam a mesma string localmente. Ver o
+// doc comment lá.
 
 /**
  * Filtro de situação (2026-09-07). A tela é de gerenciamento: as duas
@@ -1059,6 +1049,48 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
         </p>
       )}
 
+      {/* B2b (docs/pendencias.md): a porta de cadastro manual sai do rodapé e
+          vira uma afordância visível sem rolar. O backend já aceita emulador
+          de console fora do catálogo (internal/emulator/custom.go) — só
+          faltava dizer isso em algum lugar. O mesmo bloco hospeda o formulário
+          (novo ou em edição, vindo do card de um custom). */}
+      <div className="mb-5 rounded-lg border border-dashed border-line-strong bg-fill/40 p-4">
+        {formMode === "closed" ? (
+          <>
+            <p className="font-mono text-xs tracking-[0.2em] text-accent-secondary uppercase">
+              {t("manualEntryKicker")}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-ink">{t("manualEntryTitle")}</p>
+            <p className="mt-1 max-w-2xl text-sm text-muted">{t("manualEntryBody")}</p>
+            <Button
+              type="button"
+              variant="chrome"
+              className="mt-3 w-fit"
+              {...{ "data-gamepad-start": "" }}
+              onClick={() => setFormMode("new")}
+            >
+              {t("addEmulatorManuallyButton")}
+            </Button>
+          </>
+        ) : (
+          <>
+            <SectionHeading className="mb-2">{t("addEmulatorSectionTitle")}</SectionHeading>
+            <ManualEmulatorForm
+              existing={formMode === "new" ? undefined : formMode}
+              existingIds={customs
+                .map((c) => c.id)
+                .filter((id) => formMode === "new" || id !== (formMode as CustomDefinition).id)}
+              placeholders={placeholders}
+              onSaved={() => {
+                setFormMode("closed");
+                setReloadKey((k) => k + 1);
+              }}
+              onCancel={() => setFormMode("closed")}
+            />
+          </>
+        )}
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {emulators && emulators.length > PAGE_SIZE && (
           <>
@@ -1151,9 +1183,10 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           nenhum termo digitado — a frase antiga saía como `Nenhum emulador
           encontrado para ""`, culpando uma busca que não existia. */}
       {emulators && filtered.length === 0 && (
-        <p className="text-base text-muted">
-          {search.trim() ? t("noEmulatorsFound", { search }) : t("noEmulatorsForFilters")}
-        </p>
+        <EmptyState
+          title={t("noEmulatorsTitle")}
+          message={search.trim() ? t("noEmulatorsFound", { search }) : t("noEmulatorsForFilters")}
+        />
       )}
 
       {pageItems.length > 0 && (
@@ -1193,35 +1226,6 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           <Pagination page={page} totalPages={totalPages} onChange={setPage} />
         </>
       )}
-
-      {/* I1, docs/roadmap.md: o backend já existia por inteiro
-          (GET/POST/DELETE /custom-emulators, internal/emulator/custom.go) —
-          esta tela era o único pedaço faltando. */}
-      <div className="mt-6">
-        <SectionHeading className="mb-2">{t("addEmulatorSectionTitle")}</SectionHeading>
-        {formMode === "closed" ? (
-          // B8 (achado do critico-design, 2026-08-18): reescrevia as quatro
-          // classes do FOCUS_RING à mão em vez de usar o componente — único
-          // lugar do app que fazia isso. `Button variant="ghost"` já é
-          // exatamente esse bloco tracejado de slot vazio/"adicione algo
-          // aqui" (B7); texto em `text-base` normal, não `font-pixel` — é
-          // rótulo de ação, não título de seção nem chip.
-          <Button type="button" variant="ghost" onClick={() => setFormMode("new")} className="w-full text-center">
-            {t("addEmulatorManuallyButton")}
-          </Button>
-        ) : (
-          <ManualEmulatorForm
-            existing={formMode === "new" ? undefined : formMode}
-            existingIds={customs.map((c) => c.id).filter((id) => formMode === "new" || id !== (formMode as CustomDefinition).id)}
-            placeholders={placeholders}
-            onSaved={() => {
-              setFormMode("closed");
-              setReloadKey((k) => k + 1);
-            }}
-            onCancel={() => setFormMode("closed")}
-          />
-        )}
-      </div>
 
       {modalConsoleId && (
         <ConsoleInfoModal

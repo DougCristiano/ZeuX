@@ -4,7 +4,7 @@ import type { GameLaunchability } from "../lib/gameLaunchability";
 import { formatLastPlayedShort, formatPlaytime } from "../lib/format";
 import { useT } from "../i18n/i18n";
 import { dict } from "./GameTile.i18n";
-import { Badge, FavoriteToggle, FOCUS_RING, GameCover } from "./ui";
+import { FavoriteToggle, FOCUS_RING, GameCover } from "./ui";
 
 /**
  * Célula de jogo — M5 (docs/sprint-m-plano.md): componente único entre
@@ -53,6 +53,7 @@ export function GameTile({
   onToggleFavorite,
   launchability,
   onInstall,
+  gamepadStart = false,
 }: {
   game: LibraryGame;
   /** Sigla do console — capa placeholder e badge de plataforma. */
@@ -65,9 +66,21 @@ export function GameTile({
   launchability?: GameLaunchability;
   /** Só relevante quando `launchability.reason === "not_installed"` — dispara a instalação inline (L8) a partir do badge. */
   onInstall?: () => void;
+  /** Marca este tile como o pouso do cursor de controle (`data-gamepad-start`)
+   * — usado no primeiro tile da grade quando a tela não tem hero. */
+  gamepadStart?: boolean;
 }) {
   const t = useT(dict);
   const blocked = launchability !== undefined && !launchability.launchable;
+  const reason = blocked ? launchability!.reason : undefined;
+  // "jogar assim mesmo" (sem preset / BIOS vazia) e "instalar emulador"
+  // continuam acionáveis — princípio 5: informar, nunca bloquear.
+  const chipAction =
+    (reason === "no_preset" || reason === "bios_empty") && onPlay
+      ? { onClick: onPlay, label: t("playAnywayBadge") }
+      : (reason === "not_installed" || reason === "install_manual") && onInstall
+        ? { onClick: onInstall, label: launchability!.badge }
+        : undefined;
   // Achado do critico-layout-biblioteca (2026-09-06): sem data de última
   // sessão, não há nada que a faixa de hover diga que o rodapé do tile já
   // não diga (playtime, sempre visível) — a faixa simplesmente não aparece
@@ -88,6 +101,7 @@ export function GameTile({
         <div
           role="button"
           tabIndex={0}
+          {...(gamepadStart ? { "data-gamepad-start": "" } : {})}
           className={`group block w-full cursor-pointer rounded-lg text-left ${FOCUS_RING}`}
           title={game.title}
           // A11y 4.1.2: quando bloqueado, o motivo (`launchability.title`)
@@ -119,64 +133,44 @@ export function GameTile({
           />
         </div>
         <FavoriteToggle favorite={game.favorite} onToggle={onToggleFavorite} className="absolute top-1.5 right-1.5" />
+
+        {/* Redesenho retrô (2026-09-09, achado do critico-layout): o badge de
+            bloqueio ficava no rodapé de texto e empurrava a altura do tile —
+            um tile bloqueado subia ~24px, e a virtualização por linha fazia a
+            fileira inteira crescer. Migrou para CIMA da capa (canto inferior
+            esquerdo, sobre a arte). `chipAction` presente → botão acionável
+            (jogar assim mesmo / instalar); ausente → etiqueta estática. O
+            `title` sempre carrega o motivo por extenso. */}
+        {blocked &&
+          (chipAction ? (
+            <button
+              type="button"
+              title={launchability!.title}
+              onClick={(e) => {
+                e.stopPropagation();
+                chipAction.onClick();
+              }}
+              className={`absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-sm border border-accent/70 bg-black/80 px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-accent-hover backdrop-blur-sm transition duration-150 hover:border-accent hover:bg-black/90 hover:shadow-[0_0_12px_-4px_var(--accent)] ${FOCUS_RING}`}
+            >
+              {chipAction.label}
+            </button>
+          ) : (
+            <span
+              title={launchability!.title}
+              className="pointer-events-none absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-sm border border-line-strong bg-black/80 px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-muted backdrop-blur-sm"
+            >
+              {launchability!.badge}
+            </span>
+          ))}
       </div>
-      <div className="min-w-0">
-        {/* M7: line-clamp-2 — com capa real, este é o único título do tile
-            (GameCover não desenha mais o dele por cima da arte). */}
-        <p className="line-clamp-2 text-sm font-semibold text-ink" title={game.title}>
+      {/* Rodapé de altura fixa (`min-h`): 2 linhas de título + 1 de metadado,
+          sempre — sem isso um título de 1 linha encurtava o tile e a fileira
+          virtualizada ficava irregular. */}
+      <div className="min-h-[3.75rem] min-w-0">
+        <p className="line-clamp-2 text-sm leading-tight font-semibold text-ink" title={game.title}>
           {game.title}
         </p>
-        <p className="text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
-        {blocked && (
-          <div className="mt-1">
-            {/* Q5 (docs/roadmap.md, Sprint Q): "instalação manual" também é
-                acionável. Antes só `not_installed` virava botão, e o badge
-                novo nascia texto morto — o usuário lia "instalação manual" e
-                não tinha o que clicar. Os dois levam ao mesmo `onInstall`,
-                que já ramifica pelo motivo (useInlineInstall.handlePlay). */}
-            {(launchability!.reason === "no_preset" || launchability!.reason === "bios_empty") && onPlay ? (
-              // Princípio 5 (informar, nunca bloquear): sem preset ou com BIOS
-              // vazia, o chip deixou de ser texto morto — vira "jogar assim
-              // mesmo", que dispara a mesma `onPlay` do ▶ (lança sem `options`
-              // em "sem preset"; abre a confirmação de BIOS em "bios vazia").
-              // O motivo completo continua no `title` (tooltip) e no nome
-              // acessível do tile.
-              <button
-                type="button"
-                title={launchability!.title}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPlay();
-                }}
-                className={`inline-block rounded-sm border border-accent/60 bg-accent/10 px-1.5 py-0.5 font-mono text-xs tracking-wide text-accent-hover transition duration-150 hover:border-accent hover:bg-accent/20 hover:shadow-[0_0_12px_-4px_var(--accent)] ${FOCUS_RING}`}
-              >
-                {t("playAnywayBadge")}
-              </button>
-            ) : (launchability!.reason === "not_installed" || launchability!.reason === "install_manual") && onInstall ? (
-              // Versão em miniatura do `Button variant="primary"` da hero
-              // ("instalar emulador") — mesma cor de ação (roxo), não a
-              // `chrome` de navegação/arquivo. Antes era texto sublinhado
-              // pontilhado em cinza (`text-muted underline`): lia como link
-              // morto, não como algo clicável — achado do Douglas testando o
-              // app (2026-09-07), a mesma leva de ajuste que criou `chrome`.
-              <button
-                type="button"
-                title={launchability!.title}
-                onClick={(e) => {
-                  // Não deixa o clique borbulhar pro wrapper (que abriria o
-                  // detalhe) — este botão tem a própria ação.
-                  e.stopPropagation();
-                  onInstall();
-                }}
-                className={`inline-block rounded-sm border border-accent/60 bg-accent/10 px-1.5 py-0.5 font-mono text-xs tracking-wide text-accent-hover transition duration-150 hover:border-accent hover:bg-accent/20 hover:shadow-[0_0_12px_-4px_var(--accent)] ${FOCUS_RING}`}
-              >
-                {launchability!.badge}
-              </button>
-            ) : (
-              <Badge title={launchability!.title}>{launchability!.badge}</Badge>
-            )}
-          </div>
-        )}
+        <p className="mt-1 font-mono text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
       </div>
     </div>
   );

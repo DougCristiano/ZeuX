@@ -185,6 +185,22 @@ motivo que `level: "otimo"` está.
   precisa sobreviver à resposta. `session.go` usa `context.Background()` de
   propósito.
 
+### Direção visual: retrô/pixelado, e o layout atual não é lei
+
+Decidido pelo Douglas em **2026-09-09**. O tema do ZeuX puxa para o **retrô,
+com pixel art** — grade de pixels visível, fonte pixel como voz de marca,
+vocabulário CRT (scanlines, sweep, halo). Não é skin de nostalgia colada por
+cima: é a identidade do produto, e vale para telas novas e para as que já
+existem.
+
+**O layout atual das telas NÃO é regra universal.** Qualquer tela pode ser
+totalmente redesenhada — grade de consoles, biblioteca, telas de pasta,
+onboarding — se isso servir à direção acima e aos princípios de produto. O
+que continua valendo sem exceção: os princípios de produto não-negociáveis
+(consentimento, texto descritivo sobre hardware, nomear o gargalo, legal
+sobre ROMs), a regra de responsividade abaixo, e as convenções de idioma e
+de comentário. Estrutura de tela e escolha de componente estão abertas.
+
 ### Layout responsivo (frontend)
 
 O ZeuX é uma janela redimensionável, não uma página web de largura fixa — o

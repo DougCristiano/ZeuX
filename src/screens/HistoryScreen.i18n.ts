@@ -17,6 +17,14 @@ export const dict = {
     "pt-BR": "O histórico aparece aqui depois que você abrir o primeiro jogo.",
     en: "Your history shows up here after you open your first game.",
   },
+  emptyTitle: {
+    "pt-BR": "Nada jogado ainda",
+    en: "Nothing played yet",
+  },
+  emptyAction: {
+    "pt-BR": "Ver biblioteca",
+    en: "Go to library",
+  },
   loadError: {
     "pt-BR": "Não foi possível carregar o histórico.",
     en: "Could not load the history.",

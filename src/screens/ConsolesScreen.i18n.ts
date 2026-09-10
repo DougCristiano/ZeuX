@@ -35,8 +35,50 @@ export const dict = {
     "pt-BR": "Nenhum console encontrado com esse filtro.",
     en: "No consoles found with this filter.",
   },
+  noConsolesFoundTitle: {
+    "pt-BR": "Nenhum console com esse filtro",
+    en: "No consoles match this filter",
+  },
   errorLoadingConsoles: {
     "pt-BR": "Não foi possível listar os consoles.",
     en: "Could not load the consoles.",
   },
+
+  // Faixas da tela (2026-09-09): a grade única de 33 consoles não tinha
+  // hierarquia — quem já configurou um console procurava-o no meio dos 32
+  // que ainda não tocou. As três faixas separam por engajamento, não por
+  // parecer de hardware.
+  sectionReady: { "pt-BR": "Prontos para jogar", en: "Ready to play" },
+  sectionNeedsSetup: { "pt-BR": "Falta configurar", en: "Needs setup" },
+  sectionCatalog: { "pt-BR": "Catálogo", en: "Catalog" },
+  sectionReadyCount: {
+    "pt-BR": "{{count}} console",
+    en: "{{count}} console",
+  },
+  sectionReadyCountPlural: {
+    "pt-BR": "{{count}} consoles",
+    en: "{{count}} consoles",
+  },
+
+  // Régua de filtros do catálogo — separada da régua de prontidão (que
+  // pergunta "o que falta montar"). Estes recortam o catálogo por fabricante,
+  // época e "tenho jogos deste console".
+  filterByMaker: { "pt-BR": "Fabricante", en: "Manufacturer" },
+  filterByEra: { "pt-BR": "Época", en: "Era" },
+  familyOther: { "pt-BR": "Outros", en: "Others" },
+  era70s80s: { "pt-BR": "Anos 70–80", en: "70s–80s" },
+  era90s: { "pt-BR": "Anos 90", en: "90s" },
+  era2000s: { "pt-BR": "Anos 2000", en: "2000s" },
+  era2010plus: { "pt-BR": "2010 em diante", en: "2010 onward" },
+  filterOnlyWithGames: {
+    "pt-BR": "Tenho jogos deste console",
+    en: "I have games for this console",
+  },
+  clearFilters: { "pt-BR": "Limpar filtros", en: "Clear filters" },
+
+  // Card do console
+  viewGames: { "pt-BR": "Ver jogos", en: "View games" },
+  cardGameCountSingular: { "pt-BR": "{{count}} jogo", en: "{{count}} game" },
+  cardGameCountPlural: { "pt-BR": "{{count}} jogos", en: "{{count}} games" },
+  cardNoGames: { "pt-BR": "sem jogos na pasta", en: "no games in folder" },
 } satisfies Dict;

@@ -1,6 +1,5 @@
-import logoZeux from "../assets/logo-zeux.png";
 import { useT } from "../i18n/i18n";
-import { Button, AmbientGlow, InlineError } from "../components/ui";
+import { Button, AmbientGlow, InlineError, ZeuXMark } from "../components/ui";
 import { dict } from "./StatusScreen.i18n";
 
 /**
@@ -26,7 +25,7 @@ export function LoadingScreen({ message }: { message: string }) {
     >
       <AmbientGlow />
       <div className="relative z-10">
-        <img src={logoZeux} alt="" aria-hidden="true" className="h-12 w-12" />
+        <ZeuXMark size={48} />
         {/* Linhas de CRT recortadas na área do logo, mesma opacidade que o
             `SplashScreen` usa sobre a marca (60%). Decorativas, `aria-hidden`. */}
         <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-60" />

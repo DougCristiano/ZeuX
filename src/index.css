@@ -15,6 +15,19 @@
 @import "@fontsource/inter/700.css";
 @import "@fontsource/press-start-2p/400.css";
 /*
+ * Mono do ZeuX (2026-09-09). Antes deste import o `@theme` declarava
+ * `--font-sans` e `--font-pixel` mas nunca `--font-mono` — e ~40 elementos de
+ * identidade (Button variant="chrome", Badge, rótulo de Callout, kickers de
+ * onboarding, contadores, Pagination) caíam na monoespaçada do SO, que muda de
+ * máquina para máquina e nunca combina com a direção retrô. IBM Plex Mono tem
+ * a veia de terminal/mostrador que o vocabulário CRT do app pede, com desenho
+ * pixel-friendly nos dígitos (o `0` fatiado, o `1` com serifa) sem ser bitmap
+ * como a Press Start 2P — legível nos 11-13px em que esses rótulos vivem, onde
+ * a pixel font não é. Self-hospedada pelo mesmo motivo das outras (ver acima).
+ */
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+/*
  * `tw-animate-css` (utilitários de animação) e `shadcn/tailwind.css`
  * (variantes data-state/data-open etc. e utilitários como scroll-fade que os
  * componentes do Radix/shadcn usam) — infraestrutura do J1 (docs/roadmap.md).
@@ -189,6 +202,17 @@
   --font-pixel: "Press Start 2P", monospace;
 
   /*
+   * Mono de marca — ver o comentário do `@import` no topo do arquivo. É a voz
+   * dos rótulos-mostrador do app (chip de filtro, badge, contador, paginação,
+   * kicker de tela): monoespaçada de propósito para o número/rótulo não
+   * "dançar" quando o valor muda, e IBM Plex Mono em vez da mono do SO para
+   * não depender do que cada máquina traz. Fallback em Press Start 2P só como
+   * gesto de identidade antes de ui-monospace assumir — nunca vai renderizar
+   * de fato porque a fonte está embutida.
+   */
+  --font-mono: "IBM Plex Mono", "Press Start 2P", ui-monospace, "SFMono-Regular", "Menlo", monospace;
+
+  /*
    * Escala tipográfica única (item B7): tudo na interface usa um destes seis
    * degraus, para não acumular tamanho de fonte ad-hoc tela por tela.
    *
@@ -306,6 +330,25 @@ textarea {
     transparent 1px,
     transparent 3px
   );
+}
+
+/*
+ * Grade de pixels (2026-09-09, direção retrô do CLAUDE.md). Uma malha de 1px a
+ * cada 4px, quase imperceptível (opacidade ~3%), que dá textura de "tela de
+ * ponto" às superfícies grandes e vazias — o painel de estado vazio, o herói.
+ * Não é decoração solta: é a mesma grade que a marca em pixel art já carrega,
+ * estendida ao chassi ao redor dela. Sempre em elemento `aria-hidden`, nunca
+ * sobre texto — a opacidade é baixa o bastante para não mexer no contraste
+ * medido do que estiver por cima, mas some antes disso se um dia subir.
+ * `background-size` fixo em 4px (não relativo) para a grade não esticar junto
+ * com o elemento e virar retângulos.
+ */
+.zeux-pixel-grid {
+  background-image:
+    linear-gradient(to right, var(--ink) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--ink) 1px, transparent 1px);
+  background-size: 4px 4px;
+  opacity: 0.03;
 }
 
 /*

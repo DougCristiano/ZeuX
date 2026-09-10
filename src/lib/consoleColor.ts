@@ -102,6 +102,67 @@ const FALLBACK_PALETTE = [
   "#FF9F1C", // âmbar claro
 ] as const;
 
+/**
+ * Fabricante de cada console — a mesma informação que já vivia só nos
+ * comentários de `BRAND_COLORS` acima ("Sony / PlayStation", "Sega",
+ * "Nintendo"...), agora legível por código. Fica NESTE arquivo de propósito:
+ * cor de identidade e agrupamento por fabricante saem da mesma fonte, então
+ * não há como uma tabela dizer que o Mega Drive é Sega e a outra pintá-lo de
+ * vermelho.
+ *
+ * `"outros"` reúne quem não tem família com mais de um console no catálogo
+ * (3DO/Panasonic, WonderSwan/Bandai) e o `arcade`, que é categoria e não
+ * aparelho. Um `console_id` novo, fora desta tabela, também cai em `"outros"`
+ * — nunca fica sem grupo.
+ */
+export type ConsoleFamily =
+  | "nintendo"
+  | "sony"
+  | "sega"
+  | "microsoft"
+  | "snk"
+  | "atari"
+  | "nec"
+  | "outros";
+
+const CONSOLE_FAMILY: Readonly<Record<string, ConsoleFamily>> = {
+  ps1: "sony", ps2: "sony", ps3: "sony", psp: "sony", vita: "sony",
+  mastersystem: "sega", megadrive: "sega", gamegear: "sega", segacd: "sega",
+  sega32x: "sega", saturn: "sega", dreamcast: "sega",
+  nes: "nintendo", snes: "nintendo", n64: "nintendo", gamecube: "nintendo",
+  wii: "nintendo", wiiu: "nintendo", gb: "nintendo", gbc: "nintendo",
+  gba: "nintendo", nds: "nintendo", "3ds": "nintendo", virtualboy: "nintendo",
+  xbox: "microsoft", xbox360: "microsoft",
+  neogeo: "snk", ngpc: "snk",
+  atari2600: "atari",
+  pcengine: "nec",
+};
+
+export function consoleFamily(consoleId: string): ConsoleFamily {
+  return CONSOLE_FAMILY[consoleId] ?? "outros";
+}
+
+/**
+ * Cor da família, para o chip de fabricante ativo. Um representante de cada
+ * faixa de matiz que `BRAND_COLORS` já usa — não uma paleta nova, o tom médio
+ * da família. `"outros"` usa o roxo `--accent` porque não é uma marca, é "o
+ * resto".
+ */
+const FAMILY_COLORS: Readonly<Record<ConsoleFamily, string>> = {
+  nintendo: "#E01B3D",
+  sony: "#2F5FDB",
+  sega: "#0089CF",
+  microsoft: "#3A9D23",
+  snk: "#D4A017",
+  atari: "#C1440E",
+  nec: "#17A398",
+  outros: "#9D4EFF",
+};
+
+export function consoleFamilyColor(family: ConsoleFamily): string {
+  return FAMILY_COLORS[family];
+}
+
 export function consoleAccentColor(consoleId: string): string {
   const brand = BRAND_COLORS[consoleId];
   if (brand) return brand;

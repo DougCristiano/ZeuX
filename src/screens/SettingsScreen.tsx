@@ -7,7 +7,7 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
-import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
+import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
@@ -64,9 +64,14 @@ type UpdateState =
 export function SettingsScreen({
   onOpenControllerTest,
   onOpenConfigureController,
+  onReplayTour,
 }: {
   onOpenControllerTest: () => void;
   onOpenConfigureController: () => void;
+  /** Reabre o tour de primeira execução (O1, docs/pendencias.md) em qualquer
+   *  execução — a marca de "já vi" no localStorage não é apagada, só ignorada
+   *  desta vez. */
+  onReplayTour: () => void;
 }) {
   const t = useT(dict);
   const [state, setState] = useState<LoadState>({ kind: "loading" });
@@ -273,6 +278,14 @@ export function SettingsScreen({
       </Card>
 
       <Card className="mb-6">
+        <SectionHeading className="mb-2">{t("tourHeading")}</SectionHeading>
+        <p className="mb-4 text-sm text-muted">{t("tourDescription")}</p>
+        <Button variant="chrome" className="w-fit" onClick={onReplayTour}>
+          {t("replayTour")}
+        </Button>
+      </Card>
+
+      <Card className="mb-6">
         <SectionHeading className="mb-2">{t("updatesHeading")}</SectionHeading>
         <p className="mb-1 text-sm text-muted">{t("updatesDescription")}</p>
         {appVersion && <p className="mb-4 text-sm text-muted">{t("currentVersion", { version: appVersion })}</p>}
@@ -346,7 +359,7 @@ export function SettingsScreen({
           (() => {
             const bindable = emulators.filter((e) => e.installed && e.bindable);
             if (bindable.length === 0) {
-              return <p className="text-sm text-muted">{t("noBindableEmulators")}</p>;
+              return <EmptyState variant="inline" title={t("noBindableEmulators")} />;
             }
             return (
               <div>

@@ -1,6 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { Clock, EyeOff, FileX, Star } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleEntry, ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
@@ -11,8 +10,6 @@ import {
   ConfirmModal,
   EmptyState,
   ErrorModal,
-  FOCUS_RING,
-  inputClass,
   ProgressBar,
   ScreenContainer,
   ScreenHeader,
@@ -20,9 +17,18 @@ import {
   InlineError,
   ManualInstallModal,
   Toast,
-  ZSelect,
 } from "../components/ui";
-import { SelectItem } from "../components/ui/select";
+import {
+  LibraryToolbar,
+  useGridColumns,
+  loadStoredSort,
+  loadStoredViewMode,
+  loadStoredDensity,
+  persistLibraryView,
+  type CoverDensity,
+  type SortValue,
+  type ViewMode,
+} from "../components/LibraryToolbar";
 import { useToast } from "../hooks/useToast";
 import { useT } from "../i18n/i18n";
 import { dict } from "./AllGamesScreen.i18n";
@@ -61,8 +67,10 @@ const SEARCH_DEBOUNCE_MS = 300;
  * `page`/`search`/`platformFilter` não têm esse espelho de propósito —
  * reabrir o app numa busca antiga seria mais confuso que útil.
  */
-export type SortValue = "recentes" | "titulo" | "tempo_jogado";
-export type ViewMode = "grade" | "lista";
+// Tipos e a régua de controle moram em `../components/LibraryToolbar` desde
+// 2026-09-09 (redesenho retrô): `GamesScreen` reusa a mesma barra. Re-exporta
+// para não quebrar quem já importava daqui.
+export type { CoverDensity, SortValue, ViewMode } from "../components/LibraryToolbar";
 
 export interface AllGamesViewState {
   page: number;
@@ -85,6 +93,11 @@ export interface AllGamesViewState {
   excludedOnly: boolean;
   sort: SortValue;
   viewMode: ViewMode;
+  // 2026-09-09 (redesenho retrô): densidade das capas P/M/G — muda só quantas
+  // colunas a grade tem. Persistida junto de sort/viewMode (sobrevive a
+  // reabrir o app); a régua de breakpoints por densidade vive em
+  // `LibraryToolbar`.
+  coverDensity: CoverDensity;
 }
 
 export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
@@ -97,86 +110,22 @@ export const DEFAULT_ALL_GAMES_VIEW: AllGamesViewState = {
   excludedOnly: false,
   sort: "recentes",
   viewMode: "grade",
+  coverDensity: "media",
 };
 
-const SORT_VALUES: readonly SortValue[] = ["recentes", "titulo", "tempo_jogado"];
-const VIEW_MODES: readonly ViewMode[] = ["grade", "lista"];
-
-const SORT_STORAGE_KEY = "zeux.allGames.sort";
-const VIEW_MODE_STORAGE_KEY = "zeux.allGames.viewMode";
-
-function readStored<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw !== null && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback;
-  } catch {
-    // localStorage indisponível (modo privado, quota, WebView restrito) —
-    // preferência de tela, não dado crítico; cai no padrão em silêncio.
-    return fallback;
-  }
-}
-
-function writeStored(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // mesma tolerância do read acima — não é motivo pra quebrar a tela.
-  }
-}
-
-/** Lazy initializer de `App.tsx` — só sort/viewMode vêm do localStorage. */
+/** Lazy initializer de `App.tsx` — só sort/viewMode/densidade vêm do localStorage. */
 export function loadInitialAllGamesView(): AllGamesViewState {
   return {
     ...DEFAULT_ALL_GAMES_VIEW,
-    sort: readStored(SORT_STORAGE_KEY, SORT_VALUES, DEFAULT_ALL_GAMES_VIEW.sort),
-    viewMode: readStored(VIEW_MODE_STORAGE_KEY, VIEW_MODES, DEFAULT_ALL_GAMES_VIEW.viewMode),
+    sort: loadStoredSort(),
+    viewMode: loadStoredViewMode(),
+    coverDensity: loadStoredDensity(),
   };
 }
 
 /** Chamado por `App.tsx` a cada mudança de view — só grava o que precisa sobreviver a reabrir o app. */
 export function persistAllGamesView(patch: Partial<AllGamesViewState>) {
-  if (patch.sort) writeStored(SORT_STORAGE_KEY, patch.sort);
-  if (patch.viewMode) writeStored(VIEW_MODE_STORAGE_KEY, patch.viewMode);
-}
-
-// M3 (virtualização): quantas colunas a grade tem, replicando os
-// breakpoints do próprio className abaixo (`grid-cols-2 sm: md: lg: 2xl:
-// min-[2400px]:`).
-// Precisa ser calculado em JS porque a virtualização substitui o
-// `display: grid` que faria isso sozinho — cada "linha" virtualizada tem
-// que saber quantos jogos ela carrega. Mede a LARGURA DA JANELA, não a do
-// container: os breakpoints do Tailwind são media query sobre viewport,
-// não sobre elemento (CLAUDE.md, "layout responsivo").
-// O5 (docs/roadmap.md, Sprint O): as duas faixas acima de 1536px são novas —
-// antes a densidade parava em 6 colunas para sempre a partir daí, e como o
-// container também tinha teto fixo (ver o comentário no JSX abaixo), a capa
-// só encolhia (208px em 1280px de janela -> 170px em 1536px+) sem nunca
-// ganhar coluna nenhuma. Nada abaixo de 1536 muda — é o que o critério de
-// aceite do O5 exige (sem regressão em 1024/1280/1366px).
-const GRID_BREAKPOINTS: readonly [minWidth: number, columns: number][] = [
-  [2400, 9], // janela ~4K
-  [1536, 7], // 2xl
-  [1024, 5], // lg
-  [768, 4], // md
-  [640, 3], // sm
-  [0, 2],
-];
-function columnsForWidth(width: number): number {
-  for (const [min, columns] of GRID_BREAKPOINTS) {
-    if (width >= min) return columns;
-  }
-  return 2;
-}
-function useGridColumns(): number {
-  const [columns, setColumns] = useState(() => columnsForWidth(window.innerWidth));
-  useEffect(() => {
-    function onResize() {
-      setColumns(columnsForWidth(window.innerWidth));
-    }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  return columns;
+  persistLibraryView({ sort: patch.sort, viewMode: patch.viewMode, coverDensity: patch.coverDensity });
 }
 
 /**
@@ -254,7 +203,8 @@ export function AllGamesScreen({
   initialScrollTop: number;
 }) {
   const t = useT(dict);
-  const { page, search, platformFilter, favoriteOnly, missingOnly, playedOnly, excludedOnly, sort, viewMode } = view;
+  const { page, search, platformFilter, favoriteOnly, missingOnly, playedOnly, excludedOnly, sort, viewMode, coverDensity } =
+    view;
   const [games, setGames] = useState<LibraryGame[] | null>(null);
   const [total, setTotal] = useState(0);
   // Consoles presentes no resultado completo (M4) — vem do servidor, não é
@@ -281,7 +231,7 @@ export function AllGamesScreen({
   const { toastMessage, showToast } = useToast();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
-  const columns = useGridColumns();
+  const columns = useGridColumns(coverDensity);
   // M8: carregado uma vez só para a tela inteira — diferente de GamesScreen
   // (um console por vez), aqui os jogos abrangem qualquer console, então o
   // lookup de adapter é por jogo (`adapterEntryFor` abaixo), não fixo.
@@ -437,7 +387,13 @@ export function AllGamesScreen({
   // Busca de capas em lote (G1, docs/roadmap.md) — poll com setTimeout
   // recursivo (não setInterval, mesmo padrão de EmulatorsScreen.pollJob),
   // pra nunca sobrepor duas checagens da mesma busca.
-  function pollScrapeJob(jobId: string) {
+  // `userInitiated` separa o lote que o usuário pediu (clicou em "Buscar
+  // capas") do lote automático adotado por `adoptRunningScrapeJob`. Falha do
+  // automático não vira faixa de erro: o usuário nunca pediu essa busca, e um
+  // "conecte sua conta do IGDB" que surge sozinho ao abrir a tela é ruído —
+  // mesma razão do catch silencioso de `adoptRunningScrapeJob`. Douglas pediu
+  // pra tirar esse erro mais de uma vez (2026-09-09).
+  function pollScrapeJob(jobId: string, userInitiated: boolean) {
     api
       .getScrapeJob(jobId)
       .then((job) => {
@@ -458,14 +414,16 @@ export function AllGamesScreen({
           return;
         }
         if (job.phase === "falhou") {
-          setScrapeError(job.error ?? t("failedToScrapeCovers"));
+          if (userInitiated) setScrapeError(job.error ?? t("failedToScrapeCovers"));
           setScrapeJob(null);
           return;
         }
-        setTimeout(() => pollScrapeJob(jobId), 400);
+        setTimeout(() => pollScrapeJob(jobId, userInitiated), 400);
       })
       .catch((err) => {
-        setScrapeError(err instanceof ApiError ? err.message : "Não foi possível acompanhar a busca de capas.");
+        if (userInitiated) {
+          setScrapeError(err instanceof ApiError ? err.message : "Não foi possível acompanhar a busca de capas.");
+        }
         setScrapeJob(null);
       });
   }
@@ -483,7 +441,7 @@ export function AllGamesScreen({
         const running = res.jobs.find((j) => j.finished_at === null && j.phase !== "falhou");
         if (running) {
           setScrapeJob(running);
-          pollScrapeJob(running.id);
+          pollScrapeJob(running.id, false);
         }
       })
       .catch(() => {
@@ -500,7 +458,7 @@ export function AllGamesScreen({
       .scrapeCovers()
       .then((job) => {
         setScrapeJob(job);
-        pollScrapeJob(job.id);
+        pollScrapeJob(job.id, true);
       })
       .catch((err) => setScrapeError(err instanceof ApiError ? err.message : t("failedToInitiateCoverScrape")));
   }
@@ -570,6 +528,10 @@ export function AllGamesScreen({
     .map((id) => ({ id, label: shortNameFor(id) }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
+  // A faixa de destaque ("Continue jogando") já carrega `data-gamepad-start`
+  // no botão "Continuar". Sem ela, o cursor de controle pousaria em "Voltar" —
+  // então o primeiro tile/linha da grade assume esse papel.
+  const heroShown = Boolean(recentGames && recentGames.length > 0);
   const gameCount = games?.length ?? 0;
   // M3: virtualização por linha — na grade, cada "linha" carrega `columns`
   // jogos lado a lado; na lista, uma linha é um jogo. O total de nós no DOM
@@ -582,7 +544,7 @@ export function AllGamesScreen({
     // Chute inicial — `measureElement` (abaixo) corrige pela altura real
     // renderizada, então não precisa ser exato (título pode quebrar em 1 ou
     // 2 linhas, mudando a altura de verdade da célula).
-    estimateSize: () => (viewMode === "grade" ? 280 : 52),
+    estimateSize: () => (viewMode === "grade" ? 280 : 66),
     overscan: viewMode === "grade" ? 2 : 6,
     // Cola o offset do scroll ao trocar de página/ordenação/modo — sem isto
     // o virtualizer tentaria reaproveitar posições da lista anterior.
@@ -956,192 +918,28 @@ export function AllGamesScreen({
         </div>
       )}
 
-      {/* M3: uma barra só, com busca, ordenação, alternância grade/lista,
-          favoritos e chips de plataforma — nada solto fora dela (critério
-          do item).
-          2026-09-06 (critico-design + auditoria de a11y): os chips saíram do
-          `font-pixel text-[11px]` para Inter `text-xs` medium — um chip de
-          filtro *ativável* é um controle, não badge nem título de navegação,
-          e Press Start 2P a 11px colorido tem leitura ruim. Mesma decisão da
-          N17 (que tirou a pixel font da sidebar), agora nos controles.
-          2026-09-07: a decisão original do N4 (input/select em 38px, chips
-          "de propósito mais baixos") foi revista pelo Douglas testando o app
-          — "nem na mesma altura e tamanho dos selects, quero que deixe todos
-          com mesmo tamanho". Toda a barra mede `h-9` (36px) agora: input,
-          select, toggle grade/lista, chip de favoritos e chips de
-          plataforma. Os chips ganharam junto o mesmo acabamento do `Button
-          variant="chrome"` (borda `1.5px`, `font-mono`, friso claro no topo
-          via `shadow` inset, resposta de `active:` ao clicar) — um vocabulário
-          só de "controle físico" para toda a régua, não um por família. */}
-      {/* 2026-09-07: a barra virou um painel de verdade (borda + fundo
-          `--fill` + raio), em vez de controles soltos sobre o fundo da página.
-          Motivo: com a faixa de destaque acima dela, uma linha de controles
-          sem contorno ficava boiando entre dois blocos de peso visual alto e
-          não lia mais como "a régua que manda na grade abaixo". Não é sticky
-          de propósito — uma barra fixa no topo do `<main>` passaria por cima
-          do tile focado ao navegar a grade por teclado/controle (WCAG 2.2,
-          "focus not obscured"), e essa navegação é requisito real do produto,
-          não detalhe. */}
-      <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-fill/60 px-3 py-2.5">
-        <label htmlFor="all-games-search" className="sr-only">
-          {t("searchPlaceholder")}
-        </label>
-        <input
-          id="all-games-search"
-          type="text"
-          name="all-games-search"
-          autoComplete="off"
-          value={search}
-          onChange={(e) => onViewChange({ search: e.target.value })}
-          placeholder={t("searchPlaceholder")}
-          className={`${inputClass} max-w-xs`}
-        />
-
-        <ZSelect
-          ariaLabel={t("sortByLabel")}
-          value={sort}
-          onValueChange={(v) => onViewChange({ sort: v as SortValue })}
-          className="w-fit"
-        >
-          {SORT_VALUES.map((value) => (
-            <SelectItem key={value} value={value}>
-              {t(value === "recentes" ? "sortRecentes" : value === "titulo" ? "sortTitulo" : "sortTempoJogado")}
-            </SelectItem>
-          ))}
-        </ZSelect>
-
-        <div
-          className="flex h-9 items-center gap-1 rounded-sm border-[1.5px] border-line-strong p-0.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
-          role="group"
-          aria-label={t("viewModeLabel")}
-        >
-          {(["grade", "lista"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={viewMode === mode}
-              onClick={() => onViewChange({ viewMode: mode })}
-              className={`h-full rounded-sm px-2.5 font-mono text-xs font-medium tracking-wider uppercase transition duration-150 active:translate-y-px ${FOCUS_RING} ${
-                viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
-              }`}
-            >
-              {mode === "grade" ? t("gridMode") : t("listMode")}
-            </button>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => onViewChange({ favoriteOnly: !favoriteOnly })}
-          aria-pressed={favoriteOnly}
-          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
-            favoriteOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
-          }`}
-        >
-          {/* N14 (docs/roadmap.md, Sprint N): era o caractere "★" — lucide
-              agora é a família de ícone padrão do app. */}
-          <Star size={11} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden="true" />
-          {t("favoritesLabel")}
-        </button>
-        <button
-          type="button"
-          onClick={() => onViewChange({ missingOnly: !missingOnly })}
-          aria-pressed={missingOnly}
-          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
-            missingOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
-          }`}
-        >
-          <FileX size={11} aria-hidden="true" />
-          {t("missingLabel")}
-        </button>
-        {/* 2026-09-09, a pedido do Douglas: "filtro por hora de jogo" — só os
-            jogos já abertos alguma vez. Mesmo vocabulário de toggle de
-            Favoritos/Ausentes. */}
-        <button
-          type="button"
-          onClick={() => onViewChange({ playedOnly: !playedOnly })}
-          aria-pressed={playedOnly}
-          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
-            playedOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
-          }`}
-        >
-          <Clock size={11} aria-hidden="true" />
-          {t("playedLabel")}
-        </button>
-        {/* 2026-09-09: contrapartida de "Remover da biblioteca" — revela os
-            jogos escondidos para poder trazê-los de volta. */}
-        <button
-          type="button"
-          onClick={() => onViewChange({ excludedOnly: !excludedOnly })}
-          aria-pressed={excludedOnly}
-          className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
-            excludedOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
-          }`}
-        >
-          <EyeOff size={11} aria-hidden="true" />
-          {t("excludedLabel")}
-        </button>
-        {platformOptions.length > 1 && (
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => onViewChange({ platformFilter: null, page: 1 })}
-              // A11y 4.1.2: os chips de plataforma são filtros alternáveis
-              // mutuamente exclusivos — `aria-pressed` expõe qual está ativo
-              // para o leitor de tela (o estilo só comunicava a quem vê).
-              aria-pressed={platformFilter === null}
-              className={`h-9 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
-                platformFilter === null ? "border-accent text-accent" : "border-line-strong text-muted hover:text-ink"
-              }`}
-            >
-              {t("allPlatforms")}
-            </button>
-            {platformOptions.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => onViewChange({ platformFilter: id, page: 1 })}
-                // C5: o chip ativo usava sempre roxo/`border-accent`, igual
-                // pra qualquer console — a cor de marca (já usada nas capas
-                // e no badge de plataforma) não cumpria papel nenhum de
-                // navegação aqui. Filtrando um console, o chip ativo herda
-                // a cor dele; "TODOS" continua roxo (não representa um
-                // console específico).
-                //
-                // A11y 1.4.3 (auditoria de acessibilidade, 2026-09-06): a cor
-                // de identidade por console reprova contraste como TEXTO em
-                // ~metade dos 33 consoles (Nintendo, PS3, Saturn — cores de
-                // marca, não de legibilidade), o mesmo motivo pelo qual `Badge`
-                // já tinha largado `color: accentColor`. Agora a cor fica só na
-                // borda + fundo tingido (`${accent}1a`); o texto do chip ativo
-                // vai para `text-ink`, que passa contraste sobre qualquer
-                // fundo do app.
-                aria-pressed={platformFilter === id}
-                style={
-                  platformFilter === id
-                    ? {
-                        borderColor: consoleAccentColor(id),
-                        background: `${consoleAccentColor(id)}1a`,
-                        // 2026-09-07: o chip ativo tinha borda tingida e nada
-                        // mais — num painel de chips todos com borda, "o que
-                        // está ligado" dependia de comparar matizes de azul.
-                        // O halo é a mesma linguagem de glow que a capa e a
-                        // faixa de destaque já usam, e some junto com a borda
-                        // quando o filtro é desligado.
-                        boxShadow: `0 0 12px -4px ${consoleAccentColor(id)}`,
-                      }
-                    : undefined
-                }
-                className={`h-9 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
-                  platformFilter === id ? "text-ink" : "border-line-strong text-muted hover:text-ink"
-                }`}
-              >
-                {label.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Régua de controle compartilhada com `GamesScreen` (2026-09-09,
+          redesenho retrô): busca, ordenação, grade/lista, densidade das capas
+          P/M/G e os toggles de filtro num painel de chassi só. Não é sticky —
+          uma barra fixa passaria por cima do tile focado na navegação por
+          teclado/controle (WCAG 2.2, "focus not obscured"). */}
+      <LibraryToolbar
+        search={search}
+        onSearch={(v) => onViewChange({ search: v })}
+        sort={sort}
+        onSortChange={(v) => onViewChange({ sort: v })}
+        viewMode={viewMode}
+        onViewModeChange={(v) => onViewChange({ viewMode: v })}
+        coverDensity={coverDensity}
+        onCoverDensityChange={(v) => onViewChange({ coverDensity: v })}
+        favorites={{ on: favoriteOnly, onToggle: () => onViewChange({ favoriteOnly: !favoriteOnly }) }}
+        missing={{ on: missingOnly, onToggle: () => onViewChange({ missingOnly: !missingOnly }) }}
+        played={{ on: playedOnly, onToggle: () => onViewChange({ playedOnly: !playedOnly }) }}
+        excluded={{ on: excludedOnly, onToggle: () => onViewChange({ excludedOnly: !excludedOnly }) }}
+        platforms={platformOptions}
+        platformFilter={platformFilter}
+        onPlatformFilterChange={(id) => onViewChange({ platformFilter: id, page: 1 })}
+      />
 
       {/* M12 (docs/sprint-m-plano.md, 2026-08-07): skeleton na mesma grade,
           `PAGE_SIZE` células — antes, `games === null` não renderizava nada
@@ -1175,36 +973,21 @@ export function AllGamesScreen({
             !debouncedSearch && !platformFilter && !favoriteOnly && !missingOnly && !playedOnly && !excludedOnly;
           if (trulyEmpty) {
             return (
+              // 2026-09-09 (docs/pendencias.md, "Onboarding para quem abre o
+              // app sem nenhuma ROM"): não é um wizard — o `EmptyState`
+              // apresenta o app em 3 passos curtos antes da ação. Os passos
+              // agora vão pela prop `steps` (era gambiarra pela prop `action`);
+              // sem vocabulário de emulador, sem dizer de onde tirar jogo
+              // (princípio 6): a pasta é a que já existe no computador.
               <EmptyState
+                kicker={t("emptyKicker")}
+                title={t("emptyTitle")}
                 message={t("noGamesInLibrary")}
+                steps={[t("emptyStep1"), t("emptyStep2"), t("emptyStep3")]}
                 action={
-                  <>
-                    {/* 2026-09-09 (docs/pendencias.md, "Onboarding para quem
-                        abre o app sem nenhuma ROM"): não é um wizard — é o
-                        `EmptyState` de sempre, com o que o app faz em 3 passos
-                        curtos antes da ação, em vez de um botão solto que só
-                        se explica depois do clique. Sem vocabulário de
-                        emulador, sem dizer de onde tirar jogo (princípio 6): a
-                        pasta é a que já existe no computador da pessoa.
-                        `max-w-md` ~65 caracteres por linha; a caixa vazia é
-                        larga demais para texto solto. */}
-                    <ol className="mb-4 max-w-md list-none space-y-2 text-left text-sm text-muted">
-                      {[t("emptyStep1"), t("emptyStep2"), t("emptyStep3")].map((step, i) => (
-                        <li key={i} className="flex gap-2.5">
-                          <span
-                            aria-hidden="true"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-strong font-mono text-xs text-ink"
-                          >
-                            {i + 1}
-                          </span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
-                    <Button variant="primary" onClick={onOpenLibrary}>
-                      {t("chooseFolderWithGames")}
-                    </Button>
-                  </>
+                  <Button variant="primary" onClick={onOpenLibrary}>
+                    {t("chooseFolderWithGames")}
+                  </Button>
                 }
               />
             );
@@ -1218,9 +1001,11 @@ export function AllGamesScreen({
           // o usuário tinha que descobrir sozinho qual dos quatro controles da
           // barra desfazer.
           return (
-            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong px-6 py-12 text-center">
-              <p className="max-w-md text-base text-muted">
-                {debouncedSearch
+            <EmptyState
+              variant="inline"
+              title={t("noResultsTitle")}
+              message={
+                debouncedSearch
                   ? t("noGamesFound", { search: debouncedSearch })
                   : platformFilter
                     ? t("noGamesForPlatform", { platformName: shortNameFor(platformFilter) })
@@ -1230,25 +1015,27 @@ export function AllGamesScreen({
                         ? t("noPlayedGames")
                         : excludedOnly
                           ? t("noExcludedGames")
-                          : t("noFavoritedGames")}
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  onViewChange({
-                    search: "",
-                    platformFilter: null,
-                    favoriteOnly: false,
-                    missingOnly: false,
-                    playedOnly: false,
-                    excludedOnly: false,
-                    page: 1,
-                  })
-                }
-              >
-                {t("clearFilters")}
-              </Button>
-            </div>
+                          : t("noFavoritedGames")
+              }
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    onViewChange({
+                      search: "",
+                      platformFilter: null,
+                      favoriteOnly: false,
+                      missingOnly: false,
+                      playedOnly: false,
+                      excludedOnly: false,
+                      page: 1,
+                    })
+                  }
+                >
+                  {t("clearFilters")}
+                </Button>
+              }
+            />
           );
         })()
       )}
@@ -1281,6 +1068,7 @@ export function AllGamesScreen({
                       game={game}
                       consoleShortName={shortNameFor(game.console_id)}
                       accentColor={consoleAccentColor(game.console_id)}
+                      gamepadStart={!heroShown && virtualRow.index === 0}
                       onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
                       onPlay={playHandlerFor(game)}
                       onToggleFavorite={() => toggleFavorite(game)}
@@ -1313,7 +1101,7 @@ export function AllGamesScreen({
                     paddingBottom: "1rem",
                   }}
                 >
-                  {rowGames.map((game) => {
+                  {rowGames.map((game, i) => {
                     const consoleName = nameFor(game.console_id);
                     const verdict = verdictFor(game.console_id);
                     const launchability = emulators
@@ -1324,6 +1112,7 @@ export function AllGamesScreen({
                         key={game.id}
                         game={game}
                         shortName={shortNameFor(game.console_id)}
+                        gamepadStart={!heroShown && virtualRow.index === 0 && i === 0}
                         onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
                         onPlay={playHandlerFor(game)}
                         onToggleFavorite={() => toggleFavorite(game)}

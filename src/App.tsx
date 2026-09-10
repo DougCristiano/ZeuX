@@ -4,6 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { api, ApiError, setAppVersionCacheKey, type Report } from "./api";
 import { Sidebar, type NavID } from "./components/Sidebar";
 import { SplashScreen, hasSeenSplash } from "./components/SplashScreen";
+import { TourOverlay, hasSeenTour } from "./components/TourOverlay";
 import { GamepadHints } from "./components/GamepadHints";
 import { AmbientGlow, Toast } from "./components/ui";
 import { useGamepad } from "./hooks/useGamepad";
@@ -121,6 +122,26 @@ function App() {
   // Como estado à parte, a abertura só *cobre* a tela enquanto a máquina roda
   // por baixo — quando ela sai, o app já está onde estaria sem ela.
   const [splashVisible, setSplashVisible] = useState(() => !hasSeenSplash());
+
+  // Tour de primeira execução (O1, docs/pendencias.md). Sobreposição, não uma
+  // `Phase` — mesma razão do splash (ver src/components/TourOverlay.tsx). O
+  // tour aparece **depois do scan**, na primeira tela do app: antes do
+  // consentimento, quatro telas vendendo o produto virariam pressão para
+  // consentir. Quem recusou também vê, a partir de `DeclinedScreen` — é quem
+  // tem menos contexto sobre o que o app faz.
+  const [tourVisible, setTourVisible] = useState(false);
+  useEffect(() => {
+    if ((phase === "all-games" || phase === "declined") && !hasSeenTour()) {
+      setTourVisible(true);
+    }
+  }, [phase]);
+  function closeTour() {
+    setTourVisible(false);
+    // A11y 2.4.3: a sobreposição some por baixo de quem usa leitor de tela;
+    // devolve o foco para o `<main>` do shell quando ele existe (as fases de
+    // onboarding não o montam — daí o `?.`).
+    requestAnimationFrame(() => mainRef.current?.focus());
+  }
 
   // A11y 2.4.2 (auditoria de acessibilidade, 2026-09-06): `index.html` traz um
   // `<title>ZeuX</title>` estático que nunca muda de fase. Numa janela desktop
@@ -580,6 +601,7 @@ function App() {
         <HistoryScreen
           report={report ?? undefined}
           consoleCatalog={consoles}
+          onOpenLibrary={() => setPhase("all-games")}
           onOpenGame={(game, consoleName, shortName) => {
             const year =
               report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
@@ -597,6 +619,7 @@ function App() {
         <SettingsScreen
           onOpenControllerTest={() => setPhase("controller-test")}
           onOpenConfigureController={() => setPhase("configure-controller")}
+          onReplayTour={() => setTourVisible(true)}
         />
       );
       break;
@@ -658,6 +681,7 @@ function App() {
         </main>
         {gamepadToast && <Toast message={gamepadToast} />}
         <GamepadHints connected={gamepadNavConnected} />
+        {tourVisible && <TourOverlay onClose={closeTour} />}
       </div>
     );
   }
@@ -667,6 +691,7 @@ function App() {
       {screen}
       {gamepadToast && <Toast message={gamepadToast} />}
       <GamepadHints connected={gamepadNavConnected} />
+      {tourVisible && <TourOverlay onClose={closeTour} />}
     </>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, coverImageURL } from "../api";
 import type { ConsoleEntry, LibraryGame, Report } from "../api/types";
 import {
+  Button,
   Card,
   EmptyState,
   FOCUS_RING,
@@ -44,12 +45,15 @@ export function HistoryScreen({
   report,
   consoleCatalog,
   onOpenGame,
+  onOpenLibrary,
 }: {
   /** Ausente sem consentimento/scan — só serve de fonte de nome de console
    * (preferida quando existe), a tela funciona igual sem ele. */
   report?: Report;
   consoleCatalog: ConsoleEntry[];
   onOpenGame: (game: LibraryGame, consoleName: string, shortName: string) => void;
+  /** Leva a "Todos os jogos" a partir do estado vazio ("nada jogado ainda"). */
+  onOpenLibrary: () => void;
 }) {
   const t = useT(dict);
   const [recent, setRecent] = useState<LibraryGame[] | null>(null);
@@ -114,7 +118,17 @@ export function HistoryScreen({
         </p>
       )}
 
-      {nothingYet && <EmptyState message={t("empty")} />}
+      {nothingYet && (
+        <EmptyState
+          title={t("emptyTitle")}
+          message={t("empty")}
+          action={
+            <Button variant="primary" onClick={onOpenLibrary}>
+              {t("emptyAction")}
+            </Button>
+          }
+        />
+      )}
 
       {!loading && !nothingYet && (
         <div className="flex flex-col gap-8">

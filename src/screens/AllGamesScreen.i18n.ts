@@ -128,6 +128,18 @@ export const dict = {
     "pt-BR": "Nenhum jogo na biblioteca ainda.",
     en: "No games in your library yet.",
   },
+  emptyKicker: {
+    "pt-BR": "Biblioteca vazia",
+    en: "Empty library",
+  },
+  emptyTitle: {
+    "pt-BR": "Do zero ao primeiro jogo em três passos",
+    en: "From zero to your first game in three steps",
+  },
+  noResultsTitle: {
+    "pt-BR": "Nenhum jogo com esses filtros",
+    en: "No games match these filters",
+  },
   // 2026-09-09 (docs/pendencias.md, onboarding sem ROM): a tela vazia
   // apresenta o app em 3 passos curtos antes da ação, em vez de um botão
   // solto. Sem vocabulário de emulador, sem dizer de onde tirar jogo

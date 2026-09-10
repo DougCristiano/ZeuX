@@ -3,6 +3,7 @@ import { ChevronLeft, Play, Star, TriangleAlert } from "lucide-react";
 import { consoleImageURL } from "../api";
 import type { ConsoleVerdict } from "../api/types";
 import logoZeux from "../assets/logo-zeux.png";
+import logoZeuxMark from "../assets/logo-zeux-mark.png";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { useT } from "../i18n/i18n";
 import { dict } from "./ui.i18n";
@@ -122,6 +123,86 @@ export function ZSelect({
   );
 }
 
+/**
+ * Marca do ZeuX como componente (2026-09-09, direção retrô do CLAUDE.md).
+ *
+ * O problema que resolve: cinco lugares (`Sidebar`, `ConsentScreen`,
+ * `StatusScreen`, `EmptyState`, `SplashScreen`) faziam `<img src={logoZeux}>`
+ * à mão, e só a abertura aplicava `image-rendering: pixelated` — nos outros a
+ * interpolação do navegador borrava a grade de pixels, que é justamente o
+ * caráter da marca. Pior: `logo-zeux.png` traz o wordmark "ZeuX" desenhado
+ * dentro da arte, que a 36-48px vira um borrão ilegível.
+ *
+ * `logo-zeux-mark.png` é o recorte só-Zeus (busto + raio, sem wordmark),
+ * gerado do PNG original — ver nota de arte para o Douglas. `lockup` volta ao
+ * PNG completo com o wordmark, para os usos grandes (abertura) onde ele lê.
+ *
+ * `size` é travado nos múltiplos da grade (32/48/64/96/160): um bitmap de
+ * pixel art escalado para um valor que não é múltiplo inteiro da resolução
+ * nativa cintila (linhas de pixel de larguras diferentes lado a lado). Quem
+ * passa 44 recebe 48 — o valor mais próximo que não cintila.
+ */
+const MARK_SIZES = [32, 48, 64, 96, 160] as const;
+
+function snapMarkSize(requested: number): number {
+  return MARK_SIZES.reduce((best, candidate) =>
+    Math.abs(candidate - requested) < Math.abs(best - requested) ? candidate : best,
+  );
+}
+
+export function ZeuXMark({
+  size = 48,
+  tone = "brand",
+  lockup = false,
+  className = "",
+}: {
+  size?: number;
+  /** `dim` para o fundo de painel vazio, onde a marca é textura e não foco. */
+  tone?: "brand" | "dim";
+  /** Usa o PNG completo com o wordmark — só onde ele é grande o bastante para ler. */
+  lockup?: boolean;
+  className?: string;
+}) {
+  // `lockup` não passa pelo snap: ali o tamanho é escolhido a dedo (abertura)
+  // e o wordmark precisa exatamente daquela caixa.
+  const px = lockup ? size : snapMarkSize(size);
+  return (
+    <img
+      src={lockup ? logoZeux : logoZeuxMark}
+      alt=""
+      aria-hidden="true"
+      width={px}
+      height={px}
+      // `imageRendering: pixelated`: a grade de pixels é a identidade, não um
+      // artefato a suavizar. `width`/`height` explícitos (não só CSS) evitam
+      // o salto de layout enquanto o PNG carrega.
+      style={{ width: px, height: px, imageRendering: "pixelated" }}
+      className={`${tone === "dim" ? "opacity-30" : ""} ${className}`}
+    />
+  );
+}
+
+/**
+ * Régua de chips de filtro — canto reto, borda de 1.5px que lê como chassi,
+ * rótulo monoespaçado em caixa alta e o friso interno de 1px no topo (luz
+ * vindo de cima). Estava só em `ConsolesScreen`; `AllGamesScreen` reescrevia a
+ * string inline seis vezes e já tinha divergido (`border-line-strong` no lugar
+ * de `border-control-border`, contraste 1.89:1 — reprovado pelo comentário de
+ * `--control-border` em index.css). Mora aqui agora, ao lado de
+ * `CHROME_TINT_*`, e as duas telas consomem a mesma constante.
+ *
+ * Roxo no ativo e no hover, nunca âmbar nem ciano: filtrar é ação do usuário
+ * (roxo, regra da paleta em index.css). O âmbar que vários toggles de
+ * `AllGamesScreen` usavam no estado ligado era uso indevido — âmbar é
+ * reservado a ressalva/atenção; sobrevive só no `fill` da estrela de favorito.
+ */
+export const FILTER_CHIP_BASE =
+  "inline-flex h-9 items-center gap-1.5 rounded-sm border-[1.5px] px-3 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none";
+export const FILTER_CHIP_ON =
+  "border-accent bg-accent/10 text-ink shadow-[0_0_14px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.06)]";
+export const FILTER_CHIP_OFF =
+  "border-control-border text-muted hover:border-accent hover:bg-accent/10 hover:text-ink";
+
 type ButtonVariant = "primary" | "secondary" | "ghost" | "quiet" | "danger" | "chrome";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -186,7 +267,13 @@ const buttonVariants: Record<ButtonVariant, string> = {
   // `shadow-[inset...]` desenha um friso claro de 1px no topo por dentro —
   // truque clássico de botão físico (luz vindo de cima), e `active:` some
   // com ele e desce o botão 1px: o clique agora tem uma resposta tátil, não
-  // só a mudança de cor do `:hover`. `border-[1.5px]`, não `border-2`: 2px
+  // só a mudança de cor do `:hover`.
+  //
+  // 2026-09-09: `font-mono` deixou de cair na monoespaçada do SO e passou a
+  // resolver IBM Plex Mono embutida (`--font-mono` em index.css) — o rótulo
+  // do chrome agora tem a mesma voz de mostrador em qualquer máquina.
+  //
+  // `border-[1.5px]`, não `border-2`: 2px
   // exatos empurrariam o texto/ícone 0.5px a mais que os outros variants
   // (ainda em `border`/1px) e desalinharia baseline entre botões vizinhos de
   // variants diferentes numa mesma linha.
@@ -1199,19 +1286,96 @@ export function CardSkeleton({ className = "" }: { className?: string }) {
  * (ex.: `GamesScreen` sempre mostra "Voltar à biblioteca" no cabeçalho).
  */
 /**
- * Achado do critico-design (2026-09-06): fora do onboarding, o logo só
- * aparecia a 36px na sidebar — a tela vazia é o lugar com mais espaço
- * sobrando e menos conteúdo competindo, e não tinha nenhuma marca. O logo
- * a baixa opacidade acima da mensagem é o retorno de identidade mais barato
- * do app: nenhum asset novo, `aria-hidden` (é decoração, a mensagem de texto
- * já carrega o significado pra leitor de tela).
+ * Estado vazio (reescrito 2026-09-09, direção retrô do CLAUDE.md).
+ *
+ * O que tinha antes: `<img opacity-15>` + `<p text-base text-muted>` — nenhum
+ * texto em `--ink`, nenhum degrau de hierarquia, a marca borrada e quase
+ * invisível. E `AllGamesScreen` empurrava um `<ol>` de três passos pela prop
+ * `action`, que não é o lugar dele.
+ *
+ * Agora a anatomia é explícita: `kicker` (mono, ciano — "aqui o sistema
+ * informa", padrão dos kickers de onboarding), `title` (o degrau que faltava,
+ * em `--ink`), `message` (corpo, `--muted`, régua curta), `steps` (o `<ol>`
+ * que era gambiarra) e `action`. A moldura ganha a marca em pixel art de
+ * verdade (`ZeuXMark`, `pixelated`) atrás de tudo, com scanlines e um halo
+ * roxo — o mesmo material de `AmbientGlow`/`SplashScreen`, não uma linguagem
+ * nova.
+ *
+ * `variant="inline"`: sem marca, sem altura mínima, só a caixa tracejada com
+ * título e mensagem — para o vazio de uma seção dentro de uma tela que já tem
+ * conteúdo, onde o painel cheio de 420px seria exagero.
  */
-export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
+export function EmptyState({
+  kicker,
+  title,
+  message,
+  steps,
+  action,
+  variant = "panel",
+}: {
+  kicker?: string;
+  title: string;
+  message?: string;
+  /** Passos curtos ("aponte uma pasta…") — vira um `<ol>` numerado. */
+  steps?: string[];
+  action?: ReactNode;
+  variant?: "panel" | "inline";
+}) {
+  if (variant === "inline") {
+    return (
+      <div className="rounded-lg border border-dashed border-control-border px-5 py-6 text-center">
+        <p className="text-sm font-semibold text-ink">{title}</p>
+        {message && <p className="mx-auto mt-1 max-w-md text-sm text-muted">{message}</p>}
+        {action && <div className="mt-3 flex justify-center">{action}</div>}
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong px-6 py-16 text-center">
-      <img src={logoZeux} alt="" aria-hidden="true" width={64} height={64} className="object-contain opacity-15" />
-      <p className="text-base text-muted">{message}</p>
-      {action}
+    <div className="relative flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-control-border px-6 py-12 text-center">
+      {/* Camadas de fundo — decorativas, `aria-hidden`, nunca sobre o texto
+          medido: o halo é radial e a 12%, a grade de pixels a 3%, as
+          scanlines só sobre a própria marca. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(50% 45% at 50% 38%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%)",
+        }}
+      />
+      <div aria-hidden="true" className="zeux-pixel-grid pointer-events-none absolute inset-0" />
+
+      <div aria-hidden="true" className="relative mb-5 opacity-35">
+        <ZeuXMark size={96} />
+        <div className="zeux-scanlines pointer-events-none absolute inset-0 opacity-70" />
+      </div>
+
+      <div className="relative flex flex-col items-center gap-2">
+        {kicker && (
+          <p className="font-mono text-xs tracking-[0.2em] text-accent-secondary uppercase">{kicker}</p>
+        )}
+        <p className="text-lg font-semibold text-ink">{title}</p>
+        {message && <p className="max-w-md text-sm text-muted">{message}</p>}
+
+        {steps && steps.length > 0 && (
+          <ol className="mt-2 max-w-md list-none space-y-2 text-left text-sm text-muted">
+            {steps.map((step, i) => (
+              <li key={i} className="flex gap-2.5">
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-control-border font-mono text-xs text-ink"
+                >
+                  {i + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {action && <div className="mt-4">{action}</div>}
+      </div>
     </div>
   );
 }

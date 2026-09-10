@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import logoZeux from "../assets/logo-zeux.png";
-import { AmbientGlow, FOCUS_RING } from "./ui";
+import { AmbientGlow, FOCUS_RING, ZeuXMark } from "./ui";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SplashScreen.i18n";
 
@@ -122,21 +121,18 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
       <div className="relative flex flex-col items-center gap-6 px-6">
         <div className="relative">
-          <img
-            src={logoZeux}
-            alt=""
-            aria-hidden="true"
-            width={168}
-            height={168}
-            className="h-[168px] w-[168px] object-contain"
+          {/* `lockup`: a abertura é o único lugar grande o bastante para o
+              wordmark "ZeuX" da arte ler — os usos pequenos passam a marca
+              só-Zeus via `ZeuXMark` sem `lockup`. `image-rendering: pixelated`
+              vem de dentro de `ZeuXMark`; a animação de "ligar a tela" vai no
+              wrapper (transform/opacity/filter, sem reflow por quadro). */}
+          <div
             style={{
-              // `image-rendering: pixelated` porque o logo é pixel art: a
-              // interpolação suave do navegador borra a grade de pixels que é
-              // justamente o caráter da marca.
-              imageRendering: "pixelated",
               animation: reduced ? undefined : "zeux-boot-in 900ms cubic-bezier(0.16, 1, 0.3, 1) both",
             }}
-          />
+          >
+            <ZeuXMark lockup size={168} />
+          </div>
           {/* Varredura de tubo: passa uma vez só sobre a marca. Decorativa,
               recortada pelo próprio contêiner (`overflow-hidden`). */}
           {!reduced && (

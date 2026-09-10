@@ -123,6 +123,10 @@ export const dict = {
     "pt-BR": "Nenhum jogo achado ainda para este console.",
     en: "No games found yet for this console.",
   },
+  noGamesTitle: {
+    "pt-BR": "Nada para mostrar aqui",
+    en: "Nothing to show here",
+  },
   searchGames: {
     "pt-BR": "Buscar jogos",
     en: "Search games",

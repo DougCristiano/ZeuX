@@ -119,6 +119,11 @@ export function ManualEmulatorForm({
     // virar `<Card>` de verdade (precisa da semântica nativa de submit),
     // então alinhado à mão aos mesmos tokens que o componente usa.
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-line bg-fill p-4">
+      {/* Nota de honestidade, no topo do formulário: o ZeuX não valida flag de
+          terceiro nem hardware aqui (CLAUDE.md — "não afirme que as flags dos
+          adapters funcionam"). Descritiva, não um aviso de erro. */}
+      <p className="text-xs text-muted">{t("unverifiedNote")}</p>
+
       {/* A11y 3.3.2 (auditoria de acessibilidade, 2026-09-06): o atributo
           `required` já faz o leitor de tela anunciar "obrigatório", mas quem
           enxerga não tinha marca nenhuma até tentar submeter — paridade
@@ -138,6 +143,11 @@ export function ManualEmulatorForm({
           onChange={(e) => setConsoles(e.target.value)}
           className={inputClass}
         />
+        {/* B2b (docs/pendencias.md): a porta para "emulador de console fora do
+            catálogo" já existe no backend (custom.go), mas apontar uma pasta
+            de jogos para esse console ainda não. Esta frase diz o limite antes
+            de a pessoa esbarrar nele. */}
+        <span className="text-xs text-muted">{t("consolesHint")}</span>
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">

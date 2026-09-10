@@ -137,7 +137,12 @@ function EmulatorOptionCard({
           Fica no card da opção, e não numa seção separada, porque é
           propriedade dela — um standalone não tem core nenhum. */}
       {option.core && (
-        <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-fill px-3 py-2">
+        // Linha com filete no topo dentro do próprio card da opção, não uma
+        // moldura aninhada (2026-09-09): `Card` já é uma caixa com borda, e o
+        // `rounded-lg border bg-fill` daqui desenhava um segundo chassi dentro
+        // dela — card-dentro-de-card. O core é propriedade desta opção, então
+        // vive como uma seção dela, separada só por um `border-t`.
+        <div className="flex flex-col gap-1.5 border-t border-line pt-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted">{t("coreForConsole")}</span>
             <span className="font-mono text-sm text-ink">{option.core}</span>

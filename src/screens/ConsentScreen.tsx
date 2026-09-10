@@ -1,6 +1,5 @@
-import logoZeux from "../assets/logo-zeux.png";
 import { useT } from "../i18n/i18n";
-import { Button, Card, AmbientGlow } from "../components/ui";
+import { Button, Card, AmbientGlow, ZeuXMark } from "../components/ui";
 import { dict } from "./ConsentScreen.i18n";
 
 type ConsentScreenProps = {
@@ -51,7 +50,7 @@ export function ConsentScreen({ policyText, policyVersion, onAccept, onDecline, 
           desenhado para o shell rolável com sidebar, não para uma tela
           centralizada na viewport inteira, sem sidebar. */}
       <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
-        <img src={logoZeux} alt="" aria-hidden="true" className="h-12 w-12" />
+        <ZeuXMark size={48} />
         {/* Kicker-etiqueta em monoespaçada, mesmo vocabulário de "rótulo de
             chassi" dos chips e do `SectionHeading` — ciano porque é o sistema
             informando o que precisa antes de o usuário decidir. */}

@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import { Cpu, Gamepad2, History, LayoutGrid, Settings } from "lucide-react";
-import logoZeux from "../assets/logo-zeux.png";
 import { useT } from "../i18n/i18n";
 import { LanguageSelector } from "./LanguageSelector";
-import { FOCUS_RING } from "./ui";
+import { FOCUS_RING, ZeuXMark } from "./ui";
 import { dict } from "./Sidebar.i18n";
 
 export type NavID = "library" | "consoles" | "history" | "verdict" | "settings";
@@ -112,8 +111,19 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
         // ~130px de folga pro texto mais longo, teto ainda menor que antes.
         className={`absolute inset-y-0 left-0 z-20 flex w-16 flex-col items-center overflow-hidden border-r border-line bg-panel py-5 transition-[width] duration-150 ease-in-out group-hover:w-52 group-hover:shadow-xl group-focus-within:w-52 group-focus-within:shadow-xl`}
       >
-        <div className="mb-7 shrink-0" aria-hidden="true">
-          <img src={logoZeux} alt="" width={36} height={36} className="object-contain" />
+        {/* Recolhida: só a marca (busto + raio, sem wordmark), no slot de 64px
+            que alinha com os ícones de navegação abaixo. Expandida: o wordmark
+            "ZEUX" em pixel font surge ao lado com a mesma técnica de
+            `max-w`/`opacity` dos rótulos de nav — dá à fonte de marca um lugar
+            grande e permanente, em vez de só temperar badges. `44` cai em 48
+            pelo snap de `ZeuXMark` (múltiplo de grade, não cintila). */}
+        <div className="mb-7 flex h-12 w-full shrink-0 items-center" aria-hidden="true">
+          <span className="flex w-16 shrink-0 items-center justify-center">
+            <ZeuXMark size={44} />
+          </span>
+          <span className="max-w-0 overflow-hidden font-pixel text-sm leading-none tracking-[0.15em] whitespace-nowrap text-ink opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-[120px] group-hover:opacity-100 group-focus-within:max-w-[120px] group-focus-within:opacity-100">
+            ZEUX
+          </span>
         </div>
 
         <nav className="flex w-full flex-1 flex-col" aria-label={t("navAriaLabel")}>

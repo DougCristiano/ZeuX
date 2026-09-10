@@ -1377,8 +1377,13 @@ func (s *Server) handleAddLibraryFolder(w http.ResponseWriter, r *http.Request) 
 
 	console, ok := s.catalog.ConsoleByID(body.ConsoleID)
 	if !ok {
+		// Frase completa, não só o código: cadastrar um emulador para um
+		// console fora do catálogo é permitido (internal/emulator/custom.go),
+		// mas a varredura de ROMs depende das extensões que só o catálogo
+		// define — então apontar uma pasta para esse console ainda não tem
+		// como funcionar. O texto diz isso em vez de deixar a UI adivinhar.
 		s.writeError(w, http.StatusBadRequest, "unknown_console",
-			"O console informado não está no catálogo do ZeuX.")
+			"O console informado não está no catálogo do ZeuX, então indexar uma pasta de jogos para ele ainda não está disponível. Um emulador para esse console pode ser cadastrado e lançado manualmente; a varredura de ROMs cobre só os consoles do catálogo.")
 		return
 	}
 

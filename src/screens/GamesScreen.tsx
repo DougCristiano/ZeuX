@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { FileX } from "lucide-react";
 import { api, ApiError, consoleImageURL, isDownloadingCore } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
@@ -14,14 +13,24 @@ import {
   consoleIconLabel,
   EmptyState,
   ErrorModal,
-  FOCUS_RING,
   InlineError,
-  inputClass,
   ManualInstallModal,
   ProgressBar,
   ScreenContainer,
   Toast,
 } from "../components/ui";
+import {
+  LibraryToolbar,
+  useGridColumns,
+  loadStoredSort,
+  loadStoredViewMode,
+  loadStoredDensity,
+  persistLibraryView,
+  type CoverDensity,
+  type SortValue,
+  type ViewMode,
+} from "../components/LibraryToolbar";
+import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useToast } from "../hooks/useToast";
@@ -121,6 +130,14 @@ export function GamesScreen({
   // inteira de um console só. Ligado, mostra só os ausentes — nunca os dois
   // juntos, mesmo comportamento do filtro equivalente em AllGamesScreen.
   const [missingOnly, setMissingOnly] = useState(false);
+  // Régua compartilhada com `AllGamesScreen` (2026-09-09, redesenho retrô):
+  // esta tela ganha ordenação + modo lista + densidade das capas de graça. As
+  // três preferências vêm do mesmo localStorage — mudar a densidade aqui vale
+  // também lá, e vice-versa (é preferência de tela, não de tela específica).
+  const [sort, setSort] = useState<SortValue>(loadStoredSort);
+  const [viewMode, setViewMode] = useState<ViewMode>(loadStoredViewMode);
+  const [coverDensity, setCoverDensity] = useState<CoverDensity>(loadStoredDensity);
+  const columns = useGridColumns(coverDensity);
   // Erro de lançamento vira modal, não texto discreto na linha do jogo —
   // achado em 2026-08-04, um texto inline passava despercebido.
   const [launchError, setLaunchError] = useState<string | null>(null);
@@ -276,10 +293,21 @@ export function GamesScreen({
   }
 
   const trimmedSearch = search.trim();
-  const byMissing = (games ?? []).filter((g) => (missingOnly ? g.missing : !g.missing));
-  const visibleGames = trimmedSearch
-    ? byMissing.filter((g) => g.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
-    : byMissing;
+  const visibleGames = useMemo(() => {
+    const byMissing = (games ?? []).filter((g) => (missingOnly ? g.missing : !g.missing));
+    const bySearch = trimmedSearch
+      ? byMissing.filter((g) => g.title.toLowerCase().includes(trimmedSearch.toLowerCase()))
+      : byMissing;
+    if (sort === "titulo") {
+      return [...bySearch].sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
+    }
+    if (sort === "tempo_jogado") {
+      return [...bySearch].sort((a, b) => b.playtime_seconds - a.playtime_seconds);
+    }
+    // "recentes": a ordem que `GET /library/games` já devolve (jogado por
+    // último primeiro, nunca jogado no fim) — não reordena.
+    return bySearch;
+  }, [games, missingOnly, trimmedSearch, sort]);
 
   return (
     // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado — agora usa o
@@ -563,7 +591,7 @@ export function GamesScreen({
               forma do que vai chegar (capa + duas linhas de texto), senão o
               tile "cresce" ao carregar mesmo com a grade certa. É o mesmo
               esqueleto que `AllGamesScreen` já usa. */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: "1rem" }}>
             {Array.from({ length: 10 }, (_, i) => (
               <GameTileSkeleton key={i} />
             ))}
@@ -571,52 +599,36 @@ export function GamesScreen({
         </div>
       )}
 
-      {games && games.length === 0 && <EmptyState message={t("noGamesFound")} />}
+      {games && games.length === 0 && (
+        <EmptyState title={t("noGamesTitle")} message={t("noGamesFound")} />
+      )}
 
       {games && games.length > 0 && (
-        // Redesenho de 2026-09-07: o input era um controle solto acima da
-        // grade. Vira uma régua de toolbar com a mesma altura de 36px (`h-9`,
-        // via `inputClass`) do resto do chrome do app, e ganha à direita a
-        // contagem do que a busca deixou visível — em coluna monoespaçada,
-        // porque o número muda a cada tecla e não pode empurrar o layout.
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <label htmlFor="games-search" className="sr-only">
-            {t("searchGames")}
-          </label>
-          <input
-            id="games-search"
-            type="text"
-            name="games-search"
-            autoComplete="off"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("searchGamesPlaceholder")}
-            className={`${inputClass} max-w-xs`}
-          />
-          {games.some((g) => g.missing) && (
-            <button
-              type="button"
-              onClick={() => setMissingOnly((v) => !v)}
-              aria-pressed={missingOnly}
-              className={`flex h-9 items-center gap-1 rounded-sm border-[1.5px] px-2.5 font-mono text-xs font-medium tracking-wider uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition duration-150 active:translate-y-px active:shadow-none ${FOCUS_RING} ${
-                missingOnly ? "border-amber text-amber" : "border-line-strong text-muted hover:text-ink"
-              }`}
-            >
-              <FileX size={11} aria-hidden="true" />
-              {t("missingLabel")}
-            </button>
-          )}
-          {trimmedSearch && visibleGames && (
-            <p
-              // `aria-live`: quem usa leitor de tela recebe o resultado da
-              // filtragem sem precisar varrer a grade atrás dele.
-              aria-live="polite"
-              className="font-mono text-xs tracking-wider text-muted uppercase tabular-nums"
-            >
-              {t("searchMatchCount", { count: visibleGames.length, total: games.length })}
-            </p>
-          )}
-        </div>
+        <LibraryToolbar
+          search={search}
+          onSearch={setSearch}
+          sort={sort}
+          onSortChange={(v) => {
+            persistLibraryView({ sort: v });
+            setSort(v);
+          }}
+          viewMode={viewMode}
+          onViewModeChange={(v) => {
+            persistLibraryView({ viewMode: v });
+            setViewMode(v);
+          }}
+          coverDensity={coverDensity}
+          onCoverDensityChange={(v) => {
+            persistLibraryView({ coverDensity: v });
+            setCoverDensity(v);
+          }}
+          missing={
+            games.some((g) => g.missing)
+              ? { on: missingOnly, onToggle: () => setMissingOnly((prev) => !prev) }
+              : undefined
+          }
+          matchCount={trimmedSearch ? { count: visibleGames.length, total: games.length } : undefined}
+        />
       )}
 
       {games && games.length > 0 && visibleGames && visibleGames.length === 0 && (
@@ -624,6 +636,8 @@ export function GamesScreen({
         // acima — eram duas aparências para "não há o que mostrar" na mesma
         // tela (um `EmptyState` emoldurado e um parágrafo cinza solto).
         <EmptyState
+          variant="inline"
+          title={t("noGamesTitle")}
           message={
             trimmedSearch
               ? t("noGamesMatchingSearch", { search: trimmedSearch })
@@ -640,8 +654,14 @@ export function GamesScreen({
           capas desproporcionalmente grandes em monitor grande. Mesmos dois
           tiers extras copiados aqui e no skeleton acima. */}
       {visibleGames && visibleGames.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
-          {visibleGames.map((game) => {
+        <div
+          style={
+            viewMode === "lista"
+              ? { display: "flex", flexDirection: "column" }
+              : { display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: "1rem" }
+          }
+        >
+          {visibleGames.map((game, gameIndex) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =
               (install.state.kind === "installing" ||
@@ -664,22 +684,37 @@ export function GamesScreen({
 
             return (
               <div key={game.id} className="flex flex-col gap-2">
-                <GameTile
-                  game={game}
-                  shortName={shortName}
-                  onOpenDetail={() => onOpenGame(game, consoleName, shortName)}
-                  onPlay={canPlay ? () => install.handlePlay(game, verdict, adapterEntry) : undefined}
-                  onToggleFavorite={() => toggleFavorite(game)}
-                  launchability={launchability}
-                  onInstall={
-                    /* Q5 (docs/roadmap.md, Sprint Q): era `startInstall` direto, que
-                       pulava a ramificação por motivo e disparava uma instalação que o
-                       servidor recusa para fonte manual — o badge dizia "instalação
-                       manual" e o clique caía num "Não foi possível instalar o
-                       emulador". `handlePlay` já leva cada motivo ao lugar certo. */
-                    verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntry) : undefined
-                  }
-                />
+                {/* Q5: `onInstall` passa por `handlePlay`, a mesma cadeia de
+                    decisão do ▶ — ramifica por motivo e nunca dispara uma
+                    instalação que o servidor recusa para fonte manual. */}
+                {viewMode === "lista" ? (
+                  <GameListRow
+                    game={game}
+                    consoleShortName={shortName}
+                    accentColor={accent}
+                    gamepadStart={gameIndex === 0}
+                    onOpenDetail={() => onOpenGame(game, consoleName, shortName)}
+                    onPlay={canPlay ? () => install.handlePlay(game, verdict, adapterEntry) : undefined}
+                    onToggleFavorite={() => toggleFavorite(game)}
+                    launchability={launchability}
+                    onInstall={
+                      verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntry) : undefined
+                    }
+                  />
+                ) : (
+                  <GameTile
+                    game={game}
+                    shortName={shortName}
+                    gamepadStart={gameIndex === 0}
+                    onOpenDetail={() => onOpenGame(game, consoleName, shortName)}
+                    onPlay={canPlay ? () => install.handlePlay(game, verdict, adapterEntry) : undefined}
+                    onToggleFavorite={() => toggleFavorite(game)}
+                    launchability={launchability}
+                    onInstall={
+                      verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntry) : undefined
+                    }
+                  />
+                )}
 
                 {/* Redesenho de 2026-09-07: a frase era o único texto em
                     português cravado no JSX desta tela (todo o resto já

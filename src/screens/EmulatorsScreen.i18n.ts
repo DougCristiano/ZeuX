@@ -157,6 +157,10 @@ export const dict = {
     "pt-BR": "Nenhum emulador encontrado para \"{{search}}\".",
     en: "No emulators found for \"{{search}}\".",
   },
+  noEmulatorsTitle: {
+    "pt-BR": "Nenhum emulador nesta lista",
+    en: "No emulators in this list",
+  },
   failedToListEmulators: {
     "pt-BR": "Não foi possível listar os emuladores",
     en: "Could not list emulators",
@@ -232,6 +236,24 @@ export const dict = {
   addEmulatorManuallyButton: {
     "pt-BR": "+ Adicionar emulador manualmente",
     en: "+ Add emulator manually",
+  },
+  // B2b (docs/pendencias.md): a porta de cadastro manual sobe do rodapé para o
+  // topo da tela. Texto descritivo — não promete que o emulador vai funcionar
+  // (o ZeuX não valida flags de terceiros) e não cita nenhum console fora do
+  // catálogo como sugestão.
+  manualEntryKicker: {
+    "pt-BR": "Emulador fora da lista",
+    en: "Emulator not on the list",
+  },
+  manualEntryTitle: {
+    "pt-BR": "Usa um emulador que o ZeuX não conhece?",
+    en: "Using an emulator ZeuX doesn't know?",
+  },
+  manualEntryBody: {
+    "pt-BR":
+      "Aponte o executável e ele entra na lista, pronto para lançar à mão — inclusive de consoles que o ZeuX ainda não cataloga. O ZeuX não verifica se os argumentos funcionam nem se esta máquina dá conta; quem decide é você.",
+    en:
+      "Point to the executable and it joins the list, ready to launch by hand — including for consoles ZeuX doesn't catalog yet. ZeuX doesn't check whether the arguments work or whether this machine can handle it; that call is yours.",
   },
   // Redesenho de 2026-09-07: a tela dizia "instalado" só por um badge presente
   // e "não instalado" por nenhum badge — ausência não é sinal. Agora os dois

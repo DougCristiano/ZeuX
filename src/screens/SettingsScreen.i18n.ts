@@ -8,6 +8,14 @@ export const dict = {
 
   // Updates section
   updatesHeading: { "pt-BR": "Atualizações", en: "Updates" },
+  tourHeading: { "pt-BR": "Apresentação", en: "Walkthrough" },
+  tourDescription: {
+    "pt-BR":
+      "As quatro telas que aparecem na primeira vez que o ZeuX abre — o que ele configura sozinho, o parecer de hardware, a biblioteca e a camada social.",
+    en:
+      "The four screens shown the first time ZeuX opens — what it configures for you, the hardware verdict, the library and the social layer.",
+  },
+  replayTour: { "pt-BR": "Rever apresentação", en: "Replay walkthrough" },
   updatesDescription: {
     "pt-BR": "Confira as releases oficiais do ZeuX no GitHub e instale uma versão nova diretamente pelo aplicativo.",
     en: "Check the official ZeuX releases on GitHub and install a new version directly from the app.",

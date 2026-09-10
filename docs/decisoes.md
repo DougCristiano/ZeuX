@@ -896,6 +896,28 @@ o bug original — navegação por controle funcionando e invisível. Se o
 `data-gamepad-focused` deixar de ser limpo em `pointerdown`, quem usa mouse
 passa a ver um cursor de controle preso num elemento qualquer.
 
+### Direção visual retrô/pixelada, e o layout das telas deixa de ser lei — 2026-09-09
+
+O protótipo já era funcional (controle, pop-ups, fluxo de veredito), mas
+numa máquina sem jogos e sem emuladores o app parecia cru: marca só em
+tamanho pequeno e borrado, voz tipográfica "terminal" terceirizada para a
+fonte monoespaçada do SO (`@theme` nunca declarava `--font-mono`), estados
+vazios sem hierarquia, grade de consoles com peso de listagem
+administrativa, telas de pasta com card dentro de card.
+
+Decisão do Douglas: o tema puxa para **retrô com pixel art** (ver CLAUDE.md,
+"Direção visual"), e **o layout atual de qualquer tela pode ser totalmente
+refeito** — não é mais tratado como padrão a preservar. O que não muda: os
+princípios de produto não-negociáveis, a regra de responsividade e as
+convenções de idioma/comentário.
+
+**O que quebra se desfizer:** volta o app "cru" — e some o registro de que
+mudar a estrutura de uma tela é permitido, o que faz a próxima sessão tratar
+o layout herdado como intocável.
+
+**Custo aceito:** um período de inconsistência visual enquanto as telas
+migram para a nova direção, e retrabalho em telas que já estavam "prontas".
+
 ---
 
 ## O que fica fora deste log, de propósito
