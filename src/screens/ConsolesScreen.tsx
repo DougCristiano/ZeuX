@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleEntry, EmulatorEntry, LibraryFolder, Report, RetroArchCoreStatus } from "../api/types";
 import {
@@ -14,13 +14,11 @@ import {
   ScreenContainer,
   ScreenHeader,
   SectionHeading,
+  ZSelect,
 } from "../components/ui";
+import { SelectItem } from "../components/ui/select";
 import { ConsoleCard, type ConsoleCardSize } from "../components/ConsoleCard";
-import {
-  consoleFamily,
-  consoleFamilyColor,
-  type ConsoleFamily,
-} from "../lib/consoleColor";
+import { consoleFamily, type ConsoleFamily } from "../lib/consoleColor";
 import {
   buildReadinessIndex,
   evaluateConsoleReadiness,
@@ -31,6 +29,11 @@ import { useT } from "../i18n/i18n";
 import { dict } from "./ConsolesScreen.i18n";
 
 // A régua de chips (`FILTER_CHIP_*`) mora em `components/ui` desde 2026-09-09.
+
+// Sentinela de "sem recorte" nos dois `<select>` de catálogo. O `Select` do
+// Radix reserva a string vazia para "nenhum valor" e recusa `value=""` num
+// item — daí um id explícito em vez de `""`.
+const ANY = "todos";
 
 // Época pela década de lançamento — recorte 100% no cliente, a partir de
 // `entry.year`. Quatro faixas em vez de dez décadas: o catálogo tem 33
@@ -90,6 +93,33 @@ interface Avaliado {
  * **Catálogo** (ainda não tocou). O card cresceu e passa a tratar a logo como
  * arte de sistema, sobre o gradiente na cor de identidade. A paginação saiu:
  * nunca disparava nos 33 itens e cortava as faixas ao meio.
+ *
+ * 2026-09-10 (achado do Douglas, terceira rodada: "o filtro está quebrando",
+ * "avalie usar select em vez de parede de chips", "repense onde vai cada peça,
+ * o espaçamento, estilo e o UI/UX"). O que mudou e o porquê de cada peça:
+ *
+ * - **A régua de três linhas virou duas, e a primeira deixou de ser filtro
+ *   para virar conteúdo.** A prontidão (`READINESS_FILTERS`) é a pergunta da
+ *   tela inteira, e a contagem por etapa é a resposta mais útil que o ZeuX
+ *   tem antes de qualquer clique — "7 prontos, 12 sem core" é informação, não
+ *   controle. Virou um mostrador de células segmentadas (chassi único, fios
+ *   de 1px entre as células, contagem em `font-pixel`), que continua sendo o
+ *   filtro ao ser clicado. Some da tela o "resumo que não existia" e a fileira
+ *   de chips que ocupava uma linha só para repetir números pequenos.
+ * - **Fabricante e época viraram `<select>`.** Eram 8 + 4 chips numa fileira
+ *   rolável que, a 1280px (a largura padrão da janela, `tauri.conf.json`),
+ *   cortava "2010 em diante" na borda direita sem nenhuma indicação de que
+ *   havia mais — o "quebrando" do achado. São eixos de recorte raro, de
+ *   escolha única, e cujo valor cabe inteiro no rótulo fechado do controle; a
+ *   contagem que os chips mostravam foi para dentro da opção ("Nintendo (9)"),
+ *   onde não custa largura nenhuma. Dois selects de largura fixa por conteúdo
+ *   não têm como transbordar.
+ * - **"Tenho jogos deste console" continua chip**, não select: é um liga/
+ *   desliga, e um `<select>` de dois estados seria um botão disfarçado.
+ * - **A legenda do pingo desceu para o lado do título "Prontos para jogar"**,
+ *   a faixa onde os pingos de fato aparecem — antes flutuava sozinha entre a
+ *   régua e a primeira faixa, explicando um símbolo que ainda não estava na
+ *   tela.
  *
  * Quatro buscas de tela inteira, nenhuma por console: `GET /consoles`,
  * `GET /emulators`, `GET /retroarch/cores` e `GET /library/folders`. O
@@ -198,8 +228,10 @@ export function ConsolesScreen({
     return out;
   }, [avaliados]);
 
-  // Contagem por fabricante — sobre o catálogo inteiro, como a régua de
-  // prontidão. Um fabricante sem nenhum console some da régua.
+  // Contagem por fabricante e por época — sobre o catálogo inteiro, como a de
+  // prontidão. Vai para dentro do rótulo da opção do `<select>`: é o dado que
+  // os chips mostravam antes, e ali não custa largura de tela. Um fabricante
+  // sem nenhum console some da lista de opções.
   const familyCount = useMemo(() => {
     const out = new Map<ConsoleFamily, number>();
     for (const { entry } of avaliados) {
@@ -208,6 +240,22 @@ export function ConsolesScreen({
     }
     return out;
   }, [avaliados]);
+
+  const eraCount = useMemo(() => {
+    const out = new Map<EraId, number>();
+    for (const { entry } of avaliados) {
+      const era = consoleEra(entry.year);
+      out.set(era, (out.get(era) ?? 0) + 1);
+    }
+    return out;
+  }, [avaliados]);
+
+  const ERA_LABEL: Record<EraId, string> = {
+    "70s-80s": t("era70s80s"),
+    "90s": t("era90s"),
+    "2000s": t("era2000s"),
+    "2010+": t("era2010plus"),
+  };
 
   const anyFilterActive =
     search.trim() !== "" ||
@@ -262,12 +310,23 @@ export function ConsolesScreen({
     noGames: t("cardNoGames"),
   };
 
-  function renderSection(items: Avaliado[], titleKey: "sectionReady" | "sectionNeedsSetup" | "sectionCatalog", size: ConsoleCardSize, minCol: string) {
+  function renderSection(
+    items: Avaliado[],
+    titleKey: "sectionReady" | "sectionNeedsSetup" | "sectionCatalog",
+    size: ConsoleCardSize,
+    minCol: string,
+    // Legenda opcional ao lado do título — só a faixa dos prontos tem o pingo
+    // aceso para explicar.
+    legend?: ReactNode,
+  ) {
     if (items.length === 0) return null;
     return (
-      <section className="mt-8 first:mt-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <SectionHeading>{t(titleKey)}</SectionHeading>
+      <section className="mt-10 first:mt-8">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line pb-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <SectionHeading>{t(titleKey)}</SectionHeading>
+            {legend}
+          </div>
           <span className="font-mono text-xs text-muted tabular-nums">
             {items.length === 1
               ? t("sectionReadyCount", { count: items.length })
@@ -306,146 +365,143 @@ export function ConsolesScreen({
 
       {error && <InlineError>{error}</InlineError>}
 
-      {/* 2026-09-10 (achado do Douglas: "os filtros de console continuam os
-          mesmos, tem 3 linhas de filtro" — a régua desta tela, não a
-          LibraryToolbar, que foi o que a rodada anterior mexeu por engano).
-          Mesmo tratamento que `LibraryToolbar` já ganhou: um chassi único
-          (borda + `bg-fill/60`) em vez de três blocos soltos flutuando na
-          tela sem nada que diga que são o mesmo painel, e a régua de
-          catálogo (fabricante + época + "tenho jogos") virou UMA fileira
-          rolável na horizontal em vez de duas que quebravam em várias linhas
-          — nunca mais que duas linhas ao todo (prontidão + catálogo),
-          independente de quantos consoles/fabricantes o catálogo tiver. */}
-      <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-fill/60 px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-3">
-          <label htmlFor="consoles-search" className="sr-only">
-            {t("searchConsoleOrEmulator")}
-          </label>
-          <input
-            id="consoles-search"
-            type="text"
-            name="consoles-search"
-            autoComplete="off"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("searchConsoleOrEmulatorPlaceholder")}
-            className={`${inputClass} max-w-xs`}
-          />
-          {anyFilterActive && (
+      {/* Mostrador de prontidão — resumo E filtro na mesma peça (ver o doc
+          comment do componente). Chassi único, células separadas por fios de
+          1px (`gap-px` sobre `bg-line`, com o fundo vindo de cada célula):
+          a linguagem é a de um painel frontal de hardware, não a de uma barra
+          de ferramentas. `flex-wrap` + `basis-36 grow`, nunca largura fixa —
+          as células dividem a linha inteira em qualquer largura de janela e,
+          quando a janela encolhe, quebram em blocos inteiros em vez de
+          transbordar ou esconder opção (CLAUDE.md, layout responsivo). */}
+      <div
+        role="group"
+        aria-label={t("readinessPanelLabel")}
+        className="flex flex-wrap gap-px overflow-hidden rounded-sm border-[1.5px] border-control-border bg-line"
+      >
+        {READINESS_FILTERS.map((item) => {
+          const total = readinessCount.get(item.id) ?? 0;
+          if (item.id !== "todos" && total === 0) return null;
+          const on = readinessFilter === item.id;
+          return (
             <button
+              key={item.id}
               type="button"
-              onClick={clearFilters}
-              className={`${FILTER_CHIP_BASE} ${FILTER_CHIP_OFF} ${FOCUS_RING}`}
+              onClick={() => setReadinessFilter(item.id)}
+              aria-pressed={on}
+              className={`relative flex min-w-0 grow basis-36 flex-col items-start gap-1 px-3 py-2.5 text-left transition duration-150 ${FOCUS_RING} ${
+                on ? "bg-accent/10" : "bg-panel hover:bg-fill"
+              }`}
             >
-              {t("clearFilters")}
-            </button>
-          )}
-        </div>
-
-        {/* Fileira 1 — prontidão: "o que falta montar". Primária, por isso
-            fica dentro do chassi sem rótulo próprio (o `<select>`/rótulo
-            "TODOS 33" já se explica) e sem rolagem — 6 chips no máximo,
-            cabe numa linha em qualquer largura que a régua já suporta. */}
-        <div className="flex flex-wrap gap-1.5">
-          {READINESS_FILTERS.map((item) => {
-            const total = readinessCount.get(item.id) ?? 0;
-            if (item.id !== "todos" && total === 0) return null;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setReadinessFilter(item.id)}
-                aria-pressed={readinessFilter === item.id}
-                className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${
-                  readinessFilter === item.id ? FILTER_CHIP_ON : FILTER_CHIP_OFF
+              {/* Friso aceso de 2px no topo da célula ativa: o estado ligado
+                  precisa ler mesmo quando a diferença de fundo é sutil — cor
+                  de fundo sozinha não é sinal suficiente (WCAG 1.4.1), e o
+                  `aria-pressed` já cobre o leitor de tela. */}
+              <span
+                aria-hidden="true"
+                className={`absolute inset-x-0 top-0 h-0.5 ${on ? "bg-accent shadow-[0_0_10px_var(--accent)]" : "bg-transparent"}`}
+              />
+              <span
+                className={`flex min-w-0 items-center gap-1.5 font-mono text-[11px] tracking-wider uppercase ${
+                  on ? "text-ink" : "text-muted"
                 }`}
               >
-                {item.label.toUpperCase()}
-                <span className={`tabular-nums ${readinessFilter === item.id ? "text-accent" : "opacity-70"}`}>
-                  {total}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Fileira 2 — catálogo: fabricante + época + "tenho jogos", juntos
-            numa única linha rolável (nunca quebra em uma terceira/quarta
-            linha, por mais fabricante que o catálogo ganhe). Separada da
-            fileira de prontidão por um divisor: "o que falta montar" e
-            "que fatia do catálogo eu quero ver" são perguntas diferentes,
-            liam como o mesmo tipo de recorte quando empilhadas soltas. */}
-        <div className="-mx-3 flex items-center gap-2 border-t border-line/60 px-3 pt-2.5">
-          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-            <span className="mr-0.5 shrink-0 font-mono text-[11px] tracking-wide text-muted uppercase">
-              {t("filterByMaker")}
-            </span>
-            {FAMILY_ORDER.map((fam) => {
-              const total = familyCount.get(fam) ?? 0;
-              if (total === 0) return null;
-              const on = familyFilter === fam;
-              const color = consoleFamilyColor(fam);
-              return (
-                <button
-                  key={fam}
-                  type="button"
-                  onClick={() => setFamilyFilter(on ? null : fam)}
-                  aria-pressed={on}
-                  // Chip de fabricante ativo pega a cor da família (a mesma fonte
-                  // que pinta os cards) — `var(--fam)` é a parte dinâmica, a
-                  // classe arbitrária compila normalmente.
-                  style={on ? ({ "--fam": color } as CSSProperties) : undefined}
-                  className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${
-                    on
-                      ? "border-[var(--fam)] bg-[color-mix(in_srgb,var(--fam)_14%,transparent)] text-ink shadow-[0_0_14px_-4px_var(--fam)]"
-                      : FILTER_CHIP_OFF
-                  }`}
-                >
-                  {(FAMILY_LABEL[fam] || t("familyOther")).toUpperCase()}
-                </button>
-              );
-            })}
-
-            <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-line" />
-
-            <span className="mr-0.5 shrink-0 font-mono text-[11px] tracking-wide text-muted uppercase">
-              {t("filterByEra")}
-            </span>
-            {ERA_ORDER.map((era) => {
-              const on = eraFilter === era;
-              const label = { "70s-80s": t("era70s80s"), "90s": t("era90s"), "2000s": t("era2000s"), "2010+": t("era2010plus") }[era];
-              return (
-                <button
-                  key={era}
-                  type="button"
-                  onClick={() => setEraFilter(on ? null : era)}
-                  aria-pressed={on}
-                  className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${on ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
-                >
-                  {label.toUpperCase()}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setOnlyWithGames((v) => !v)}
-              aria-pressed={onlyWithGames}
-              className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${onlyWithGames ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
-            >
-              {t("filterOnlyWithGames").toUpperCase()}
+                {/* O mesmo pingo ciano que acende no canto do card pronto —
+                    aqui ele amarra a célula à faixa lá embaixo. */}
+                {item.id === "pronto" && (
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-secondary shadow-[0_0_4px_var(--accent-secondary)]"
+                  />
+                )}
+                <span className="truncate">{item.label}</span>
+              </span>
+              <span className={`font-pixel text-base leading-none tabular-nums ${on ? "text-accent" : "text-ink"}`}>
+                {total}
+              </span>
             </button>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
-      {/* Legenda do pingo aceso — cor sozinha nunca é informação (WCAG 1.4.1). */}
-      <p className="mt-3 flex items-center gap-1.5 text-xs text-muted">
-        <span
-          aria-hidden="true"
-          className="h-2 w-2 shrink-0 rounded-full bg-accent-secondary shadow-[0_0_4px_var(--accent-secondary)]"
+      {/* Linha de refino — busca + os dois recortes de catálogo + o liga/
+          desliga de "tenho jogos". Uma linha só, e sem nada que possa
+          transbordar: os dois `<select>` medem pelo próprio rótulo, não pela
+          quantidade de opções que carregam. */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <label htmlFor="consoles-search" className="sr-only">
+          {t("searchConsoleOrEmulator")}
+        </label>
+        <input
+          id="consoles-search"
+          type="text"
+          name="consoles-search"
+          autoComplete="off"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("searchConsoleOrEmulatorPlaceholder")}
+          className={`${inputClass} max-w-xs`}
         />
-        {t("readyLegend")}
-      </p>
+
+        <ZSelect
+          ariaLabel={t("filterByMaker")}
+          value={familyFilter ?? ANY}
+          onValueChange={(v) => setFamilyFilter(v === ANY ? null : (v as ConsoleFamily))}
+          // Borda acesa quando o recorte está ligado: num `<select>` o valor
+          // já aparece fechado, mas sem isso ele fica com o mesmo peso do
+          // chip desligado ao lado e "há um filtro ativo aqui" só se descobre
+          // lendo. Mesmo roxo de "o usuário agiu" dos chips (regra da paleta
+          // em index.css). Não é o único sinal — o rótulo diz "Sega (7)".
+          className={`w-fit ${familyFilter ? "border-accent text-ink" : ""}`}
+        >
+          <SelectItem value={ANY}>{t("filterAllMakers")}</SelectItem>
+          {FAMILY_ORDER.map((fam) => {
+            const total = familyCount.get(fam) ?? 0;
+            if (total === 0) return null;
+            return (
+              <SelectItem key={fam} value={fam}>
+                {`${FAMILY_LABEL[fam] || t("familyOther")} (${total})`}
+              </SelectItem>
+            );
+          })}
+        </ZSelect>
+
+        <ZSelect
+          ariaLabel={t("filterByEra")}
+          value={eraFilter ?? ANY}
+          onValueChange={(v) => setEraFilter(v === ANY ? null : (v as EraId))}
+          className={`w-fit ${eraFilter ? "border-accent text-ink" : ""}`}
+        >
+          <SelectItem value={ANY}>{t("filterAllEras")}</SelectItem>
+          {ERA_ORDER.map((era) => (
+            <SelectItem key={era} value={era}>
+              {`${ERA_LABEL[era]} (${eraCount.get(era) ?? 0})`}
+            </SelectItem>
+          ))}
+        </ZSelect>
+
+        <button
+          type="button"
+          onClick={() => setOnlyWithGames((v) => !v)}
+          aria-pressed={onlyWithGames}
+          className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${onlyWithGames ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
+        >
+          {t("filterOnlyWithGames").toUpperCase()}
+        </button>
+
+        {anyFilterActive && (
+          // Saída de emergência, não um filtro: fica em `quiet` (sem chassi)
+          // para não somar um sétimo controle do mesmo peso à linha, mas
+          // herda a voz monoespaçada em caixa alta do resto dela.
+          <Button
+            variant="quiet"
+            className="font-mono text-xs tracking-wider uppercase"
+            onClick={clearFilters}
+          >
+            {t("clearFilters")}
+          </Button>
+        )}
+      </div>
+
 
       {consoles === null && !error && (
         <div
@@ -481,7 +537,22 @@ export function ConsolesScreen({
       {/* Card grande na faixa dos prontos (logo grande + contagem + "Ver
           jogos"), médio no "falta configurar", denso no catálogo. `auto-fill`
           nas três — imune à regra de breakpoint do CLAUDE.md. */}
-      {renderSection(prontos, "sectionReady", "grande", "260px")}
+      {renderSection(
+        prontos,
+        "sectionReady",
+        "grande",
+        "260px",
+        // Legenda do pingo aceso — cor sozinha nunca é informação (WCAG
+        // 1.4.1). Fica ao lado do título desta faixa, e não solta acima da
+        // tela: é aqui que os pingos aparecem.
+        <span className="flex items-center gap-1.5 text-xs text-muted">
+          <span
+            aria-hidden="true"
+            className="h-2 w-2 shrink-0 rounded-full bg-accent-secondary shadow-[0_0_4px_var(--accent-secondary)]"
+          />
+          {t("readyLegend")}
+        </span>,
+      )}
       {renderSection(faltaConfigurar, "sectionNeedsSetup", "media", "210px")}
       {renderSection(catalogo, "sectionCatalog", "densa", "190px")}
     </ScreenContainer>
