@@ -633,8 +633,18 @@ export function ScreenHeader({
       {back && <BackButton label={back.label} onClick={back.onClick} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+          {/* 2026-09-10 (achado do critico-design: "a voz pixel virou
+              resíduo, sobrevive só na abertura"): a fonte pixel volta ao
+              topo de TODA tela, não como exceção — mas só aqui, a 22px, onde
+              ela é legível de verdade (o motivo de tê-la tirado dos rótulos
+              pequenos em 2026-09-06/N17 continua válido abaixo deste
+              tamanho). `leading-relaxed` porque a altura-x da Press Start 2P
+              é maior que a de uma sans no mesmo tamanho de fonte — sem
+              folga extra a entrelinha lê apertada. Acentos (ç/ã/õ/é, pt-BR)
+              cobertos pelo subset `latin`/`latin-ext` que o `400.css` já
+              importa por inteiro (conferido: sem tofu). */}
+          <h1 className="font-pixel text-xl leading-relaxed tracking-[0.04em] text-ink">{title}</h1>
+          {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>

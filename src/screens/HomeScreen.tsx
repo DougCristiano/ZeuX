@@ -17,6 +17,7 @@ import {
   ManualInstallModal,
   ProgressBar,
   ScreenContainer,
+  ScreenHeader,
   SectionHeading,
   Toast,
 } from "../components/ui";
@@ -378,6 +379,13 @@ export function HomeScreen({
       ) : (
         toastMessage && <Toast message={toastMessage} />
       )}
+
+      {/* 2026-09-10 (achado do critico-design: a home era a única tela do
+          app sem `ScreenHeader` — sem <h1>, sem a voz pixel que ele agora
+          carrega). Sem subtítulo no onboarding: o `EmptyState` logo abaixo
+          já apresenta o app por extenso, um subtítulo repetiria a mesma
+          frase duas vezes na mesma tela. */}
+      <ScreenHeader title={t("title")} subtitle={isOnboarding ? undefined : t("subtitle")} />
 
       {isOnboarding ? (
         <EmptyState

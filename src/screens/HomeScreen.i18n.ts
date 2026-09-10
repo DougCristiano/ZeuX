@@ -1,6 +1,8 @@
 import type { Dict } from "../i18n/i18n";
 
 export const dict = {
+  title: { "pt-BR": "Biblioteca", en: "Library" },
+  subtitle: { "pt-BR": "Seus jogos, seus consoles, onde você parou.", en: "Your games, your consoles, where you left off." },
   continuePlaying: { "pt-BR": "Continue jogando", en: "Continue playing" },
   yourConsoles: { "pt-BR": "Seus consoles", en: "Your consoles" },
   seeAllConsoles: { "pt-BR": "Ver todos", en: "See all" },

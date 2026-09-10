@@ -712,6 +712,14 @@ function App() {
       // fase sem precisar repetir em cada uma das nove telas pós-onboarding.
       <div className="relative flex h-screen overflow-hidden">
         <AmbientGlow opacity={9} />
+        {/* 2026-09-10 (achado do critico-design): a grade de pixels
+            (`.zeux-pixel-grid`, index.css) existia em só 3 componentes
+            isolados — o chassi que o usuário olha o tempo inteiro (este
+            `<main>`) não carregava textura nenhuma, o que contradizia a
+            decisão de 2026-09-09 na prática. `fixed`, não dentro do `<main>`
+            rolável: é a tela do tubo, não conteúdo — não deveria rolar junto
+            com a grade de jogos por baixo dela. */}
+        <div aria-hidden="true" className="zeux-pixel-grid pointer-events-none fixed inset-0" />
         <Sidebar active={active} onNav={navigateSidebar} />
         {/* `tabIndex={-1}`: não entra na ordem de Tab, mas pode receber foco
             por script — é o alvo para onde a abertura devolve o foco ao sair
