@@ -29,6 +29,7 @@ import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { GamesScreen } from "./screens/GamesScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
+import { HomeScreen } from "./screens/HomeScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
@@ -49,10 +50,16 @@ type Phase =
   | "declined"
   | "scanning"
   | "scan-error"
-  // "all-games" é a tela inicial depois do parecer pronto (2026-08-04, a
-  // pedido do Douglas — "clicar direto e começar a jogar"), não "verdict".
-  // O parecer de compatibilidade continua existindo, alcançável a partir
-  // daqui.
+  // "home" é a tela inicial desde 2026-09-10 (A1, docs/pendencias.md — pedido
+  // do Douglas: "quero mais destaque pro console" + "faltam motivos pra usar
+  // num PC zerado"). Sempre a entrada, com ou sem histórico — sem nenhum jogo
+  // jogado e nenhuma pasta configurada, ela vira o onboarding (HomeScreen
+  // decide isso sozinha). "Todos os jogos" continua existindo, alcançado a
+  // partir daqui ("Ver todos os jogos"), não mais o destino direto da
+  // sidebar.
+  | "home"
+  // O parecer de compatibilidade continua existindo, alcançável a partir da
+  // home.
   | "all-games"
   | "verdict"
   | "consoles"
@@ -131,7 +138,7 @@ function App() {
   // tem menos contexto sobre o que o app faz.
   const [tourVisible, setTourVisible] = useState(false);
   useEffect(() => {
-    if ((phase === "all-games" || phase === "declined") && !hasSeenTour()) {
+    if ((phase === "home" || phase === "declined") && !hasSeenTour()) {
       setTourVisible(true);
     }
   }, [phase]);
@@ -197,12 +204,16 @@ function App() {
   // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
   // a tela por console (LibraryScreen) continua existindo.
   const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library" | "console-detail">("all-games");
+  // "library" (fase de gerenciar pastas) agora é alcançada tanto da home
+  // quanto de "Todos os jogos" (2026-09-10, A1) — "Voltar" precisa saber pra
+  // qual das duas devolver, mesmo padrão de `gamesOrigin`.
+  const [libraryOrigin, setLibraryOrigin] = useState<"home" | "all-games">("home");
   // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04). M5
   // (docs/sprint-m-plano.md, 2026-08-07): até aqui só vinha de
   // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
   // ver M5) — "Voltar" precisa saber pra qual fase retornar, senão sempre
   // devolveria pra "all-games" mesmo vindo de dentro de um console.
-  const [gameDetailOrigin, setGameDetailOrigin] = useState<"all-games" | "games" | "history">("all-games");
+  const [gameDetailOrigin, setGameDetailOrigin] = useState<"home" | "all-games" | "games" | "history">("home");
   const [selectedGame, setSelectedGame] = useState<{
     game: LibraryGame;
     consoleName: string;
@@ -309,7 +320,7 @@ function App() {
       await api.scanHardware();
       const nextReport = await api.getVerdicts();
       setReport(nextReport);
-      setPhase("all-games");
+      setPhase("home");
     } catch (err) {
       setErrorMessage(err instanceof ApiError ? err.message : t("scanError"));
       setPhase("scan-error");
@@ -360,7 +371,10 @@ function App() {
   }
 
   function navigateSidebar(id: NavID) {
-    if (id === "library") setPhase("all-games");
+    // "library" é o nome de NavID (item da sidebar), não da Phase — a home
+    // (2026-09-10, decisão do Douglas) é quem esse item abre agora;
+    // "all-games" virou sub-visão, alcançada de dentro da home.
+    if (id === "library") setPhase("home");
     if (id === "verdict") setPhase("verdict");
     if (id === "consoles") {
       setCameFromDeclined(false);
@@ -450,7 +464,7 @@ function App() {
           // que quem aceitou — só sem parecer de hardware (`report` fica
           // `null`; as telas de biblioteca já toleram isso, ver
           // AllGamesScreen/LibraryScreen/GamesScreen/GameDetailScreen).
-          onContinueWithoutConsent={() => setPhase("all-games")}
+          onContinueWithoutConsent={() => setPhase("home")}
         />
       );
       break;
@@ -463,12 +477,38 @@ function App() {
       screen = <ErrorScreen message={errorMessage} onRetry={runScan} />;
       break;
 
+    case "home":
+      screen = (
+        <HomeScreen
+          report={report ?? undefined}
+          consoleCatalog={consoles}
+          onOpenLibrary={() => {
+            setLibraryOrigin("home");
+            setPhase("library");
+          }}
+          onOpenConsole={abrirConsolePorID}
+          onOpenAllGames={() => setPhase("all-games")}
+          onOpenGame={(game, consoleName, shortName) => {
+            const year =
+              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
+              consoles.find((c) => c.console_id === game.console_id)?.year;
+            setGameDetailOrigin("home");
+            setSelectedGame({ game, consoleName, shortName, year });
+            setPhase("game-detail");
+          }}
+        />
+      );
+      break;
+
     case "all-games":
       screen = (
         <AllGamesScreen
           report={report ?? undefined}
           consoleCatalog={consoles}
-          onOpenLibrary={() => setPhase("library")}
+          onOpenLibrary={() => {
+            setLibraryOrigin("all-games");
+            setPhase("library");
+          }}
           onOpenConsole={abrirConsolePorID}
           view={allGamesView}
           onViewChange={handleAllGamesViewChange}
@@ -562,7 +602,7 @@ function App() {
         <LibraryScreen
           consoleCatalog={consoles}
           report={report ?? undefined}
-          onBack={() => setPhase("all-games")}
+          onBack={() => setPhase(libraryOrigin)}
           onOpenGames={(id, name, shortName) => {
             setSelectedConsole({ id, name, shortName });
             setGamesOrigin("library");
@@ -705,6 +745,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
   declined: "Consentimento recusado",
   scanning: "Lendo o computador",
   "scan-error": "Erro na leitura do computador",
+  home: "Biblioteca",
   "all-games": "Todos os jogos",
   "game-detail": "Detalhe do jogo",
   history: "Histórico",
@@ -720,6 +761,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
 };
 
 const SIDEBAR_PHASES: Phase[] = [
+  "home",
   "all-games",
   "verdict",
   "consoles",

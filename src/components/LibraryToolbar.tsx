@@ -137,6 +137,19 @@ type Toggle = { on: boolean; onToggle: () => void };
  * não passa `platforms`, e a régua omite a fileira inteira. Não é sticky de
  * propósito: uma barra fixa passaria por cima do tile focado na navegação por
  * teclado/controle (WCAG 2.2, "focus not obscured").
+ *
+ * 2026-09-10 (achado do Douglas: "os filtros de console estão legais, mas a
+ * estética não ficou legal, tem 3 linhas de filtro"): a fileira de chips de
+ * plataforma virou rolagem horizontal (`overflow-x-auto` + `flex-nowrap`) em
+ * vez de `flex-wrap` — antes, numa janela estreita ou com muitos consoles na
+ * biblioteca, ela quebrava em 2-3 linhas com o mesmo peso visual da régua de
+ * controle acima, competindo por atenção em vez de ficar claramente
+ * subordinada. Agora ocupa no máximo uma linha sempre, com um rótulo
+ * (`platformFilterLabel`) que a separa como "isto filtra o quê aparece",
+ * diferente da régua de cima ("isto muda como aparece" — busca, ordem,
+ * densidade). `-mx-3 px-3`: a rolagem chega até a borda do chassi sem cortar
+ * o padding do container, mesmo truque de faixa horizontal que `HomeScreen`
+ * usa na prateleira de consoles.
  */
 export function LibraryToolbar({
   search,
@@ -260,6 +273,14 @@ export function LibraryToolbar({
           </div>
         )}
 
+        {/* Divisor fino antes dos toggles de filtro (2026-09-10): separa
+            "como a grade aparece" (busca, ordem, grade/lista, densidade — à
+            esquerda) de "o que aparece nela" (favoritos/ausentes/jogado/
+            oculto — à direita), que antes liam como um só bloco de sete
+            controles do mesmo peso. */}
+        {(favorites || missing || played || excluded) && (
+          <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line sm:block" />
+        )}
         {favorites && (
           <Chip on={favorites.on} onToggle={favorites.onToggle} label={t("favoritesLabel")}>
             <Star size={11} fill={favorites.on ? "currentColor" : "none"} aria-hidden="true" />
@@ -292,39 +313,47 @@ export function LibraryToolbar({
       </div>
 
       {platforms && platforms.length > 1 && onPlatformFilterChange && (
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => onPlatformFilterChange(null)}
-            aria-pressed={platformFilter == null}
-            className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${platformFilter == null ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
-          >
-            {t("allPlatforms")}
-          </button>
-          {platforms.map(({ id, label }) => {
-            const active = platformFilter === id;
-            const accent = consoleAccentColor(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => onPlatformFilterChange(id)}
-                aria-pressed={active}
-                style={
-                  active
-                    ? ({
-                        borderColor: accent,
-                        background: `${accent}1a`,
-                        boxShadow: `0 0 12px -4px ${accent}`,
-                      } as CSSProperties)
-                    : undefined
-                }
-                className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${active ? "text-ink" : FILTER_CHIP_OFF}`}
-              >
-                {label.toUpperCase()}
-              </button>
-            );
-          })}
+        <div className="-mx-3 flex items-center gap-2 border-t border-line/60 px-3 pt-2.5">
+          {/* Rótulo curto, fora da linha rolável: âncora visual que separa
+              esta fileira ("filtra o quê aparece") da régua de controle
+              acima ("muda como aparece") sem precisar de outro painel. */}
+          <span className="shrink-0 font-mono text-[11px] tracking-wide text-muted uppercase">
+            {t("platformFilterLabel")}
+          </span>
+          <div className="flex flex-nowrap gap-1.5 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => onPlatformFilterChange(null)}
+              aria-pressed={platformFilter == null}
+              className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${platformFilter == null ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
+            >
+              {t("allPlatforms")}
+            </button>
+            {platforms.map(({ id, label }) => {
+              const active = platformFilter === id;
+              const accent = consoleAccentColor(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onPlatformFilterChange(id)}
+                  aria-pressed={active}
+                  style={
+                    active
+                      ? ({
+                          borderColor: accent,
+                          background: `${accent}1a`,
+                          boxShadow: `0 0 12px -4px ${accent}`,
+                        } as CSSProperties)
+                      : undefined
+                  }
+                  className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${active ? "text-ink" : FILTER_CHIP_OFF}`}
+                >
+                  {label.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

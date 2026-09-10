@@ -35,61 +35,34 @@ home) → Sprint 2 (não trava) → Sprint 3 (organização) → Sprint 4 (temas
 
 ## Trilha A — bonito e console-forward
 
-### A1 — Página inicial de destaque (fase `home` nova)
+### A1 — Página inicial de destaque (fase `home` nova) — **FEITO (2026-09-10)**
 
-**O problema:** depois do scan, `App.tsx` cai direto em `all-games`
-(`setPhase("all-games")`). Não há tela inicial. A grade de capas trata o
-jogo de ontem igual ao que nunca foi aberto, e o console — o diferencial do
-produto — não aparece em lugar nenhum de destaque.
+Implementado: `App.tsx` ganhou a fase `home`, sempre a tela de entrada
+(decisão do Douglas em 2026-09-10 — sem histórico e sem pasta nenhuma, ela
+vira o onboarding sozinha, sem tela separada). O item "Biblioteca" da
+sidebar abre `home`; "Todos os jogos" (`AllGamesScreen`) virou sub-visão,
+alcançada pelo botão "Ver todos os jogos" no rodapé. `HomeScreen.tsx` traz:
 
-**Direção levantada (o Douglas ainda não fechou a "cara"):** uma fase `home`
-antes de `all-games`, com:
+1. **Hero** (`GameHero`, reaproveitado) — só quando há jogo jogado.
+2. **Prateleira "Seus consoles"** (`ConsoleCard`, tamanho `media`, rolagem
+   horizontal) — só consoles com pasta apontada ou emulador já resolvido, não
+   o catálogo dos 33.
+3. **Rodapé de estatística** — tempo jogado total (`GET /sessions`) + "N de M
+   consoles prontos" (`report.verdicts`, níveis `otimo`/`bom`), sem rota nova.
 
-1. **Hero** — arte do último jogo jogado ao fundo (desfocada, tingida na cor
-   do console), "▶ Continuar". Usuário sem histórico: o estado de boas-vindas
-   / "aponte sua pasta" (encosta no item de onboarding, abaixo). Reaproveita
-   `GameHero`.
-2. **Prateleira "Seus consoles"** — cards grandes (~180px, contra os 64px de
-   hoje) com a **imagem real do console** (`GET /consoles/{id}/image`, já
-   embutida), nome, ano, e estado ("12 jogos · pronto pra jogar" /
-   "3 jogos · falta emulador"). Clicar → os jogos daquele console. Rolável na
-   horizontal.
-3. **Rodapé de estatística** — "3 h 20 min jogados · 5 consoles prontos"
-   (dados de `GET /sessions` + `GET /consoles/verdicts`, sem rota nova).
-
-**Decisões em aberto antes de implementar:**
-- A `home` é sempre a tela de entrada, ou só quando há histórico? (Sem
-  histórico ela vira quase o onboarding — vale unir os dois?)
-- Ela substitui `all-games` como destino do item "Biblioteca" da sidebar, ou
-  é um sexto item / a "Biblioteca" abre a `home` e "todos os jogos" é uma
-  sub-visão?
-- Encaixe na máquina de estados de `App.tsx` sem somar tempo ao boot de quem
-  só quer abrir o jogo de sempre (mesmo cuidado do splash).
+Ver o comentário no topo de `HomeScreen.tsx` para a nota sobre duplicação
+proposital com `AllGamesScreen` (a cadeia de lançamento/instalação já mora
+nos hooks; o que se repete é só a fiação dos modais em volta).
 
 **Depende de:** decisão de produto sobre a "cara" da home · **Bloqueia:** A2
 (compartilham o card de console)
 
-### A2 — Cards de console grandes (Consoles + prateleira da home)
+### A2 — Cards de console grandes (Consoles + prateleira da home) — **FEITO**
 
-**O problema:** `ConsoleIcon` é `h-16 w-16` (64px) — já subiu de `h-12`
-uma vez (2026-09-07, achado do Douglas) e ainda está pequeno. A tela de
-Consoles é uma grade desses selos.
-
-**Escopo:** um componente `ConsoleCard` (~180px) com arte real do console,
-nome, ano, cor da marca (`--console-accent`, já existe) e estado de
-prontidão. Usado na prateleira da home (A1) e na grade da tela de Consoles.
-`ConsoleIcon` continua para os lugares pequenos (badge de plataforma no tile
-de jogo, chip).
-
-**Critério de aceite:**
-- [ ] Tela de Consoles usa `ConsoleCard`, não a grade de selos 64px.
-- [ ] A arte real aparece; sem arte em cache, cai para `ConsoleIcon` (a
-      lógica de fallback já existe).
-- [ ] `lg`/`xl` da grade descontam sidebar + scrollbar (regra do CLAUDE.md).
-- [ ] Alcançável e visivelmente realçado pelo controle (o cursor de
-      `data-gamepad-focused`).
-
-**Depende de:** nada · **Bloqueia:** nada
+`components/ConsoleCard.tsx` já existe (três tamanhos — `grande`/`media`/
+`densa`), usado por `ConsolesScreen` (as três faixas por prontidão) e agora
+também pela prateleira de `HomeScreen` (A1, tamanho `media`). `ConsoleIcon`
+continua só para os lugares pequenos (badge de plataforma, chip).
 
 ### A3 — Filtro por fabricante (Sony → todos os PlayStation)
 
