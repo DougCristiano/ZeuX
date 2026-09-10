@@ -156,12 +156,17 @@ export function SettingsScreen({
   // isso o botão só aparece no Windows; nos outros dois a tela explica o
   // caminho manual em vez de fingir automação que não existe.
   //
-  // Mesma classe de bug do "Abrir pasta de instalação" (2026-08-17):
-  // "opener:default" (src-tauri/capabilities/default.json) só libera
-  // mailto:/tel:/https:/http: (permissão opener:allow-default-urls) — um
-  // esquema customizado como "ms-settings:" precisa da permissão
-  // opener:allow-open-url à parte, sem a qual o Tauri recusava com "Not
-  // allowed to open url" antes de sequer chegar no Windows.
+  // Mesma classe de bug do "Abrir pasta de instalação" (2026-08-17), e achado
+  // de novo em 2026-09-10 (relato do Douglas: "Not allowed to open url
+  // ms-settings:appsfeatures" ao clicar): "opener:default"
+  // (src-tauri/capabilities/default.json) só libera mailto:/tel:/https:/
+  // http: (permissão opener:allow-default-urls). A correção anterior tinha
+  // adicionado `opener:allow-open-url` **sem escopo** — e, como
+  // `opener:allow-open-path` já mostrava ao lado (`{"path": "$CONFIG/**"}`),
+  // uma permissão de URL sem escopo não libera URL nenhuma além do que o
+  // escopo padrão já cobre; precisa do mesmo formato de objeto, com
+  // `{"url": "ms-settings:*"}`. Sem isso o Tauri recusa "Not allowed to open
+  // url" antes de sequer chegar no Windows.
   async function openWindowsUninstall() {
     setUninstallError(null);
     try {
