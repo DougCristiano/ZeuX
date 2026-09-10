@@ -134,6 +134,11 @@ func TestScrapeBatchPartialSuccess(t *testing.T) {
 	mux.HandleFunc("/images/upload/t_cover_big/abcd1234.jpg", imageEndpoint())
 	fakeIGDBServer(t, mux)
 
+	// Fake do libretro-thumbnails que responde 404 a tudo: força os dois jogos
+	// a cair para o IGDB de forma determinística, sem tocar a rede real
+	// (FetchLibretroThumbnail agora tenta várias variações do nome).
+	fakeLibretroThumbnailsServer(t, http.NewServeMux())
+
 	manager := NewScrapeManager(lib, credsStore, silentLogger())
 	job, err := manager.Start(context.Background(), nil)
 	if err != nil {
@@ -382,6 +387,10 @@ func TestScrapeStartWhileRunningRefuses(t *testing.T) {
 	})
 	mux.HandleFunc("/v4/games", gamesEndpoint(t, nil))
 	fakeIGDBServer(t, mux)
+	// 404 em tudo no libretro-thumbnails: o jogo semeado precisa chegar ao
+	// caminho do IGDB (a autenticação segurada por `block`) sem depender da
+	// rede real.
+	fakeLibretroThumbnailsServer(t, http.NewServeMux())
 
 	manager := NewScrapeManager(lib, credsStore, silentLogger())
 	first, err := manager.Start(context.Background(), nil)

@@ -13,6 +13,12 @@
 // que a maior parte das ROMs em circulação já vem nomeada, então não exige
 // nada novo do usuário.
 //
+// Para coleções nomeadas à mão (sem a etiqueta de região, "God of War I" em
+// vez de "God of War", "&" no lugar de "_"), FetchLibretroThumbnail tenta um
+// leque de variações do nome — ver libretroNameCandidates — antes de desistir
+// e deixar o IGDB assumir. É o que impede o IGDB de virar, na prática, a
+// fonte primária (relato do Douglas, 2026-09-09).
+//
 // Decisão de arquitetura (Douglas, 2026-09-06): fica dentro deste pacote em
 // vez de um pacote novo — as duas fontes resolvem o mesmo problema (capa de
 // jogo) e compartilham infraestrutura (checkHost/httpClient/downloadImage,
@@ -40,6 +46,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // var, não const, pelo mesmo motivo de twitchTokenURL/igdbAPIBase/
@@ -115,35 +122,147 @@ var libretroSystemFolders = map[string]string{
 	"xbox360":      "Microsoft - Xbox 360",
 }
 
+// libretroRegionTags são as etiquetas de região/idioma mais comuns da
+// convenção No-Intro, em ordem aproximada de frequência. O libretro-thumbnails
+// indexa a capa pelo nome de arquivo No-Intro *com* a etiqueta ("Super Mario
+// World (USA).png"), mas uma ROM organizada à mão quase nunca a carrega
+// ("Super Mario World"). libretroNameCandidates anexa cada uma destas ao
+// título nu para cobrir esse caso — a causa mais comum de a capa "não ser
+// achada" e o lote cair pro IGDB (relato do Douglas, 2026-09-09).
+var libretroRegionTags = []string{
+	"(USA)",
+	"(World)",
+	"(USA, Europe)",
+	"(Europe)",
+	"(Japan, USA)",
+	"(Japan)",
+}
+
+// libretroSanitizeReplacer espelha a regra de nomeação do repositório
+// libretro-thumbnails: estes caracteres do título viram "_" no nome do
+// arquivo publicado (ex.: "Sonic & Knuckles" -> "Sonic _ Knuckles.png").
+// Sem aplicar a mesma troca antes de montar a URL, todo jogo com um desses
+// caracteres no nome erraria o caminho.
+var libretroSanitizeReplacer = strings.NewReplacer(
+	"&", "_", "*", "_", "/", "_", ":", "_", "`", "_",
+	"<", "_", ">", "_", "?", "_", `\`, "_", "|", "_", `"`, "_",
+)
+
+// libretroNameCandidates devolve, em ordem de tentativa, os nomes de arquivo a
+// experimentar em libretro-thumbnails para romName (nome do arquivo da ROM sem
+// extensão). A primeira entrada é sempre o nome exato — o comportamento
+// antigo; as seguintes são variações que cobrem coleções nomeadas fora da
+// convenção No-Intro estrita.
+func libretroNameCandidates(romName string) []string {
+	romName = strings.TrimSpace(romName)
+
+	// Formas "base" do título, cada uma depois combinada com as etiquetas de
+	// região. Ordem importa: a primeira base é a mais provável.
+	bases := []string{romName}
+
+	// Um numeral romano "I" solto no fim ("God of War I") costuma ser adição
+	// de quem organizou a coleção — o primeiro título de uma série no No-Intro
+	// (e no libretro-thumbnails) não leva o "I" ("God of War"). "II"/"III"/…
+	// são reais e não são tocados.
+	if strings.HasSuffix(romName, " I") && !strings.HasSuffix(romName, " II") {
+		bases = append(bases, strings.TrimSuffix(romName, " I"))
+	}
+
+	// Nome que já traz uma etiqueta entre parênteses: tenta também sem ela.
+	// Cobre etiqueta à moda antiga ("(U)", "(E)") que não bate com a do
+	// repositório, e a etiqueta é então re-anexada da lista canônica abaixo.
+	if stripped := stripTrailingParenTags(romName); stripped != "" && stripped != romName {
+		bases = append(bases, stripped)
+	}
+
+	seen := make(map[string]bool)
+	var out []string
+	add := func(name string) {
+		name = libretroSanitizeReplacer.Replace(strings.TrimSpace(name))
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+
+	for _, base := range bases {
+		add(base) // nome exato desta base primeiro
+		if hasTrailingParenTag(base) {
+			continue // já tem etiqueta própria; não empilha região por cima
+		}
+		for _, tag := range libretroRegionTags {
+			add(base + " " + tag)
+		}
+	}
+	return out
+}
+
+func hasTrailingParenTag(name string) bool {
+	return strings.HasSuffix(strings.TrimSpace(name), ")")
+}
+
+// stripTrailingParenTags remove uma ou mais etiquetas "(...)" grudadas no fim
+// do nome ("Jogo (USA) (Rev 1)" -> "Jogo"). Não mexe em parênteses no meio do
+// título ("Tom Clancy's ... (2002)" no meio ficaria, mas No-Intro não nomeia
+// assim — etiqueta é sempre sufixo).
+func stripTrailingParenTags(name string) string {
+	name = strings.TrimSpace(name)
+	for strings.HasSuffix(name, ")") {
+		open := strings.LastIndex(name, "(")
+		if open < 0 {
+			break
+		}
+		name = strings.TrimSpace(name[:open])
+	}
+	return name
+}
+
 // FetchLibretroThumbnail tenta baixar a capa de romName (nome de arquivo da
 // ROM sem extensão, mas COM as etiquetas de região/revisão que
 // library.TitleFromFilename remove pra exibição — ex. "Super Mario Bros.
 // (World)", não "Super Mario Bros") para consoleID, gravando em destPath.
+// Tenta, em ordem, o nome exato e depois as variações de libretroNameCandidates
+// (etiqueta de região anexada, "&" -> "_", etc.) — para na primeira que existir.
 //
 // Devolve (false, nil) sempre que a busca não é possível ou não achou nada
-// — console fora de libretroSystemFolders, ou a imagem não existe lá (404).
-// Nenhum dos dois é erro: cabe a quem chama (scrape.go) seguir para o IGDB
-// em qualquer um dos casos. Só uma falha de rede de verdade, ou resposta
-// grande demais, vira erro.
+// — console fora de libretroSystemFolders, ou nenhuma variação existe lá
+// (404 em todas). Nenhum dos dois é erro: cabe a quem chama (scrape.go)
+// seguir para o IGDB em qualquer um dos casos. Só uma falha de rede de
+// verdade, ou resposta grande demais, vira erro — e, mesmo assim, só depois
+// de todas as variações falharem, para não abortar por um soluço de rede numa
+// única tentativa.
 func FetchLibretroThumbnail(ctx context.Context, consoleID, romName, destPath string) (bool, error) {
 	folder, ok := libretroSystemFolders[consoleID]
 	if !ok {
 		return false, nil
 	}
 
-	reqURL := fmt.Sprintf("%s/%s/%s/%s.png",
-		libretroThumbnailsBase,
-		url.PathEscape(folder),
-		libretroThumbnailCategory,
-		url.PathEscape(romName),
-	)
+	var firstErr error
+	for _, name := range libretroNameCandidates(romName) {
+		reqURL := fmt.Sprintf("%s/%s/%s/%s.png",
+			libretroThumbnailsBase,
+			url.PathEscape(folder),
+			libretroThumbnailCategory,
+			url.PathEscape(name),
+		)
 
-	status, err := downloadImage(ctx, reqURL, destPath)
-	if err != nil {
-		return false, fmt.Errorf("baixando capa do libretro-thumbnails: %w", err)
+		status, err := downloadImage(ctx, reqURL, destPath)
+		if err != nil {
+			// Guarda a primeira falha de rede e segue: outra variação ainda
+			// pode funcionar. Só propaga se nenhuma funcionar.
+			if firstErr == nil {
+				firstErr = fmt.Errorf("baixando capa do libretro-thumbnails: %w", err)
+			}
+			continue
+		}
+		if status == http.StatusOK {
+			return true, nil
+		}
 	}
-	if status != http.StatusOK {
-		return false, nil
+
+	if firstErr != nil {
+		return false, firstErr
 	}
-	return true, nil
+	return false, nil
 }

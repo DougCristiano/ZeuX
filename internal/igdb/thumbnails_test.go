@@ -105,6 +105,99 @@ func TestLibretroSystemFoldersCoversAuditedConsoles(t *testing.T) {
 	}
 }
 
+// serveOneThumbnail sobe um fake que só responde 200 no caminho want (com o
+// conteúdo dado) e 404 em qualquer outro — o suficiente para checar qual
+// variação de nome FetchLibretroThumbnail acaba acertando.
+func serveOneThumbnail(t *testing.T, want string) []byte {
+	t.Helper()
+	content := []byte("capa-de-mentira")
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != want {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write(content)
+	})
+	fakeLibretroThumbnailsServer(t, mux)
+	return content
+}
+
+// Trava a variação mais importante: uma ROM nomeada sem etiqueta de região
+// ("Super Mario World") ainda acha a capa, que no repositório mora sob o nome
+// No-Intro completo ("Super Mario World (USA)").
+func TestFetchLibretroThumbnailAppendsRegionTag(t *testing.T) {
+	want := serveOneThumbnail(t, "/Nintendo - Super Nintendo Entertainment System/Named_Boxarts/Super Mario World (USA).png")
+
+	dest := filepath.Join(t.TempDir(), "cover.jpg")
+	found, err := FetchLibretroThumbnail(context.Background(), "snes", "Super Mario World", dest)
+	if err != nil {
+		t.Fatalf("FetchLibretroThumbnail: %v", err)
+	}
+	if !found {
+		t.Fatal("esperava achar a capa anexando a etiqueta de região")
+	}
+	got, _ := os.ReadFile(dest)
+	if string(got) != string(want) {
+		t.Fatalf("conteúdo baixado = %q, esperado %q", got, want)
+	}
+}
+
+// Trava a regra de sanitização do libretro-thumbnails: "&" no título vira "_"
+// no nome do arquivo publicado.
+func TestFetchLibretroThumbnailSanitizesSpecialChars(t *testing.T) {
+	serveOneThumbnail(t, "/Sega - Mega Drive - Genesis/Named_Boxarts/Sonic _ Knuckles (World).png")
+
+	found, err := FetchLibretroThumbnail(context.Background(), "megadrive", "Sonic & Knuckles", filepath.Join(t.TempDir(), "cover.jpg"))
+	if err != nil {
+		t.Fatalf("FetchLibretroThumbnail: %v", err)
+	}
+	if !found {
+		t.Fatal(`esperava achar a capa trocando "&" por "_"`)
+	}
+}
+
+// Trava o descarte do numeral romano "I" solto no fim ("God of War I"), que
+// costuma ser adição de quem organizou a coleção — o primeiro título da série
+// não leva o "I" no No-Intro.
+func TestFetchLibretroThumbnailStripsTrailingRomanOne(t *testing.T) {
+	serveOneThumbnail(t, "/Sony - PlayStation 2/Named_Boxarts/God of War (USA).png")
+
+	found, err := FetchLibretroThumbnail(context.Background(), "ps2", "God of War I", filepath.Join(t.TempDir(), "cover.jpg"))
+	if err != nil {
+		t.Fatalf("FetchLibretroThumbnail: %v", err)
+	}
+	if !found {
+		t.Fatal(`esperava achar a capa removendo o " I" final`)
+	}
+}
+
+// "God of War II" não pode virar "God of War I" nem "God of War" — o "II" é
+// parte real do título. Trava o caso vizinho do teste acima.
+func TestLibretroNameCandidatesKeepsRealNumeral(t *testing.T) {
+	for _, name := range libretroNameCandidates("God of War II") {
+		if name == "God of War" || name == "God of War I" {
+			t.Fatalf(`"God of War II" não deveria gerar a variação %q`, name)
+		}
+	}
+}
+
+// A primeira variação é sempre o nome exato — garante que uma coleção já
+// nomeada no padrão No-Intro continua acertando na primeira tentativa, sem
+// requisição extra antes.
+func TestLibretroNameCandidatesExactFirst(t *testing.T) {
+	got := libretroNameCandidates("Chrono Trigger (USA)")
+	if len(got) == 0 || got[0] != "Chrono Trigger (USA)" {
+		t.Fatalf("primeira variação = %v, esperava o nome exato", got)
+	}
+	// Nome que já tem etiqueta não deve ganhar região empilhada por cima.
+	for _, name := range got {
+		if strings.Contains(name, ") (") {
+			t.Fatalf("não deveria empilhar etiqueta de região: %q", name)
+		}
+	}
+}
+
 // 404 (arquivo não existe pra este jogo específico) é resultado normal desta
 // fonte, não erro — quem chama (scrape.go) precisa poder seguir pro IGDB
 // sem tratar isto como falha.
