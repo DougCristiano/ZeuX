@@ -306,7 +306,17 @@ export function ConsolesScreen({
 
       {error && <InlineError>{error}</InlineError>}
 
-      <div className="flex flex-col gap-3">
+      {/* 2026-09-10 (achado do Douglas: "os filtros de console continuam os
+          mesmos, tem 3 linhas de filtro" — a régua desta tela, não a
+          LibraryToolbar, que foi o que a rodada anterior mexeu por engano).
+          Mesmo tratamento que `LibraryToolbar` já ganhou: um chassi único
+          (borda + `bg-fill/60`) em vez de três blocos soltos flutuando na
+          tela sem nada que diga que são o mesmo painel, e a régua de
+          catálogo (fabricante + época + "tenho jogos") virou UMA fileira
+          rolável na horizontal em vez de duas que quebravam em várias linhas
+          — nunca mais que duas linhas ao todo (prontidão + catálogo),
+          independente de quantos consoles/fabricantes o catálogo tiver. */}
+      <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-fill/60 px-3 py-2.5">
         <div className="flex flex-wrap items-center gap-3">
           <label htmlFor="consoles-search" className="sr-only">
             {t("searchConsoleOrEmulator")}
@@ -332,7 +342,10 @@ export function ConsolesScreen({
           )}
         </div>
 
-        {/* Régua 1 — prontidão: "o que falta montar". */}
+        {/* Fileira 1 — prontidão: "o que falta montar". Primária, por isso
+            fica dentro do chassi sem rótulo próprio (o `<select>`/rótulo
+            "TODOS 33" já se explica) e sem rolagem — 6 chips no máximo,
+            cabe numa linha em qualquer largura que a régua já suporta. */}
         <div className="flex flex-wrap gap-1.5">
           {READINESS_FILTERS.map((item) => {
             const total = readinessCount.get(item.id) ?? 0;
@@ -356,63 +369,72 @@ export function ConsolesScreen({
           })}
         </div>
 
-        {/* Régua 2 — catálogo: fabricante, época e "tenho jogos". Separada da
-            de cima de propósito: juntas virariam uma parede de doze chips onde
-            "falta core" e "Sega" leriam como o mesmo tipo de recorte. */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 font-mono text-[11px] tracking-wide text-muted uppercase">{t("filterByMaker")}</span>
-          {FAMILY_ORDER.map((fam) => {
-            const total = familyCount.get(fam) ?? 0;
-            if (total === 0) return null;
-            const on = familyFilter === fam;
-            const color = consoleFamilyColor(fam);
-            return (
-              <button
-                key={fam}
-                type="button"
-                onClick={() => setFamilyFilter(on ? null : fam)}
-                aria-pressed={on}
-                // Chip de fabricante ativo pega a cor da família (a mesma fonte
-                // que pinta os cards) — `var(--fam)` é a parte dinâmica, a
-                // classe arbitrária compila normalmente.
-                style={on ? ({ "--fam": color } as CSSProperties) : undefined}
-                className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${
-                  on
-                    ? "border-[var(--fam)] bg-[color-mix(in_srgb,var(--fam)_14%,transparent)] text-ink shadow-[0_0_14px_-4px_var(--fam)]"
-                    : FILTER_CHIP_OFF
-                }`}
-              >
-                {(FAMILY_LABEL[fam] || t("familyOther")).toUpperCase()}
-              </button>
-            );
-          })}
-        </div>
+        {/* Fileira 2 — catálogo: fabricante + época + "tenho jogos", juntos
+            numa única linha rolável (nunca quebra em uma terceira/quarta
+            linha, por mais fabricante que o catálogo ganhe). Separada da
+            fileira de prontidão por um divisor: "o que falta montar" e
+            "que fatia do catálogo eu quero ver" são perguntas diferentes,
+            liam como o mesmo tipo de recorte quando empilhadas soltas. */}
+        <div className="-mx-3 flex items-center gap-2 border-t border-line/60 px-3 pt-2.5">
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+            <span className="mr-0.5 shrink-0 font-mono text-[11px] tracking-wide text-muted uppercase">
+              {t("filterByMaker")}
+            </span>
+            {FAMILY_ORDER.map((fam) => {
+              const total = familyCount.get(fam) ?? 0;
+              if (total === 0) return null;
+              const on = familyFilter === fam;
+              const color = consoleFamilyColor(fam);
+              return (
+                <button
+                  key={fam}
+                  type="button"
+                  onClick={() => setFamilyFilter(on ? null : fam)}
+                  aria-pressed={on}
+                  // Chip de fabricante ativo pega a cor da família (a mesma fonte
+                  // que pinta os cards) — `var(--fam)` é a parte dinâmica, a
+                  // classe arbitrária compila normalmente.
+                  style={on ? ({ "--fam": color } as CSSProperties) : undefined}
+                  className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${
+                    on
+                      ? "border-[var(--fam)] bg-[color-mix(in_srgb,var(--fam)_14%,transparent)] text-ink shadow-[0_0_14px_-4px_var(--fam)]"
+                      : FILTER_CHIP_OFF
+                  }`}
+                >
+                  {(FAMILY_LABEL[fam] || t("familyOther")).toUpperCase()}
+                </button>
+              );
+            })}
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 font-mono text-[11px] tracking-wide text-muted uppercase">{t("filterByEra")}</span>
-          {ERA_ORDER.map((era) => {
-            const on = eraFilter === era;
-            const label = { "70s-80s": t("era70s80s"), "90s": t("era90s"), "2000s": t("era2000s"), "2010+": t("era2010plus") }[era];
-            return (
-              <button
-                key={era}
-                type="button"
-                onClick={() => setEraFilter(on ? null : era)}
-                aria-pressed={on}
-                className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${on ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
-              >
-                {label.toUpperCase()}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setOnlyWithGames((v) => !v)}
-            aria-pressed={onlyWithGames}
-            className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${onlyWithGames ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
-          >
-            {t("filterOnlyWithGames").toUpperCase()}
-          </button>
+            <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-line" />
+
+            <span className="mr-0.5 shrink-0 font-mono text-[11px] tracking-wide text-muted uppercase">
+              {t("filterByEra")}
+            </span>
+            {ERA_ORDER.map((era) => {
+              const on = eraFilter === era;
+              const label = { "70s-80s": t("era70s80s"), "90s": t("era90s"), "2000s": t("era2000s"), "2010+": t("era2010plus") }[era];
+              return (
+                <button
+                  key={era}
+                  type="button"
+                  onClick={() => setEraFilter(on ? null : era)}
+                  aria-pressed={on}
+                  className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${on ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
+                >
+                  {label.toUpperCase()}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setOnlyWithGames((v) => !v)}
+              aria-pressed={onlyWithGames}
+              className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${onlyWithGames ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
+            >
+              {t("filterOnlyWithGames").toUpperCase()}
+            </button>
+          </div>
         </div>
       </div>
 
