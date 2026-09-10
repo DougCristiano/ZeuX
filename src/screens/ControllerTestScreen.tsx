@@ -278,7 +278,7 @@ export function ControllerTestScreen({ onBack }: { onBack: () => void }) {
           )}
         </>
       ) : (
-        <Callout label="—" className="mb-4">
+        <Callout label={t("controllerStatusLabel")} className="mb-4">
           {t("noController")}
         </Callout>
       )}
@@ -299,7 +299,7 @@ export function ControllerTestScreen({ onBack }: { onBack: () => void }) {
         <p className="max-w-prose text-sm text-muted">{testing ? t("testingActiveHint") : t("idleHint")}</p>
       </div>
 
-      <Card>
+      <Card filled>
         <ControllerDiagram snapshot={snapshot} />
       </Card>
 

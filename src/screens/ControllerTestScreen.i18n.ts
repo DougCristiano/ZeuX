@@ -87,4 +87,10 @@ export const dict = {
     "pt-BR": "Navegação por botões suspensa. Use 'Parar teste' ou o mouse/teclado para sair.",
     en: "Button navigation is suspended. Use 'Stop test' or mouse/keyboard to exit.",
   },
+  // Rótulo do bloco que reporta a situação do controle. Era "—" literal, que
+  // não diz nada a quem lê a tela nem a um leitor de tela.
+  controllerStatusLabel: {
+    "pt-BR": "Situação",
+    en: "Status",
+  },
 } satisfies Dict;

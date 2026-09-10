@@ -358,6 +358,38 @@ export function AmbientGlow({ opacity = 14 }: { opacity?: number }) {
 }
 
 /**
+ * "Céu" da tela (2026-09-10, achado do critico-design: o glow do shell é
+ * uniforme e não varia por tela, então o app inteiro continua lendo como
+ * "preto parelho").
+ *
+ * Diferente do `AmbientGlow`, que fica ancorado na JANELA e vale para todas as
+ * fases: este halo é ancorado no TOPO DO CONTEÚDO da tela — é o degrau que faz
+ * uma tela parecer diferente da anterior ao trocar de item na sidebar.
+ *
+ * A fórmula do gradiente é a mesma já calibrada no cabeçalho de
+ * `ConsoleDetailScreen` (`radial-gradient` + `color-mix` sobre a cor de
+ * identidade), só com a âncora no topo e a porcentagem mais baixa: o próprio
+ * crítico avisou que acima de ~10-12% isso lê como "sujo", não como clima.
+ *
+ * `accent` opcional: telas que têm uma cor de console usam a dela; sem isso
+ * cai no roxo `--accent` do tema. Decorativo, `aria-hidden`, nunca sobre
+ * texto medido — o pai precisa ser `relative`, e o conteúdo da tela vem
+ * depois no DOM.
+ */
+export function ScreenAtmosphere({ accent, opacity = 12 }: { accent?: string; opacity?: number }) {
+  const color = accent ?? "var(--accent)";
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 top-0 h-[420px]"
+      style={{
+        background: `radial-gradient(55% 35% at 50% 0%, color-mix(in srgb, ${color} ${opacity}%, transparent), transparent 70%)`,
+      }}
+    />
+  );
+}
+
+/**
  * N3 (docs/roadmap.md, Sprint N): antes, cada tela escolhia seu próprio teto
  * de largura e seu próprio espaçamento de topo — conferido por `grep`, eram
  * seis valores diferentes (`max-w-6xl`, `max-w-7xl`, `max-w-5xl`,

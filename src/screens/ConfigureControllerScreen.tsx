@@ -328,7 +328,7 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
         </Callout>
       )}
 
-      <Card>
+      <Card filled>
         <div className="relative mx-auto w-full max-w-xl">
           <img
             src={controllerPhoto}

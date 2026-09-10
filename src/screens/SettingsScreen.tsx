@@ -7,7 +7,7 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
-import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, InlineError, inputClass, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
+import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, InlineError, inputClass, ScreenAtmosphere, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
@@ -268,16 +268,18 @@ export function SettingsScreen({
   }
 
   return (
-    <ScreenContainer variant="listing">
+    <ScreenContainer variant="listing" className="relative">
+      {/* Céu da tela (2026-09-10) — halo ancorado no topo do conteúdo. */}
+      <ScreenAtmosphere />
       {toastMessage && <Toast message={toastMessage} />}
       <ScreenHeader title={t("title")} />
 
-      <Card className="mb-6">
+      <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("languageLabel")}</SectionHeading>
         <LanguageSelector />
       </Card>
 
-      <Card className="mb-6">
+      <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("tourHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">{t("tourDescription")}</p>
         <Button variant="chrome" className="w-fit" onClick={onReplayTour}>
@@ -285,7 +287,7 @@ export function SettingsScreen({
         </Button>
       </Card>
 
-      <Card className="mb-6">
+      <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("updatesHeading")}</SectionHeading>
         <p className="mb-1 text-sm text-muted">{t("updatesDescription")}</p>
         {appVersion && <p className="mb-4 text-sm text-muted">{t("currentVersion", { version: appVersion })}</p>}
@@ -318,7 +320,7 @@ export function SettingsScreen({
         </div>
       </Card>
 
-      <Card className="mb-6">
+      <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("controllersHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">{t("controllersDescription")}</p>
 
@@ -389,7 +391,7 @@ export function SettingsScreen({
           })()}
       </Card>
 
-      <Card className="mb-6">
+      <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("installationHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">
           {t("installationDescription")}
@@ -413,7 +415,7 @@ export function SettingsScreen({
         )}
       </Card>
 
-      <Card className="mb-6">
+      <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("uninstallHeading")}</SectionHeading>
 
         {systemInfo.kind === "loaded" && systemInfo.info.os === "windows" && (
@@ -442,7 +444,7 @@ export function SettingsScreen({
         )}
       </Card>
 
-      <Card>
+      <Card filled>
         <SectionHeading className="mb-2">{t("igdbHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">
           {t("igdbDescription")}

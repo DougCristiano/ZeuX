@@ -11,6 +11,7 @@ import {
   FOCUS_RING,
   InlineError,
   inputClass,
+  ScreenAtmosphere,
   ScreenContainer,
   ScreenHeader,
   SectionHeading,
@@ -352,7 +353,9 @@ export function ConsolesScreen({
   }
 
   return (
-    <ScreenContainer variant="listing">
+    <ScreenContainer variant="listing" className="relative">
+      {/* Céu da tela (2026-09-10) — halo ancorado no topo do conteúdo. */}
+      <ScreenAtmosphere />
       <ScreenHeader
         title={t("consoles")}
         subtitle={t("consolesDescription")}

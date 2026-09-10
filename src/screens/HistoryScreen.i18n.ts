@@ -12,6 +12,11 @@ export const dict = {
   // "em <console>" — frase descritiva, nunca "você só jogou X" (princípio 2).
   playtimeOnConsole: { "pt-BR": "{{time}} em {{console}}", en: "{{time}} on {{console}}" },
   playedOn: { "pt-BR": "{{console}} · jogado em {{date}}", en: "{{console}} · played on {{date}}" },
+  // 2026-09-10: o painel de tempo virou o primeiro objeto da tela, então o
+  // rótulo dele deixou de ser um título de seção genérico ("Tempo de jogo") e
+  // passou a dizer o recorte — o ranking abaixo é por console.
+  byConsoleHeading: { "pt-BR": "Por console", en: "By console" },
+  seeAllGames: { "pt-BR": "Ver todos os jogos", en: "See all games" },
   loading: { "pt-BR": "Carregando o histórico…", en: "Loading history…" },
   empty: {
     "pt-BR": "O histórico aparece aqui depois que você abrir o primeiro jogo.",

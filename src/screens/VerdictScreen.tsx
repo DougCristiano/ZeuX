@@ -76,7 +76,7 @@ function SpecsPanel() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <Card filled>
-        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("system")}</p>
+        <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">{t("system")}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
           <dt className="text-muted">{t("platform")}</dt>
           <dd className="text-ink">{hardware.os.platform}</dd>
@@ -88,7 +88,7 @@ function SpecsPanel() {
       </Card>
 
       <Card filled>
-        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("processor")}</p>
+        <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">{t("processor")}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
           <dt className="text-muted">{t("model")}</dt>
           <dd className="text-ink">{hardware.cpu.model}</dd>
@@ -106,7 +106,7 @@ function SpecsPanel() {
       </Card>
 
       <Card filled>
-        <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("memory")}</p>
+        <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">{t("memory")}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
           <dt className="text-muted">{t("total")}</dt>
           <dd className="text-ink">{formatBytes(hardware.memory.total_bytes, t("unknown"))}</dd>
@@ -118,7 +118,7 @@ function SpecsPanel() {
       {hardware.gpus && hardware.gpus.length > 0 ? (
         hardware.gpus.map((gpu, i) => (
           <Card filled key={`${gpu.model}-${i}`}>
-            <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">
+            <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">
               {t("gpuCard")}{hardware.gpus!.length > 1 ? ` ${i + 1}` : ""}
             </p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
@@ -143,7 +143,7 @@ function SpecsPanel() {
         ))
       ) : (
         <Card filled>
-          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("gpuCard")}</p>
+          <p className="mb-2 font-mono text-xs tracking-wide text-muted uppercase">{t("gpuCard")}</p>
           <p className="text-sm text-muted">{t("gpuNotIdentified")}</p>
         </Card>
       )}
@@ -155,7 +155,7 @@ function SpecsPanel() {
       {hardware.displays && hardware.displays.length > 0 ? (
         hardware.displays.map((display, i) => (
           <Card filled key={`${display.name ?? "tela"}-${i}`}>
-            <p className="mb-3 font-pixel text-[11px] tracking-wide text-muted uppercase">
+            <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">
               {t("display")}{hardware.displays!.length > 1 ? ` ${i + 1}` : ""}
             </p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
@@ -191,7 +191,7 @@ function SpecsPanel() {
         ))
       ) : (
         <Card filled>
-          <p className="mb-2 font-pixel text-[11px] tracking-wide text-muted uppercase">{t("display")}</p>
+          <p className="mb-2 font-mono text-xs tracking-wide text-muted uppercase">{t("display")}</p>
           <p className="text-sm text-muted">{t("displayNotIdentified")}</p>
         </Card>
       )}

@@ -724,7 +724,29 @@ function App() {
         {/* `tabIndex={-1}`: não entra na ordem de Tab, mas pode receber foco
             por script — é o alvo para onde a abertura devolve o foco ao sair
             (ver `SplashScreen.onDone`, acima). */}
-        <main ref={mainRef} tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
+        {/* 2026-09-10 (achado do critico-design, "céu variável"): o chassi era
+            preto parelho de cima a baixo. Um degradê vertical curto — `--panel`
+            no topo, dissolvendo em `--paper` a 35% da altura — dá horizonte ao
+            conteúdo sem faixa visível: os dois tokens são vizinhos na paleta
+            recalibrada (index.css), então a transição lê como profundidade, não
+            como banda. `background-attachment: local` prende o degrau ao topo do
+            CONTEÚDO, não da janela — rolando uma grade longa o céu sobe junto,
+            em vez de ficar colado na moldura. */}
+        <main
+          ref={mainRef}
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto outline-none"
+          style={{
+            backgroundImage: "linear-gradient(to bottom, var(--panel), var(--paper) 35%)",
+            backgroundRepeat: "no-repeat",
+            backgroundAttachment: "local",
+            // Altura fixa, não `%`: com `local` a área de fundo é a do conteúdo
+            // ROLÁVEL inteiro — uma porcentagem esticaria o degradê por 35% de
+            // uma grade de 4000px e viraria um tingimento parelho, exatamente o
+            // que este item existe para evitar.
+            backgroundSize: "100% 480px",
+          }}
+        >
           {screen}
         </main>
         {gamepadToast && <Toast message={gamepadToast} />}

@@ -106,6 +106,7 @@ function EmulatorOptionCard({
 
   return (
     <Card
+      filled
       className="flex flex-col gap-3"
       // Barra esquerda de 3px, não a borda inteira em roxo (2026-09-07): o
       // contorno roxo fechado lia como "selecionado/em foco", competindo com o

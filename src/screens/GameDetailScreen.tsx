@@ -904,7 +904,7 @@ export function GameDetailScreen({
         <div className={`flex flex-col gap-6 ${verdict ? "" : "lg:col-span-3"}`}>
           <section>
             <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
-            <Card>
+            <Card filled>
               {/* Empilhado em linhas rotuladas, não em três colunas: na
                   coluna estreita da grade os valores ("nunca jogado",
                   "07/09/2026 21:14") quebravam em duas linhas cada um e
@@ -945,7 +945,7 @@ export function GameDetailScreen({
               CLAUDE.md — só revela o que já está no disco do usuário). */}
           <section>
             <SectionHeading className="mb-3">{t("fileHeading")}</SectionHeading>
-            <Card>
+            <Card filled>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
                   <Button variant="chrome" onClick={openGameFolder} className="w-fit">
@@ -981,7 +981,7 @@ export function GameDetailScreen({
             <SectionHeading className="mb-3">
               {excluded ? t("restoreHeading") : t("removeHeading")}
             </SectionHeading>
-            <Card>
+            <Card filled>
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-muted">
                   {excluded ? t("restoreToLibraryHelp") : t("removeFromLibraryHelp")}
