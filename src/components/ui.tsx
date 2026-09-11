@@ -183,6 +183,55 @@ export function ZeuXMark({
 }
 
 /**
+ * Lockup de abertura da Biblioteca: a marca (`ZeuXMark`, o mesmo PNG de
+ * sempre) + o NOME tratado tipograficamente.
+ *
+ * 2026-09-11, pedido do Douglas depois de ver o mockup H: "a logo do zeux
+ * permanece a mesma mas gostei de como ficou o nome". O que o mockup fazia
+ * com o wordmark e o app não fazia em lugar nenhum: escala grande, as duas
+ * sílabas em cores diferentes ("ZEU" na tinta do texto, o "X" no acento) e
+ * uma sombra dura deslocada, que é o que dá o ar de cartaz/gibi em vez de
+ * título de página. Aqui a sombra dura vira o próprio vocabulário do app —
+ * roxo `--accent` deslocado 3px, a cor que já significa "a marca/você age" —
+ * em vez do rosa do mockup, que não existe na paleta.
+ *
+ * O raio ao lado não é um desenho novo de mascote: é um acento gráfico de
+ * 1 glifo, na mesma língua do raio que a própria logo já carrega. A imagem
+ * do busto de Zeus continua sendo `ZeuXMark`, intocada — o pedido era
+ * explícito quanto a isso.
+ *
+ * Vive aqui (e não numa tela) porque é marca, vizinha de `ZeuXMark`; por
+ * ora só a Home a usa — as outras telas continuam abrindo com
+ * `ScreenHeader`, que não muda.
+ */
+export function ZeuXWordmark({ tagline }: { tagline?: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <ZeuXMark size={64} />
+      <div className="min-w-0">
+        <p
+          className="font-pixel text-xl leading-none tracking-[0.06em] text-ink"
+          // Sombra dura (sem blur) em vez de `text-shadow` suave: pixel font
+          // com sombra borrada perde a borda reta que é a identidade.
+          style={{ textShadow: "3px 3px 0 var(--accent)" }}
+        >
+          ZEU
+          <span className="text-accent-secondary">X</span>
+        </p>
+        {tagline && (
+          <p className="mt-2 flex items-center gap-1.5 font-mono text-xs tracking-[0.18em] text-muted uppercase">
+            <svg width="9" height="12" viewBox="0 0 9 12" aria-hidden="true" className="shrink-0">
+              <path d="M5 0 0 7h3l-1 5 6-8H5l1.6-4z" fill="var(--amber)" />
+            </svg>
+            {tagline}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Régua de chips de filtro — canto reto, borda de 1.5px que lê como chassi,
  * rótulo monoespaçado em caixa alta e o friso interno de 1px no topo (luz
  * vindo de cima). Estava só em `ConsolesScreen`; `AllGamesScreen` reescrevia a
