@@ -6,6 +6,18 @@ export const dict = {
   // Language section
   languageLabel: { "pt-BR": "Idioma", en: "Language" },
 
+  // Visual effects section (B6, docs/pendencias.md) — intensidade de
+  // scanline/glow, não paleta de cor (por isso "Efeitos visuais", não "Tema").
+  visualEffectsHeading: { "pt-BR": "Efeitos visuais", en: "Visual effects" },
+  visualEffectsDescription: {
+    "pt-BR":
+      "Controla scanlines e o brilho ambiente de fundo (decoração CRT) — não muda o tema, que continua escuro. O sistema operacional também pode reduzir isto sozinho quando \"mais contraste\" está ativado.",
+    en:
+      "Controls scanlines and the ambient background glow (CRT decoration) — this does not change the theme, which stays dark either way. The operating system can also reduce this on its own when \"increase contrast\" is on.",
+  },
+  visualEffectsFull: { "pt-BR": "Completo", en: "Full" },
+  visualEffectsReduced: { "pt-BR": "Reduzido", en: "Reduced" },
+
   // Updates section
   updatesHeading: { "pt-BR": "Atualizações", en: "Updates" },
   tourHeading: { "pt-BR": "Apresentação", en: "Walkthrough" },

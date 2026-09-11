@@ -12,6 +12,7 @@ import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
 import { useGamepad } from "../hooks/useGamepad";
+import { useVisualEffects } from "../hooks/useVisualEffects";
 
 // Instruções fixas por adapter (2026-09-08) — passos reais confirmados
 // mapeando um controle físico de verdade dentro de cada emulador. Não vem
@@ -74,6 +75,7 @@ export function SettingsScreen({
   onReplayTour: () => void;
 }) {
   const t = useT(dict);
+  const [visualEffects, setVisualEffects] = useVisualEffects();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -282,6 +284,29 @@ export function SettingsScreen({
       <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("languageLabel")}</SectionHeading>
         <LanguageSelector />
+      </Card>
+
+      <Card filled className="mb-6">
+        <SectionHeading className="mb-2">{t("visualEffectsHeading")}</SectionHeading>
+        <p className="mb-4 text-sm text-muted">{t("visualEffectsDescription")}</p>
+        <div role="radiogroup" aria-label={t("visualEffectsHeading")} className="flex w-fit gap-2">
+          <Button
+            type="button"
+            variant={visualEffects === "full" ? "chrome" : "secondary"}
+            aria-pressed={visualEffects === "full"}
+            onClick={() => setVisualEffects("full")}
+          >
+            {t("visualEffectsFull")}
+          </Button>
+          <Button
+            type="button"
+            variant={visualEffects === "reduced" ? "chrome" : "secondary"}
+            aria-pressed={visualEffects === "reduced"}
+            onClick={() => setVisualEffects("reduced")}
+          >
+            {t("visualEffectsReduced")}
+          </Button>
+        </div>
       </Card>
 
       <Card filled className="mb-6">

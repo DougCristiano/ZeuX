@@ -349,7 +349,11 @@ export function AmbientGlow({ opacity = 14 }: { opacity?: number }) {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 overflow-hidden"
+      // `zeux-ambient-glow`: gancho puro de CSS para o bloco de
+      // `prefers-contrast`/`data-visual-effects` em index.css (B6,
+      // docs/pendencias.md) zerar isto por `opacity` — a intensidade em si
+      // continua calculada pela prop `opacity` acima, embutida no gradiente.
+      className="zeux-ambient-glow pointer-events-none absolute inset-0 overflow-hidden"
       style={{
         background: `radial-gradient(60% 50% at 50% 30%, color-mix(in srgb, var(--accent) ${opacity}%, transparent), transparent 70%)`,
       }}
