@@ -188,11 +188,14 @@ func TestCheckHostRejectsUntrustedOrigins(t *testing.T) {
 	}
 }
 
-// Trava a lista de hosts permitidos no valor exato esperado (ADR 0015, R1):
-// buildbot.libretro.com é o único host novo que o download sob demanda de
-// cores do RetroArch deveria justificar. Se este teste falhar porque alguém
-// adicionou um host, é sinal de que a lista cresceu sem essa decisão passar
-// por revisão — ajuste o teste deliberadamente, não só para fazê-lo passar.
+// Trava a lista de hosts permitidos no valor exato esperado (ADR 0015, R1,
+// mais InstallVCRedist): buildbot.libretro.com é o host que o download sob
+// demanda de cores do RetroArch justifica; aka.ms e
+// download.visualstudio.microsoft.com são o encurtador oficial da Microsoft
+// para o Visual C++ Redistributable e o host para onde ele redireciona
+// (vcredist.go). Se este teste falhar porque alguém adicionou um host, é
+// sinal de que a lista cresceu sem essa decisão passar por revisão — ajuste
+// o teste deliberadamente, não só para fazê-lo passar.
 func TestAllowedHostsListIsExactlyTheExpectedSet(t *testing.T) {
 	expected := map[string]bool{
 		"api.github.com":                       true,
@@ -201,6 +204,8 @@ func TestAllowedHostsListIsExactlyTheExpectedSet(t *testing.T) {
 		"release-assets.githubusercontent.com": true,
 		"codeload.github.com":                  true,
 		"buildbot.libretro.com":                true,
+		"aka.ms":                               true,
+		"download.visualstudio.microsoft.com":  true,
 	}
 
 	if len(allowedHosts) != len(expected) {

@@ -44,6 +44,7 @@ JSON (isso desatualiza rápido e o compilador já garante que bate).
 |---|---|
 | `GET /health` | Liveness simples. |
 | `GET /system/info` | Informação do sistema (SO, e o que mais o `zeuxd` souber sobre o ambiente) para a tela de Configurações. |
+| `POST /system/vcredist/install` | Baixa e inicia o instalador oficial do Visual C++ Redistributable (x64) da Microsoft — a ação por trás do botão que aparece quando uma sessão de PS1/PS2 morre com 0xC0000135 (ver `describeExitCode`, `internal/emulator/session.go`). Só em Windows: `400 not_windows` em qualquer outro SO. Não espera o instalador fechar — ele é interativo (UAC, EULA); `200` só confirma que o processo nasceu. **Nunca testado ao vivo contra o instalador real** (`internal/install/vcredist.go`). |
 
 ## 2. Consentimento e hardware
 
@@ -72,6 +73,7 @@ JSON (isso desatualiza rápido e o compilador já garante que bate).
 | `DELETE /emulators/{id}/install` | Desinstala uma instalação gerenciada pelo ZeuX. |
 | `POST /emulators/{id}/open` | Abre o emulador sozinho, sem jogo — o escape manual para quem quer configurar algo que o ZeuX ainda não sabe editar. |
 | `POST /emulators/{id}/managed-dir` | Cria (se preciso) a pasta gerenciada onde o `findBinary` procura este emulador e devolve `{ "path": "<absoluto>" }`. Passo (b) do trilho de instalação manual: a tela abre essa pasta no explorador para o usuário largar ali o download oficial. Não baixa nem instala nada. `404 not_found` para id desconhecido. |
+| `GET /emulators/{id}/save-data` | Onde este adapter guarda memory card e save state nesta máquina, e o que já existe lá (inspeção, não gerência — não apaga nada). `known:false` quando o local não foi verificado ao vivo ainda (hoje só o PCSX2 tem `known:true` — ver `emulator.ResolveSaveDataDirs`). `404 not_found` para id desconhecido. |
 | `GET/POST/DELETE /custom-emulators[/{id}]` | Cadastro manual: usuário aponta um binário que o ZeuX não achou sozinho. `POST` valida que o caminho existe e é executável (`emulator.IsExecutableFile`) antes de aceitar — `400 invalid_definition` caso contrário. |
 | `GET /retroarch/cores` | Status de cada core conhecido do RetroArch: instalado ou não, caminho. |
 | `POST /retroarch/cores/{core}/install` | Baixa um core sob demanda (ADR histórico 0015). `400 core_install_refused` se o core for desconhecido, não tiver download para a plataforma, ou a entrada do manifesto ainda não tiver sido medida (`generated: false`). O SHA256 do manifesto embutido é conferido durante o job: bateu, `checksum_verified: true`; não bateu, o core é instalado mesmo assim (`checksum_verified: false` + `warning` preenchido) — ver `docs/decisoes.md`, "RetroArch: cores baixados sob demanda". |
@@ -142,6 +144,8 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `binary_not_found`, `not_installed`, `emulator_unavailable` | 400 | Emulador exigido não está no disco. |
 | `rom_unavailable` | 400 | ROM referenciada não existe/não é legível. |
 | `command_failed`, `launch_failed`, `open_failed` | 400 | Falha ao montar ou rodar o comando do emulador — quase sempre acionável pelo usuário. |
+| `not_windows`, `vcredist_install_failed` | 400 | `POST /system/vcredist/install` fora do Windows, ou download/execução do instalador falhou. |
+| `save_data_read_failed` | 500 | `GET /emulators/{id}/save-data` não conseguiu ler o diretório de save (permissão, I/O). |
 | `not_configurable`, `not_bindable`, `controller_check_unsupported` | 400 | Emulador sem suporte a config/bindings/checagem de controle pelo ZeuX. |
 | `config_restore_failed`, `config_read_failed`, `config_write_failed` | 400/500 | Config de emulador (leitura, escrita, restauração de backup). |
 | `unknown_controller_profile` | 400 | `profile_id` não reconhecido. |

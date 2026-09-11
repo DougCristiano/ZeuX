@@ -844,6 +844,67 @@ medido há menos de 24h e `checksum_verified` volta a significar algo; o
 **Depende de:** infraestrutura de CI/hospedagem do asset · **Bloqueia:** nada
 (o remendo do `warning` já desbloqueia o usuário)
 
+## Backend pronto, interface pendente: VC++ Redistributable e visão de saves (2026-09-11)
+
+**Origem:** pedido do Douglas na sessão remota de 2026-09-11 (ambiente Linux,
+sem acesso a uma máquina Windows para testar de ponta a ponta).
+
+### VC++ Redistributable — auto-instalação
+
+`internal/install/vcredist.go` (`InstallVCRedist`) e a rota
+`POST /system/vcredist/install` (ver `docs/api.md`) já baixam o instalador
+oficial da Microsoft e o iniciam, com confirmação do usuário sendo o próprio
+clique que dispara a rota. **Nunca testado ao vivo** — foi escrito sem
+Windows disponível; o doc comment da função e a entrada correspondente em
+`decisoes.md` (a fazer quando alguém verificar) carregam essa ressalva.
+
+**Falta:**
+- Testar de verdade numa máquina Windows: o download, a elevação UAC, o
+  instalador abrindo, o comportamento se o runtime já estiver instalado.
+- **Frontend:** o `ErrorModal` de lançamento que mostra a frase de
+  `describeExitCode` (0xC0000135) precisa ganhar um botão "Instalar o
+  Visual C++ Redistributable" que chama a rota nova — hoje o usuário só lê a
+  instrução em texto e precisa achar o link sozinho.
+
+### Ver saves dentro do ZeuX — MVP de inspeção (não gerência)
+
+`internal/emulator/save_data.go` (`ResolveSaveDataDirs`, `ListSaveFiles`) e a
+rota `GET /emulators/{id}/save-data` (ver `docs/api.md`) listam o que existe
+nos diretórios de memory card e save state — hoje só para o **PCSX2**, porque
+é o único cujo local (`memcards`/`sstates` dentro de `pcsx2DataDir()`) foi
+confirmado contra um binário real (docs/decisoes.md, entrada de
+2026-09-11). Todo outro adapter devolve `known:false` de propósito — nenhum
+palpite de caminho, princípio 4.
+
+**Decisão do Douglas:** começar só por listar/inspecionar (memory card e
+save state juntos), sem gerência (apagar/exportar) nesta primeira rodada.
+
+**Falta:**
+- **Frontend:** nenhuma tela consome a rota ainda. Um lugar razoável é uma
+  seção "Saves" em `ConsoleDetailScreen` (ou `EmulatorsScreen`) para
+  consoles cujo adapter resolvido tem `known:true` — mostrando os arquivos
+  com tamanho e data, e a frase honesta de "ainda não sei onde procurar"
+  para o resto.
+- **Ampliar cobertura:** cada adapter novo (DuckStation, RetroArch, Dolphin…)
+  exige o mesmo método já registrado em `pcsx2DataDir()` — rodar o binário
+  de verdade, fotografar antes/depois, documentar em `decisoes.md`. Não dá
+  para fazer isso sem Windows/os binários reais; é trabalho para uma sessão
+  com a máquina do Douglas.
+- Ainda não existe tentativa de casar um arquivo de save com um jogo
+  específico da biblioteca — os nomes de arquivo que cada emulador usa para
+  isso não foram confirmados. A lista hoje é "o que tem na pasta", não "o
+  save deste jogo".
+
+### Outros emuladores mapeados para o onde-clicar-direto
+
+Conferido nesta sessão (`internal/install/firstrun.go`): 13 adapters já têm
+`seedFirstRun` — DuckStation, PCSX2, Dolphin, PPSSPP, Flycast, RPCS3,
+melonDS, Azahar, xemu, Vita3K, Xenia, Cemu, RMG. Quem instala pelo ZeuX hoje
+(`GET /emulator-sources`) e ainda não aparece nessa lista teria assistente
+de primeira execução na cara — não achei nenhum nesta conferência rápida,
+mas vale checar contra `internal/install/data/sources.json` sempre que um
+adapter novo entrar no catálogo de instalação automática.
+
 ## O que fica fora deste documento
 
 - Trabalho já feito, mesmo que recente — isso vive só no código e no

@@ -142,12 +142,14 @@ func (s *Server) Routes() http.Handler {
 	// não é lançamento de jogo, por isso não é /games/launch. Ver
 	// Launcher.LaunchStandalone, internal/emulator/session.go.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/open", s.handleOpenEmulator)
+	mux.HandleFunc("POST /api/v1/system/vcredist/install", s.handleInstallVCRedist)
 	// Trilho guiado de instalação manual (2026-09-09): cria (se ainda não
 	// existir) a pasta onde o findBinary procura este emulador e devolve o
 	// caminho, para a tela abrir no explorador de arquivos. Sem isso, "abrir
 	// a pasta de destino" falha quando ela ainda não existe — que é
 	// justamente o caso de quem nunca instalou o emulador.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/managed-dir", s.handleEnsureManagedDir)
+	mux.HandleFunc("GET /api/v1/emulators/{id}/save-data", s.handleSaveData)
 	// H1/H2 (docs/roadmap.md): configuração persistida do emulador — só
 	// para adapters que satisfazem emulator.ConfigurableAdapter
 	// (PCSX2/RetroArch nesta v1.0, ver Status.Configurable em GET
@@ -624,6 +626,32 @@ func (s *Server) handleOpenEmulator(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"opened": r.PathValue("id")})
 }
 
+// handleInstallVCRedist baixa e inicia o instalador oficial do Visual C++
+// Redistributable (x64) da Microsoft. É a ação por trás do botão que o
+// ErrorModal de lançamento oferece quando a sessão morre com 0xC0000135 —
+// ver describeExitCode em internal/emulator/session.go e InstallVCRedist em
+// internal/install/vcredist.go para o porquê e as ressalvas (nunca testado
+// ao vivo contra o instalador real).
+//
+// Não bloqueia até o instalador fechar: ele é interativo (UAC, EULA), pode
+// ficar aberto por minutos, e a resposta 200 só confirma que o processo
+// nasceu — não que a instalação terminou ou funcionou.
+func (s *Server) handleInstallVCRedist(w http.ResponseWriter, r *http.Request) {
+	if runtime.GOOS != "windows" {
+		s.writeError(w, http.StatusBadRequest, "not_windows",
+			"O runtime do Visual C++ é específico do Windows; este sistema não precisa dele.")
+		return
+	}
+
+	if err := install.InstallVCRedist(r.Context()); err != nil {
+		s.writeError(w, http.StatusBadRequest, "vcredist_install_failed",
+			fmt.Sprintf("Não foi possível instalar o Visual C++ Redistributable: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"started": true})
+}
+
 // handleEnsureManagedDir garante que a pasta gerenciada deste emulador exista
 // e devolve o caminho absoluto. É o passo (b) do trilho de instalação manual:
 // a tela abre essa pasta no explorador para o usuário largar ali o download
@@ -654,6 +682,52 @@ func (s *Server) handleEnsureManagedDir(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"path": dir})
+}
+
+// handleSaveData devolve onde este adapter guarda memory card e save state
+// nesta máquina, e o que já existe lá — "ver os saves dentro do ZeuX", sem
+// fingir que casa cada arquivo com um jogo específico da biblioteca (nenhum
+// formato de nome foi confirmado ainda, ver ResolveSaveDataDirs). É inspeção:
+// a interface mostra a lista, não oferece apagar por aqui.
+//
+// known=false não é erro — é a resposta honesta para todo adapter cujo local
+// de save ainda não foi verificado ao vivo (princípio 4 do CLAUDE.md).
+func (s *Server) handleSaveData(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, ok := s.emulators.ByID(id); !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum emulador com o id %q.", id))
+		return
+	}
+
+	dirs := emulator.ResolveSaveDataDirs(id)
+	if !dirs.Known {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"adapter_id": id,
+			"known":      false,
+			"message":    "O ZeuX ainda não confirmou onde este emulador guarda save neste sistema.",
+		})
+		return
+	}
+
+	memoryCards, err := emulator.ListSaveFiles(dirs.MemoryCardsDir)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "save_data_read_failed", err.Error())
+		return
+	}
+	saveStates, err := emulator.ListSaveFiles(dirs.SaveStatesDir)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "save_data_read_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"adapter_id":       id,
+		"known":            true,
+		"memory_cards_dir": dirs.MemoryCardsDir,
+		"save_states_dir":  dirs.SaveStatesDir,
+		"memory_cards":     memoryCards,
+		"save_states":      saveStates,
+	})
 }
 
 // resolveConfigurableAdapter acha o adapter, confirma que ele está

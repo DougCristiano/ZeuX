@@ -25,9 +25,15 @@ import (
 // URL do manifesto embutido (internal/install/data/retroarch_cores_manifest.json)
 // que apontasse para outro lugar seria recusada aqui do mesmo jeito que uma
 // release de GitHub comprometida seria.
+// aka.ms e download.visualstudio.microsoft.com foram adicionados para
+// InstallVCRedist (vcredist.go): o primeiro é o encurtador oficial da
+// Microsoft para o instalador do Visual C++ Redistributable, o segundo é
+// para onde ele redireciona — CheckRedirect valida os dois saltos.
 var allowedHosts = map[string]bool{
 	"api.github.com":                       true,
 	"github.com":                           true,
+	"aka.ms":                               true,
+	"download.visualstudio.microsoft.com":  true,
 	"objects.githubusercontent.com":        true,
 	"release-assets.githubusercontent.com": true,
 	"codeload.github.com":                  true,
