@@ -150,6 +150,7 @@ func (s *Server) Routes() http.Handler {
 	// justamente o caso de quem nunca instalou o emulador.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/managed-dir", s.handleEnsureManagedDir)
 	mux.HandleFunc("GET /api/v1/emulators/{id}/save-data", s.handleSaveData)
+	mux.HandleFunc("POST /api/v1/emulators/{id}/save-data", s.handleSetSaveData)
 	// H1/H2 (docs/roadmap.md): configuração persistida do emulador — só
 	// para adapters que satisfazem emulator.ConfigurableAdapter
 	// (PCSX2/RetroArch nesta v1.0, ver Status.Configurable em GET
@@ -736,6 +737,56 @@ func (s *Server) handleSaveData(w http.ResponseWriter, r *http.Request) {
 		"memory_cards":     memoryCards,
 		"save_states":      saveStates,
 	})
+}
+
+// handleSetSaveData deixa o usuário escolher, pelo próprio ZeuX, onde este
+// adapter grava memory card e save state — hoje só o RetroArch satisfaz
+// SaveDataConfigurableAdapter (retroarch_config.go). Campo omitido/vazio no
+// corpo volta essa chave para o padrão do próprio emulador (para o
+// RetroArch, "default" — salvar ao lado do jogo), nunca "não mexer".
+func (s *Server) handleSetSaveData(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	adapter, ok := s.emulators.ByID(id)
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum emulador com o id %q.", id))
+		return
+	}
+
+	settable, ok := adapter.(emulator.SaveDataConfigurableAdapter)
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "not_save_data_configurable",
+			fmt.Sprintf("O %s não tem local de save configurável pelo ZeuX ainda.", adapter.Name()))
+		return
+	}
+
+	install, ok := adapter.Locate(r.Context())
+	if !ok {
+		s.writeError(w, http.StatusBadRequest, "not_installed",
+			fmt.Sprintf("O %s não está instalado — instale antes de configurar.", adapter.Name()))
+		return
+	}
+
+	var body struct {
+		MemoryCardsDir string `json:"memory_cards_dir"`
+		SaveStatesDir  string `json:"save_states_dir"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON no formato {"memory_cards_dir": string, "save_states_dir": string}.`)
+		return
+	}
+
+	dirs := emulator.SaveDataDirs{
+		AdapterID:      id,
+		MemoryCardsDir: body.MemoryCardsDir,
+		SaveStatesDir:  body.SaveStatesDir,
+	}
+	if err := settable.SetSaveDataDirs(install, dirs); err != nil {
+		s.writeError(w, http.StatusInternalServerError, "save_data_write_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"saved": true})
 }
 
 // listSaveFilesIfSet evita chamar emulator.ListSaveFiles com dir vazio —

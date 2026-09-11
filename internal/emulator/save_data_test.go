@@ -83,6 +83,69 @@ func TestResolveSaveDataDirsRetroArchWithFixedPaths(t *testing.T) {
 	}
 }
 
+// Trava que SetSaveDataDirs grava as duas chaves com o caminho pedido, e
+// que a pasta de destino é criada — sem depender do RetroArch criar
+// sozinho.
+func TestRetroArchSetSaveDataDirsWritesFixedPaths(t *testing.T) {
+	base := t.TempDir()
+	cfgPath := filepath.Join(base, "retroarch.cfg")
+
+	orig := retroArchConfigPath
+	retroArchConfigPath = func(Installation) (string, error) { return cfgPath, nil }
+	defer func() { retroArchConfigPath = orig }()
+
+	adapter := newRetroArch().(SaveDataConfigurableAdapter)
+
+	memCards := filepath.Join(base, "meus-saves")
+	states := filepath.Join(base, "meus-states")
+	if err := adapter.SetSaveDataDirs(Installation{}, SaveDataDirs{
+		MemoryCardsDir: memCards,
+		SaveStatesDir:  states,
+	}); err != nil {
+		t.Fatalf("SetSaveDataDirs: %v", err)
+	}
+
+	if _, err := os.Stat(memCards); err != nil {
+		t.Fatalf("pasta de memory card deveria ter sido criada: %v", err)
+	}
+	if _, err := os.Stat(states); err != nil {
+		t.Fatalf("pasta de save state deveria ter sido criada: %v", err)
+	}
+
+	dirs := retroArchSaveDataDirs("retroarch", cfgPath)
+	if !dirs.Known {
+		t.Fatal("depois de SetSaveDataDirs com caminho fixo, Known deveria ser true")
+	}
+	if dirs.MemoryCardsDir != memCards || dirs.SaveStatesDir != states {
+		t.Fatalf("caminhos gravados não batem: %+v", dirs)
+	}
+}
+
+// Trava que um campo vazio volta a chave para "default" (sentinela do
+// RetroArch para "ao lado do jogo"), nunca deixa a chave como estava.
+func TestRetroArchSetSaveDataDirsEmptyResetsToDefault(t *testing.T) {
+	base := t.TempDir()
+	cfgPath := filepath.Join(base, "retroarch.cfg")
+	initial := "savefile_directory = \"/algo/fixo\"\n"
+	if err := os.WriteFile(cfgPath, []byte(initial), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := retroArchConfigPath
+	retroArchConfigPath = func(Installation) (string, error) { return cfgPath, nil }
+	defer func() { retroArchConfigPath = orig }()
+
+	adapter := newRetroArch().(SaveDataConfigurableAdapter)
+	if err := adapter.SetSaveDataDirs(Installation{}, SaveDataDirs{}); err != nil {
+		t.Fatalf("SetSaveDataDirs: %v", err)
+	}
+
+	dirs := retroArchSaveDataDirs("retroarch", cfgPath)
+	if dirs.Known {
+		t.Fatalf("campos vazios deveriam voltar para \"default\" (Known=false), veio %+v", dirs)
+	}
+}
+
 // Trava que uma pasta ausente é lista vazia, não erro — é o estado normal
 // de quem nunca salvou nada ali.
 func TestListSaveFilesMissingDir(t *testing.T) {

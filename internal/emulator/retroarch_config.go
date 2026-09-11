@@ -251,6 +251,58 @@ func retroArchSaveDataDirs(adapterID, path string) SaveDataDirs {
 	return result
 }
 
+// SetSaveDataDirs satisfaz SaveDataConfigurableAdapter: grava
+// "savefile_directory"/"savestate_directory" no retroarch.cfg real. Campo
+// vazio em dirs volta a chave para "default" (sentinela do próprio
+// RetroArch para "salvar ao lado do jogo"), nunca deixa a chave como
+// estava — quem quer preservar o valor atual manda o que
+// ResolveSaveDataDirs já tinha devolvido.
+//
+// Cria a pasta de destino se ela ainda não existir: diferente de
+// BuildCommand (que nunca toca o sistema de arquivos, ver CLAUDE.md), isto
+// é uma escrita de configuração explicitamente pedida pelo usuário através
+// da tela de saves — mesma categoria de ação de seedFirstRun/backupBeforeFirstWrite,
+// não de montagem de comando.
+func (retroArchAdapter) SetSaveDataDirs(install Installation, dirs SaveDataDirs) error {
+	path, err := retroArchConfigPath(install)
+	if err != nil {
+		return err
+	}
+	if err := backupBeforeFirstWrite(path); err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("lendo %s: %w", path, err)
+	}
+	cfg := parseRetroArchCfg(data)
+
+	memoryCards := strings.TrimSpace(dirs.MemoryCardsDir)
+	if memoryCards == "" {
+		memoryCards = "default"
+	} else if err := os.MkdirAll(memoryCards, 0o755); err != nil {
+		return fmt.Errorf("criando %s: %w", memoryCards, err)
+	}
+	cfg.set("savefile_directory", memoryCards)
+
+	saveStates := strings.TrimSpace(dirs.SaveStatesDir)
+	if saveStates == "" {
+		saveStates = "default"
+	} else if err := os.MkdirAll(saveStates, 0o755); err != nil {
+		return fmt.Errorf("criando %s: %w", saveStates, err)
+	}
+	cfg.set("savestate_directory", saveStates)
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("criando a pasta de configuração do RetroArch: %w", err)
+	}
+	if err := os.WriteFile(path, cfg.bytes(), 0o644); err != nil {
+		return fmt.Errorf("gravando %s: %w", path, err)
+	}
+	return nil
+}
+
 // ControllerConfigured diz se existe pelo menos um arquivo de autoconfig de
 // controle salvo — confirmado em 2026-09-08 que é aqui, não em
 // retroarch.cfg, que o RetroArch grava o mapeamento de um controle físico

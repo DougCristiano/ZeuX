@@ -33,6 +33,20 @@ type SaveFile struct {
 	ModifiedAt time.Time `json:"modified_at"`
 }
 
+// SaveDataConfigurableAdapter é a capacidade opcional de deixar o usuário
+// escolher, pelo próprio ZeuX, onde este adapter grava save — sem abrir a
+// GUI dele. Espelha ConfigurableAdapter (adapter.go): capacidade separada,
+// não um método a mais nela, porque "onde salvar" e "preset de vídeo" são
+// perguntas independentes — um adapter pode responder uma sem a outra.
+type SaveDataConfigurableAdapter interface {
+	// SetSaveDataDirs grava os caminhos escolhidos no arquivo de
+	// configuração real. Campo vazio em dirs significa "voltar ao padrão do
+	// próprio emulador" (para o RetroArch, o sentinela "default" — salvar ao
+	// lado do jogo), nunca "não mexer" — quem quer preservar um valor manda
+	// o que ResolveSaveDataDirs devolveu para ele.
+	SetSaveDataDirs(install Installation, dirs SaveDataDirs) error
+}
+
 // ResolveSaveDataDirs devolve onde procurar save de um adapter, quando já
 // verificado ao vivo ou lido de dentro da própria config do emulador —
 // PCSX2 e RetroArch.

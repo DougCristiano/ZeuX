@@ -881,7 +881,7 @@ verdade, fotografar antes/depois, registrar em `decisoes.md`.
 | **xenia** | `Documents\Xenia\content\` (ou ao lado do exe, se houver `portable.txt`) | não pesquisado a fundo | `Documents\Xenia\xenia.config.toml` (ou ao lado do exe em modo portátil) | Sim, via `portable.txt` — mesmo mecanismo que `seedXenia` já pressupõe, mas **não confirmado se o ZeuX ativa esse portable.txt** (não vi isso no `firstrun.go` atual). |
 | **cemu** | `mlc01/usr/save/` dentro do MLC (path configurável) | não pesquisado | `settings.xml` | **Mudou de comportamento entre versões**: Cemu passou a ser não-portátil por padrão no Windows (`%AppData%\Roaming\Cemu`), com portátil ainda disponível via pasta `portable` ao lado do exe — `seedCemu` hoje só cria `mlc01` dentro do `installDir`, o que pode não ser onde o Cemu moderno olha. **Precisa verificação ao vivo, mesmo padrão do PCSX2.** |
 | **rmg** | não pesquisado a fundo (Mupen64Plus core guarda save por jogo, formato `.sra`/`.mpk` conforme o tipo) | `.../RMG/Save/State` | `.../RMG/config/mupen64plus.cfg` (ou local, se portátil) | A doc citada diz que a versão portátil guarda tudo dentro da própria pasta — consistente com `seedRMG`. |
-| **retroarch** | `savefile_directory` no `retroarch.cfg` (pode ser `default` = ao lado da ROM, ou um caminho fixo) | `savestate_directory`, mesma regra | `retroarch.cfg` | **Leitura feita (2026-09-11):** `ResolveSaveDataDirs("retroarch", ...)` já lê as duas chaves do `retroarch.cfg` real via `retroArchSaveDataDirs` — `known:false` quando a chave está ausente ou vale `"default"` (sem pasta única para mostrar), `known:true` com o caminho lido quando o usuário configurou um fixo. Falta **escrever** — deixar o usuário escolher a pasta pelo ZeuX (`retroArchWriteConfig` ainda não toca nessas duas chaves). |
+| **retroarch** | `savefile_directory` no `retroarch.cfg` (pode ser `default` = ao lado da ROM, ou um caminho fixo) | `savestate_directory`, mesma regra | `retroarch.cfg` | **Leitura e escrita feitas (2026-09-11):** `GET/POST /emulators/retroarch/save-data` lê e grava as duas chaves do `retroarch.cfg` real (`retroArchSaveDataDirs`/`SetSaveDataDirs`). Campo vazio no `POST` volta para `"default"`. **Falta o frontend** — nenhuma tela chama a rota ainda. |
 
 ### O padrão de risco que se repete
 
@@ -927,10 +927,8 @@ backup), por formato de arquivo:
   precisaria de um cuidado equivalente para não perder configuração que o
   usuário já tinha.
 
-**RetroArch — leitura feita (2026-09-11):** ver a linha da tabela acima.
-Escrita ainda falta: `POST /emulators/retroarch/config` não deixa o usuário
-escolher a pasta de save pelo ZeuX ainda — só lê o que já está no
-`retroarch.cfg`.
+**RetroArch — leitura e escrita feitas (2026-09-11):** ver a linha da tabela
+acima. Falta só o frontend consumir `GET/POST /emulators/retroarch/save-data`.
 
 **Ordem sugerida pro resto:** Cemu, Azahar e Vita3K **primeiro precisam da
 verificação ao vivo** da seção acima — mapear chave de config antes de saber
