@@ -32,6 +32,7 @@ import {
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
+import { SaveDataPanel } from "../components/SaveDataPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { percentOf } from "../lib/format";
@@ -912,6 +913,16 @@ export function ConsoleDetailScreen({
           )}
 
           <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} />
+
+          {/* Saves (docs/pendencias.md, "Ver saves dentro do ZeuX — MVP de
+              inspeção"): só aparece com um emulador resolvido — sem isso não
+              há `adapter_id` para perguntar à rota. */}
+          {readiness.chosen && (
+            <div className="flex flex-col gap-3">
+              <SectionHeading>{t("savesHeading")}</SectionHeading>
+              <SaveDataPanel adapterId={readiness.chosen.adapter_id} />
+            </div>
+          )}
         </div>
 
         <aside className="flex flex-col gap-4">

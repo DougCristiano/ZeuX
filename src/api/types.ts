@@ -290,6 +290,35 @@ export type EmulatorConfigWriteResult = {
   unapplied: string[];
 };
 
+// --- Inspeção de saves (memory card / save state) ---
+
+/** Um arquivo listado dentro de `memory_cards`/`save_states` — nome cru,
+ * sem tentar casar com um jogo específico (não temos esse dado). */
+export type SaveDataFile = {
+  name: string;
+  size_bytes: number;
+  modified_at: string;
+};
+
+export type SaveData = {
+  adapter_id: string;
+  /** `false` quando o ZeuX ainda não verificou/leu onde este adapter guarda
+   * saves nesta máquina — não é erro, é estado normal (ver `message`). */
+  known: boolean;
+  /** Só presente quando `known` é `false`. */
+  message?: string;
+  /** Os quatro campos abaixo só vêm quando `known` é `true`. */
+  memory_cards_dir?: string;
+  save_states_dir?: string;
+  memory_cards?: SaveDataFile[];
+  save_states?: SaveDataFile[];
+};
+
+export type SaveDataDirs = {
+  memory_cards_dir: string;
+  save_states_dir: string;
+};
+
 // --- Mapeamento de teclado/controle (H3/H4) ---
 
 export type InputBinding = {

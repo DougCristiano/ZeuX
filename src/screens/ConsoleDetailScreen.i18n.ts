@@ -293,6 +293,10 @@ export const dict = {
     "pt-BR": "Nesta máquina",
     en: "On this machine",
   },
+  savesHeading: {
+    "pt-BR": "Saves",
+    en: "Saves",
+  },
   // Migrado de VerdictScreen.i18n.ts (2026-09-07): a grade de parecer por
   // console saiu da tela de Especificações — este disclaimer (D2,
   // docs/roadmap.md) segue o parecer para onde ele passou a viver de
