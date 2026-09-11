@@ -607,3 +607,47 @@ textarea {
     opacity: 0.6 !important;
   }
 }
+
+/*
+ * B6 (docs/pendencias.md): scanline (`.zeux-scanlines`) e glow
+ * (`AmbientGlow`, classe `.zeux-ambient-glow`) são decoração CRT fixa, sem
+ * escape — problema real em sala clara ou para quem tem fotossensibilidade.
+ * Duas portas de entrada para o MESMO efeito, por isso as duas regras abaixo
+ * repetem as mesmas declarações em vez de compartilhar um `@media` só:
+ *
+ *   1. `prefers-contrast: more` do SO — "simplesmente funciona", zero clique,
+ *      pensado para quem já pediu alto contraste ao sistema todo.
+ *   2. `[data-visual-effects="reduced"]` no `<html>` — o toggle manual
+ *      "Efeitos visuais" de Configurações (`useVisualEffects.ts`), para quem
+ *      quer só isto sem mexer no resto do SO.
+ *
+ * Nenhuma das duas mexe em `color-scheme`/`--paper`: continua tema único
+ * escuro (não é alternância clima claro/escuro, só intensidade de efeito).
+ */
+@media (prefers-contrast: more) {
+  :root {
+    /* Sobe --muted para perto de --ink (#e2e8f0): o texto secundário deixa
+       de se diferenciar por ser mais apagado, só por peso/tamanho. */
+    --muted: #d3dbe8;
+    /* --line alimenta --border/--input/--color-line (ver bloco de tokens
+       acima) — sobrescrever aqui já refaz toda borda decorativa do app para
+       o contorno de controle, mais forte, sem precisar tocar cada regra que
+       usa var(--line). */
+    --line: var(--control-border);
+  }
+
+  .zeux-scanlines,
+  .zeux-ambient-glow {
+    opacity: 0 !important;
+  }
+}
+
+:root[data-visual-effects="reduced"] {
+  --muted: #d3dbe8;
+  --line: var(--control-border);
+}
+
+[data-visual-effects="reduced"] .zeux-scanlines,
+[data-visual-effects="reduced"] .zeux-ambient-glow {
+  opacity: 0 !important;
+}
