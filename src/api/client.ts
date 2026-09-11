@@ -202,6 +202,13 @@ export const api = {
   getCustomEmulators: () => request<CustomEmulatorsResponse>("/custom-emulators"),
   upsertCustomEmulator: (def: CustomDefinition) =>
     postJSON<{ custom_emulators: CustomDefinition[] }>("/custom-emulators", def),
+  // Segunda porta do cadastro manual: em vez de navegar pastas atrás do
+  // executável depois de extrair na mão, aponta o pacote (.zip/.7z/.tar.gz)
+  // baixado e o ZeuX extrai + devolve os executáveis achados lá dentro.
+  extractCustomEmulatorPackage: (archivePath: string) =>
+    postJSON<{ extracted_to: string; candidates: string[] }>("/custom-emulators/extract-package", {
+      archive_path: archivePath,
+    }),
   deleteCustomEmulator: (id: string) =>
     request<{ custom_emulators: CustomDefinition[] }>(`/custom-emulators/${encodeURIComponent(id)}`, {
       method: "DELETE",

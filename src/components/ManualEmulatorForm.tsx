@@ -67,9 +67,46 @@ export function ManualEmulatorForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fluxo do pacote compactado: a maioria dos emuladores é distribuída como
+  // .zip/.7z, não como um .exe avulso — pedir pra navegar a pasta extraída
+  // na mão é a fricção que este fluxo evita. `extracting` cobre só esta
+  // ação (não reusa `saving`, que é do submit do formulário inteiro);
+  // `packageCandidates` só populado quando o pacote trouxe mais de um
+  // executável e o ZeuX não pode escolher por conta própria.
+  const [extracting, setExtracting] = useState(false);
+  const [packageCandidates, setPackageCandidates] = useState<string[] | null>(null);
+
   async function pickBinary() {
     const picked = await open({ multiple: false, directory: false });
     if (typeof picked === "string") setBinaryPath(picked);
+  }
+
+  async function pickPackage() {
+    const picked = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: t("packageFileFilter"), extensions: ["zip", "7z", "tar.gz", "tgz"] }],
+    });
+    if (typeof picked !== "string") return;
+
+    setError(null);
+    setPackageCandidates(null);
+    setExtracting(true);
+    try {
+      const result = await api.extractCustomEmulatorPackage(picked);
+      if (result.candidates.length === 1) {
+        setBinaryPath(result.candidates[0]);
+      } else {
+        // Mais de um executável dentro do pacote (emulador + atualizador,
+        // por exemplo) — o ZeuX não adivinha qual é o certo, oferece a
+        // escolha em vez de cravar um palpite.
+        setPackageCandidates(result.candidates);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("packageExtractError"));
+    } finally {
+      setExtracting(false);
+    }
   }
 
   function resolveID(): string {
@@ -164,6 +201,38 @@ export function ManualEmulatorForm({
             {t("chooseFile")}
           </Button>
         </div>
+
+        {/* Segunda porta: a maioria dos emuladores chega como .zip/.7z, não
+            como um .exe avulso — evita obrigar quem não é da área a extrair
+            na mão e navegar pastas atrás do binário certo. */}
+        <button
+          type="button"
+          onClick={pickPackage}
+          disabled={extracting}
+          className="w-fit text-xs text-accent underline decoration-dotted underline-offset-2 hover:text-ink disabled:opacity-60"
+        >
+          {extracting ? t("extractingPackage") : t("choosePackage")}
+        </button>
+
+        {packageCandidates && (
+          <div className="flex flex-col gap-1 rounded-md border border-line bg-fill-strong p-2">
+            <span className="text-xs text-muted">{t("packageCandidatesLabel")}</span>
+            {packageCandidates.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                onClick={() => {
+                  setBinaryPath(candidate);
+                  setPackageCandidates(null);
+                }}
+                className="truncate rounded px-2 py-1 text-left font-mono text-xs text-ink hover:bg-fill"
+                title={candidate}
+              >
+                {candidate}
+              </button>
+            ))}
+          </div>
+        )}
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">

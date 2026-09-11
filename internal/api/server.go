@@ -132,6 +132,7 @@ func (s *Server) Routes() http.Handler {
 	// /emulators/{id}/install — o roteador do Go recusa registrar padrões em
 	// que "/emulators/custom/install" casaria com os dois.
 	mux.HandleFunc("GET /api/v1/custom-emulators", s.handleListCustom)
+	mux.HandleFunc("POST /api/v1/custom-emulators/extract-package", s.handleExtractCustomPackage)
 	mux.HandleFunc("POST /api/v1/custom-emulators", s.handleUpsertCustom)
 	mux.HandleFunc("DELETE /api/v1/custom-emulators/{id}", s.handleDeleteCustom)
 
@@ -1172,6 +1173,39 @@ func (s *Server) handleListCustom(w http.ResponseWriter, r *http.Request) {
 			emulator.PlaceholderScale:    "multiplicador de resolução interna do preset",
 			emulator.PlaceholderRenderer: "backend gráfico do preset",
 		},
+	})
+}
+
+// handleExtractCustomPackage é a segunda porta para o cadastro manual de
+// emulador (ManualEmulatorForm) — em vez de o usuário extrair um .zip/.7z
+// baixado na mão e navegar pastas atrás do executável, ele aponta o pacote
+// e o ZeuX extrai + acha os candidatos (install.ExtractCustomEmulatorPackage).
+// A tela pré-preenche binary_path com o único candidato, ou deixa escolher
+// entre vários — o ZeuX nunca decide sozinho qual é "o" executável quando
+// há mais de um.
+func (s *Server) handleExtractCustomPackage(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ArchivePath string `json:"archive_path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_body",
+			`O corpo deve ser um JSON no formato {"archive_path": string}.`)
+		return
+	}
+	if strings.TrimSpace(body.ArchivePath) == "" {
+		s.writeError(w, http.StatusBadRequest, "missing_fields", "Informe o caminho do pacote baixado.")
+		return
+	}
+
+	destDir, candidates, err := install.ExtractCustomEmulatorPackage(body.ArchivePath)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "package_extract_failed", err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"extracted_to": destDir,
+		"candidates":   candidates,
 	})
 }
 
