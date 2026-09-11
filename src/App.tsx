@@ -134,11 +134,18 @@ function App() {
   // `Phase` — mesma razão do splash (ver src/components/TourOverlay.tsx). O
   // tour aparece **depois do scan**, na primeira tela do app: antes do
   // consentimento, quatro telas vendendo o produto virariam pressão para
-  // consentir. Quem recusou também vê, a partir de `DeclinedScreen` — é quem
-  // tem menos contexto sobre o que o app faz.
+  // consentir.
+  //
+  // 2026-09-11: e **não** abre sozinho para quem acabou de recusar. Os quatro
+  // passos falam de ler o hardware e autoconfigurar o emulador — exatamente o
+  // que a pessoa acabou de dizer que não quer. Abrir a apresentação em cima da
+  // recusa lê como insistência, e vai contra o princípio 1 (o "não" vale como
+  // resposta, não como começo de negociação). O caminho continua aberto: a
+  // `DeclinedScreen` permite consentir depois, e Configurações tem "rever a
+  // apresentação" (`onReplayTour`) para quem quiser ver por conta própria.
   const [tourVisible, setTourVisible] = useState(false);
   useEffect(() => {
-    if ((phase === "home" || phase === "declined") && !hasSeenTour()) {
+    if (phase === "home" && !hasSeenTour()) {
       setTourVisible(true);
     }
   }, [phase]);

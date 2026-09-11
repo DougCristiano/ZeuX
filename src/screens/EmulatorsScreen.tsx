@@ -17,6 +17,7 @@ import {
   Button,
   Callout,
   Card,
+  CARD_CHROME,
   CHROME_TINT_DANGER,
   CHROME_TINT_INFO,
   ConfirmModal,
@@ -76,15 +77,6 @@ const ALL_CONSOLES = "__all__";
  * filtro de console ao lado.
  */
 type StatusFilter = "" | "installed" | "available";
-
-/**
- * Barra de chrome do card: altura de 28px em vez dos 36px do `chrome` padrão.
- * Um card de grade cabe 3 numa fileira (~290px de largura) e chega a ter
- * cinco destes botões; na altura cheia eles ocupariam três linhas e
- * empurrariam a ação de instalar/remover para fora do campo de visão. O piso
- * de 24px da WCAG 2.2 AA (`web-target-size`) continua respeitado com folga.
- */
-const CARD_CHROME = "h-7! px-2! whitespace-nowrap";
 
 // Achado em 2026-08-04: um core podia estar ausente por um bug silencioso
 // (log de aviso, nunca erro) e nada avisava até o usuário tentar lançar um

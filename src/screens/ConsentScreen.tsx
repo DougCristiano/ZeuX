@@ -55,7 +55,11 @@ export function ConsentScreen({ policyText, policyVersion, onAccept, onDecline, 
             chassi" dos chips e do `SectionHeading` — ciano porque é o sistema
             informando o que precisa antes de o usuário decidir. */}
         <p className="font-mono text-xs tracking-wider text-accent-secondary uppercase">{t("kicker")}</p>
-        <h1 className="text-2xl font-semibold text-ink">{t("heading")}</h1>
+        {/* Voz pixel, como todo título de tela do app (direção retrô do
+            CLAUDE.md): só o título. O corpo — o texto da política e a
+            explicação — continua em Inter, que é a fonte de leitura; texto
+            longo em fonte pixel seria bonito e ilegível. */}
+        <h1 className="font-pixel text-xl leading-relaxed tracking-[0.04em] text-ink">{t("heading")}</h1>
 
         {/* Filete esquerdo ciano: marca o cartão como "o que o sistema
             registra" (mesma regra da paleta), sem tirar espaço de conteúdo. O

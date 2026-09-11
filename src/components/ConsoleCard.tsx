@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { ConsoleEntry } from "../api/types";
-import { consoleAccentColor } from "../lib/consoleColor";
+import { consoleAccentColor, consoleTextColor } from "../lib/consoleColor";
 import type { ConsoleReadiness } from "../lib/consoleReadiness";
 import { consoleIconLabel, FOCUS_RING } from "./ui";
 
@@ -69,6 +69,11 @@ export function ConsoleCard({
   onOpen: () => void;
 }) {
   const accent = consoleAccentColor(entry.console_id);
+  // A sigla é TEXTO: usa a variante clara da mesma matiz (`consoleTextColor`,
+  // ≥4.5:1 sobre `--fill` — WCAG 1.4.3). O `accent` puro continua na borda, no
+  // glow e no gradiente do compartimento, onde é decoração e não precisa ser
+  // lido.
+  const labelColor = consoleTextColor(entry.console_id);
   const ready = readiness.step === "pronto";
 
   // A contagem toma o lugar do chip de pendência só quando há pasta E o
@@ -107,7 +112,7 @@ export function ConsoleCard({
         <div aria-hidden="true" className="zeux-pixel-grid pointer-events-none absolute inset-0" />
         <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
 
-        <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: accent }}>
+        <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: labelColor }}>
           {consoleIconLabel(entry.console_id, entry.short_name)}
         </span>
 

@@ -62,6 +62,7 @@ export function GameHero({
   onToggleFavorite,
   launchability,
   onInstall,
+  installing = false,
 }: {
   game: LibraryGame;
   shortName: string;
@@ -70,6 +71,13 @@ export function GameHero({
   onToggleFavorite: () => void;
   launchability?: GameLaunchability;
   onInstall?: () => void;
+  /**
+   * A instalação disparada por este botão já está em andamento (2026-09-11).
+   * O botão sai do ar e troca de rótulo já no clique — antes do servidor
+   * responder — porque a chamada de instalação chega a demorar mais de dez
+   * segundos e, sem retorno nenhum, o caminho natural era clicar de novo.
+   */
+  installing?: boolean;
 }) {
   const t = useT(dict);
   const accent = consoleAccentColor(game.console_id);
@@ -201,8 +209,8 @@ export function GameHero({
             {blocked &&
             onInstall &&
             (launchability!.reason === "not_installed" || launchability!.reason === "install_manual") ? (
-              <Button variant="primary" onClick={onInstall} {...{ "data-gamepad-start": "" }}>
-                {launchability!.badge}
+              <Button variant="primary" disabled={installing} onClick={onInstall} {...{ "data-gamepad-start": "" }}>
+                {installing ? t("installingEmulator") : launchability!.badge}
               </Button>
             ) : blocked &&
               onPlay &&

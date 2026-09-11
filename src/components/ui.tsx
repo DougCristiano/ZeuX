@@ -479,6 +479,21 @@ export function Card({
  * sinal chegar ANTES do clique. A cor nunca é o único sinal (o rótulo diz
  * "Remover" e um `ConfirmModal` sempre confirma), então não viola 1.4.1.
  */
+/**
+ * Barra de chrome do card: altura de 28px em vez dos 36px do `chrome` padrão.
+ * Um card de grade cabe 3 numa fileira (~290px de largura) e chega a ter
+ * cinco destes botões; na altura cheia eles ocupariam três linhas e
+ * empurrariam a ação de instalar/remover para fora do campo de visão. O piso
+ * de 24px da WCAG 2.2 AA (`web-target-size`) continua respeitado com folga.
+ *
+ * Morava em `EmulatorsScreen.tsx` até 2026-09-11, quando `ConsoleDetailScreen`
+ * passou a usar a mesma régua (os botões de "abrir a janela de outro
+ * programa" viraram `chrome` nas duas telas) — mora aqui pelo mesmo motivo
+ * que `CHROME_TINT_*`: duas telas com a mesma regra não podem ter duas
+ * definições dela.
+ */
+export const CARD_CHROME = "h-7! px-2! whitespace-nowrap";
+
 export const CHROME_TINT_INFO =
   "border-accent-secondary/50! text-accent-secondary! hover:border-accent-secondary! hover:bg-accent-secondary/10! hover:shadow-[0_0_14px_-4px_var(--accent-secondary),inset_0_1px_0_0_rgba(255,255,255,0.06)]!";
 export const CHROME_TINT_DANGER =
@@ -1456,7 +1471,10 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
   const accent = consoleAccentColor(verdict.console_id);
 
   return (
-    <Card className="flex flex-col gap-2" style={{ borderLeftColor: accent, borderLeftWidth: 3 }}>
+    // `filled` como todo card do app — era o último `<Card>` sem a prop, e
+    // sem ela este card ficava um degrau de superfície abaixo dos vizinhos na
+    // mesma tela (ver a escada de superfícies em src/index.css).
+    <Card filled className="flex flex-col gap-2" style={{ borderLeftColor: accent, borderLeftWidth: 3 }}>
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold text-ink">{verdict.name}</p>
         <Badge variant={isGoodTier ? "solid" : "default"}>{levelLabel(verdict.level)}</Badge>

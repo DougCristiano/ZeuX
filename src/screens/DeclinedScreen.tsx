@@ -47,7 +47,11 @@ export function DeclinedScreen({
       <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-[0.08]" />
       <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
         <p className="font-mono text-xs tracking-wider text-accent-secondary uppercase">{t("kicker")}</p>
-        <h1 className="text-2xl font-semibold text-ink">{t("heading")}</h1>
+        {/* Voz pixel, como todo título de tela do app (direção retrô do
+            CLAUDE.md): só o título. O corpo — o texto da política e a
+            explicação — continua em Inter, que é a fonte de leitura; texto
+            longo em fonte pixel seria bonito e ilegível. */}
+        <h1 className="font-pixel text-xl leading-relaxed tracking-[0.04em] text-ink">{t("heading")}</h1>
         <p className="text-base text-ink">
           {t("description")}
         </p>

@@ -163,6 +163,112 @@ export function consoleFamilyColor(family: ConsoleFamily): string {
   return FAMILY_COLORS[family];
 }
 
+/**
+ * Variante clara da cor de identidade, usada **só quando a cor vira texto**
+ * (2026-09-11, achado de uma auditoria WCAG sobre a sigla do `ConsoleCard`).
+ *
+ * O problema medido: a sigla do console era pintada com `consoleAccentColor`
+ * direto sobre `--fill` (#1a2542) e **25 dos 33 consoles** ficavam abaixo do
+ * 4.5:1 que a WCAG 1.4.3 AA exige para texto normal — `virtualboy` em 1.50:1,
+ * `gamecube` em 1.62:1, `ps3` em 1.67:1, e casos que quase passavam (`psp`
+ * 4.44:1, `xbox` 4.34:1). Cor de marca é calibrada para borda/glow sobre
+ * fundo escuro, não para carregar texto.
+ *
+ * A calibração segue a mesma regra do resto da paleta — "variar tom/brilho,
+ * nunca matiz" (o comentário de `BRAND_COLORS` acima, e `--control-border` em
+ * src/index.css): converte o hex de marca para HSL, **mantém H e S** e sobe
+ * só o L em passos de 0.5%, medindo a cada passo o contraste contra `--fill`
+ * pela fórmula da WCAG (hex → sRGB → linear γ2.4 → L = 0.2126R + 0.7152G +
+ * 0.0722B → ratio = (L1+0.05)/(L2+0.05)), até passar de **4.6:1** — a folga
+ * de 0.1 acima do piso existe porque o arredondamento de volta para 8 bits
+ * por canal pode custar alguns centésimos.
+ *
+ * Verificado com esta mesma conta sobre os 33 ids do catálogo: todos entre
+ * 4.60:1 e 9.00:1 depois da subida; os 8 que já passavam (Dreamcast, Game
+ * Gear, NGPC, Neo Geo, Xbox 360, Master System, PC Engine, 32X) saem
+ * **inalterados**, porque o laço para antes do primeiro passo. Procedural em
+ * vez de uma segunda tabela de 33 hexes à mão de propósito: uma tabela
+ * paralela poderia divergir de `BRAND_COLORS` numa edição futura, e um
+ * `console_id` novo (que cai em `FALLBACK_PALETTE`) também sai corrigido de
+ * graça.
+ *
+ * **Isto não substitui `consoleAccentColor`.** A cor de identidade continua
+ * exatamente a mesma na borda, no glow e no gradiente do compartimento — a
+ * família de cada fabricante continua separada por matiz lá, que é onde a cor
+ * carrega o reconhecimento. Aqui subiu o brilho porque o olho precisa LER.
+ */
+export function consoleTextColor(consoleId: string): string {
+  const base = consoleAccentColor(consoleId);
+  const cached = textColorCache.get(base);
+  if (cached) return cached;
+
+  const [h, s, l0] = hexToHsl(base);
+  let result = base;
+  for (let l = l0; l <= 1 && contrastOnFill(result) < MIN_TEXT_CONTRAST; l += 0.005) {
+    result = hslToHex(h, s, Math.min(1, l + 0.005));
+  }
+  textColorCache.set(base, result);
+  return result;
+}
+
+/** `--fill` (src/index.css) — o fundo do compartimento onde a sigla é lida. */
+const FILL_LUMINANCE = relativeLuminance("#1a2542");
+/** 4.5:1 é o piso da WCAG AA; a folga cobre o arredondamento para 8 bits. */
+const MIN_TEXT_CONTRAST = 4.6;
+const textColorCache = new Map<string, string>();
+
+function contrastOnFill(hex: string): number {
+  const l = relativeLuminance(hex);
+  return (Math.max(l, FILL_LUMINANCE) + 0.05) / (Math.min(l, FILL_LUMINANCE) + 0.05);
+}
+
+function relativeLuminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((channel) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+}
+
+function hexToHsl(hex: string): [number, number, number] {
+  const [r, g, b] = hexToRgb(hex);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let h = 0;
+  if (delta !== 0) {
+    if (max === r) h = ((g - b) / delta) % 6;
+    else if (max === g) h = (b - r) / delta + 2;
+    else h = (r - g) / delta + 4;
+    h = (h * 60 + 360) % 360;
+  }
+  const l = (max + min) / 2;
+  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+  return [h, s, l];
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [r, g, b] =
+    h < 60
+      ? [c, x, 0]
+      : h < 120
+        ? [x, c, 0]
+        : h < 180
+          ? [0, c, x]
+          : h < 240
+            ? [0, x, c]
+            : h < 300
+              ? [x, 0, c]
+              : [c, 0, x];
+  return `#${[r, g, b].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, "0")).join("")}`;
+}
+
 export function consoleAccentColor(consoleId: string): string {
   const brand = BRAND_COLORS[consoleId];
   if (brand) return brand;

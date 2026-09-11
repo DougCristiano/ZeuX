@@ -18,4 +18,10 @@ export const dict = {
     "pt-BR": "Jogar assim mesmo",
     en: "Play anyway",
   },
+  // 2026-09-11: rótulo do botão de instalar enquanto o pedido está em curso —
+  // o retorno precisa chegar no clique, não quando o servidor responder.
+  installingEmulator: {
+    "pt-BR": "Instalando…",
+    en: "Installing…",
+  },
 } satisfies Dict;
