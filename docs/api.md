@@ -61,6 +61,7 @@ JSON (isso desatualiza rápido e o compilador já garante que bate).
 |---|---|
 | `GET /consoles` | Lista os consoles do catálogo embutido — usada pela tela de Consoles como entrada principal. Cada entrada traz `has_image` (ver rota abaixo). |
 | `GET /consoles/{id}/image` | Logo oficial do console, embutida no binário (`cmd/generate-console-images`, gerado uma vez — não é scraping em runtime). `404` quando `has_image` da rota acima é `false`; a interface trata isso como estado normal, nunca chama sem checar `has_image` primeiro. Ver `docs/decisoes.md`, "Identidade visual por console". |
+| `POST/DELETE /consoles/{id}/image` | Troca (`{"source_path": "..."}`) ou remove a logo customizada de um console, voltando a servir a embutida (ou a sigla, se não houver nenhuma). `400 unknown_console` para id fora do catálogo. |
 | `GET /consoles/verdicts` | Roda `verdict.Evaluate` sobre o último scan: nível de compatibilidade por console, gargalos nomeados, `precision` (`"completo"` ou `"parcial"`). Sem scan: `400 no_scan_yet`. |
 
 ## 4. Emuladores: descoberta, instalação e cadastro manual
@@ -131,6 +132,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 |---|---|
 | `GET/POST/DELETE /igdb/credentials` | Credencial **do usuário** para o IGDB — nunca uma chave do ZeuX compartilhada (motivo: uma credencial de teste compartilhada já foi suspensa por uso agregado). `POST` com credencial inválida: `400 igdb_credentials_invalid`. |
 | `POST /library/games/scrape-covers` | Dispara busca de capa em lote (job assíncrono). Tenta libretro-thumbnails primeiro (sem credencial nenhuma) e só recorre ao IGDB se essa fonte não achar; sem credencial do IGDB configurada, um jogo que também não é achado em libretro-thumbnails fica `not_found` (nunca recusa o disparo por isso). Busca já em andamento: `409 scrape_in_progress`. |
+| `POST /library/games/{id}/cover` | Troca a capa de um jogo por um arquivo local (`{"source_path": "..."}`) — mesma validação de imagem que a logo de console. `404 not_found` para id de jogo inexistente. |
 | `GET /scrape-jobs` | Lista as buscas de capa recentes (`{ "jobs": [...] }`), da mais nova para a mais antiga. A tela "Todos os jogos" usa para descobrir um lote automático já em andamento — sem um id de job, não havia como mostrar o progresso de uma busca que a tela não iniciou. |
 | `GET /scrape-jobs/{id}` | Progresso do job de busca de capas. |
 | `GET /covers/{arquivo}` | Serve o arquivo de capa já baixado, do cache local — nunca proxya uma URL de terceiro direto pro WebView. |
