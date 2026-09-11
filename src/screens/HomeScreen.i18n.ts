@@ -5,12 +5,15 @@ export const dict = {
   subtitle: { "pt-BR": "Seus jogos, seus consoles, onde você parou.", en: "Your games, your consoles, where you left off." },
   continuePlaying: { "pt-BR": "Continue jogando", en: "Continue playing" },
   yourConsoles: { "pt-BR": "Seus consoles", en: "Your consoles" },
-  seeAllConsoles: { "pt-BR": "Ver todos", en: "See all" },
   seeAllGames: { "pt-BR": "Ver todos os jogos", en: "See all games" },
-  viewGames: { "pt-BR": "Ver jogos", en: "View games" },
-  gameCountSingular: { "pt-BR": "{{count}} jogo", en: "{{count}} game" },
-  gameCountPlural: { "pt-BR": "{{count}} jogos", en: "{{count}} games" },
-  noGames: { "pt-BR": "sem jogos nesta pasta", en: "no games in this folder" },
+  // Faixa de hardware da Home (2026-09-11). Descritiva: conta consoles no
+  // melhor patamar que ESTA máquina alcança, sem adjetivo sobre a máquina
+  // (princípio 2 do CLAUDE.md). O gargalo nomeado continua por console.
+  hardwareSeal: { "pt-BR": "Sua máquina", en: "Your machine" },
+  hardwareLine: {
+    "pt-BR": "{{ready}} de {{total}} consoles já rodam no melhor patamar que esta máquina alcança.",
+    en: "{{ready}} of {{total}} consoles already run at the best tier this machine reaches.",
+  },
   // Rodapé de estatística — dado real (GET /sessions + /consoles/verdicts),
   // frase descritiva (princípio 2 do CLAUDE.md), nunca "só X horas".
   statsPlaytimeAndConsoles: {

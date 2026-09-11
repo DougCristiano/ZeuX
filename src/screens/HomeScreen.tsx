@@ -17,12 +17,15 @@ import {
   ManualInstallModal,
   ProgressBar,
   ScreenContainer,
-  ScreenHeader,
   SectionHeading,
   Toast,
+  ZeuXWordmark,
 } from "../components/ui";
-import { ConsoleCard } from "../components/ConsoleCard";
+import { ConsoleRail } from "../components/ConsoleRail";
 import { GameHero } from "../components/GameHero";
+import { GameTile } from "../components/GameTile";
+import { LibraryShelf } from "../components/LibraryShelf";
+import { PracaPanel } from "../components/PracaPanel";
 import { ManualEmulatorFormModal } from "../components/ManualEmulatorFormModal";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
@@ -44,13 +47,20 @@ import { openPath } from "@tauri-apps/plugin-opener";
  * (`AllGamesScreen`) passa a ser alcançado a partir daqui ("Ver todos os
  * jogos"), não mais o destino direto do item.
  *
- * Três blocos, nesta ordem: o hero do último jogo jogado (mesmo componente e
- * mesma cadeia de lançamento/instalação de `AllGamesScreen` — duplicada aqui
- * de propósito por ora, ver nota abaixo), a prateleira "Seus consoles"
- * (`ConsoleCard`, rolável na horizontal, só os consoles com pelo menos uma
- * peça configurada — pasta ou emulador — para não repetir o catálogo inteiro
- * de `ConsolesScreen`) e o rodapé de estatística (tempo jogado + consoles
- * prontos, sem rota nova: `GET /sessions` e o parecer já têm o dado).
+ * Redesenhada em 2026-09-11 no padrão do mockup H, escolhido pelo Douglas
+ * ("achei que um pouco mais de cor ficou realmente mais legal"): três
+ * colunas — trilho de consoles (`ConsoleRail`, filtro desta tela, não
+ * navegação do app), palco com o hero de retomada (`GameHero`) e as
+ * prateleiras de capas por console (`LibraryShelf`), e a coluna de
+ * comunidade (`PracaPanel`). A fileira de `ConsoleCard` que existia aqui saiu:
+ * o card de console virou o cabeçalho colorido da prateleira dele, e o
+ * catálogo inteiro continua morando em "Consoles" (sidebar).
+ *
+ * Nenhuma rota nova entrou: o hero vem de `GET /library/games` paginado, as
+ * prateleiras de `GET /library/games?console_id=` (que esta tela já chamava só
+ * para contar), o rodapé de `GET /sessions` e o parecer de
+ * `GET /consoles/verdicts`. `PracaPanel` não tem backend nenhum e diz isso na
+ * própria cara — ver o doc comment dele.
  *
  * Nota sobre a duplicação com `AllGamesScreen`: a cadeia "clicar Jogar →
  * instalar emulador → confirmar hardware/BIOS → lançar" já vive nos hooks
@@ -155,7 +165,7 @@ export function HomeScreen({
     onEmulatorInstalled: (adapterId) =>
       setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
     onLaunch: (romPath) => {
-      const game = featured?.find((g) => g.path === romPath);
+      const game = findGameByPath(romPath);
       if (game) {
         showToast(t("openingGame", { title: game.title }));
         launch(game);
@@ -163,13 +173,41 @@ export function HomeScreen({
     },
   });
 
+  /**
+   * Os modais de instalação/BIOS guardam o caminho da ROM pendente, não o
+   * jogo. Antes do redesenho a busca era só em `featured` (um item), o que
+   * bastava porque só o hero lançava jogo; agora as prateleiras lançam
+   * também, então a busca varre as duas fontes. `function` e não `const`: é
+   * chamada de dentro de `useInlineInstall`, declarado acima dela (hoisting).
+   */
+  function findGameByPath(romPath: string): LibraryGame | undefined {
+    const naDestaque = featured?.find((g) => g.path === romPath);
+    if (naDestaque) return naDestaque;
+    for (const games of gamesByConsole.values()) {
+      const achado = games.find((g) => g.path === romPath);
+      if (achado) return achado;
+    }
+    return undefined;
+  }
+
   function toggleFavorite(game: LibraryGame) {
     const next = !game.favorite;
-    setFeatured((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: next } : g)) : prev));
+    const aplica = (fav: boolean) => {
+      setFeatured((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: fav } : g)) : prev));
+      setGamesByConsole((prev) => {
+        const lista = prev.get(game.console_id);
+        if (!lista) return prev;
+        return new Map(prev).set(
+          game.console_id,
+          lista.map((g) => (g.id === game.id ? { ...g, favorite: fav } : g)),
+        );
+      });
+    };
+    // Otimista nas duas fontes (hero e prateleira mostram o mesmo jogo) e
+    // desfaz nas duas se o servidor recusar.
+    aplica(next);
     const call = next ? api.favoriteGame(game.id) : api.unfavoriteGame(game.id);
-    call.catch(() => {
-      setFeatured((prev) => (prev ? prev.map((g) => (g.id === game.id ? { ...g, favorite: !next } : g)) : prev));
-    });
+    call.catch(() => aplica(!next));
   }
 
   // Prateleira: só consoles que já têm alguma peça configurada (pasta OU
@@ -178,7 +216,11 @@ export function HomeScreen({
   // ser um resumo do que já é do usuário.
   const index = useMemo(() => buildReadinessIndex(emulators ?? [], cores, folders), [emulators, cores, folders]);
   const folderConsoleIds = useMemo(() => new Set(folders.map((f) => f.console_id)), [folders]);
-  const [gameCounts, setGameCounts] = useState<Map<string, number>>(new Map());
+  // Guarda os JOGOS, não só a contagem (2026-09-11): as prateleiras do
+  // redesenho mostram capa de verdade por console, e a mesma resposta que já
+  // era pedida só para contar (`GET /library/games?console_id=`) traz a lista
+  // inteira — contar passou a ser `.length` em vez de uma chamada própria.
+  const [gamesByConsole, setGamesByConsole] = useState<Map<string, LibraryGame[]>>(new Map());
   useEffect(() => {
     let cancelado = false;
     for (const consoleId of folderConsoleIds) {
@@ -186,7 +228,7 @@ export function HomeScreen({
         .getLibraryGames(consoleId)
         .then((res) => {
           if (cancelado) return;
-          setGameCounts((prev) => new Map(prev).set(consoleId, res.games.length));
+          setGamesByConsole((prev) => new Map(prev).set(consoleId, res.games));
         })
         .catch(() => {});
     }
@@ -203,7 +245,8 @@ export function HomeScreen({
         entry,
         readiness: evaluateConsoleReadiness(entry, index),
         hasFolder: folderConsoleIds.has(entry.console_id),
-        gameCount: gameCounts.has(entry.console_id) ? gameCounts.get(entry.console_id)! : null,
+        games: gamesByConsole.get(entry.console_id) ?? null,
+        gameCount: gamesByConsole.has(entry.console_id) ? gamesByConsole.get(entry.console_id)!.length : null,
       }))
       // Só quem já começou — tem pasta apontada OU já tem um emulador
       // instalado que serve (`readiness.chosen`). O catálogo dos 33 consoles
@@ -213,19 +256,26 @@ export function HomeScreen({
       .sort((a, b) => {
         if (a.readiness.step === "pronto" && b.readiness.step !== "pronto") return -1;
         if (b.readiness.step === "pronto" && a.readiness.step !== "pronto") return 1;
-        return 0;
+        // Prateleira com jogo vem antes da vazia: a Home é feita de capas, e
+        // uma fileira vazia no topo empurraria o acervo real para baixo da
+        // dobra.
+        return (b.games?.length ?? 0) - (a.games?.length ?? 0);
       });
-  }, [consoleCatalog, folderConsoleIds, index, emulators, gameCounts]);
+  }, [consoleCatalog, folderConsoleIds, index, emulators, gamesByConsole]);
 
   const readyCount = report?.verdicts.filter((v) => v.level === "otimo" || v.level === "bom").length ?? 0;
   const totalConsoles = report?.verdicts.length ?? consoleCatalog.length;
   const totalPlaytime = playtimeByConsole ? Object.values(playtimeByConsole).reduce((a, b) => a + b, 0) : 0;
 
-  const cardLabels = {
-    viewGames: t("viewGames"),
-    gameCount: (count: number) => (count === 1 ? t("gameCountSingular", { count }) : t("gameCountPlural", { count })),
-    noGames: t("noGames"),
-  };
+  // Filtro do trilho de consoles — `null` é "TUDO". Vive na tela (e não no
+  // `ConsoleRail`) porque quem filtra é a lista de prateleiras.
+  const [railFilter, setRailFilter] = useState<string | null>(null);
+
+  // Quantas capas cabem numa prateleira antes do "Ver os N". Seis é o que a
+  // coluna do meio comporta em duas fileiras curtas numa janela padrão sem
+  // empurrar a segunda prateleira para fora da dobra — o resto do console
+  // continua a um clique, na tela dele.
+  const SHELF_SIZE = 6;
 
   // Sem nenhuma pasta configurada ainda: a home vira onboarding em vez de
   // mostrar uma prateleira e um hero vazios lado a lado — pedido do Douglas
@@ -341,7 +391,7 @@ export function HomeScreen({
       {install.state.kind === "confirm-bios" &&
         (() => {
           const confirmState = install.state;
-          const pendingGame = featured?.find((g) => g.path === confirmState.pendingGamePath);
+          const pendingGame = findGameByPath(confirmState.pendingGamePath);
           const pendingAdapterEntry = pendingGame ? adapterEntryFor(verdictFor(pendingGame.console_id)) : undefined;
           return (
             <ConfirmModal
@@ -376,7 +426,7 @@ export function HomeScreen({
       {install.state.kind === "bios-after-install" &&
         (() => {
           const s = install.state;
-          const pendingGame = featured?.find((g) => g.path === s.pendingGamePath);
+          const pendingGame = findGameByPath(s.pendingGamePath);
           return (
             <ConfirmModal
               title={t("emulatorInstalledBiosNeededTitle")}
@@ -446,12 +496,49 @@ export function HomeScreen({
         toastMessage && <Toast message={toastMessage} />
       )}
 
-      {/* 2026-09-10 (achado do critico-design: a home era a única tela do
-          app sem `ScreenHeader` — sem <h1>, sem a voz pixel que ele agora
-          carrega). Sem subtítulo no onboarding: o `EmptyState` logo abaixo
-          já apresenta o app por extenso, um subtítulo repetiria a mesma
-          frase duas vezes na mesma tela. */}
-      <ScreenHeader title={t("title")} subtitle={isOnboarding ? undefined : t("subtitle")} />
+      {/* Cabeçalho próprio da Home (2026-09-11, padrão do mockup H): a marca
+          com o NOME tratado (`ZeuXWordmark`) no lugar do `ScreenHeader`
+          genérico. É a tela de entrada — a única onde a marca ocupa espaço de
+          cartaz; as outras onze continuam abrindo com `ScreenHeader`, que não
+          mudou. O <h1> continua existindo, só que invisível: o texto que
+          nomeia a tela é "Biblioteca", e quem lê por leitor de tela precisa
+          dele — o wordmark é marca, não título de página. */}
+      <h1 className="sr-only">{t("title")}</h1>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <ZeuXWordmark
+          tagline={
+            report
+              ? t("statsPlaytimeAndConsoles", {
+                  playtime: formatPlaytimeClean(totalPlaytime),
+                  ready: readyCount,
+                  total: totalConsoles,
+                })
+              : t("statsPlaytimeOnly", { playtime: formatPlaytimeClean(totalPlaytime) })
+          }
+        />
+        {!isOnboarding && (
+          <Button variant="chrome" onClick={onOpenAllGames} {...{ "data-gamepad-start": "" }}>
+            {t("seeAllGames")}
+          </Button>
+        )}
+      </div>
+
+      {/* Faixa de hardware — o "veredito" do mockup, com o texto do próprio
+          servidor por trás: só conta quantos consoles já estão no melhor
+          patamar que ESTA máquina alcança, sem adjetivo sobre a máquina
+          (princípio 2 do CLAUDE.md). O detalhe por console (e o gargalo
+          nomeado) continua no cabeçalho de cada prateleira e na tela de
+          Especificações. */}
+      {report && !isOnboarding && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-amber-line bg-amber-bg px-4 py-2.5">
+          <span className="rounded-sm bg-amber px-2 py-1 font-mono text-[11px] tracking-wider text-paper uppercase">
+            {t("hardwareSeal")}
+          </span>
+          <span className="min-w-0 text-sm text-ink">
+            {t("hardwareLine", { ready: readyCount, total: totalConsoles })}
+          </span>
+        </div>
+      )}
 
       {isOnboarding ? (
         <EmptyState
@@ -466,50 +553,63 @@ export function HomeScreen({
           }
         />
       ) : (
-        <>
-          {featured && featured.length > 0 && (
-            <div className="mb-8">
-              <SectionHeading className="mb-3">{t("continuePlaying")}</SectionHeading>
-              {(() => {
-                const [game] = featured;
-                const verdict = verdictFor(game.console_id);
-                return (
-                  <GameHero
-                    game={game}
-                    shortName={shortNameFor(game.console_id)}
-                    onOpenDetail={() => onOpenGame(game, nameFor(game.console_id), shortNameFor(game.console_id))}
-                    onPlay={playHandlerFor(game)}
-                    onToggleFavorite={() => toggleFavorite(game)}
-                    launchability={emulators ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict)) : undefined}
-                    onInstall={
-                      verdict?.adapter_id
-                        ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict))
-                        : undefined
-                    }
-                    installing={
-                      install.state.kind === "installing" && install.state.pendingGamePath === game.path
-                    }
-                  />
-                );
-              })()}
-            </div>
-          )}
+        // Três colunas do mockup H — trilho de consoles, palco de
+        // prateleiras, A Praça. Tracks em `rem` para o trilho (chrome de
+        // ícone, exceção já documentada no CLAUDE.md) e `minmax(0,1fr)` no
+        // palco, que é quem encolhe e cresce com a janela. Os breakpoints
+        // são `md`/`lg` de propósito, nunca `xl`: esta tela já perde 64px de
+        // sidebar + a barra de rolagem, e um `xl:` que casasse com o tamanho
+        // padrão da janela (1280px) nunca dispararia de verdade — é
+        // exatamente o bug de 2026-08-04 registrado no CLAUDE.md. Abaixo de
+        // `md` tudo empilha: trilho vira régua horizontal rolável e a Praça
+        // desce para o fim da tela.
+        <div className="grid gap-6 md:grid-cols-[4.5rem_minmax(0,1fr)] lg:grid-cols-[4.5rem_minmax(0,1fr)_minmax(15rem,19rem)]">
+          <div className="min-w-0 md:sticky md:top-4 md:self-start">
+            <ConsoleRail
+              consoles={(shelfConsoles ?? []).map(({ entry, gameCount }) => ({
+                consoleId: entry.console_id,
+                shortName: entry.short_name,
+                name: entry.name,
+                gameCount,
+              }))}
+              selected={railFilter}
+              onSelect={setRailFilter}
+            />
+          </div>
 
-          <div className="mb-8">
-            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-              <SectionHeading>{t("yourConsoles")}</SectionHeading>
-              <button
-                type="button"
-                onClick={onOpenLibrary}
-                className="font-mono text-xs tracking-wide text-accent-secondary uppercase hover:underline"
-              >
-                {t("seeAllConsoles")}
-              </button>
-            </div>
+          <div className="min-w-0">
+            {featured && featured.length > 0 && (
+              <div className="mb-8">
+                <SectionHeading className="mb-3">{t("continuePlaying")}</SectionHeading>
+                {(() => {
+                  const [game] = featured;
+                  const verdict = verdictFor(game.console_id);
+                  return (
+                    <GameHero
+                      game={game}
+                      shortName={shortNameFor(game.console_id)}
+                      onOpenDetail={() => onOpenGame(game, nameFor(game.console_id), shortNameFor(game.console_id))}
+                      onPlay={playHandlerFor(game)}
+                      onToggleFavorite={() => toggleFavorite(game)}
+                      launchability={
+                        emulators ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict)) : undefined
+                      }
+                      onInstall={
+                        verdict?.adapter_id
+                          ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict))
+                          : undefined
+                      }
+                      installing={install.state.kind === "installing" && install.state.pendingGamePath === game.path}
+                    />
+                  );
+                })()}
+              </div>
+            )}
+
             {shelfConsoles === null ? (
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <div key={i} className="h-44 w-[210px] shrink-0 animate-pulse rounded-md border border-line bg-panel" />
+              <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))]">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className="aspect-[3/4] animate-pulse rounded-lg border border-line bg-panel" />
                 ))}
               </div>
             ) : shelfConsoles.length === 0 ? (
@@ -524,44 +624,53 @@ export function HomeScreen({
                 }
               />
             ) : (
-              // Rolagem horizontal, não grade: a prateleira é um resumo curto
-              // do que o usuário já configurou, não o catálogo — o card
-              // "media" (mesmo de ConsolesScreen) cabe ~5-6 por vez numa
-              // janela padrão, e rolar lateralmente é o vocabulário que a home
-              // do Steam/GOG já usa para "seus jogos" vs. "a loja inteira".
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {shelfConsoles.map(({ entry, readiness, hasFolder, gameCount }) => (
-                  <div key={entry.console_id} className="w-[210px] shrink-0">
-                    <ConsoleCard
-                      entry={entry}
-                      readiness={readiness}
-                      size="media"
-                      hasFolder={hasFolder}
-                      gameCount={gameCount}
-                      labels={cardLabels}
-                      onOpen={() => onOpenConsole(entry.console_id, entry.name, entry.short_name)}
+              shelfConsoles
+                .filter(({ entry }) => railFilter === null || entry.console_id === railFilter)
+                .map(({ entry, games }) => {
+                  const verdict = verdictFor(entry.console_id);
+                  const lista = games ?? [];
+                  return (
+                    <LibraryShelf
+                      key={entry.console_id}
+                      consoleId={entry.console_id}
+                      name={entry.name}
+                      headline={verdict?.headline}
+                      games={lista.slice(0, SHELF_SIZE)}
+                      totalCount={lista.length}
+                      onOpenConsole={() => onOpenConsole(entry.console_id, entry.name, entry.short_name)}
+                      onChooseFolder={onOpenLibrary}
+                      renderGame={(game) => (
+                        <GameTile
+                          game={game}
+                          shortName={entry.short_name}
+                          onOpenDetail={() => onOpenGame(game, entry.name, entry.short_name)}
+                          onPlay={playHandlerFor(game)}
+                          onToggleFavorite={() => toggleFavorite(game)}
+                          launchability={
+                            emulators
+                              ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
+                              : undefined
+                          }
+                          onInstall={
+                            verdict?.adapter_id
+                              ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict))
+                              : undefined
+                          }
+                        />
+                      )}
                     />
-                  </div>
-                ))}
-              </div>
+                  );
+                })
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-            <p className="font-mono text-xs tracking-wide text-muted uppercase tabular-nums">
-              {report
-                ? t("statsPlaytimeAndConsoles", {
-                    playtime: formatPlaytimeClean(totalPlaytime),
-                    ready: readyCount,
-                    total: totalConsoles,
-                  })
-                : t("statsPlaytimeOnly", { playtime: formatPlaytimeClean(totalPlaytime) })}
-            </p>
-            <Button variant="chrome" onClick={onOpenAllGames} {...{ "data-gamepad-start": "" }}>
-              {t("seeAllGames")}
-            </Button>
+          {/* Fixa junto com o trilho enquanto as prateleiras rolam: a
+              coluna é curta e, sem isso, sumia logo no primeiro rolar,
+              deixando um vão vazio do lado direito da tela inteira. */}
+          <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
+            <PracaPanel />
           </div>
-        </>
+        </div>
       )}
     </ScreenContainer>
   );
