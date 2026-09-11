@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/doufl/zeux/internal/emulator"
 )
 
 // seedFirstRun grava, para os emuladores em que já mapeamos o mecanismo, um
@@ -18,7 +20,8 @@ import (
 //
 // Mapeados (D8):
 // - DuckStation (modo portátil + settings.ini)
-// - PCSX2 (inis/PCSX2_qt.ini)
+// - PCSX2 (inis/PCSX2.ini no diretório de dados do usuário, não na pasta
+//   gerenciada — ver seedPCSX2)
 // - Dolphin (Dolphin.ini)
 // - PPSSPP (ppsspp.ini)
 // - Flycast (emu.cfg)
@@ -35,7 +38,9 @@ func seedFirstRun(installDir, adapterID string) error {
 	case "duckstation":
 		return seedDuckStationPortable(installDir)
 	case "pcsx2":
-		return seedPCSX2(installDir)
+		// Sem installDir: o PCSX2 no Windows e no Linux ignora a pasta
+		// gerenciada e lê a config do diretório de dados do usuário.
+		return seedPCSX2()
 	case "dolphin":
 		return seedDolphin(installDir)
 	case "ppsspp":
@@ -153,28 +158,62 @@ func preservePortableUserData(oldDir, newDir string) error {
 	})
 }
 
-// seedPCSX2 escreve a chave de pulo do assistente de primeira execução no
-// arquivo de configuração do PCSX2.
+// pcsx2SeedPath diz onde semear a configuração do PCSX2. Aponta para o
+// arquivo que o binário real lê (Documentos\PCSX2\inis\PCSX2.ini no Windows,
+// ~/.config/PCSX2/inis/PCSX2.ini no Linux), calculado por um único lugar no
+// projeto — internal/emulator, que já é dependência de internal/install.
 //
-// O PCSX2 não publica a chave exata, mas a existência de PCSX2_qt.ini já
-// suprime o assistente: o emulador só mostra o wizard quando nenhum arquivo de
-// configuração existe. Gravar um arquivo mínimo é suficiente.
-func seedPCSX2(installDir string) error {
-	iniDir := filepath.Join(installDir, "inis")
-	if err := os.MkdirAll(iniDir, 0o755); err != nil {
-		return err
-	}
+// var, não chamada direta: o teste substitui por um caminho temporário e
+// assim nunca encosta na configuração real de quem roda a suíte (mesmo
+// padrão de pcsx2ConfigPath em internal/emulator).
+var pcsx2SeedPath = emulator.PCSX2ConfigPath
 
-	iniPath := filepath.Join(iniDir, "PCSX2_qt.ini")
-	if _, err := os.Stat(iniPath); err == nil {
-		// Já existe: não sobrescrevemos.
+// seedPCSX2 grava a configuração mínima que faz o PCSX2 abrir direto no
+// jogo, sem o "Assistente de Configuração do PCSX2" na frente.
+//
+// Duas chaves, as duas necessárias, medidas contra o binário real (PCSX2
+// v2.8.2, Windows, 2026-09-11 — o método e os oito experimentos estão em
+// docs/decisoes.md):
+//
+//   - "SettingsVersion = 1" é a que manda. Sem ela o PCSX2 trata o arquivo
+//     como se não existisse config válida: não mostra o assistente, mas
+//     também não cria a árvore de dados (memcards, sstates, logs…) e recusa
+//     dar boot em qualquer jogo, em silêncio. É a armadilha do arquivo
+//     "mínimo demais" — parecia funcionar porque o assistente sumia.
+//   - "SetupWizardIncomplete = false" é a chave do assistente propriamente
+//     dita, e só é lida quando a de cima está presente: com
+//     "SettingsVersion = 1" e "SetupWizardIncomplete = true" o assistente
+//     volta a aparecer. Gravá-la explícita (em vez de contar com o default)
+//     é o que deixa a intenção legível.
+//
+// O que NÃO é semeado, de propósito: o BIOS. O ZeuX não tem como saber qual
+// arquivo o usuário possui, e inventar um caminho faria o PCSX2 falhar de um
+// jeito pior. Com o assistente suprimido o PCSX2 procura o BIOS só na raiz
+// da pasta apontada por BiosDir — quem cobre esse buraco é o aviso de BIOS
+// do próprio ZeuX, não este arquivo.
+func seedPCSX2() error {
+	iniPath, err := pcsx2SeedPath()
+	if err != nil {
+		// Sistema operacional em que o caminho do PCSX2 não foi confirmado
+		// (macOS). Semear um palpite seria pior do que não semear nada: o
+		// assistente continua aparecendo, mas nenhum arquivo estranho é
+		// deixado para trás. Instalar não falha por causa disso.
 		return nil
 	}
 
-	// Arquivo mínimo: gravar um INI vazio é suficiente para suprimir o wizard.
-	const seed = "[Main]\n"
+	if _, err := os.Stat(iniPath); err == nil {
+		// Já existe: é a configuração de verdade do usuário, com jogos,
+		// controles e BIOS já ajustados. Não se toca.
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(iniPath), 0o755); err != nil {
+		return fmt.Errorf("criando a pasta de configuração do PCSX2: %w", err)
+	}
+
+	const seed = "[UI]\nSettingsVersion = 1\nSetupWizardIncomplete = false\n"
 	if err := os.WriteFile(iniPath, []byte(seed), 0o644); err != nil {
-		return fmt.Errorf("criando inis/PCSX2_qt.ini: %w", err)
+		return fmt.Errorf("criando %s: %w", iniPath, err)
 	}
 	return nil
 }

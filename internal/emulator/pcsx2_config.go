@@ -18,25 +18,50 @@ import (
 // inclusive a cópia instalada pelo próprio ZeuX): mesmo a instalação
 // gerenciada (AppImage) não roda em modo portátil — grava em
 // "~/.config/PCSX2/" (padrão XDG, via os.UserConfigDir()), não em
-// "<diretório da instalação>/inis/". `seedPCSX2` (firstrun.go) grava um
+// "<diretório da instalação>/inis/". `seedPCSX2` (firstrun.go) gravava um
 // "inis/PCSX2_qt.ini" dentro do diretório gerenciado partindo do
-// pressuposto de modo portátil — achado real desta sessão mostra que esse
-// arquivo nunca é lido pelo binário de verdade nesta plataforma; a correção
-// de seedPCSX2 fica fora do escopo do H1, registrada aqui para não se
-// perder.
+// pressuposto de modo portátil, e esse arquivo nunca era lido pelo binário
+// de verdade — **corrigido em 2026-09-11**: hoje `seedPCSX2` chama
+// `PCSX2ConfigPath()` (abaixo) e semeia o arquivo que o PCSX2 realmente lê.
 //
-// Windows: convenção documentada pelo próprio projeto PCSX2 — pasta
-// "Documentos\PCSX2\", não "%AppData%\PCSX2\" (esse era o palpite anterior
-// deste arquivo, errado: PCSX2 no Windows sem modo portátil usa a pasta de
-// Documentos, não AppData; seedPCSX2 não ativa modo portátil para o PCSX2,
-// só suprime o assistente de primeira execução). Não verificado contra um
-// binário Windows real nesta sessão (2026-09-11, achado reportado pelo
-// Douglas: o painel de configurações do PCSX2 parecia não funcionar — o
-// caminho antigo lia/gravava em AppData, onde o PCSX2 nunca escreveu nada).
-// Se o "Documentos" do usuário estiver redirecionado (OneDrive, política de
-// empresa), este caminho erra — não há como descobrir isso sem a API nativa
-// de pastas conhecidas do Windows, que o projeto evita para não crescer a
-// superfície de dependências.
+// Windows: **verificado ao vivo em 2026-09-11**, contra o PCSX2 v2.8.2 real
+// desta máquina, pelo mesmo método de snapshot que resolveu o Flycast
+// (fotografar Documentos, %AppData%, %LocalAppData% e a pasta da instalação
+// antes e depois de executar o binário). O que o PCSX2 fez ao rodar:
+//
+//   - Criou a árvore de dados inteira dentro de "Documentos\PCSX2\":
+//     cache, cheats, covers, gamesettings, inputprofiles, logs, memcards,
+//     patches, resources, snaps, sstates, textures, videos, e
+//     inis\debuggerlayouts + inis\debuggersettings.
+//   - Reescreveu "Documentos\PCSX2\inis\PCSX2.ini" com config de verdade
+//     (13 KB, dezenas de seções) por cima do esboço de 96 bytes que o ZeuX
+//     tinha deixado ali.
+//   - **Não tocou em "%AppData%\PCSX2\"** — a pasta continuou com o
+//     carimbo de horário anterior ao teste.
+//
+// Ou seja: o caminho abaixo estava certo, e agora é fato observado, não
+// convenção. O palpite que este arquivo carregava antes ("%AppData%\PCSX2")
+// era mesmo o errado.
+//
+// Achado de bônus do mesmo teste, que vale para BiosDir (bios_dir.go): o
+// BIOS desta máquina estava em "bios\ps2-bios-usa\ps2 bios usa\SCPH-39001…\",
+// vários níveis abaixo, e mesmo assim acabou configurado sozinho — o
+// "[Folders] Bios" do arquivo real aponta para essa subpasta funda. **Quem
+// varre subpasta é o assistente de primeira execução, não o carregamento do
+// jogo**: medido em 2026-09-11 (ver decisoes.md), ao dar boot o PCSX2 olha
+// exatamente a pasta configurada em "[Folders] Bios" e mais nada — o log diz
+// "Searching for a BIOS image in '<pasta>'" e falha se o arquivo estiver um
+// nível abaixo. Como o ZeuX suprime o assistente, a orientação ao usuário
+// tem de ser colocar o BIOS **na raiz** da pasta que BiosDir aponta.
+// De qualquer forma o critério padrão de BiosDirLooksEmpty ("a pasta não tem
+// nada dentro") continua servindo para o PCSX2 — a pasta é dedicada ao BIOS,
+// não é preciso um critério próprio como o do Flycast.
+//
+// Ressalva que permanece: se o "Documentos" do usuário estiver redirecionado
+// (OneDrive, política de empresa), este caminho erra — não há como descobrir
+// isso sem a API nativa de pastas conhecidas do Windows, que o projeto evita
+// para não crescer a superfície de dependências. A máquina onde a
+// verificação rodou não tem esse redirecionamento.
 //
 // macOS: sem confirmação nenhuma — devolve erro, e BiosDir/pcsx2ConfigPath
 // continuam recusando apontar qualquer caminho. Mesma regra de "melhor não
@@ -58,6 +83,18 @@ func pcsx2DataDir() (string, error) {
 	default:
 		return "", fmt.Errorf("caminho de configuração do PCSX2 não confirmado neste sistema operacional")
 	}
+}
+
+// PCSX2ConfigPath expõe para fora do pacote o arquivo que o PCSX2 de fato
+// lê/grava. Existe por causa de `internal/install`, que precisa semear a
+// chave de pulo do assistente de primeira execução **neste** arquivo e não
+// dentro da pasta gerenciada — ver seedPCSX2 (install/firstrun.go) e a
+// entrada de 2026-09-11 em docs/decisoes.md. Expor a função em vez de
+// duplicar o caminho lá mantém uma única fonte de verdade sobre onde o
+// PCSX2 olha; `install` já depende de `emulator` (manager.go), então a
+// direção de dependência não muda.
+func PCSX2ConfigPath() (string, error) {
+	return pcsx2ConfigPath()
 }
 
 // pcsx2ConfigPath resolve o arquivo que o PCSX2 de fato lê/grava.

@@ -2,6 +2,7 @@ package emulator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -258,10 +259,7 @@ func (l *Launcher) supervise(session Session, cmd *exec.Cmd) {
 	waitErr := cmd.Wait()
 
 	endedAt := time.Now().UTC()
-	exitError := ""
-	if waitErr != nil {
-		exitError = waitErr.Error()
-	}
+	exitError := describeExitError(waitErr)
 
 	if err := l.sessions.Close(context.Background(), session.ID, endedAt, exitError); err != nil {
 		l.logger.Error("não foi possível fechar a sessão no banco", "sessao", session.ID, "erro", err)
@@ -271,6 +269,62 @@ func (l *Launcher) supervise(session Session, cmd *exec.Cmd) {
 		"sessao", session.ID,
 		"emulador", session.Emulator,
 		"duracao", endedAt.Sub(session.StartedAt).Round(time.Second))
+}
+
+// windowsDLLNotFound é o NTSTATUS STATUS_DLL_NOT_FOUND. O carregador do
+// Windows devolve este código quando o processo chega a nascer mas morre
+// antes da primeira instrução do emulador, porque uma DLL que o executável
+// importa não está no sistema.
+//
+// Não há checagem de sistema operacional em volta dele de propósito: código
+// de saída no Unix cabe em um byte (0-255), então nenhum processo de Linux ou
+// macOS consegue sair com este valor por acidente. Uma comparação a mais é
+// mais barata que um caminho por SO a mais.
+const windowsDLLNotFound = 0xC0000135
+
+// describeExitError traduz a saída do processo do emulador para uma frase em
+// que o usuário consiga agir.
+//
+// Verificado ao vivo em 2026-09-11, nesta máquina, depois de o Douglas
+// relatar que o PS1 e o PS2 "dizem que vão abrir e não abrem": o DuckStation
+// e o PCSX2 morriam em menos de 100 ms e gravavam "exit status 0xc0000135" na
+// sessão — texto que atravessava a API inteira sem explicar nada. Rodando os
+// dois executáveis direto pelo terminal, sem o ZeuX no meio, o mesmo código
+// se repetiu, e o runtime do Visual C++ que ambos importam
+// (VCRUNTIME140.dll, VCRUNTIME140_1.dll, MSVCP140.dll) não está instalado
+// aqui. O RetroArch continua abrindo normalmente porque o build dele para
+// Windows não importa nenhuma dessas DLLs — é isso que faz a mesma máquina
+// jogar SNES e N64 e não jogar PS1 nem PS2.
+//
+// Só este código ganha tradução. Qualquer outra saída diferente de zero
+// continua vindo crua, porque é comum e esperada quando o usuário fecha o
+// emulador pela janela: inventar explicação para ela seria pior que não
+// explicar nada.
+func describeExitError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		if message, ok := describeExitCode(exitErr.ExitCode()); ok {
+			return message
+		}
+	}
+
+	return err.Error()
+}
+
+// describeExitCode é separada de describeExitError para poder ser testada sem
+// precisar de um processo real que saia com um código do Windows — fabricar
+// um *exec.ExitError com código arbitrário não é portátil.
+func describeExitCode(code int) (string, bool) {
+	if uint32(code) == windowsDLLNotFound {
+		return "O emulador abriu e fechou na mesma hora porque o Windows não encontrou uma biblioteca que o executável dele precisa (código 0xC0000135). " +
+			"Na prática isso quase sempre é o runtime do Visual C++ da Microsoft, que o DuckStation e o PCSX2 exigem e não trazem junto. " +
+			"Instale o \"Microsoft Visual C++ Redistributable (x64)\" e abra o jogo de novo.", true
+	}
+	return "", false
 }
 
 // Sessions devolve o histórico, do mais recente para o mais antigo.

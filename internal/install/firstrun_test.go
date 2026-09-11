@@ -1,6 +1,7 @@
 package install
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -160,42 +161,80 @@ func TestPreservePortableUserDataSkipsNonPortableInstalls(t *testing.T) {
 	}
 }
 
-// Trava a regra: instalar PCSX2 grava a chave que pula o assistente de
-// primeira execução no arquivo de configuração.
-func TestSeedPCSX2WritesWizardSkip(t *testing.T) {
-	dir := t.TempDir()
+// pcsx2SeedEmTempDir aponta a semeadura do PCSX2 para um arquivo temporário
+// e devolve o caminho. Existe porque o alvo de verdade é o diretório de
+// dados do usuário (Documentos\PCSX2 no Windows): sem esta troca, o teste
+// escreveria na configuração real de quem roda a suíte — exatamente o tipo
+// de vazamento que já apagou dados de verdade nesta máquina (2026-09-11,
+// docs/decisoes.md).
+func pcsx2SeedEmTempDir(t *testing.T) string {
+	t.Helper()
 
-	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+	iniPath := filepath.Join(t.TempDir(), "PCSX2", "inis", "PCSX2.ini")
+	original := pcsx2SeedPath
+	pcsx2SeedPath = func() (string, error) { return iniPath, nil }
+	t.Cleanup(func() { pcsx2SeedPath = original })
+	return iniPath
+}
+
+// Trava a regra: instalar PCSX2 grava, no arquivo que o binário real lê, as
+// DUAS chaves medidas contra o PCSX2 v2.8.2 em 2026-09-11 — "SettingsVersion"
+// (sem ela o PCSX2 ignora o arquivo, não cria a árvore de dados e não dá
+// boot em jogo nenhum) e "SetupWizardIncomplete = false" (o assistente em si,
+// que só é lido quando a primeira está presente).
+func TestSeedPCSX2WritesWizardSkip(t *testing.T) {
+	iniPath := pcsx2SeedEmTempDir(t)
+
+	if err := seedFirstRun(t.TempDir(), "pcsx2"); err != nil {
 		t.Fatalf("seedFirstRun: %v", err)
 	}
 
-	iniPath := filepath.Join(dir, "inis", "PCSX2_qt.ini")
 	got, err := os.ReadFile(iniPath)
 	if err != nil {
-		t.Fatalf("inis/PCSX2_qt.ini não foi criado: %v", err)
+		t.Fatalf("PCSX2.ini não foi criado em %s: %v", iniPath, err)
 	}
 
-	want := "[Main]\n"
+	want := "[UI]\nSettingsVersion = 1\nSetupWizardIncomplete = false\n"
 	if string(got) != want {
-		t.Errorf("PCSX2_qt.ini = %q, want %q", got, want)
+		t.Errorf("PCSX2.ini = %q, want %q", got, want)
 	}
 }
 
-// Trava a regra: um arquivo PCSX2_qt.ini pré-existente nunca é sobrescrito.
+// Trava a regra que nasceu do bug: a semeadura NÃO pode cair na pasta
+// gerenciada pelo ZeuX. O arquivo que ficava em "<instalação>/inis/" nunca
+// era lido pelo binário real — era código morto que deixava o assistente
+// aparecer assim mesmo.
+func TestSeedPCSX2DoesNotWriteInsideManagedDir(t *testing.T) {
+	pcsx2SeedEmTempDir(t)
+
+	installDir := t.TempDir()
+	if err := seedFirstRun(installDir, "pcsx2"); err != nil {
+		t.Fatalf("seedFirstRun: %v", err)
+	}
+
+	entries, err := os.ReadDir(installDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("a pasta gerenciada foi tocada: %v", entries)
+	}
+}
+
+// Trava a regra: um PCSX2.ini pré-existente é a configuração de verdade do
+// usuário (jogos, controle, BIOS) e nunca é sobrescrito.
 func TestSeedPCSX2DoesNotOverwriteExistingSettings(t *testing.T) {
-	dir := t.TempDir()
-	iniDir := filepath.Join(dir, "inis")
-	if err := os.MkdirAll(iniDir, 0o755); err != nil {
+	iniPath := pcsx2SeedEmTempDir(t)
+	if err := os.MkdirAll(filepath.Dir(iniPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	iniPath := filepath.Join(iniDir, "PCSX2_qt.ini")
-	custom := "[Main]\nGPURenderer=Vulkan\n"
+	custom := "[UI]\nSettingsVersion = 1\nTheme = darkfusionblue\n"
 	if err := os.WriteFile(iniPath, []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+	if err := seedFirstRun(t.TempDir(), "pcsx2"); err != nil {
 		t.Fatalf("seedFirstRun: %v", err)
 	}
 
@@ -204,9 +243,34 @@ func TestSeedPCSX2DoesNotOverwriteExistingSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(got) != custom {
-		t.Errorf("PCSX2_qt.ini existente foi alterado: got %q, want %q", got, custom)
+		t.Errorf("PCSX2.ini existente foi alterado: got %q, want %q", got, custom)
 	}
 }
+
+// Trava a regra: num sistema operacional onde o caminho do PCSX2 não foi
+// confirmado (macOS), instalar não falha — só não semeia nada.
+func TestSeedPCSX2SkipsWhenPathUnknown(t *testing.T) {
+	original := pcsx2SeedPath
+	pcsx2SeedPath = func() (string, error) {
+		return "", errCaminhoDesconhecidoNoTeste
+	}
+	t.Cleanup(func() { pcsx2SeedPath = original })
+
+	installDir := t.TempDir()
+	if err := seedFirstRun(installDir, "pcsx2"); err != nil {
+		t.Fatalf("seedFirstRun deveria ser no-op, devolveu: %v", err)
+	}
+
+	entries, err := os.ReadDir(installDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("nada deveria ter sido escrito: %v", entries)
+	}
+}
+
+var errCaminhoDesconhecidoNoTeste = errors.New("caminho não confirmado neste sistema operacional")
 
 // Trava a regra: instalar Dolphin grava a chave que marca o prompt de
 // analytics como respondido, suprimindo o wizard.

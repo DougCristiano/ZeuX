@@ -44,7 +44,12 @@ func TestManagedEmulatorDirDefaultsToSharedForUnknownAdapter(t *testing.T) {
 // console dele, não mais num diretório achatado por adapter.
 func TestFindBinaryLocatesSingleConsoleAdapterInsideConsoleFolder(t *testing.T) {
 	configHome := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", configHome) // AppData no Windows não se aplica aqui; testado em Linux.
+	// XDG_CONFIG_HOME isola no Linux; AppData isola no Windows (achado real de
+	// 2026-09-11, docs/decisoes.md: sem esta segunda linha, os.UserConfigDir()
+	// no Windows ignora XDG_CONFIG_HOME e este teste grava/apaga dentro do
+	// %AppData%\ZeuX de verdade de quem roda a suíte).
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	root, err := ManagedRoot()
 	if err != nil {
@@ -80,7 +85,11 @@ func TestFindBinaryLocatesSingleConsoleAdapterInsideConsoleFolder(t *testing.T) 
 // tempo indetectáveis em qualquer sistema Linux.
 func TestFindBinaryLocatesAppImageByGlobWhenExactNameDoesNotMatch(t *testing.T) {
 	configHome := t.TempDir()
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e o teste grava/apaga dentro do %AppData%\ZeuX real de
+	// quem roda a suíte (achado de 2026-09-11, docs/decisoes.md).
 	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	root, err := ManagedRoot()
 	if err != nil {
@@ -116,7 +125,11 @@ func TestFindBinaryLocatesAppImageByGlobWhenExactNameDoesNotMatch(t *testing.T) 
 // sem executar o binário para perguntar a ele.
 func TestFindBinaryReadsVersionMarkerForManagedInstall(t *testing.T) {
 	configHome := t.TempDir()
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e o teste grava/apaga dentro do %AppData%\ZeuX real de
+	// quem roda a suíte (achado de 2026-09-11, docs/decisoes.md).
 	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	root, err := ManagedRoot()
 	if err != nil {
@@ -148,7 +161,11 @@ func TestFindBinaryReadsVersionMarkerForManagedInstall(t *testing.T) {
 // existir) devolve versão vazia, não erro nem valor inventado.
 func TestFindBinaryVersionEmptyWithoutMarker(t *testing.T) {
 	configHome := t.TempDir()
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e o teste grava/apaga dentro do %AppData%\ZeuX real de
+	// quem roda a suíte (achado de 2026-09-11, docs/decisoes.md).
 	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	root, err := ManagedRoot()
 	if err != nil {
@@ -177,7 +194,11 @@ func TestFindBinaryVersionEmptyWithoutMarker(t *testing.T) {
 // uma às cegas seria pior que não achar nenhuma.
 func TestFindBinaryDoesNotGuessBetweenMultipleAppImages(t *testing.T) {
 	configHome := t.TempDir()
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e o teste grava/apaga dentro do %AppData%\ZeuX real de
+	// quem roda a suíte (achado de 2026-09-11, docs/decisoes.md).
 	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	root, err := ManagedRoot()
 	if err != nil {

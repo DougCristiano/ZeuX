@@ -1083,6 +1083,226 @@ apontar o padrão — onde o Flycast procura sem ninguém configurar nada — em
 vez de ler o `emu.cfg`, que traria uma segunda fonte de verdade sobre o
 mesmo assunto.
 
+### PS1 e PS2 não abriam: faltava o runtime do Visual C++, não era o caminho do BIOS — 2026-09-11
+
+O Douglas relatou, no mesmo dia das duas entradas acima, que "o PCSX2 ainda é
+um problema, antes estava funcionando normal", e logo depois que o
+DuckStation também "diz que vai abrir e não abre". A suspeita natural era
+regressão das mudanças de BIOS/config do PCSX2 daquela sessão. **Não era.**
+
+O que a investigação mostrou, em ordem:
+
+- `GET /sessions` tinha o mesmo carimbo em **todas** as sessões de PS1 e PS2,
+  sem exceção: `exit_error: "exit status 0xc0000135"`, duração de 0 a 1
+  segundo. Nenhuma sessão de DuckStation ou PCSX2 nesta máquina jamais durou
+  mais que isso. As sessões longas de verdade (SNES, N64, GBA) são todas de
+  RetroArch.
+- `0xC0000135` é o NTSTATUS `STATUS_DLL_NOT_FOUND`: o processo nasce e o
+  carregador do Windows o mata antes da primeira instrução, por faltar uma
+  DLL importada.
+- Rodar `duckstation-qt-x64-ReleaseLTCG.exe` e `pcsx2-qt.exe` **direto pelo
+  terminal, sem o ZeuX no meio**, reproduziu exatamente o mesmo código. Ou
+  seja: não passa por código nosso.
+- A tabela de importação dos dois binários pede `VCRUNTIME140.dll`,
+  `VCRUNTIME140_1.dll` e `MSVCP140.dll` (o DuckStation também
+  `MSVCP140_ATOMIC_WAIT.dll`). Nenhuma delas existe em `C:\Windows\System32`
+  nesta máquina, e não há nenhuma entrada "Visual C++" no registro de
+  programas instalados.
+- O `retroarch.exe` **não importa nenhuma dessas DLLs** — é isso, e só isso,
+  que faz a mesma máquina jogar SNES e N64 normalmente e não abrir PS1 nem
+  PS2. É o mesmo motivo já registrado para o Vita3K na entrada anterior.
+
+**Causa raiz:** o runtime do Microsoft Visual C++ (x64) não está instalado
+nesta máquina. Instalá-lo é mexer no sistema do usuário, coisa que o
+CLAUDE.md manda perguntar antes — então ficou como recomendação ao Douglas,
+não como ação.
+
+**O que foi corrigido no código:** `supervise` (`internal/emulator/session.go`)
+gravava `waitErr.Error()` cru na sessão, então o único vestígio do problema
+era a string `"exit status 0xc0000135"` — que além de opaca, nem chega à tela
+(o front tem `exit_error` em `src/api/types.ts` e não exibe em lugar nenhum).
+Agora `describeExitError` traduz **só este código** numa frase acionável que
+nomeia o runtime que falta, pelo princípio 3 (nomeie o componente que barra).
+Qualquer outro código de saída continua vindo cru de propósito: saída
+diferente de zero é rotina quando o usuário fecha o emulador pela janela, e
+inventar explicação para ela enganaria mais do que o código.
+
+**Depois de instalar o runtime, a verificação que faltava foi feita.** Com o
+VC++ Redistributable instalado (autorizado pelo Douglas), o `pcsx2-qt.exe`
+passou a executar de verdade, e o método de snapshot do Flycast finalmente
+pôde rodar para o PCSX2 v2.8.2. Resultado:
+
+- O PCSX2 criou a árvore de dados inteira em **`Documentos\PCSX2\`** (cache,
+  cheats, covers, gamesettings, inputprofiles, logs, memcards, patches,
+  resources, snaps, sstates, textures, videos, `inis\debuggerlayouts`,
+  `inis\debuggersettings`).
+- Reescreveu `Documentos\PCSX2\inis\PCSX2.ini` com config real de 13 KB por
+  cima do esboço de 96 bytes que o ZeuX tinha deixado ali.
+- **Não encostou em `%AppData%\PCSX2\`.**
+
+Ou seja: `Documentos\PCSX2\` **estava certo**, e deixou de ser convenção para
+virar fato observado. `pcsx2DataDir` e `BiosDir` não precisaram mudar — só os
+comentários, que agora dizem "verificado" em vez de "não verificado".
+
+**Achado de bônus, que fecha uma dúvida aberta:** o PCSX2 **varre subpastas**
+atrás do BIOS. O BIOS desta máquina estava três níveis abaixo
+(`bios\ps2-bios-usa\ps2 bios usa\SCPH-39001…\*.BIN`, do jeito que o .zip foi
+extraído), e o PCSX2 achou sozinho e gravou
+`[Folders] Bios = bios\ps2-bios-usa\...` mais
+`[Filenames] BIOS = SCPH-39001_BIOS_V7_USA_160.BIN`. Por isso o critério
+padrão de `BiosDirLooksEmpty` ("a pasta não tem nada dentro") **basta** para o
+PCSX2 — ele não precisa do critério próprio que o Flycast precisou.
+
+**Segunda causa, achada por acidente e mais grave que a primeira: rodar
+`go test` nesta máquina apagou a instalação real do DuckStation do Douglas.**
+Depois que o runtime foi instalado, o `pcsx2-qt.exe` abriu normalmente mas o
+`duckstation-qt-x64-ReleaseLTCG.exe` tinha **sumido** — a pasta gerenciada do
+DuckStation tinha sobrado só com `.zeux-version` e um arquivo de **1 byte**
+chamado `duckstation-qt`, contendo a letra `x`. Esse byte é assinatura: é
+literalmente o que `TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder`
+(`internal/install/manager_test.go`) escreve —
+`os.WriteFile(filepath.Join(staging, "duckstation-qt"), []byte("x"), 0o755)`.
+
+A causa é uma suposição de Unix no isolamento dos testes. Vários deles se
+isolam com `t.Setenv("XDG_CONFIG_HOME", t.TempDir())`, mas quem resolve a
+raiz é `emulator.ManagedRoot()` → `AppDataDir()` → **`os.UserConfigDir()`**, e
+no Windows essa função lê `%AppData%` e **ignora `XDG_CONFIG_HOME`** (a
+variável só vale nos caminhos Unix da biblioteca padrão do Go). Resultado: no
+Windows esses testes não se isolam de nada — eles escrevem, promovem e
+**apagam** dentro do `%AppData%\ZeuX` de verdade do usuário.
+
+O mesmo mecanismo explica a falha de `TestFindBinaryVersionEmptyWithoutMarker`
+nesta máquina (`version = "v0.10.1", esperava vazio sem marcador gravado`): o
+teste está lendo o `.zeux-version` real da instalação do Douglas, não um
+diretório temporário.
+
+**Consequência prática, que precisa virar correção:** hoje, no Windows,
+rodar a suíte de testes do próprio projeto destrói dados do usuário. O
+conserto certo não é trocar a variável de ambiente — é os testes injetarem a
+raiz em vez de perguntarem ao sistema operacional onde ela fica. Isso ficou
+**registrado e não corrigido** nesta sessão: mexe em vários testes de
+`internal/install` e `internal/emulator` ao mesmo tempo, e o Douglas estava
+com o app aberto usando a máquina. Enquanto não for corrigido, **não rode
+`go test ./...` no Windows numa máquina com instalação real do ZeuX.**
+
+**Causa terciária, de ambiente, não de código:** havia um `zeuxd` de teste
+desta sessão de IA ocupando a porta 7777 (`zeux-dev-tools\zeuxd.exe`, iniciado
+às 02:46). O app real do Douglas subiu às 03:46, uma hora depois, e o sidecar
+dele não teve porta para ligar — o app acabou conversando com o daemon de
+teste. Isso não causou o 0xC0000135 (reproduzido fora do ZeuX), mas é
+confusão real de diagnóstico. O processo foi encerrado e a porta devolvida.
+**Regra que fica:** daemon de teste de sessão de IA não pode ficar vivo depois
+que a sessão termina, porque ele sequestra silenciosamente o app de verdade.
+
+**O que quebra se desfizer:** um emulador que morre no carregador do Windows
+volta a registrar só um código hexadecimal que ninguém consegue agir em cima,
+e o próximo diagnóstico recomeça do zero.
+
+### O assistente do PCSX2 aparecia porque `seedPCSX2` semeava no lugar errado — e o lugar certo precisa de duas chaves, não uma — 2026-09-11
+
+Com o runtime do Visual C++ instalado (entrada acima), o PCSX2 finalmente
+abriu de verdade nesta máquina e o Douglas viu o que ninguém tinha visto
+antes: o **"Assistente de Configuração do PCSX2"** na frente do jogo, apesar
+de o ZeuX ter um `seedPCSX2` justamente para suprimi-lo.
+
+**Causa raiz:** `seedPCSX2` gravava `inis/PCSX2_qt.ini` **dentro da pasta
+gerenciada pelo ZeuX**, presumindo modo portátil. O binário real, no Windows,
+lê `Documentos\PCSX2\inis\PCSX2.ini` e jamais olha a pasta gerenciada (o
+comentário de `pcsx2DataDir` já alertava para isso desde o Linux). Era código
+morto: o arquivo existia, não suprimia nada, e ninguém percebia porque o
+PCSX2 nem chegava a executar nesta máquina.
+
+**Como foi medido.** Oito execuções do `pcsx2-qt.exe` v2.8.2 de verdade,
+numa **cópia isolada** da instalação (modo portátil via `portable.ini` ao
+lado do executável, para não encostar em `Documentos\PCSX2\` do Douglas),
+variando só o conteúdo do `inis\PCSX2.ini` e observando (a) o título das
+janelas de topo do processo, (b) as pastas criadas e (c) o `emulog.txt`:
+
+| ini semeado | assistente? | árvore de dados | boot de ROM |
+|---|---|---|---|
+| nenhum arquivo | **aparece** | criada | — |
+| `[Main]` vazio (o que o ZeuX gravava) | não | **não criada** | **não dá boot** |
+| `[UI] SetupWizardIncomplete = false` | não | **não criada** | **não dá boot** |
+| `[UI] SetupWizardIncomplete = true` | não | não criada | — |
+| idem + `[Folders]`/`[Filenames]` de BIOS | não | não criada | **não dá boot** |
+| `[UI] SettingsVersion = 1` | não | criada | — |
+| `[UI] SettingsVersion = 1` + `SetupWizardIncomplete = true` | **aparece** | criada | — |
+| `[UI] SettingsVersion = 1` + `SetupWizardIncomplete = false` | não | criada | **dá boot** |
+
+A armadilha está na segunda e na terceira linha: um arquivo "mínimo demais"
+faz o assistente sumir e **parece** resolver, mas o PCSX2 trata a config como
+inválida — não cria `memcards`, `sstates`, `logs`, e recusa dar boot em
+qualquer jogo sem dizer por quê. Trocar um assistente visível por um
+emulador que abre e não roda nada seria estrago maior que o problema
+original.
+
+**O que manda é `SettingsVersion`.** Com ela presente, o PCSX2 lê o resto do
+arquivo — inclusive `SetupWizardIncomplete`, que aí passa a valer de verdade
+(linha 7 da tabela prova: com `SettingsVersion` e o assistente marcado como
+incompleto, ele volta). Sem ela, nada do arquivo é levado a sério.
+
+**Correção:** `seedPCSX2` (`internal/install/firstrun.go`) agora resolve o
+caminho por `emulator.PCSX2ConfigPath()` — função nova, exportada só para
+isto, para que exista **uma** fonte de verdade sobre onde o PCSX2 olha
+(`internal/install` já dependia de `internal/emulator` via `manager.go`, então
+a direção de dependência não mudou) — e grava as duas chaves. A regra de "se
+já existe, não mexe" foi mantida: o `PCSX2.ini` de 13 KB do Douglas, com
+BIOS, tema e controle configurados, não é tocado. Em macOS, onde o caminho
+nunca foi confirmado, a semeadura vira no-op silencioso em vez de erro de
+instalação.
+
+**Correção de fato errado que estava documentado.** A entrada anterior (e os
+comentários de `pcsx2DataDir` e `bios_dir.go`) afirmavam que "o PCSX2 varre
+subpastas atrás do BIOS". **Não varre.** Quem varre é o assistente de
+primeira execução — foi ele que achou o BIOS três níveis abaixo e gravou
+`[Folders] Bios` apontando para a subpasta funda. No boot, o log é explícito:
+`Searching for a BIOS image in '<pasta configurada>'`, e falha se o arquivo
+estiver um nível abaixo. **Consequência direta desta correção:** com o
+assistente suprimido, o BIOS precisa estar na **raiz** da pasta que
+`BiosDir` aponta. O aviso de BIOS do próprio ZeuX é quem cobre isso; o que
+não se faz é o ZeuX chutar um caminho de BIOS no `PCSX2.ini`, porque não há
+como saber qual arquivo o usuário possui.
+
+**Verificação final, com o código de produção no circuito:** o `seedPCSX2`
+real semeou uma cópia portátil limpa, e o `pcsx2-qt.exe` rodou a partir dela
+— nenhuma janela de assistente, árvore de dados criada, `BIOS Found` e
+`ELF … is executing` no log, com a janela do jogo aberta.
+
+**O que quebra se desfizer:** todo usuário novo de PS2 volta a encontrar o
+assistente de configuração entre o clique em "Jogar" e o jogo — exatamente o
+tipo de fricção que o ZeuX existe para eliminar. E se alguém "simplificar" o
+seed tirando `SettingsVersion`, o sintoma que aparece não é o assistente de
+volta: é o PCSX2 abrindo e nunca dando boot em jogo nenhum.
+
+### `go test` no Windows destruindo instalação real — corrigido (2026-09-11)
+
+Fechamento da pendência registrada na entrada acima ("O assistente do
+DuckStation…", causa secundária): `os.UserConfigDir()` no Windows lê
+`%AppData%` e ignora `XDG_CONFIG_HOME` — só um subconjunto dos testes que
+isolam `ManagedRoot()`/`AppDataDir()` já setava as duas variáveis
+(`internal/api/server_test.go`, `internal/verdict/images_test.go`,
+`internal/igdb/scrape_test.go`, `internal/emulator/retroarch_config_test.go`).
+`internal/emulator/discovery_test.go` (5 testes) e `internal/install/manager_test.go`
+(4 testes, incluindo o próprio `TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder`
+que apagou o DuckStation do Douglas) setavam só `XDG_CONFIG_HOME` — no Windows
+isso não isolava nada, e a suíte lia/escrevia/apagava dentro do
+`%AppData%\ZeuX` real de quem rodasse os testes.
+
+**Corrigido:** as duas variáveis (`XDG_CONFIG_HOME` + `AppData`) agora são
+setadas juntas nos 9 testes que faltavam, mesmo padrão que já existia nos
+outros arquivos. `internal/emulator/bios_dir_test.go` não precisou de ajuste
+— o teste que só setava `XDG_CONFIG_HOME` já tinha `t.Skip` para todo SO que
+não seja Linux, antes de chegar no `Setenv`.
+
+**Ainda não verificado nesta sessão:** rodar a suíte de verdade num Windows
+com Go instalado, para confirmar que os 9 testes corrigidos passam e que
+nenhum outro caminho equivalente ficou de fora (esta sessão rodou numa
+máquina sem toolchain Go/mise instalado — revisão só estática).
+
+**O que quebra se desfizer:** volta o risco documentado acima — rodar
+`go test ./...` neste projeto, no Windows, com uma instalação real do ZeuX
+na máquina, pode apagar emuladores instalados de verdade.
+
 ---
 
 ## O que fica fora deste log, de propósito

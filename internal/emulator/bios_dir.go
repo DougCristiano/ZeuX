@@ -31,12 +31,18 @@ import (
 //     `/proc/<pid>/environ` do processo real, não do processo de bootstrap.
 //     Por isso este caso devolve o caminho global, não
 //     `ManagedEmulatorDir`: é para onde o PCSX2 realmente olha hoje.
-//   - PCSX2 (ps2), Windows: convenção documentada pelo próprio projeto
-//     PCSX2 (pasta "Documentos\PCSX2\bios", não modo portátil — mesma razão
-//     que o Linux: seedPCSX2 não ativa portable.ini para o PCSX2). Não
-//     verificado contra um binário Windows real nesta sessão (2026-09-11) —
-//     ver o comentário de pcsx2DataDir em pcsx2_config.go, que é quem
-//     calcula este caminho para as duas plataformas.
+//   - PCSX2 (ps2), Windows: verificado ao vivo em 2026-09-11 contra o PCSX2
+//     v2.8.2 real desta máquina — a pasta é "Documentos\PCSX2\bios", e não
+//     "%AppData%". O binário criou a árvore de dados inteira em Documentos e
+//     não encostou em %AppData%; detalhe da verificação no comentário de
+//     pcsx2DataDir em pcsx2_config.go, que é quem calcula este caminho para
+//     as duas plataformas. Quem varre subpastas atrás do BIOS é o
+//     assistente de primeira execução, **não** o carregamento do jogo:
+//     medido em 2026-09-11 com o assistente suprimido, o PCSX2 procura
+//     exatamente na pasta configurada e falha se o arquivo estiver um nível
+//     abaixo. Como o ZeuX suprime o assistente, o BIOS precisa estar na
+//     raiz desta pasta. O critério padrão de BiosDirLooksEmpty continua
+//     bastando aqui porque a pasta é dedicada ao BIOS e mais nada.
 //   - Flycast (dreamcast), Windows: verificado ao vivo em 2026-09-11 —
 //     ver flycastBiosDir abaixo.
 //

@@ -2,8 +2,10 @@ package emulator
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -113,6 +115,39 @@ func TestLauncherPlaytimeSumsByConsole(t *testing.T) {
 }
 
 func timePtr(t time.Time) *time.Time { return &t }
+
+// Trava a regressão real de 2026-09-11: o DuckStation e o PCSX2 abriam e
+// fechavam na hora, e a sessão guardava só "exit status 0xc0000135" — um
+// código que não diz ao usuário o que fazer. Este código específico precisa
+// virar frase acionável, nomeando o que está faltando (princípio 3: nomeie o
+// componente que barra).
+func TestDescribeExitCodeExplainsMissingWindowsDLL(t *testing.T) {
+	message, ok := describeExitCode(windowsDLLNotFound)
+	if !ok {
+		t.Fatal("0xC0000135 precisa ter explicação própria")
+	}
+	if !strings.Contains(message, "Visual C++") {
+		t.Errorf("a mensagem precisa nomear o runtime que falta, veio: %q", message)
+	}
+}
+
+// Trava a outra metade da regra: só o código conhecido é traduzido. Saída
+// diferente de zero é rotina quando o usuário fecha o emulador pela janela, e
+// inventar explicação para ela enganaria mais do que o código cru.
+func TestDescribeExitErrorKeepsUnknownCausesLiteral(t *testing.T) {
+	if got := describeExitError(nil); got != "" {
+		t.Errorf("sem erro não pode virar texto, veio %q", got)
+	}
+
+	if _, ok := describeExitCode(1); ok {
+		t.Error("código de saída comum não pode ganhar explicação inventada")
+	}
+
+	other := errors.New("signal: killed")
+	if got := describeExitError(other); got != "signal: killed" {
+		t.Errorf("erro que não é saída conhecida deve passar cru, veio %q", got)
+	}
+}
 
 func discardLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError + 1}))

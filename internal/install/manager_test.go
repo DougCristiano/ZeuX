@@ -16,7 +16,14 @@ import (
 // adapter. A prova real é a descoberta (findBinary, via Locate) achar
 // sozinha o que acabou de ser promovido.
 func TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e promote()/Uninstall() mexem na instalação real de
+	// emuladores de quem roda a suíte (achado de 2026-09-11, docs/decisoes.md:
+	// foi assim que TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder
+	// apagou o DuckStation de verdade do Douglas).
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	staging := t.TempDir()
 	if err := os.WriteFile(filepath.Join(staging, "duckstation-qt"), []byte("x"), 0o755); err != nil {
@@ -53,7 +60,14 @@ func TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder(t *testing.T) {
 // Dolphin atende dois consoles (gamecube, wii) — não tem "o console dele" e
 // precisa cair na pasta compartilhada, não duplicado em nenhum dos dois.
 func TestPromoteMultiConsoleAdapterGoesToSharedFolder(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e promote()/Uninstall() mexem na instalação real de
+	// emuladores de quem roda a suíte (achado de 2026-09-11, docs/decisoes.md:
+	// foi assim que TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder
+	// apagou o DuckStation de verdade do Douglas).
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	staging := t.TempDir()
 	if err := os.WriteFile(filepath.Join(staging, "dolphin-emu"), []byte("x"), 0o755); err != nil {
@@ -85,7 +99,14 @@ func TestPromoteMultiConsoleAdapterGoesToSharedFolder(t *testing.T) {
 // simetria entre os dois, já que cada um resolve o caminho de forma
 // independente (managedDirFor).
 func TestUninstallRemovesFromTheSameFolderPromoteUsed(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e promote()/Uninstall() mexem na instalação real de
+	// emuladores de quem roda a suíte (achado de 2026-09-11, docs/decisoes.md:
+	// foi assim que TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder
+	// apagou o DuckStation de verdade do Douglas).
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	staging := t.TempDir()
 	if err := os.WriteFile(filepath.Join(staging, "duckstation-qt"), []byte("x"), 0o755); err != nil {
@@ -112,7 +133,14 @@ func TestUninstallRemovesFromTheSameFolderPromoteUsed(t *testing.T) {
 // caso normal: o RetroArch é instalado manualmente pelo usuário), a recusa
 // vem do mesmo caminho de qualquer outro emulador nunca instalado pelo ZeuX.
 func TestUninstallRetroArchWithoutManagedInstallSaysNothingToRemove(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// AppData isola no Windows — sem isso, os.UserConfigDir() ignora
+	// XDG_CONFIG_HOME e promote()/Uninstall() mexem na instalação real de
+	// emuladores de quem roda a suíte (achado de 2026-09-11, docs/decisoes.md:
+	// foi assim que TestPromoteSingleConsoleAdapterGoesInsideConsoleFolder
+	// apagou o DuckStation de verdade do Douglas).
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("AppData", configHome)
 
 	manager := NewManager(mustCatalog(t), discardLogger())
 
