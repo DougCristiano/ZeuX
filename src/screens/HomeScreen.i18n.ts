@@ -37,6 +37,10 @@ export const dict = {
   // Modais de instalação/lançamento inline — mesmo texto de AllGamesScreen,
   // reaproveitado aqui porque a home lança o jogo em destaque do mesmo jeito.
   failedToOpenGame: { "pt-BR": "Não foi possível abrir o jogo", en: "Could not open the game" },
+  alreadyHaveEmulatorPointIt: {
+    "pt-BR": "Já tenho esse emulador — apontar onde ele está",
+    en: "I already have this emulator — point to it",
+  },
   failedToInstallEmulator: { "pt-BR": "Não foi possível instalar o emulador", en: "Could not install the emulator" },
   hardwareBelowRecommended: { "pt-BR": "Hardware abaixo do recomendado", en: "Hardware below the recommended" },
   cancel: { "pt-BR": "Cancelar", en: "Cancel" },

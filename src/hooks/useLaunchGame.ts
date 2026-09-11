@@ -38,6 +38,12 @@ export type LaunchStatus =
 export function useLaunchGame(opts?: { onLaunched?: () => void }) {
   const [statusByGameId, setStatusByGameId] = useState<Record<number, LaunchStatus>>({});
   const [launchError, setLaunchError] = useState<string | null>(null);
+  // B2 (docs/pendencias.md): guardado à parte da mensagem — a tela precisa
+  // saber SE o motivo foi "emulador não encontrado" pra oferecer a terceira
+  // ação do ErrorModal, e reescrever/adivinhar isso a partir do texto da
+  // mensagem (traduzível, em português) seria frágil. `null` cobre tanto
+  // "sem erro" quanto "erro que não veio de ApiError".
+  const [launchErrorCode, setLaunchErrorCode] = useState<string | null>(null);
   // Guardado só para o "Tentar de novo" do ErrorModal (M1,
   // docs/sprint-m-plano.md) — sem isto o botão não saberia qual jogo
   // relançar, já que o erro em si (`launchError`) não carrega o jogo.
@@ -72,10 +78,12 @@ export function useLaunchGame(opts?: { onLaunched?: () => void }) {
         const message = job.error ?? "O download do core não foi concluído.";
         setStatus(gameId, { kind: "error", message });
         setLaunchError(message);
+        setLaunchErrorCode(null);
       },
       onError: (message) => {
         setStatus(gameId, { kind: "error", message });
         setLaunchError(message);
+        setLaunchErrorCode(null);
       },
       networkErrorFallback: "Não foi possível acompanhar o download do core.",
     });
@@ -100,6 +108,7 @@ export function useLaunchGame(opts?: { onLaunched?: () => void }) {
             "O core foi baixado, mas o ZeuX continua não encontrando ele no computador. Tente abrir o jogo de novo; se persistir, confira a lista de cores na tela de Emuladores.";
           setStatus(game.id, { kind: "error", message });
           setLaunchError(message);
+          setLaunchErrorCode(null);
           return;
         }
         setStatus(game.id, { kind: "downloading-core", job: result.install_job });
@@ -116,6 +125,10 @@ export function useLaunchGame(opts?: { onLaunched?: () => void }) {
       const message = err instanceof ApiError ? err.message : "Não foi possível abrir o jogo.";
       setStatus(game.id, { kind: "error", message });
       setLaunchError(message);
+      // B2 (docs/pendencias.md): o `code` (docs/api.md, tabela de códigos)
+      // é o que diferencia "emulador não encontrado" (oferece o cadastro
+      // manual) de qualquer outro motivo de falha.
+      setLaunchErrorCode(err instanceof ApiError ? err.code : null);
     }
   }
 
@@ -128,6 +141,7 @@ export function useLaunchGame(opts?: { onLaunched?: () => void }) {
       const message = err instanceof ApiError ? err.message : "Não foi possível cancelar o download.";
       setStatus(gameId, { kind: "error", message });
       setLaunchError(message);
+      setLaunchErrorCode(null);
     }
   }
 
@@ -155,7 +169,15 @@ export function useLaunchGame(opts?: { onLaunched?: () => void }) {
     activeCoreDownload,
     cancelCoreDownload,
     launchError,
-    clearLaunchError: () => setLaunchError(null),
+    launchErrorCode,
+    // B2 (docs/pendencias.md): exposto para a tela poder nomear o console e o
+    // adapter esperados no cadastro manual pré-preenchido — sem isto, o
+    // `ErrorModal` sabe só a mensagem, não qual jogo/console falhou.
+    lastGame,
+    clearLaunchError: () => {
+      setLaunchError(null);
+      setLaunchErrorCode(null);
+    },
     retryLaunch,
   };
 }

@@ -47,20 +47,27 @@ function RequiredMark() {
 
 export function ManualEmulatorForm({
   existing,
+  prefill,
   existingIds,
   placeholders,
   onSaved,
   onCancel,
 }: {
   existing?: CustomDefinition;
+  /** B2 (docs/pendencias.md): pré-preenche nome/consoles de um cadastro NOVO
+   *  (id ainda por gerar via slug) — diferente de `existing`, que edita um
+   *  cadastro que já existe. Usado quando o form abre a partir de um erro de
+   *  lançamento ou do detalhe do console: já se sabe qual console e, às
+   *  vezes, qual emulador o parecer esperava, mas isso não é uma edição. */
+  prefill?: { name?: string; consoles?: string[] };
   existingIds: string[];
   placeholders: Record<string, string>;
   onSaved: () => void;
   onCancel: () => void;
 }) {
   const t = useT(dict);
-  const [name, setName] = useState(existing?.name ?? "");
-  const [consoles, setConsoles] = useState((existing?.consoles ?? []).join(", "));
+  const [name, setName] = useState(existing?.name ?? prefill?.name ?? "");
+  const [consoles, setConsoles] = useState((existing?.consoles ?? prefill?.consoles ?? []).join(", "));
   const [binaryPath, setBinaryPath] = useState(existing?.binary_path ?? "");
   const [args, setArgs] = useState((existing?.args ?? ["{rom}"]).join("\n"));
   const [notes, setNotes] = useState(existing?.notes ?? "");

@@ -754,11 +754,18 @@ export function ErrorModal({
   message,
   onClose,
   onRetry,
+  extraAction,
 }: {
   title: string;
   message: string;
   onClose: () => void;
   onRetry?: () => void;
+  /** B2 (docs/pendencias.md): terceira ação opcional, ao lado de
+   *  Fechar/Tentar de novo — hoje só usada pelo erro de "emulador não
+   *  encontrado" (`binary_not_found`/`not_installed`/`emulator_unavailable`),
+   *  levando ao cadastro manual do emulador. Genérica de propósito: este
+   *  componente não sabe o que `onClick` abre, só desenha o botão. */
+  extraAction?: { label: string; onClick: () => void };
 }) {
   const t = useT(dict);
   return (
@@ -780,7 +787,12 @@ export function ErrorModal({
             (o `cn` do componente usa twMerge, então `text-base text-ink`
             vence de verdade os tokens padrão dele). */}
         <DialogDescription className="text-base text-ink">{message}</DialogDescription>
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {extraAction && (
+            <Button variant="secondary" onClick={extraAction.onClick}>
+              {extraAction.label}
+            </Button>
+          )}
           {onRetry && (
             <Button variant="secondary" onClick={onClose}>
               {t("close")}
@@ -811,12 +823,19 @@ export function ManualInstallModal({
   adapterName,
   onClose,
   onOpenConsole,
+  onPointManually,
 }: {
   adapterName: string;
   onClose: () => void;
   /** Ausente quando a tela não sabe navegar para o console — o modal ainda
    * explica o estado, só não oferece o atalho. */
   onOpenConsole?: () => void;
+  /** B2 (docs/pendencias.md): quem já tem este emulador instalado, só que
+   *  fora de onde o ZeuX olha, não precisa do trilho "baixe e coloque
+   *  aqui" — precisa apontar o executável. Ausente pelo mesmo motivo de
+   *  `onOpenConsole`: a tela que não sabe abrir o form não oferece o
+   *  atalho. */
+  onPointManually?: () => void;
 }) {
   const t = useT(dict);
   return (
@@ -829,6 +848,11 @@ export function ManualInstallModal({
           <Button variant="secondary" onClick={onClose}>
             {t("close")}
           </Button>
+          {onPointManually && (
+            <Button variant="secondary" onClick={onPointManually}>
+              {t("alreadyInstalledPointManually")}
+            </Button>
+          )}
           {onOpenConsole && (
             <Button variant="primary" autoFocus onClick={onOpenConsole}>
               {t("seeConsole")}

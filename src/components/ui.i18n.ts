@@ -45,6 +45,10 @@ export const dict = {
     "pt-BR": "Ver o console",
     en: "See the console",
   },
+  alreadyInstalledPointManually: {
+    "pt-BR": "Já está instalado — apontar",
+    en: "Already installed — point to it",
+  },
   playGame: {
     "pt-BR": "Jogar {{title}}",
     en: "Play {{title}}",
