@@ -51,6 +51,7 @@ import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { percentOf } from "../lib/format";
+import { parentDir } from "../lib/paths";
 
 const PAGE_SIZE = 6;
 // Quantos ícones de console cabem no card sem esticar a altura entre
@@ -450,6 +451,7 @@ function EmulatorCardChrome({ entry }: { entry: EmulatorEntry }) {
   const [showBindings, setShowBindings] = useState(false);
   const [showCores, setShowCores] = useState(false);
   const [biosError, setBiosError] = useState<string | null>(null);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
 
@@ -482,6 +484,23 @@ function EmulatorCardChrome({ entry }: { entry: EmulatorEntry }) {
       await openPath(entry.bios_dir!);
     } catch (err) {
       setBiosError(t("failedToOpenBiosFolder", { error: err instanceof Error ? err.message : String(err) }));
+    }
+  }
+
+  // "Abrir pasta do emulador" (2026-09-11): diferente de "Abrir pasta do
+  // BIOS" (gated por BiosDir, só confirmado para alguns adapters/SOs), esta
+  // não depende de nenhuma convenção verificada — usa o caminho real que o
+  // ZeuX já achou em disco (installation.binary_path), o mesmo que
+  // `openStandalone` executa. Sempre correta quando o emulador está
+  // instalado, gerenciado pelo ZeuX ou não.
+  async function openEmulatorFolder() {
+    setFolderError(null);
+    try {
+      await openPath(parentDir(entry.installation!.binary_path));
+    } catch (err) {
+      setFolderError(
+        t("failedToOpenEmulatorFolder", { error: err instanceof Error ? err.message : String(err) }),
+      );
     }
   }
 
@@ -543,6 +562,12 @@ function EmulatorCardChrome({ entry }: { entry: EmulatorEntry }) {
             {t("openBiosFolder")}
           </Button>
         )}
+        {entry.installed && entry.installation && (
+          <Button type="button" variant="chrome" className={CARD_CHROME} onClick={openEmulatorFolder}>
+            <FolderOpen size={12} aria-hidden="true" />
+            {t("openEmulatorFolder")}
+          </Button>
+        )}
         {isRetroArch && (
           // Ciano em repouso (regra da paleta, src/index.css: "aqui o sistema
           // informa"): a lista de cores não é uma decisão do usuário sobre o
@@ -562,6 +587,7 @@ function EmulatorCardChrome({ entry }: { entry: EmulatorEntry }) {
       </div>
 
       {biosError && <InlineError>{biosError}</InlineError>}
+      {folderError && <InlineError>{folderError}</InlineError>}
       {openError && <InlineError>{openError}</InlineError>}
 
       {entry.installed && !entry.configurable && !entry.bindable && (

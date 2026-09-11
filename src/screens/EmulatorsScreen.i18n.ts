@@ -49,6 +49,14 @@ export const dict = {
     "pt-BR": "Abrir pasta do BIOS",
     en: "Open BIOS folder",
   },
+  openEmulatorFolder: {
+    "pt-BR": "Abrir pasta do emulador",
+    en: "Open emulator folder",
+  },
+  failedToOpenEmulatorFolder: {
+    "pt-BR": "Não foi possível abrir a pasta do emulador: {{error}}",
+    en: "Could not open the emulator folder: {{error}}",
+  },
   failedToDeleteEmulator: {
     "pt-BR": "Não foi possível excluir este emulador.",
     en: "Could not delete this emulator.",

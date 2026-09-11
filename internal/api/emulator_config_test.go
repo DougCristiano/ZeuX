@@ -12,10 +12,14 @@ import (
 )
 
 // installFakePCSX2 grava um "binário" na pasta gerenciada do PCSX2, para
-// Locate() achá-lo, e um PCSX2.ini realista em
-// $XDG_CONFIG_HOME/PCSX2/inis/PCSX2.ini — o mesmo caminho que
-// pcsx2ConfigPath() resolve nesta máquina (os.UserConfigDir() respeita
-// XDG_CONFIG_HOME, que newTestServer já isola por teste).
+// Locate() achá-lo, e um PCSX2.ini realista no mesmo caminho que
+// pcsx2ConfigPath() resolve nesta máquina (pcsx2_config.go: Linux usa
+// os.UserConfigDir(), que respeita XDG_CONFIG_HOME; Windows usa
+// os.UserHomeDir()+"Documents", que respeita USERPROFILE — os dois isolados
+// por teste em newTestServerFull). A duplicação da regra aqui (em vez de
+// chamar a função não exportada do outro pacote) é deliberada: o teste trava
+// o contrato observável (onde o arquivo precisa estar para o handler achar),
+// não a implementação interna.
 func installFakePCSX2(t *testing.T) {
 	t.Helper()
 
@@ -35,11 +39,7 @@ func installFakePCSX2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	configHome, err := os.UserConfigDir()
-	if err != nil {
-		t.Fatalf("UserConfigDir: %v", err)
-	}
-	iniDir := filepath.Join(configHome, "PCSX2", "inis")
+	iniDir := filepath.Join(pcsx2TestHome(t), "inis")
 	if err := os.MkdirAll(iniDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +47,26 @@ func installFakePCSX2(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(iniDir, "PCSX2.ini"), []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// pcsx2TestHome devolve a mesma pasta base que pcsx2DataDir (pcsx2_config.go)
+// resolve nesta plataforma: duplicada aqui de propósito, não importada, para
+// o teste travar o contrato observável (onde o arquivo precisa estar para o
+// handler achar) em vez da implementação interna do outro pacote.
+func pcsx2TestHome(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("UserHomeDir: %v", err)
+		}
+		return filepath.Join(home, "Documents", "PCSX2")
+	}
+	configHome, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatalf("UserConfigDir: %v", err)
+	}
+	return filepath.Join(configHome, "PCSX2")
 }
 
 // Trava o critério central do H2: ler devolve o valor efetivo hoje (lido do
@@ -243,11 +263,7 @@ func TestControllerStatusPCSX2(t *testing.T) {
 		t.Fatalf("configured = %v, esperado false (só o PCSX2.ini de installFakePCSX2, sem [Pad1])", configured)
 	}
 
-	configHome, err := os.UserConfigDir()
-	if err != nil {
-		t.Fatalf("UserConfigDir: %v", err)
-	}
-	iniPath := filepath.Join(configHome, "PCSX2", "inis", "PCSX2.ini")
+	iniPath := filepath.Join(pcsx2TestHome(t), "inis", "PCSX2.ini")
 	raw, err := os.ReadFile(iniPath)
 	if err != nil {
 		t.Fatal(err)

@@ -1,4 +1,5 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { consoleImageURL } from "../api";
 import type { ConsoleEntry } from "../api/types";
 import { consoleAccentColor, consoleTextColor } from "../lib/consoleColor";
 import type { ConsoleReadiness } from "../lib/consoleReadiness";
@@ -35,18 +36,33 @@ export interface ConsoleCardLabels {
 }
 
 // 2026-09-10 (decisão do Douglas, a partir do achado do critico-design): o
-// card não mostra mais a logo do IGDB. Era o único objeto claro do app
-// inteiro — uma chapa branca atrás de arte de terceiro, concentrando todo o
-// contraste da interface onde a identidade não é do ZeuX — e produzia dois
-// desenhos de card diferentes na mesma prateleira (com/sem logo). Agora todo
-// card mostra sempre a sigla em `font-pixel`, na cor de identidade do
-// console: é o mesmo elemento que já existia como fallback, promovido a
-// único caminho. A textura de "tela de ponto" continua vindo de
-// `.zeux-pixel-grid` e da scanline no fundo do compartimento.
+// card deixou de mostrar a logo do IGDB por um tempo — a chapa branca atrás
+// de arte de terceiro concentrava todo o contraste da interface onde a
+// identidade não é do ZeuX, e produzia dois desenhos de card diferentes na
+// mesma prateleira (com/sem logo).
+//
+// 2026-09-11 (pedido do Douglas): revertido de novo — a Home/grade de
+// consoles era a única tela do app onde o card não mostrava a logo real,
+// enquanto `ConsoleHero` (detalhe do console) e a linha de identidade da
+// Biblioteca (`LibraryScreen`) sempre mostraram. Em vez de repetir a mesma
+// chapa branca em tela cheia que motivou o primeiro achado, a imagem aqui
+// entra numa placa pequena (mesma proporção da caixa de 64px do
+// `ConsoleHero`), centralizada sobre o compartimento com gradiente/textura —
+// a arte de terceiro fica contida, a identidade do ZeuX (grade de pixels,
+// scanline, cor de acento) continua sendo o que preenche o card. A sigla em
+// `font-pixel` continua sendo o fallback: consoles sem logo cadastrada, ou
+// cuja imagem falhar ao carregar (`onError`), caem nela — nunca um card
+// quebrado.
 const LOGO_BOX_HEIGHT: Record<ConsoleCardSize, string> = {
   grande: "h-28",
   media: "h-24",
   densa: "h-20",
+};
+
+const LOGO_PLATE_SIZE: Record<ConsoleCardSize, string> = {
+  grande: "h-16 w-16",
+  media: "h-14 w-14",
+  densa: "h-12 w-12",
 };
 
 export function ConsoleCard({
@@ -76,6 +92,13 @@ export function ConsoleCard({
   const labelColor = consoleTextColor(entry.console_id);
   const ready = readiness.step === "pronto";
 
+  // Mesma checagem de `ConsoleHero`/`LibraryScreen`: `has_image` diz o que o
+  // catálogo sabe, `onError` cobre o resto (imagem cadastrada mas que falhou
+  // ao carregar). Nunca um `slice(0, 4)` à mão — `consoleIconLabel` já
+  // conhece o mapa de exceções de sigla.
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = entry.has_image && !imageFailed;
+
   // A contagem toma o lugar do chip de pendência só quando há pasta E o
   // console está pronto: com uma peça ainda faltando, o que o usuário precisa
   // ver é o que falta, não quantos jogos já achou.
@@ -94,7 +117,15 @@ export function ConsoleCard({
       // nunca do `style` inline (inline venceria o `group-hover:` por
       // especificidade).
       style={{ "--console-accent": accent } as CSSProperties}
-      className={`group relative flex flex-col overflow-hidden rounded-md border bg-panel text-left transition duration-150 hover:border-[var(--console-accent)] hover:shadow-[0_0_20px_-6px_var(--console-accent)] focus-visible:border-[var(--console-accent)] [[data-gamepad-focused]_&]:border-[var(--console-accent)] ${
+      // `w-full` (achado ao vivo, 2026-09-11: Douglas reportou espaçamento
+      // desigual na prateleira "Seus consoles" da Home): `<button>` é
+      // controle de formulário — mesmo com `display: flex`, `width: auto`
+      // encolhe até o conteúdo (shrink-to-fit), então cada card ficava do
+      // tamanho do NOME do console, não dos 210px do `<div>` wrapper em
+      // `HomeScreen.tsx`. Só não aparecia em `ConsolesScreen` porque lá o
+      // card é filho de um `grid`, que estica o item independente da
+      // largura intrínseca do botão.
+      className={`group relative flex w-full flex-col overflow-hidden rounded-md border bg-panel text-left transition duration-150 hover:border-[var(--console-accent)] hover:shadow-[0_0_20px_-6px_var(--console-accent)] focus-visible:border-[var(--console-accent)] [[data-gamepad-focused]_&]:border-[var(--console-accent)] ${
         ready ? "border-[color-mix(in_srgb,var(--console-accent)_55%,var(--line))]" : "border-line"
       } ${FOCUS_RING}`}
     >
@@ -112,9 +143,23 @@ export function ConsoleCard({
         <div aria-hidden="true" className="zeux-pixel-grid pointer-events-none absolute inset-0" />
         <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
 
-        <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: labelColor }}>
-          {consoleIconLabel(entry.console_id, entry.short_name)}
-        </span>
+        {showImage ? (
+          <span
+            aria-hidden="true"
+            className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ${LOGO_PLATE_SIZE[size]}`}
+          >
+            <img
+              src={consoleImageURL(entry.console_id)}
+              alt=""
+              className="h-full w-full object-contain p-1.5"
+              onError={() => setImageFailed(true)}
+            />
+          </span>
+        ) : (
+          <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: labelColor }}>
+            {consoleIconLabel(entry.console_id, entry.short_name)}
+          </span>
+        )}
 
         {ready && (
           <span

@@ -93,7 +93,13 @@ func newTestServerFull(t *testing.T, probe hardware.Probe) (*api.Server, *sql.DB
 
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir) // Linux/BSD
-	t.Setenv("AppData", dir)         // Windows
+	t.Setenv("AppData", dir)         // Windows: os.UserConfigDir()
+	// Windows: os.UserHomeDir() (lido por pcsx2DataDir, pcsx2_config.go, já
+	// que o PCSX2 sem modo portátil grava em "Documentos\PCSX2\", não em
+	// AppData) — sem isolar USERPROFILE também, um teste que grava um
+	// PCSX2.ini "de mentira" escreveria no Documentos real de quem roda o
+	// teste nesta plataforma.
+	t.Setenv("USERPROFILE", dir)
 
 	catalog, err := verdict.LoadCatalog()
 	if err != nil {

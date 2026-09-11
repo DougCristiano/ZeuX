@@ -507,12 +507,14 @@ function GamesFolderSection({
  *
  * **O que esta seção deliberadamente não faz:** apontar uma pasta por
  * convenção. `BiosDir` (internal/emulator/bios_dir.go) só responde para
- * DuckStation instalado pelo ZeuX e PCSX2 no Linux — nos demais casos o
- * caminho nunca foi verificado contra o emulador rodando, e uma pasta errada
- * é pior que nenhuma: o usuário coloca o arquivo, o jogo continua não
- * abrindo, e agora ele nem sabe mais por quê. Console marcado
- * `requires_external_file` sem pasta conhecida recebe o aviso genérico, sem
- * caminho — princípio 4 do CLAUDE.md.
+ * DuckStation instalado pelo ZeuX e PCSX2 (Linux e Windows) — nos demais
+ * casos o caminho nunca foi verificado contra o emulador rodando (ou, no
+ * caso do PCSX2 no Windows, segue a convenção documentada pelo próprio
+ * projeto sem confirmação contra um binário real), e uma pasta errada é pior
+ * que nenhuma: o usuário coloca o arquivo, o jogo continua não abrindo, e
+ * agora ele nem sabe mais por quê. Console marcado `requires_external_file`
+ * sem pasta conhecida recebe o aviso genérico, sem caminho — princípio 4 do
+ * CLAUDE.md.
  *
  * O ZeuX também nunca sugere onde obter o arquivo. Ver o princípio 6.
  */

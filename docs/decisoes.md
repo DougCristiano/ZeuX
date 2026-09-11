@@ -918,6 +918,171 @@ o layout herdado como intocável.
 **Custo aceito:** um período de inconsistência visual enquanto as telas
 migram para a nova direção, e retrabalho em telas que já estavam "prontas".
 
+### ConsoleCard volta a mostrar a logo real — 2026-09-11
+
+Em 2026-09-10 `ConsoleCard.tsx` (Home/"Seus consoles" e a grade de
+`ConsolesScreen`) tinha passado a mostrar só a sigla estilizada — a decisão
+está registrada só no comentário do componente, não neste log (falha de
+processo desta sessão: toda reversão de decisão de produto deveria vir
+para cá). O motivo citado era a "chapa branca" atrás da logo concentrando
+todo o contraste da tela.
+
+O Douglas pediu de volta nesta data: a Home era a única tela do app sem a
+logo real, enquanto `ConsoleHero` (detalhe do console) e a linha de
+identidade de `LibraryScreen` sempre mostraram — duas convenções coexistindo
+sem necessidade. A correção não repete a chapa branca em tela cheia: a
+imagem entra numa placa pequena (64/56/48px conforme o tamanho do card,
+mesma proporção da caixa do `ConsoleHero`), centralizada sobre o
+compartimento com gradiente/textura de pixel — a arte de terceiro fica
+contida, a identidade visual do ZeuX continua sendo o que preenche o card.
+Fallback para a sigla via `onError`, mesmo padrão de sempre.
+
+**O que quebra se desfizer:** a Home volta a ser a única tela sem logo real,
+inconsistente com o resto do app — e como da última vez, ninguém vai saber
+por quê a menos que leia o comentário do componente.
+
+### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
+
+`BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do
+PCSX2 no Linux (verificado ao vivo em 2026-08-04); no Windows devolvia
+`("", false)` de propósito, por não haver confirmação do caminho. Efeito
+prático reportado pelo Douglas: PS2 nunca mostrava o aviso de BIOS ausente
+(que PS1/DuckStation mostra), e não havia botão de "abrir pasta" nem para o
+BIOS nem para a instalação do emulador.
+
+Foram dois problemas empilhados, não um só:
+
+1. **`biosDirFor("pcsx2", ...)` recusava qualquer caminho fora do Linux** —
+   endereçado adicionando o caso Windows.
+2. **`pcsx2ConfigPath` (painel "Configurações" do PCSX2, H1) já apontava
+   para o Windows, mas para o lugar errado:** usava `os.UserConfigDir()`
+   (`%AppData%\PCSX2\inis\PCSX2.ini`) nas duas plataformas. No Linux isso é
+   `~/.config`, verificado contra binário real. No Windows, `%AppData%` está
+   errado por convenção documentada do próprio PCSX2: sem modo portátil
+   (`seedPCSX2` em `internal/install/firstrun.go` não ativa portable.ini
+   para o PCSX2, só suprime o assistente), o PCSX2 no Windows grava em
+   **"Documentos\PCSX2\"**, não em AppData — provável causa real de o painel
+   de configurações parecer não funcionar.
+
+As duas rotas agora compartilham `pcsx2DataDir()` (`pcsx2_config.go`), para
+nunca mais divergir sobre onde o PCSX2 realmente olha nesta plataforma:
+Linux usa `os.UserConfigDir()/PCSX2` (verificado), Windows usa
+`~/Documents/PCSX2` (convenção documentada, **não verificada contra um
+binário Windows real nesta sessão** — mesma ressalva que o D1 exige para
+flags não testadas). macOS continua sem caminho algum.
+
+Também foi adicionado um botão genérico "Abrir pasta do emulador" em
+`EmulatorsScreen.tsx`, que não depende de `BiosDir`/convenção nenhuma — usa
+`installation.binary_path` (que o ZeuX já confirmou em disco via
+`Adapter.Locate`) para qualquer emulador instalado, gerenciado pelo ZeuX ou
+achado numa instalação alheia do usuário.
+
+**O que quebra se desfizer:** volta a faltar o aviso de BIOS do PS2 no
+Windows (única plataforma testada pelo Douglas), e o painel de
+configurações do PCSX2 volta a ler/gravar num arquivo que o PCSX2 nunca
+tocou.
+
+**Risco aceito, não eliminado:** se o "Documentos" do usuário estiver
+redirecionado (OneDrive, política de empresa), `~/Documents/PCSX2` erra —
+não há como descobrir isso sem a API nativa de pastas conhecidas do
+Windows, que o projeto evita para não crescer a superfície de dependências.
+Sem confirmação contra um PCSX2 real rodando no Windows, também não dá para
+descartar de vez a hipótese de o PCSX2 usar `%AppData%` em alguma versão —
+se um teste ao vivo desmentir isso, `pcsx2DataDir` é o único lugar a
+corrigir.
+
+### Pasta de BIOS no Windows: Flycast entra, xemu e Vita3K ficam de fora — 2026-09-11
+
+Continuação direta da entrada acima. Depois de acertar o PCSX2, os três
+emuladores restantes que exigem BIOS/firmware e não passam pelo RetroArch
+foram investigados no mesmo dia: **xemu** (Xbox), **Vita3K** (PS Vita) e
+**Flycast** (Dreamcast). RPCS3 continua fora por motivo já registrado (o
+firmware é instalado por dentro do próprio RPCS3, não há pasta para
+apontar), e os consoles servidos por cores do RetroArch ficaram fora por
+pedido do Douglas — aquilo é outro mecanismo.
+
+Os três foram instalados de verdade pelo próprio ZeuX nesta máquina Windows,
+e o método foi o mesmo para todos: fotografar os diretórios candidatos
+(pasta da instalação, `%AppData%`, `%LocalAppData%`, Documentos,
+`%UserProfile%`) antes e depois de executar o binário, e comparar. Nada aqui
+veio de convenção não confirmada.
+
+**Flycast (dreamcast) — implementado.** A pasta é `data`, ao lado do
+`flycast.exe`. O que foi observado, em ordem:
+
+- Rodar o binário criou `data/` e reescreveu `emu.cfg` ao lado do
+  executável, sem tocar em nada fora dali.
+- Apagar `emu.cfg` e `data/` e repetir não mudou nada: no Windows o Flycast
+  é portátil **incondicionalmente**. Isso é o oposto do xemu, onde
+  `xemu.toml` é um marcador de verdade (sem ele, o xemu passa a gravar em
+  `%AppData%\xemu\` — testado). Como não depende de `seedFlycast` ter
+  rodado, o caminho vale também para uma instalação que o usuário já tinha
+  por conta própria, e por isso o caso **não** é restrito a `Managed`.
+- Repetir com o diretório de trabalho apontando para outra pasta manteve o
+  `data/` ao lado do executável: a âncora é o caminho do binário, não o CWD.
+  Importa porque o launcher do ZeuX não promete rodar o emulador de dentro
+  da pasta dele.
+- Quem afirma que é ali que o BIOS entra é o próprio binário: a string de
+  ajuda embutida no `flycast.exe`, já traduzida para português dentro do
+  mesmo arquivo, é *"A pasta onde o Flycast salva os arquivos de
+  configuração e VMUs. Os arquivos de BIOS devem estar em uma subpasta
+  chamada \"data\""*, ao lado de *"Pastas que contêm arquivos BIOS (por
+  exemplo, dc_boot.bin ou dc_bios.bin)"*.
+
+Só Windows. No Linux e no macOS o Flycast não é portátil, e isso não foi
+verificado — continua devolvendo `("", false)` por lá.
+
+**Efeito colateral que precisou de conserto próprio:** `BiosDirEmpty` era
+calculado como "a pasta não tem nada dentro", critério que funciona para
+DuckStation e PCSX2 porque a pasta deles é dedicada ao BIOS. A `data` do
+Flycast é também onde ele guarda cache de shaders e capas — depois da
+primeira execução ela nunca está vazia, e o ZeuX passaria a afirmar que o
+BIOS do Dreamcast está no lugar sem nenhum BIOS existir. Isso é pior do que
+não dizer nada, e feriria o princípio 4. A checagem virou
+`BiosDirLooksEmpty(adapterID, dir)` (`bios_dir.go`), que para o Flycast
+pergunta pelo arquivo de boot (`dc_boot.bin`/`dc_bios.bin`) em vez de pela
+pasta, mantém o critério antigo para todo o resto, e devolve um segundo
+booleano de "não deu para olhar" — pasta ilegível não vira afirmação.
+
+**xemu (xbox) — fora, por conclusão, não por falta de tentativa.** O xemu
+não varre pasta nenhuma atrás de BIOS: cada arquivo é um caminho absoluto e
+individual em `[sys.files]` do `xemu.toml` (`bootrom_path`, `flashrom_path`,
+`eeprom_path`, `hdd_path`, `dvd_path`), escolhido pelo usuário num diálogo
+de arquivo. Confirmado das duas pontas — fechando o xemu graciosamente para
+ele gravar a configuração padrão, o único caminho que apareceu foi
+`eeprom_path`, absoluto, apontando para dentro da própria pasta de
+instalação; e as únicas chaves de caminho que existem no binário são essas
+cinco, todas de arquivo. Mesma categoria do RPCS3. Apontar uma pasta aqui
+faria o usuário largar o MCPX e a imagem de flash num lugar que o xemu nunca
+lê — exatamente o que `bios_dir.go` existe para evitar.
+
+**Vita3K (vita) — inconclusivo, que não é a mesma coisa que "sem pasta".** O
+binário não chega a iniciar nesta máquina: sai imediatamente, sem janela,
+sem log e sem registro no Visualizador de Eventos. A causa foi identificada
+— o `Vita3K.exe` importa `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll` e
+`MSVCP140.dll`, e o runtime do MSVC não está instalado aqui (os plugins do
+Qt vieram completos, então não é isso). Instalar o redistribuível do MSVC
+seria mexer no sistema desta máquina, coisa que o CLAUDE.md manda perguntar
+antes. Sem observar o emulador rodando, não dá para dizer onde ele lê o
+firmware, e a regra da casa é não chutar — `Vita3K` continua devolvendo
+`("", false)`, e a interface simplesmente não mostra seção de BIOS para ele.
+**Este é o único dos três que vale reabrir:** numa máquina com o runtime do
+MSVC instalado, o mesmo método de snapshot resolve em minutos.
+
+**O que quebra se desfizer:** o Dreamcast volta a não avisar que falta BIOS
+e perde o botão "Abrir pasta do BIOS". Se `BiosDirLooksEmpty` voltar a ser
+"a pasta está vazia", o aviso do Dreamcast some silenciosamente para sempre
+depois da primeira execução do Flycast — o pior tipo de regressão, porque o
+app continua parecendo certo.
+
+**Ressalva que fica registrada:** o Flycast tem uma chave de configuração
+(`Dreamcast.BiosPath`) que deixa o usuário acrescentar outras pastas de BIOS
+pela interface dele. Se o usuário fizer isso, o BIOS também funciona de lá,
+e o ZeuX vai continuar dizendo que a pasta `data` está vazia. Optou-se por
+apontar o padrão — onde o Flycast procura sem ninguém configurar nada — em
+vez de ler o `emu.cfg`, que traria uma segunda fonte de verdade sobre o
+mesmo assunto.
+
 ---
 
 ## O que fica fora deste log, de propósito

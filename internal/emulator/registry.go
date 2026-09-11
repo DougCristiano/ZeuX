@@ -3,7 +3,6 @@ package emulator
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -237,8 +236,8 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 
 			if dir, ok := BiosDir(adapter.ID(), install); ok {
 				status.BiosDir = dir
-				if entries, err := os.ReadDir(dir); err == nil {
-					status.BiosDirEmpty = len(entries) == 0
+				if empty, ok := BiosDirLooksEmpty(adapter.ID(), dir); ok {
+					status.BiosDirEmpty = empty
 				}
 			}
 		}

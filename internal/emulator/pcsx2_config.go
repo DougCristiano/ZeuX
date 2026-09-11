@@ -4,16 +4,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
 
-// pcsx2ConfigPath resolve o arquivo que o PCSX2 de fato lê/grava.
+// pcsx2DataDir resolve a pasta base onde o PCSX2 grava configuração, BIOS e
+// memory cards nesta plataforma. Usada tanto por pcsx2ConfigPath (abaixo)
+// quanto por BiosDir (bios_dir.go), para as duas nunca divergirem sobre onde
+// o PCSX2 realmente olha.
 //
-// Verificado contra binário real em 2026-08-05 (Linux, PCSX2 2.6.3,
+// Linux: verificado contra binário real em 2026-08-05 (PCSX2 2.6.3,
 // inclusive a cópia instalada pelo próprio ZeuX): mesmo a instalação
 // gerenciada (AppImage) não roda em modo portátil — grava em
-// "~/.config/PCSX2/inis/PCSX2.ini" (padrão XDG), não em
+// "~/.config/PCSX2/" (padrão XDG, via os.UserConfigDir()), não em
 // "<diretório da instalação>/inis/". `seedPCSX2` (firstrun.go) grava um
 // "inis/PCSX2_qt.ini" dentro do diretório gerenciado partindo do
 // pressuposto de modo portátil — achado real desta sessão mostra que esse
@@ -21,20 +25,52 @@ import (
 // de seedPCSX2 fica fora do escopo do H1, registrada aqui para não se
 // perder.
 //
-// Windows/macOS: caminho **não verificado** contra binário real (só a
-// convenção documentada pelo próprio projeto PCSX2 — `%APPDATA%\PCSX2\
-// inis\PCSX2.ini` no Windows). Mesma ressalva que o D1 já exige para flags
-// de linha de comando não testadas: declarar o que foi visto rodando de
-// verdade, não fingir certeza.
+// Windows: convenção documentada pelo próprio projeto PCSX2 — pasta
+// "Documentos\PCSX2\", não "%AppData%\PCSX2\" (esse era o palpite anterior
+// deste arquivo, errado: PCSX2 no Windows sem modo portátil usa a pasta de
+// Documentos, não AppData; seedPCSX2 não ativa modo portátil para o PCSX2,
+// só suprime o assistente de primeira execução). Não verificado contra um
+// binário Windows real nesta sessão (2026-09-11, achado reportado pelo
+// Douglas: o painel de configurações do PCSX2 parecia não funcionar — o
+// caminho antigo lia/gravava em AppData, onde o PCSX2 nunca escreveu nada).
+// Se o "Documentos" do usuário estiver redirecionado (OneDrive, política de
+// empresa), este caminho erra — não há como descobrir isso sem a API nativa
+// de pastas conhecidas do Windows, que o projeto evita para não crescer a
+// superfície de dependências.
+//
+// macOS: sem confirmação nenhuma — devolve erro, e BiosDir/pcsx2ConfigPath
+// continuam recusando apontar qualquer caminho. Mesma regra de "melhor não
+// apontar do que apontar errado" que já vale para o resto do arquivo.
+func pcsx2DataDir() (string, error) {
+	switch runtime.GOOS {
+	case "linux":
+		dir, err := os.UserConfigDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(dir, "PCSX2"), nil
+	case "windows":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, "Documents", "PCSX2"), nil
+	default:
+		return "", fmt.Errorf("caminho de configuração do PCSX2 não confirmado neste sistema operacional")
+	}
+}
+
+// pcsx2ConfigPath resolve o arquivo que o PCSX2 de fato lê/grava.
+//
 // var, não const/func fixa: testes substituem por um caminho temporário,
 // sem tocar no diretório de configuração real da máquina que roda o teste
 // (mesmo padrão de internal/consent, internal/igdb).
 var pcsx2ConfigPath = func() (string, error) {
-	dir, err := os.UserConfigDir()
+	dir, err := pcsx2DataDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "PCSX2", "inis", "PCSX2.ini"), nil
+	return filepath.Join(dir, "inis", "PCSX2.ini"), nil
 }
 
 // pcsx2ReadConfig lê Fullscreen e InternalScale — os dois campos
