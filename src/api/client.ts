@@ -28,6 +28,8 @@ import type {
   PreviewResult,
   Report,
   RetroArchCoreStatus,
+  SaveData,
+  SaveDataDirs,
   ScrapeJob,
   SessionsResponse,
   SystemInfo,
@@ -238,6 +240,11 @@ export const api = {
     postJSON<EmulatorConfigWriteResult>(`/emulators/${encodeURIComponent(id)}/config`, opts),
   restoreEmulatorConfig: (id: string) =>
     request<{ restored: boolean }>(`/emulators/${encodeURIComponent(id)}/config`, { method: "DELETE" }),
+
+  // --- Inspeção de saves (MVP de listar/ver, não gerenciar) ---
+  getSaveData: (id: string) => request<SaveData>(`/emulators/${encodeURIComponent(id)}/save-data`),
+  setSaveData: (id: string, dirs: SaveDataDirs) =>
+    postJSON<{ saved: boolean }>(`/emulators/${encodeURIComponent(id)}/save-data`, dirs),
 
   // --- Mapeamento de teclado/controle (H3/H4) ---
   getEmulatorBindings: (id: string) =>

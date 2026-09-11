@@ -52,6 +52,33 @@ export function percentOf(job: { downloaded_bytes: number; total_bytes: number }
   return Math.min(100, Math.round((job.downloaded_bytes / job.total_bytes) * 100));
 }
 
+// Tamanho de arquivo em texto curto ("128 KB", "3.4 MB") — usado pela lista
+// crua de saves (SaveDataPanel). Base 1024 porque é o que o Explorer/Finder
+// mostram e o usuário vai comparar visualmente com o tamanho que o próprio
+// sistema operacional reporta.
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  const digits = value < 10 ? 1 : 0;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+// Data completa de modificação de um arquivo de save — deliberadamente com
+// hora (diferente de `formatLastPlayedShort`, que é só data para caber numa
+// faixa de hover): aqui o campo mora numa lista de arquivos, com espaço de
+// sobra, e a hora ajuda a diferenciar dois saves do mesmo dia.
+export function formatFileDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "data desconhecida";
+  return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
 /**
  * Sufixo de fase para um download de core em andamento (ADR 0015, R3).
  *
