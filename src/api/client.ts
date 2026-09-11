@@ -272,6 +272,12 @@ export const api = {
 
   getSessions: () => request<SessionsResponse>("/sessions"),
 
+  // Botão oferecido quando uma sessão de PS1/PS2 morre com 0xC0000135 (ver
+  // useSessionWatcher.ts e describeExitCode em internal/emulator/session.go).
+  // Não espera o instalador fechar (ele é interativo) — 200 só confirma que
+  // o processo nasceu, docs/api.md.
+  installVCRedist: () => postJSON<{ started: boolean }>("/system/vcredist/install", {}),
+
   addLibraryFolder: (consoleId: string, path: string) =>
     postJSON<{ folder: LibraryFolder; games_found: number }>("/library/folders", {
       console_id: consoleId,

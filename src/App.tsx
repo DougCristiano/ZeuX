@@ -6,9 +6,10 @@ import { Sidebar, type NavID } from "./components/Sidebar";
 import { SplashScreen, hasSeenSplash } from "./components/SplashScreen";
 import { TourOverlay, hasSeenTour } from "./components/TourOverlay";
 import { GamepadHints } from "./components/GamepadHints";
-import { AmbientGlow, Toast } from "./components/ui";
+import { AmbientGlow, Button, ConfirmModal, Toast } from "./components/ui";
 import { useGamepad } from "./hooks/useGamepad";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
+import { useSessionWatcher } from "./hooks/useSessionWatcher";
 import { useToast } from "./hooks/useToast";
 import { useT } from "./i18n/i18n";
 import type { ConsoleEntry, LibraryGame } from "./api/types";
@@ -116,6 +117,11 @@ function App() {
     // propósito: é a mesma informação que a Steam mostra ao abrir com o
     // controle já ligado, não um bug de disparo duplicado.
   }, [gamepad.connected, gamepad.name, showGamepadToast, t]);
+
+  // B5 (docs/pendencias.md): um poll só de `GET /sessions`, vivo no shell
+  // inteiro (não por tela), alimenta a faixa "jogo rodando agora" e a
+  // detecção de morte rápida por 0xC0000135 — ver useSessionWatcher.ts.
+  const { runningSession, vcredistSession, dismissVcredist } = useSessionWatcher();
 
   const [phase, setPhase] = useState<Phase>("checking-port");
 
@@ -375,6 +381,26 @@ function App() {
     if (!name || !shortName) return;
     setSelectedConsole({ id: consoleId, name, shortName });
     setPhase("console-detail");
+  }
+
+  // Mesmo padrão de fallback que HistoryScreen/GameDetailScreen já usam: o
+  // parecer é a fonte preferida de nome (cobre os 33 consoles quando
+  // existe), `consoles` (GET /consoles) cobre quem recusou consentimento.
+  function consoleNameFor(consoleId: string): string {
+    return (
+      report?.verdicts.find((v) => v.console_id === consoleId)?.name ??
+      consoles.find((c) => c.console_id === consoleId)?.name ??
+      consoleId
+    );
+  }
+
+  // `Session` não carrega o título do jogo (só `rom_path`) — a faixa "jogo
+  // rodando agora" não tem de onde puxar o título da biblioteca sem uma
+  // segunda chamada por poll, então cai no nome do arquivo sem extensão.
+  // Aceitável aqui: é um indicador de canto de tela, não a ficha do jogo.
+  function titleFromRomPath(romPath: string): string {
+    const fileName = romPath.split(/[/\\]/).pop() ?? romPath;
+    return fileName.replace(/\.[^.]+$/, "");
   }
 
   function navigateSidebar(id: NavID) {
@@ -756,9 +782,23 @@ function App() {
         >
           {screen}
         </main>
+        {runningSession && (
+          <RunningGameBanner
+            text={t("runningNow", {
+              console: consoleNameFor(runningSession.console_id),
+              title: titleFromRomPath(runningSession.rom_path),
+            })}
+          />
+        )}
         {gamepadToast && <Toast message={gamepadToast} />}
         <GamepadHints connected={gamepadNavConnected} />
         {tourVisible && <TourOverlay onClose={closeTour} />}
+        {vcredistSession && (
+          <VCRedistOffer
+            consoleName={consoleNameFor(vcredistSession.console_id)}
+            onClose={() => dismissVcredist(vcredistSession.id)}
+          />
+        )}
       </div>
     );
   }
@@ -766,10 +806,106 @@ function App() {
   return (
     <>
       {screen}
+      {runningSession && (
+        <RunningGameBanner
+          text={t("runningNow", {
+            console: consoleNameFor(runningSession.console_id),
+            title: titleFromRomPath(runningSession.rom_path),
+          })}
+        />
+      )}
       {gamepadToast && <Toast message={gamepadToast} />}
       <GamepadHints connected={gamepadNavConnected} />
       {tourVisible && <TourOverlay onClose={closeTour} />}
+      {vcredistSession && (
+        <VCRedistOffer
+            consoleName={consoleNameFor(vcredistSession.console_id)}
+            onClose={() => dismissVcredist(vcredistSession.id)}
+          />
+      )}
     </>
+  );
+}
+
+/**
+ * B5 (docs/pendencias.md): faixa fina, canto da tela, para "um jogo está
+ * rodando agora" — não é `Toast` (que some sozinho após 3s, `useToast.ts`):
+ * esta precisa continuar visível enquanto `useSessionWatcher` continuar
+ * reportando `is_running: true`, e sumir sozinha quando o poll parar de
+ * achar a sessão. `fixed`: não entra no fluxo do `<main>`, então não reserva
+ * espaço nenhum quando não há sessão rodando (o chamador já só monta este
+ * componente com a sessão em mãos).
+ */
+function RunningGameBanner({ text }: { text: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed top-4 left-1/2 z-40 -translate-x-1/2 rounded-sm border border-line bg-fill/95 px-3 py-1.5 text-xs text-ink shadow-lg backdrop-blur-sm"
+    >
+      <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
+      {text}
+    </div>
+  );
+}
+
+/**
+ * B5 / achado da sessão anterior: `POST /games/launch` responde 200 mesmo
+ * quando o emulador morre ~100ms depois — o único jeito de saber é notar,
+ * pelo poll de `GET /sessions`, uma sessão recém-lançada que já não está
+ * `is_running` e carrega em `exit_error` o texto que `describeExitCode`
+ * (internal/emulator/session.go) grava para 0xC0000135. `useSessionWatcher`
+ * já filtrou por esse texto exato antes de expor `vcredistSession` — este
+ * componente só precisa mostrar a oferta, sem reavaliar o critério.
+ *
+ * Um lugar só no shell (não em cada tela de lançamento): a mesma detecção
+ * serviria GamesScreen, AllGamesScreen, GameDetailScreen e a Home, e
+ * duplicá-la em cada uma divergiria na primeira correção.
+ */
+function VCRedistOffer({ consoleName, onClose }: { consoleName: string; onClose: () => void }) {
+  const t = useT(dict);
+  const [state, setState] = useState<"offer" | "installing" | "opened" | "error">("offer");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function handleInstall() {
+    setState("installing");
+    try {
+      await api.installVCRedist();
+      setState("opened");
+    } catch (err) {
+      setErrorMessage(err instanceof ApiError ? err.message : t("vcredistError"));
+      setState("error");
+    }
+  }
+
+  return (
+    <ConfirmModal
+      title={t("vcredistTitle")}
+      message={
+        state === "opened"
+          ? t("vcredistOpened")
+          : state === "error"
+            ? errorMessage
+            : t("vcredistMessage", { console: consoleName })
+      }
+      onClose={onClose}
+      actions={
+        state === "opened" ? (
+          <Button variant="primary" autoFocus onClick={onClose}>
+            {t("understand")}
+          </Button>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={onClose}>
+              {t("close")}
+            </Button>
+            <Button variant="primary" autoFocus onClick={handleInstall} disabled={state === "installing"}>
+              {state === "installing" ? t("vcredistInstalling") : t("vcredistInstallButton")}
+            </Button>
+          </>
+        )
+      }
+    />
   );
 }
 
