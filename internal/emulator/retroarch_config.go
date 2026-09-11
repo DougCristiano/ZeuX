@@ -219,6 +219,38 @@ func retroArchWriteConfig(path string, opts Options) ([]string, error) {
 	return unapplied, nil
 }
 
+// retroArchSaveDataDirs lê "savefile_directory"/"savestate_directory" do
+// retroarch.cfg real e devolve o que ResolveSaveDataDirs (save_data.go)
+// expõe pra API. Diferente de pcsx2DataDir, isto não é uma convenção fixa
+// de sistema operacional — é o próprio RetroArch que decide o caminho e
+// grava a chave no arquivo que o ZeuX já sabe editar (retroArchReadConfig/
+// WriteConfig). Ausente ou igual a "default" (o valor que o
+// retroarch.cfg-modelo do próprio projeto documenta como "salvar ao lado do
+// conteúdo") sai como Known=false: não existe uma pasta única para mostrar
+// nesse caso, e cada jogo salva num lugar diferente — mostrar um caminho
+// aqui seria inventar.
+func retroArchSaveDataDirs(adapterID, path string) SaveDataDirs {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		// Arquivo ainda não existe (RetroArch nunca aberto) ou não pôde ser
+		// lido: sem config para consultar, não há caminho para afirmar.
+		return SaveDataDirs{AdapterID: adapterID}
+	}
+
+	cfg := parseRetroArchCfg(data)
+	result := SaveDataDirs{AdapterID: adapterID}
+
+	if raw, ok := cfg.get("savefile_directory"); ok && raw != "" && raw != "default" {
+		result.MemoryCardsDir = raw
+	}
+	if raw, ok := cfg.get("savestate_directory"); ok && raw != "" && raw != "default" {
+		result.SaveStatesDir = raw
+	}
+	result.Known = result.MemoryCardsDir != "" || result.SaveStatesDir != ""
+
+	return result
+}
+
 // ControllerConfigured diz se existe pelo menos um arquivo de autoconfig de
 // controle salvo — confirmado em 2026-09-08 que é aqui, não em
 // retroarch.cfg, que o RetroArch grava o mapeamento de um controle físico

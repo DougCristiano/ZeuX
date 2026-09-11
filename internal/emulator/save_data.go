@@ -34,7 +34,8 @@ type SaveFile struct {
 }
 
 // ResolveSaveDataDirs devolve onde procurar save de um adapter, quando já
-// verificado ao vivo — hoje só o PCSX2.
+// verificado ao vivo ou lido de dentro da própria config do emulador —
+// PCSX2 e RetroArch.
 //
 // PCSX2 (ps2): pcsx2DataDir() já é fato observado, não convenção — medido
 // contra o PCSX2 v2.8.2 real no Windows em 2026-09-11 (comentário de
@@ -43,15 +44,22 @@ type SaveFile struct {
 // isso os dois nomes de subpasta abaixo são citação do que foi visto, não
 // palpite.
 //
-// Todo o resto (DuckStation, RetroArch, Dolphin, PPSSPP...) devolve
-// Known=false: cada um guarda save num lugar e formato diferentes
-// (DuckStation portátil provavelmente numa subpasta do diretório da
-// instalação, RetroArch num diretório configurável em retroarch.cfg que o
-// ZeuX ainda não lê), e nenhum foi confirmado rodando o binário de verdade
-// como o PCSX2 foi. Adicionar um adapter aqui exige o mesmo método:
-// executar o emulador de verdade, fotografar antes/depois, documentar em
-// decisoes.md — nunca supor pelo nome do arquivo de config.
-func ResolveSaveDataDirs(adapterID string) SaveDataDirs {
+// RetroArch: diferente do PCSX2, aqui não há palpite nenhum — o ZeuX lê
+// "savefile_directory"/"savestate_directory" direto do retroarch.cfg real
+// deste `install` (mesmo arquivo que retroArchReadConfig/WriteConfig já
+// editam), via retroArchSaveDataDirs. Known só vira true quando o próprio
+// RetroArch tem um caminho fixo gravado ali — quando a chave está ausente
+// ou vale "default" (o sentinela que o RetroArch documenta no próprio
+// arquivo-modelo para "salvar ao lado do jogo"), não existe uma pasta única
+// para mostrar, e a resposta certa é dizer isso, não inventar uma.
+//
+// Todo o resto (DuckStation, Dolphin, PPSSPP...) devolve Known=false: cada
+// um guarda save num lugar e formato diferentes, e nenhum foi confirmado
+// rodando o binário de verdade como o PCSX2 foi. Adicionar um adapter aqui
+// exige o mesmo método: executar o emulador de verdade, fotografar
+// antes/depois, documentar em decisoes.md — nunca supor pelo nome do
+// arquivo de config.
+func ResolveSaveDataDirs(adapterID string, install Installation) SaveDataDirs {
 	switch adapterID {
 	case "pcsx2":
 		dir, err := pcsx2DataDir()
@@ -64,6 +72,12 @@ func ResolveSaveDataDirs(adapterID string) SaveDataDirs {
 			SaveStatesDir:  filepath.Join(dir, "sstates"),
 			Known:          true,
 		}
+	case "retroarch":
+		path, err := retroArchConfigPath(install)
+		if err != nil {
+			return SaveDataDirs{AdapterID: adapterID}
+		}
+		return retroArchSaveDataDirs(adapterID, path)
 	default:
 		return SaveDataDirs{AdapterID: adapterID}
 	}

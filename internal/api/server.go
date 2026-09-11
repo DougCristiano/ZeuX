@@ -694,12 +694,20 @@ func (s *Server) handleEnsureManagedDir(w http.ResponseWriter, r *http.Request) 
 // de save ainda não foi verificado ao vivo (princípio 4 do CLAUDE.md).
 func (s *Server) handleSaveData(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if _, ok := s.emulators.ByID(id); !ok {
+	adapter, ok := s.emulators.ByID(id)
+	if !ok {
 		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum emulador com o id %q.", id))
 		return
 	}
 
-	dirs := emulator.ResolveSaveDataDirs(id)
+	// install fica zerado quando o adapter não está instalado nesta
+	// máquina — ResolveSaveDataDirs ainda funciona para o RetroArch nesse
+	// caso (retroArchConfigPath cai no caminho padrão do sistema sem
+	// BinaryPath), só não enxerga um retroarch.cfg portátil ao lado do
+	// binário que não existe.
+	install, _ := adapter.Locate(r.Context())
+
+	dirs := emulator.ResolveSaveDataDirs(id, install)
 	if !dirs.Known {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"adapter_id": id,
@@ -709,12 +717,12 @@ func (s *Server) handleSaveData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	memoryCards, err := emulator.ListSaveFiles(dirs.MemoryCardsDir)
+	memoryCards, err := listSaveFilesIfSet(dirs.MemoryCardsDir)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "save_data_read_failed", err.Error())
 		return
 	}
-	saveStates, err := emulator.ListSaveFiles(dirs.SaveStatesDir)
+	saveStates, err := listSaveFilesIfSet(dirs.SaveStatesDir)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "save_data_read_failed", err.Error())
 		return
@@ -728,6 +736,17 @@ func (s *Server) handleSaveData(w http.ResponseWriter, r *http.Request) {
 		"memory_cards":     memoryCards,
 		"save_states":      saveStates,
 	})
+}
+
+// listSaveFilesIfSet evita chamar emulator.ListSaveFiles com dir vazio —
+// caso possível no RetroArch, onde savefile_directory e savestate_directory
+// são configuráveis de forma independente uma da outra (ver
+// retroArchSaveDataDirs): um jogo pode ter só uma das duas chaves definida.
+func listSaveFilesIfSet(dir string) ([]emulator.SaveFile, error) {
+	if dir == "" {
+		return nil, nil
+	}
+	return emulator.ListSaveFiles(dir)
 }
 
 // resolveConfigurableAdapter acha o adapter, confirma que ele está

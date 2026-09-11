@@ -10,7 +10,7 @@ import (
 // Trava que só o PCSX2 devolve local conhecido — todo adapter não coberto
 // ainda tem que sair com Known=false, nunca um caminho chutado (princípio 4).
 func TestResolveSaveDataDirsUnknownAdapter(t *testing.T) {
-	dirs := ResolveSaveDataDirs("duckstation")
+	dirs := ResolveSaveDataDirs("duckstation", Installation{})
 	if dirs.Known {
 		t.Fatal("DuckStation não tem local de save verificado ainda; Known deveria ser false")
 	}
@@ -23,7 +23,7 @@ func TestResolveSaveDataDirsUnknownAdapter(t *testing.T) {
 // usada por pcsx2ConfigPath — nomes citados do teste ao vivo, não palpite
 // (ver doc comment de ResolveSaveDataDirs).
 func TestResolveSaveDataDirsPCSX2(t *testing.T) {
-	dirs := ResolveSaveDataDirs("pcsx2")
+	dirs := ResolveSaveDataDirs("pcsx2", Installation{})
 	if !dirs.Known {
 		t.Fatal("PCSX2 tem local de save verificado ao vivo; Known deveria ser true")
 	}
@@ -32,6 +32,54 @@ func TestResolveSaveDataDirsPCSX2(t *testing.T) {
 	}
 	if filepath.Base(dirs.SaveStatesDir) != "sstates" {
 		t.Fatalf("esperava subpasta sstates, veio %q", dirs.SaveStatesDir)
+	}
+}
+
+// Trava que o RetroArch só devolve Known=true quando o retroarch.cfg real
+// tem um caminho fixo gravado — "default" (o sentinela do próprio
+// retroarch.cfg-modelo para "salvar ao lado do jogo") continua Known=false,
+// porque não existe uma pasta única para mostrar nesse caso.
+func TestResolveSaveDataDirsRetroArchDefaultIsUnknown(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "retroarch.cfg")
+	cfg := "savefile_directory = \"default\"\nsavestate_directory = \"default\"\n"
+	if err := os.WriteFile(path, []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := retroArchConfigPath
+	retroArchConfigPath = func(Installation) (string, error) { return path, nil }
+	defer func() { retroArchConfigPath = orig }()
+
+	dirs := ResolveSaveDataDirs("retroarch", Installation{})
+	if dirs.Known {
+		t.Fatalf("savefile_directory/savestate_directory = \"default\" não deveria contar como conhecido: %+v", dirs)
+	}
+}
+
+// Trava que um retroarch.cfg com caminho fixo de verdade sai Known=true com
+// o caminho lido do arquivo — sem tocar em ListSaveFiles/disco nenhum.
+func TestResolveSaveDataDirsRetroArchWithFixedPaths(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "retroarch.cfg")
+	cfg := "savefile_directory = \"/home/user/saves\"\nsavestate_directory = \"default\"\n"
+	if err := os.WriteFile(path, []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := retroArchConfigPath
+	retroArchConfigPath = func(Installation) (string, error) { return path, nil }
+	defer func() { retroArchConfigPath = orig }()
+
+	dirs := ResolveSaveDataDirs("retroarch", Installation{})
+	if !dirs.Known {
+		t.Fatal("savefile_directory com caminho fixo deveria bastar para Known=true")
+	}
+	if dirs.MemoryCardsDir != "/home/user/saves" {
+		t.Fatalf("esperava o caminho lido do cfg, veio %q", dirs.MemoryCardsDir)
+	}
+	if dirs.SaveStatesDir != "" {
+		t.Fatalf("savestate_directory = \"default\" deveria sair vazio, veio %q", dirs.SaveStatesDir)
 	}
 }
 
