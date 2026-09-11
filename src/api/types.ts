@@ -363,6 +363,15 @@ export type CustomDefinition = {
   binary_path: string;
   /** Precisa conter `{rom}` — validado pelo servidor, não neste tipo. */
   args: string[];
+  /**
+   * Extensões de arquivo (sem ponto, minúsculas — ex. "pkg", "iso") que a
+   * biblioteca reconhece como jogo para os consoles acima, quando pelo
+   * menos um deles está fora do catálogo do ZeuX. Opcional: sem isto o
+   * emulador continua cadastrável e lançável à mão, só não habilita
+   * `POST /library/folders` para esse console (ver docs/api.md,
+   * unknown_console).
+   */
+  extensions?: string[];
   notes?: string;
 };
 

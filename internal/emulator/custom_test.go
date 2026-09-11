@@ -264,3 +264,37 @@ func TestCustomLocateTrustsUserPath(t *testing.T) {
 		t.Error("arquivo inexistente não deveria ser reportado como instalado")
 	}
 }
+
+// Trava a mesma regra do catálogo embutido (verdict/catalog_integration_test.go)
+// aplicada às extensões de um CustomDefinition: sem ponto, minúscula, nunca
+// vazia — texto vindo direto do usuário no formulário.
+func TestValidateRejectsBadExtensionFormat(t *testing.T) {
+	cases := []struct {
+		name string
+		ext  string
+	}{
+		{"com ponto", ".pkg"},
+		{"maiúscula", "PKG"},
+		{"vazia", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			def := sampleDefinition()
+			def.Extensions = []string{c.ext}
+			if err := def.Validate(); err == nil {
+				t.Errorf("extensão %q deveria ser recusada", c.ext)
+			}
+		})
+	}
+}
+
+// Trava que uma extensão bem formada é aceita — Extensions é opcional, então
+// isto também garante que o campo novo não quebrou uma definição que já
+// passava sem ele.
+func TestValidateAcceptsGoodExtension(t *testing.T) {
+	def := sampleDefinition()
+	def.Extensions = []string{"pkg", "iso"}
+	if err := def.Validate(); err != nil {
+		t.Errorf("extensões bem formadas não deveriam ser recusadas: %v", err)
+	}
+}

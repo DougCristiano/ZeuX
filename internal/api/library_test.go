@@ -132,6 +132,116 @@ func TestAddLibraryFolderRejectsUnknownConsole(t *testing.T) {
 	}
 }
 
+// Trava o pedido do Douglas em 2026-09-11: um console fora do catálogo (o
+// exemplo dele foi "ps4") passa a ter pasta de jogos indexável quando um
+// emulador personalizado declara as extensões — não precisa entrar no
+// catálogo dos 33 pra isso.
+func TestAddLibraryFolderAcceptsCustomConsoleWithDeclaredExtensions(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	binDir := t.TempDir()
+	bin := newExecutableFile(t, binDir, "meu-emulador-ps4")
+
+	upsertRec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/custom-emulators", map[string]any{
+		"id":          "meu-ps4",
+		"name":        "Emulador de PS4",
+		"consoles":    []string{"ps4"},
+		"binary_path": bin,
+		"args":        []string{"{rom}"},
+		"extensions":  []string{"pkg"},
+	})
+	if upsertRec.Code != http.StatusOK {
+		t.Fatalf("cadastro do emulador personalizado: status %d, corpo: %s", upsertRec.Code, upsertRec.Body.String())
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Jogo.pkg"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM de teste: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "leia-me.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando arquivo não-ROM: %v", err)
+	}
+
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "ps4",
+		"path":       dir,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, esperado 200, corpo: %s", rec.Code, rec.Body.String())
+	}
+	if found, _ := decodeBody(t, rec)["games_found"].(float64); found != 1 {
+		t.Fatalf("games_found = %v, esperado 1 (só o .pkg, não o .txt)", found)
+	}
+}
+
+// Trava que a extensão declarada continua valendo numa revarredura — sem
+// isso, o rescan (que resolve extensão de novo a cada chamada) quebraria
+// silenciosamente assim que a primeira resposta saísse de cache no front.
+func TestLibraryFolderRescanKeepsWorkingForCustomConsole(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	binDir := t.TempDir()
+	bin := newExecutableFile(t, binDir, "meu-emulador-ps4")
+
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/custom-emulators", map[string]any{
+		"id":          "meu-ps4",
+		"name":        "Emulador de PS4",
+		"consoles":    []string{"ps4"},
+		"binary_path": bin,
+		"args":        []string{"{rom}"},
+		"extensions":  []string{"pkg"},
+	})
+
+	dir := t.TempDir()
+	addRec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "ps4",
+		"path":       dir,
+	})
+	folder := decodeBody(t, addRec)["folder"].(map[string]any)
+	id := int64(folder["id"].(float64))
+
+	if err := os.WriteFile(filepath.Join(dir, "Jogo Novo.pkg"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("criando ROM nova: %v", err)
+	}
+
+	scanRec := doJSON(t, server.Routes(), http.MethodPost,
+		"/api/v1/library/folders/"+strconv.FormatInt(id, 10)+"/scan", nil)
+	if scanRec.Code != http.StatusOK {
+		t.Fatalf("status da revarredura = %d, esperado 200, corpo: %s", scanRec.Code, scanRec.Body.String())
+	}
+	if found, _ := decodeBody(t, scanRec)["games_found"].(float64); found != 1 {
+		t.Fatalf("games_found na revarredura = %v, esperado 1", found)
+	}
+}
+
+// Trava que sem NENHUM emulador personalizado declarando extensão pro
+// console fora do catálogo, o comportamento continua o de antes: recusa
+// nomeando o que falta, não uma pasta vazia aceita silenciosamente.
+func TestAddLibraryFolderStillRejectsCustomConsoleWithoutDeclaredExtensions(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	binDir := t.TempDir()
+	bin := newExecutableFile(t, binDir, "meu-emulador-ps4")
+
+	// Cadastra o emulador, mas sem "extensions" — cadastro manual válido
+	// hoje mesmo (lançamento à mão), só não habilita pasta de jogos.
+	doJSON(t, server.Routes(), http.MethodPost, "/api/v1/custom-emulators", map[string]any{
+		"id":          "meu-ps4",
+		"name":        "Emulador de PS4",
+		"consoles":    []string{"ps4"},
+		"binary_path": bin,
+		"args":        []string{"{rom}"},
+	})
+
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/library/folders", map[string]any{
+		"console_id": "ps4",
+		"path":       t.TempDir(),
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, esperado 400", rec.Code)
+	}
+	if code := errorCode(decodeBody(t, rec)); code != "unknown_console" {
+		t.Fatalf("code = %q, esperado unknown_console", code)
+	}
+}
+
 // Trava que apontar um caminho que não existe no disco é 400 nomeando o
 // caminho, não 500 — regra 10 do CLAUDE.md (falha do usuário não é erro de
 // servidor).

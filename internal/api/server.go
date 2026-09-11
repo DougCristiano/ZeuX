@@ -1553,15 +1553,17 @@ func (s *Server) handleAddLibraryFolder(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	console, ok := s.catalog.ConsoleByID(body.ConsoleID)
+	// resolveConsoleExtensions cobre os dois casos: console do catálogo, ou
+	// console fora dele com extensão declarada num CustomDefinition
+	// (docs/pendencias.md, item G reduzido: pasta de jogos para emulador
+	// personalizado, sem o parecer de hardware que o catálogo completo
+	// exigiria). Sem nenhuma das duas fontes, a mensagem diz exatamente o
+	// que falta, em vez de recusar com um "não está no catálogo" que já não
+	// seria verdade se o problema for só a extensão não declarada.
+	extensions, _, ok := s.resolveConsoleExtensions(r.Context(), body.ConsoleID)
 	if !ok {
-		// Frase completa, não só o código: cadastrar um emulador para um
-		// console fora do catálogo é permitido (internal/emulator/custom.go),
-		// mas a varredura de ROMs depende das extensões que só o catálogo
-		// define — então apontar uma pasta para esse console ainda não tem
-		// como funcionar. O texto diz isso em vez de deixar a UI adivinhar.
 		s.writeError(w, http.StatusBadRequest, "unknown_console",
-			"O console informado não está no catálogo do ZeuX, então indexar uma pasta de jogos para ele ainda não está disponível. Um emulador para esse console pode ser cadastrado e lançado manualmente; a varredura de ROMs cobre só os consoles do catálogo.")
+			"O ZeuX não sabe reconhecer arquivo de jogo para este console. Se ele estiver no catálogo, isso não deveria acontecer — reporte. Se for um console fora do catálogo, cadastre (ou edite) um emulador personalizado para ele em Emuladores, informando as extensões de arquivo dos jogos.")
 		return
 	}
 
@@ -1578,7 +1580,7 @@ func (s *Server) handleAddLibraryFolder(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	found, err := s.syncLibraryFolder(r.Context(), folder, console)
+	found, err := s.syncLibraryFolder(r.Context(), folder, extensions)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
 		return
@@ -1678,7 +1680,12 @@ func (s *Server) handleBulkAddLibraryFolders(w http.ResponseWriter, r *http.Requ
 			s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
 			return
 		}
-		found, err := s.syncLibraryFolder(r.Context(), folder, console)
+		// Bulk continua catálogo-only de propósito: casar subpasta por nome
+		// com um console fora do catálogo exigiria decidir qual
+		// CustomDefinition (podem existir várias) dá nome à pasta — sem uma
+		// "definição de console" única, isso é ambíguo o bastante para
+		// merecer decisão própria, não um efeito colateral deste item.
+		found, err := s.syncLibraryFolder(r.Context(), folder, console.Extensions)
 		if err != nil {
 			s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
 			return
@@ -1788,14 +1795,19 @@ func (s *Server) handleScanLibraryFolder(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	console, ok := s.catalog.ConsoleByID(folder.ConsoleID)
+	// Mesma resolução de handleAddLibraryFolder: catálogo, ou extensão de um
+	// CustomDefinition para um console fora dele. Uma pasta de console
+	// personalizado já indexada uma vez tem que continuar revarrível — sem
+	// isto, editar/apagar o CustomDefinition que declarou a extensão
+	// quebraria silenciosamente o rescan de toda pasta que dependia dele.
+	extensions, _, ok := s.resolveConsoleExtensions(r.Context(), folder.ConsoleID)
 	if !ok {
 		s.writeError(w, http.StatusInternalServerError, "unknown_console",
-			"O console desta pasta não está mais no catálogo do ZeuX.")
+			"O ZeuX não sabe mais reconhecer arquivo de jogo para o console desta pasta — se for um console fora do catálogo, confira se o emulador personalizado que declarava as extensões ainda existe.")
 		return
 	}
 
-	found, err := s.syncLibraryFolder(r.Context(), folder, console)
+	found, err := s.syncLibraryFolder(r.Context(), folder, extensions)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
 		return
@@ -2363,11 +2375,64 @@ func (s *Server) autoScrapeCovers() {
 	}
 }
 
-// syncLibraryFolder varre o disco a partir de folder, usando as extensões do
-// console, e reconcilia o resultado com o banco. Devolve quantos jogos a
-// varredura encontrou desta vez.
-func (s *Server) syncLibraryFolder(ctx context.Context, folder library.Folder, console verdict.Console) (int, error) {
-	paths, err := library.FindROMs(folder.Path, console.Extensions)
+// resolveConsoleExtensions devolve as extensões de arquivo a reconhecer como
+// ROM para consoleID e um nome legível para exibir — do catálogo quando o
+// console está nele, ou dos emuladores personalizados cadastrados para ele
+// quando não está (pedido do Douglas, 2026-09-11: "importante ter uma pasta
+// que diga qual é a pasta de jogos dele... mesmo não estando nos 33 consoles
+// iniciais"). `ok=false` quando nenhuma das duas fontes souber — aí a
+// varredura de biblioteca não tem o que procurar, e quem chama deve recusar
+// com uma mensagem que diz exatamente isso, não uma pasta vazia silenciosa.
+//
+// Quando mais de uma CustomDefinition lista o mesmo console fora do
+// catálogo, as extensões saem em união (nunca a primeira que aparecer) —
+// Extensions pertence à definição do emulador, não existe uma "definição do
+// console" única para desempatar.
+func (s *Server) resolveConsoleExtensions(ctx context.Context, consoleID string) (extensions []string, name string, ok bool) {
+	if console, found := s.catalog.ConsoleByID(consoleID); found {
+		return console.Extensions, console.Name, true
+	}
+
+	customs, err := s.customs.Load()
+	if err != nil {
+		return nil, "", false
+	}
+
+	seen := make(map[string]bool)
+	var union []string
+	for _, def := range customs {
+		if len(def.Extensions) == 0 {
+			continue
+		}
+		for _, console := range def.Consoles {
+			if console != consoleID {
+				continue
+			}
+			for _, ext := range def.Extensions {
+				if !seen[ext] {
+					seen[ext] = true
+					union = append(union, ext)
+				}
+			}
+		}
+	}
+	if len(union) == 0 {
+		return nil, "", false
+	}
+	return union, consoleID, true
+}
+
+// syncLibraryFolder varre o disco a partir de folder, usando extensions, e
+// reconcilia o resultado com o banco. Devolve quantos jogos a varredura
+// encontrou desta vez.
+//
+// Recebe []string, não verdict.Console: as únicas duas fontes de extensão
+// são o catálogo (console.Extensions) e resolveCustomConsoleExtensions, para
+// um console fora dele — a função nunca precisou de mais nada de
+// verdict.Console, então pedir a struct inteira só obrigava quem chama para
+// um console custom a fabricar um verdict.Console de mentira.
+func (s *Server) syncLibraryFolder(ctx context.Context, folder library.Folder, extensions []string) (int, error) {
+	paths, err := library.FindROMs(folder.Path, extensions)
 	if err != nil {
 		return 0, err
 	}

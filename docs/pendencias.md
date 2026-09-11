@@ -266,12 +266,38 @@ posicionamento de UI, barata. Nada além disso deveria entrar nesta rodada.
       emulador ou o jogo.
 - [ ] Alcançável pelo controle (`data-gamepad-focused`).
 
-**Fica de fora (de propósito):**
-- **Adicionar console novo ao catálogo por essa via** (um "cadastrar console"
-  com extensões, patamares de hardware e parecer). É item G, mexe em
-  `consoles.json`, no motor de parecer e na biblioteca — e é a única forma de
-  fazer a pasta de jogos funcionar para um sistema fora do catálogo. Se o
-  Douglas quiser isso, é uma pendência própria, não um crescimento desta.
+**Atualização (2026-09-11) — a pasta de jogos passou a funcionar, sem
+esperar pelo item G completo:** o Douglas pediu especificamente isto —
+*"acho importante ter uma pasta que diga qual é a pasta de jogos dele e o
+ZeuX entender, mesmo não estando colocado nos 33 consoles iniciais"*. Feito
+como fatia isolada do item G, sem mexer em `consoles.json` nem no motor de
+parecer:
+
+- `CustomDefinition` ganhou `Extensions []string` (mesmo formato do
+  catálogo: sem ponto, minúscula — `internal/emulator/custom.go`,
+  validado em `Validate()`).
+- `Server.resolveConsoleExtensions` (`internal/api/server.go`) é a nova
+  fonte única de "quais extensões contam como ROM para este console_id":
+  catálogo primeiro, união das `Extensions` de todo `CustomDefinition` que
+  lista esse console fora dele depois. `POST /library/folders` e
+  `POST /library/folders/{id}/scan` (o rescan também precisava, senão
+  quebraria depois de editado o emulador) usam essa resolução em vez de
+  `catalog.ConsoleByID` puro.
+- `ManualEmulatorForm` ganhou o campo "Extensões dos arquivos de jogo"
+  (opcional), com a mesma normalização do backend.
+- **Fica de fora, de propósito, nesta fatia:** `POST /library/folders/bulk`
+  continua catálogo-only (casar nome de subpasta com console exige saber
+  qual `CustomDefinition` "é dona" do nome quando há mais de uma para o
+  mesmo console — ambíguo, decisão própria se vier a importar). Nenhum
+  parecer de hardware, nenhuma logo, nenhuma entrada em `consoles.json` —
+  é só "a biblioteca sabe reconhecer o arquivo", que era o pedido.
+
+**O que continua de fora (o resto do item G, sem mudança):**
+- **Adicionar console novo ao catálogo de verdade** (um "cadastrar console"
+  com patamares de hardware e parecer, dado pelo motor de veredito). Ainda
+  mexe em `consoles.json` e no motor de parecer — a fatia acima resolveu só
+  a biblioteca, não "este PC aguenta rodar isso". Se o Douglas quiser isso,
+  é uma pendência própria.
 - Nintendo Switch, Yuzu, Ryujinx — fora do catálogo por decisão registrada, e
   esta porta não é rota de contorno disso. O texto da tela não cita nenhum
   console fora do catálogo como sugestão; `ps4` aparece só como exemplo de

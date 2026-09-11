@@ -42,6 +42,21 @@ type CustomDefinition struct {
 	// valores do preset. Qualquer outro texto é repassado literalmente.
 	Args []string `json:"args"`
 
+	// Extensions são as extensões de arquivo (sem ponto, minúsculas — mesmo
+	// formato de verdict.Console.Extensions) que a varredura de biblioteca
+	// deve reconhecer como ROM para os consoles listados acima. Opcional: um
+	// emulador cadastrado só para lançamento manual (sem pasta de jogos
+	// indexada) não precisa disso. Só passa a valer alguma coisa quando pelo
+	// menos um id de Consoles está fora do catálogo do ZeuX — para um
+	// console do catálogo, as extensões de lá é que mandam
+	// (ver resolveCustomConsoleExtensions, internal/api/server.go).
+	//
+	// Pertence à definição do emulador, não a um console próprio (o ZeuX não
+	// tem essa entidade para console fora do catálogo) — se dois cadastros
+	// diferentes declararem o mesmo console com extensões diferentes, a
+	// varredura usa a união das duas listas (ver resolveCustomConsoleExtensions).
+	Extensions []string `json:"extensions,omitempty"`
+
 	// Notes é espaço livre para o usuário anotar o que quiser sobre esta
 	// definição — de onde veio o build, qual bug ela contorna, o que for.
 	Notes string `json:"notes,omitempty"`
@@ -60,6 +75,21 @@ func (d CustomDefinition) Validate() error {
 	}
 	if len(d.Consoles) == 0 {
 		return fmt.Errorf("informe ao menos um console que este emulador atende")
+	}
+
+	// Mesma regra do catálogo embutido (verdict/catalog_integration_test.go):
+	// sem ponto, minúscula, nunca vazia — texto vindo do usuário é a razão de
+	// checar aqui, não só confiar no formulário.
+	for _, ext := range d.Extensions {
+		if ext == "" {
+			return fmt.Errorf("a lista de extensões não pode ter um item vazio")
+		}
+		if strings.HasPrefix(ext, ".") {
+			return fmt.Errorf("a extensão %q não deve incluir o ponto (escreva %q)", ext, strings.TrimPrefix(ext, "."))
+		}
+		if ext != strings.ToLower(ext) {
+			return fmt.Errorf("a extensão %q deve estar em minúsculas", ext)
+		}
 	}
 
 	// Sem {rom} o emulador abriria sem jogo nenhum. É a única exigência sobre o

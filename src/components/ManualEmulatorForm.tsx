@@ -68,6 +68,11 @@ export function ManualEmulatorForm({
   const t = useT(dict);
   const [name, setName] = useState(existing?.name ?? prefill?.name ?? "");
   const [consoles, setConsoles] = useState((existing?.consoles ?? prefill?.consoles ?? []).join(", "));
+  // Extensões (docs/pendencias.md, pedido do Douglas em 2026-09-11): opcional
+  // de propósito — sem preencher, o emulador continua cadastrável e
+  // lançável à mão como sempre foi; só habilita apontar uma pasta de jogos
+  // pra POST /library/folders quando o console não está no catálogo.
+  const [extensions, setExtensions] = useState((existing?.extensions ?? []).join(", "));
   const [binaryPath, setBinaryPath] = useState(existing?.binary_path ?? "");
   const [args, setArgs] = useState((existing?.args ?? ["{rom}"]).join("\n"));
   const [notes, setNotes] = useState(existing?.notes ?? "");
@@ -142,6 +147,10 @@ export function ManualEmulatorForm({
           .split("\n")
           .map((a) => a.trim())
           .filter(Boolean),
+        extensions: extensions
+          .split(",")
+          .map((ext) => ext.trim().toLowerCase().replace(/^\./, ""))
+          .filter(Boolean),
         notes: notes.trim() || undefined,
       };
       await api.upsertCustomEmulator(def);
@@ -192,6 +201,21 @@ export function ManualEmulatorForm({
             de jogos para esse console ainda não. Esta frase diz o limite antes
             de a pessoa esbarrar nele. */}
         <span className="text-xs text-muted">{t("consolesHint")}</span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm text-ink">
+        {t("extensionsLabel")}
+        <input
+          type="text"
+          value={extensions}
+          onChange={(e) => setExtensions(e.target.value)}
+          placeholder="pkg, iso"
+          className={inputClass}
+        />
+        {/* Só relevante pra console fora do catálogo — pra um console
+            conhecido, as extensões de lá já mandam e este campo é ignorado
+            do lado do servidor (resolveConsoleExtensions, server.go). */}
+        <span className="text-xs text-muted">{t("extensionsHint")}</span>
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-ink">

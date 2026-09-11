@@ -5,9 +5,19 @@ export const dict = {
   consolesLabel: { "pt-BR": "Consoles atendidos (ids separados por vírgula, ex.: ps1, ps2)", en: "Supported consoles (ids separated by comma, e.g., ps1, ps2)" },
   consolesHint: {
     "pt-BR":
-      "Ids fora do catálogo do ZeuX (por exemplo, ps4) também valem: o emulador fica cadastrado e você pode lançá-lo à mão. O que ainda não existe é apontar uma pasta de ROMs para um console que o ZeuX não conhece — a biblioteca só indexa os consoles do catálogo.",
+      "Ids fora do catálogo do ZeuX (por exemplo, ps4) também valem: o emulador fica cadastrado e você pode lançá-lo à mão. Pra ter uma pasta de jogos indexada pra esse console, preencha as extensões abaixo.",
     en:
-      "Ids outside the ZeuX catalog (ps4, for instance) work too: the emulator gets registered and you can launch it by hand. What doesn't exist yet is pointing a ROM folder at a console ZeuX doesn't know — the library only indexes catalog consoles.",
+      "Ids outside the ZeuX catalog (ps4, for instance) work too: the emulator gets registered and you can launch it by hand. To get an indexed game folder for that console, fill in the extensions below.",
+  },
+  extensionsLabel: {
+    "pt-BR": "Extensões dos arquivos de jogo (opcional, ids separados por vírgula, ex.: pkg, iso)",
+    en: "Game file extensions (optional, comma-separated, e.g., pkg, iso)",
+  },
+  extensionsHint: {
+    "pt-BR":
+      "Só necessário para um console fora do catálogo (ex.: ps4) — é o que permite apontar uma pasta de jogos pra ele em Biblioteca. Pra um console do catálogo, as extensões já conhecidas valem e este campo é ignorado.",
+    en:
+      "Only needed for a console outside the catalog (e.g., ps4) — it's what lets you point a game folder at it in Library. For a catalog console, the known extensions already apply and this field is ignored.",
   },
   unverifiedNote: {
     "pt-BR":
