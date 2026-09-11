@@ -29,6 +29,7 @@ import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { GamesScreen } from "./screens/GamesScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
+import { HomeScreen } from "./screens/HomeScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
@@ -49,10 +50,16 @@ type Phase =
   | "declined"
   | "scanning"
   | "scan-error"
-  // "all-games" é a tela inicial depois do parecer pronto (2026-08-04, a
-  // pedido do Douglas — "clicar direto e começar a jogar"), não "verdict".
-  // O parecer de compatibilidade continua existindo, alcançável a partir
-  // daqui.
+  // "home" é a tela inicial desde 2026-09-10 (A1, docs/pendencias.md — pedido
+  // do Douglas: "quero mais destaque pro console" + "faltam motivos pra usar
+  // num PC zerado"). Sempre a entrada, com ou sem histórico — sem nenhum jogo
+  // jogado e nenhuma pasta configurada, ela vira o onboarding (HomeScreen
+  // decide isso sozinha). "Todos os jogos" continua existindo, alcançado a
+  // partir daqui ("Ver todos os jogos"), não mais o destino direto da
+  // sidebar.
+  | "home"
+  // O parecer de compatibilidade continua existindo, alcançável a partir da
+  // home.
   | "all-games"
   | "verdict"
   | "consoles"
@@ -127,11 +134,18 @@ function App() {
   // `Phase` — mesma razão do splash (ver src/components/TourOverlay.tsx). O
   // tour aparece **depois do scan**, na primeira tela do app: antes do
   // consentimento, quatro telas vendendo o produto virariam pressão para
-  // consentir. Quem recusou também vê, a partir de `DeclinedScreen` — é quem
-  // tem menos contexto sobre o que o app faz.
+  // consentir.
+  //
+  // 2026-09-11: e **não** abre sozinho para quem acabou de recusar. Os quatro
+  // passos falam de ler o hardware e autoconfigurar o emulador — exatamente o
+  // que a pessoa acabou de dizer que não quer. Abrir a apresentação em cima da
+  // recusa lê como insistência, e vai contra o princípio 1 (o "não" vale como
+  // resposta, não como começo de negociação). O caminho continua aberto: a
+  // `DeclinedScreen` permite consentir depois, e Configurações tem "rever a
+  // apresentação" (`onReplayTour`) para quem quiser ver por conta própria.
   const [tourVisible, setTourVisible] = useState(false);
   useEffect(() => {
-    if ((phase === "all-games" || phase === "declined") && !hasSeenTour()) {
+    if (phase === "home" && !hasSeenTour()) {
       setTourVisible(true);
     }
   }, [phase]);
@@ -197,12 +211,16 @@ function App() {
   // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
   // a tela por console (LibraryScreen) continua existindo.
   const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library" | "console-detail">("all-games");
+  // "library" (fase de gerenciar pastas) agora é alcançada tanto da home
+  // quanto de "Todos os jogos" (2026-09-10, A1) — "Voltar" precisa saber pra
+  // qual das duas devolver, mesmo padrão de `gamesOrigin`.
+  const [libraryOrigin, setLibraryOrigin] = useState<"home" | "all-games">("home");
   // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04). M5
   // (docs/sprint-m-plano.md, 2026-08-07): até aqui só vinha de
   // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
   // ver M5) — "Voltar" precisa saber pra qual fase retornar, senão sempre
   // devolveria pra "all-games" mesmo vindo de dentro de um console.
-  const [gameDetailOrigin, setGameDetailOrigin] = useState<"all-games" | "games" | "history">("all-games");
+  const [gameDetailOrigin, setGameDetailOrigin] = useState<"home" | "all-games" | "games" | "history">("home");
   const [selectedGame, setSelectedGame] = useState<{
     game: LibraryGame;
     consoleName: string;
@@ -309,7 +327,7 @@ function App() {
       await api.scanHardware();
       const nextReport = await api.getVerdicts();
       setReport(nextReport);
-      setPhase("all-games");
+      setPhase("home");
     } catch (err) {
       setErrorMessage(err instanceof ApiError ? err.message : t("scanError"));
       setPhase("scan-error");
@@ -360,7 +378,10 @@ function App() {
   }
 
   function navigateSidebar(id: NavID) {
-    if (id === "library") setPhase("all-games");
+    // "library" é o nome de NavID (item da sidebar), não da Phase — a home
+    // (2026-09-10, decisão do Douglas) é quem esse item abre agora;
+    // "all-games" virou sub-visão, alcançada de dentro da home.
+    if (id === "library") setPhase("home");
     if (id === "verdict") setPhase("verdict");
     if (id === "consoles") {
       setCameFromDeclined(false);
@@ -450,7 +471,7 @@ function App() {
           // que quem aceitou — só sem parecer de hardware (`report` fica
           // `null`; as telas de biblioteca já toleram isso, ver
           // AllGamesScreen/LibraryScreen/GamesScreen/GameDetailScreen).
-          onContinueWithoutConsent={() => setPhase("all-games")}
+          onContinueWithoutConsent={() => setPhase("home")}
         />
       );
       break;
@@ -463,12 +484,38 @@ function App() {
       screen = <ErrorScreen message={errorMessage} onRetry={runScan} />;
       break;
 
+    case "home":
+      screen = (
+        <HomeScreen
+          report={report ?? undefined}
+          consoleCatalog={consoles}
+          onOpenLibrary={() => {
+            setLibraryOrigin("home");
+            setPhase("library");
+          }}
+          onOpenConsole={abrirConsolePorID}
+          onOpenAllGames={() => setPhase("all-games")}
+          onOpenGame={(game, consoleName, shortName) => {
+            const year =
+              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
+              consoles.find((c) => c.console_id === game.console_id)?.year;
+            setGameDetailOrigin("home");
+            setSelectedGame({ game, consoleName, shortName, year });
+            setPhase("game-detail");
+          }}
+        />
+      );
+      break;
+
     case "all-games":
       screen = (
         <AllGamesScreen
           report={report ?? undefined}
           consoleCatalog={consoles}
-          onOpenLibrary={() => setPhase("library")}
+          onOpenLibrary={() => {
+            setLibraryOrigin("all-games");
+            setPhase("library");
+          }}
           onOpenConsole={abrirConsolePorID}
           view={allGamesView}
           onViewChange={handleAllGamesViewChange}
@@ -562,7 +609,7 @@ function App() {
         <LibraryScreen
           consoleCatalog={consoles}
           report={report ?? undefined}
-          onBack={() => setPhase("all-games")}
+          onBack={() => setPhase(libraryOrigin)}
           onOpenGames={(id, name, shortName) => {
             setSelectedConsole({ id, name, shortName });
             setGamesOrigin("library");
@@ -672,11 +719,41 @@ function App() {
       // fase sem precisar repetir em cada uma das nove telas pós-onboarding.
       <div className="relative flex h-screen overflow-hidden">
         <AmbientGlow opacity={9} />
+        {/* 2026-09-10 (achado do critico-design): a grade de pixels
+            (`.zeux-pixel-grid`, index.css) existia em só 3 componentes
+            isolados — o chassi que o usuário olha o tempo inteiro (este
+            `<main>`) não carregava textura nenhuma, o que contradizia a
+            decisão de 2026-09-09 na prática. `fixed`, não dentro do `<main>`
+            rolável: é a tela do tubo, não conteúdo — não deveria rolar junto
+            com a grade de jogos por baixo dela. */}
+        <div aria-hidden="true" className="zeux-pixel-grid pointer-events-none fixed inset-0" />
         <Sidebar active={active} onNav={navigateSidebar} />
         {/* `tabIndex={-1}`: não entra na ordem de Tab, mas pode receber foco
             por script — é o alvo para onde a abertura devolve o foco ao sair
             (ver `SplashScreen.onDone`, acima). */}
-        <main ref={mainRef} tabIndex={-1} className="flex-1 overflow-y-auto outline-none">
+        {/* 2026-09-10 (achado do critico-design, "céu variável"): o chassi era
+            preto parelho de cima a baixo. Um degradê vertical curto — `--panel`
+            no topo, dissolvendo em `--paper` a 35% da altura — dá horizonte ao
+            conteúdo sem faixa visível: os dois tokens são vizinhos na paleta
+            recalibrada (index.css), então a transição lê como profundidade, não
+            como banda. `background-attachment: local` prende o degrau ao topo do
+            CONTEÚDO, não da janela — rolando uma grade longa o céu sobe junto,
+            em vez de ficar colado na moldura. */}
+        <main
+          ref={mainRef}
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto outline-none"
+          style={{
+            backgroundImage: "linear-gradient(to bottom, var(--panel), var(--paper) 35%)",
+            backgroundRepeat: "no-repeat",
+            backgroundAttachment: "local",
+            // Altura fixa, não `%`: com `local` a área de fundo é a do conteúdo
+            // ROLÁVEL inteiro — uma porcentagem esticaria o degradê por 35% de
+            // uma grade de 4000px e viraria um tingimento parelho, exatamente o
+            // que este item existe para evitar.
+            backgroundSize: "100% 480px",
+          }}
+        >
           {screen}
         </main>
         {gamepadToast && <Toast message={gamepadToast} />}
@@ -705,6 +782,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
   declined: "Consentimento recusado",
   scanning: "Lendo o computador",
   "scan-error": "Erro na leitura do computador",
+  home: "Biblioteca",
   "all-games": "Todos os jogos",
   "game-detail": "Detalhe do jogo",
   history: "Histórico",
@@ -720,6 +798,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
 };
 
 const SIDEBAR_PHASES: Phase[] = [
+  "home",
   "all-games",
   "verdict",
   "consoles",

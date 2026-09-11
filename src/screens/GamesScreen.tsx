@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { api, ApiError, consoleImageURL, isDownloadingCore } from "../api";
+import { api, ApiError, isDownloadingCore } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
@@ -10,7 +10,6 @@ import {
   CHROME_TINT_DANGER,
   CHROME_TINT_INFO,
   ConfirmModal,
-  consoleIconLabel,
   EmptyState,
   ErrorModal,
   InlineError,
@@ -30,6 +29,7 @@ import {
   type SortValue,
   type ViewMode,
 } from "../components/LibraryToolbar";
+import { ConsoleHero } from "../components/ConsoleHero";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useInlineInstall } from "../hooks/useInlineInstall";
@@ -141,15 +141,9 @@ export function GamesScreen({
   // Erro de lançamento vira modal, não texto discreto na linha do jogo —
   // achado em 2026-08-04, um texto inline passava despercebido.
   const [launchError, setLaunchError] = useState<string | null>(null);
-  // A logo oficial não existe para os 3 consoles sem imagem cadastrada no
-  // IGDB (ver PRODUCT.md). Esta tela não recebe o `has_image` do catálogo
-  // como `ConsoleDetailScreen` recebe, então a checagem é o próprio
-  // `onError` do <img> — mesma queda para a sigla, um quadro depois.
-  const [heroImageFailed, setHeroImageFailed] = useState(false);
   const { toastMessage, showToast } = useToast();
 
   const accent = consoleAccentColor(consoleId);
-  const showHeroImage = !heroImageFailed;
 
   const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
 
@@ -329,6 +323,15 @@ export function GamesScreen({
           title={t("couldNotInstallEmulator")}
           message={install.state.message}
           onClose={() => install.setState({ kind: "idle" })}
+          /* Falha de instalação é quase sempre rede, e costuma passar na
+             segunda tentativa — sem isto a pessoa tinha que refazer o caminho
+             todo até "Jogar". `retry` guarda os argumentos exatos do
+             `startInstall` que falhou (ver `InstallState`). */
+          onRetry={
+            install.state.retry
+              ? ((r) => () => install.startInstall(r.adapterId, r.force, r.pendingGamePath))(install.state.retry)
+              : undefined
+          }
         />
       ) : (
         error && <ErrorModal title={t("couldNotLoadScreen")} message={error} onClose={() => setError(null)} />
@@ -464,74 +467,31 @@ export function GamesScreen({
       {/* N12 (docs/roadmap.md, Sprint N) tinha dado a esta tela a borda
           esquerda de 3px na cor do console — o sinal certo, na dose errada
           para a tela que é DESTE console: um filete ao lado de um h1 solto,
-          o mesmo cabeçalho que qualquer listagem genérica teria.
-          Redesenho de 2026-09-07: o cabeçalho passa a ser o mesmo hero de
-          `ConsoleDetailScreen` (logo em caixa de 64px, a própria logo
-          gigante e desfocada como arte de fundo, gradiente radial na cor de
-          identidade, borda esquerda mantida) — vocabulário já estabelecido,
-          não uma linguagem nova, e as duas telas do mesmo console deixam de
-          se apresentar de jeitos diferentes. */}
-      <div
-        className="relative mb-6 overflow-hidden rounded-lg border border-line p-5"
-        style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
-      >
-        {showHeroImage && (
-          <img
-            src={consoleImageURL(consoleId)}
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-24 -left-10 h-72 w-72 object-contain opacity-40 blur-3xl saturate-[1.8]"
-            onError={() => setHeroImageFailed(true)}
-          />
-        )}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: `radial-gradient(65% 90% at 12% 25%, color-mix(in srgb, ${accent} 22%, transparent), transparent 70%)`,
-          }}
-        />
-        <div className="relative flex items-center gap-4">
-          {/* Fundo branco quando há logo: as imagens do IGDB foram desenhadas
-              para selo em fundo claro (mesma razão registrada em
-              `ConsolesScreen`/`ConsoleDetailScreen`). */}
-          <span
-            aria-hidden="true"
-            style={{ borderColor: `${accent}66`, color: accent, backgroundColor: showHeroImage ? "#fff" : undefined }}
-            className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
-          >
-            {showHeroImage ? (
-              <img
-                src={consoleImageURL(consoleId)}
-                alt=""
-                className="h-14 w-14 object-contain p-0.5"
-                onError={() => setHeroImageFailed(true)}
-              />
-            ) : (
-              consoleIconLabel(consoleId, shortName)
+          o mesmo cabeçalho que qualquer listagem genérica teria. Desde
+          2026-09-07 o cabeçalho é o mesmo hero de `ConsoleDetailScreen`, e
+          desde 2026-09-11 é literalmente o mesmo componente
+          (`ConsoleHero`) — antes eram duas cópias que já divergiam. */}
+      <ConsoleHero
+        consoleId={consoleId}
+        name={consoleName}
+        shortName={shortName}
+        meta={
+          /* A contagem só aparece depois que a lista chega; até lá o lugar
+             fica vazio em vez de mostrar "0 jogos", que seria afirmar algo
+             ainda não sabido. */
+          <>
+            <span className="uppercase">{shortName}</span>
+            {games && (
+              <>
+                {" · "}
+                <span className="tabular-nums">
+                  {games.length === 1 ? t("gameCountOne") : t("gameCountMany", { count: games.length })}
+                </span>
+              </>
             )}
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold text-ink">{consoleName}</h1>
-            {/* `font-mono`: sigla e contagem são dado de catálogo, não prosa —
-                mesmo tratamento que o ano recebe no tile e no detalhe do
-                console. A contagem só aparece depois que a lista chega; até
-                lá o lugar fica vazio em vez de mostrar "0 jogos", que seria
-                afirmar algo ainda não sabido. */}
-            <p className="mt-1 font-mono text-sm tracking-wide text-muted">
-              <span className="uppercase">{shortName}</span>
-              {games && (
-                <>
-                  {" · "}
-                  <span className="tabular-nums">
-                    {games.length === 1 ? t("gameCountOne") : t("gameCountMany", { count: games.length })}
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* L9: aviso genérico de dependência externa, nunca nomeando arquivo,
           nunca bloqueando o jogo — só informa (regra 5). O botão "Abrir
@@ -683,7 +643,14 @@ export function GamesScreen({
             const launchability = evaluateGameLaunchability(game, verdict, adapterEntry);
 
             return (
-              <div key={game.id} className="flex flex-col gap-2">
+              // Sem `gap` no modo lista (correção de 2026-09-11): o
+              // `GameListRow` foi desenhado para encostar no seguinte — a
+              // borda inferior dele é o único separador entre um jogo e o
+              // próximo (ver o comentário do componente). Um `gap-2` aqui
+              // afastava as linhas e transformava cada uma num cartão solto,
+              // desmontando o desenho da lista. A margem de 2 continua no
+              // modo grade, onde ela separa o tile dos blocos de progresso.
+              <div key={game.id} className={viewMode === "lista" ? "flex flex-col" : "flex flex-col gap-2"}>
                 {/* Q5: `onInstall` passa por `handlePlay`, a mesma cadeia de
                     decisão do ▶ — ramifica por motivo e nunca dispara uma
                     instalação que o servidor recusa para fonte manual. */}
@@ -716,6 +683,17 @@ export function GamesScreen({
                   />
                 )}
 
+                {/* Os blocos abaixo (progresso, aviso, erro) foram desenhados
+                    para a largura de um tile. No modo lista eles ganham o
+                    mesmo recuo horizontal da linha e uma borda inferior, para
+                    continuarem lendo como parte daquela linha; no modo grade
+                    `contents` dissolve este wrapper e o layout fica idêntico
+                    ao de antes. */}
+                <div
+                  className={
+                    viewMode === "lista" ? "flex flex-col gap-2 border-b border-control-border px-2 py-2 empty:hidden empty:border-0" : "contents"
+                  }
+                >
                 {/* Redesenho de 2026-09-07: a frase era o único texto em
                     português cravado no JSX desta tela (todo o resto já
                     passava pelo `dict`), e vinha em `text-sm` de prosa. Vira
@@ -728,11 +706,17 @@ export function GamesScreen({
                     <p className="font-mono text-[11px] tracking-wider text-muted uppercase">
                       {t("installingEmulator", { emulator: verdict?.emulator ?? t("emulatorFallbackName") })}
                     </p>
-                    <p className="font-mono text-[11px] tracking-wider text-muted/70 uppercase">
-                      {install.state.job.phase}
-                    </p>
+                    {/* Sem `job`, a instalação acabou de ser pedida e o
+                        servidor ainda não respondeu (ver `InstallState`) —
+                        a linha de fase fica de fora e a barra sem
+                        porcentagem, mas o bloco já está no ar. */}
+                    {install.state.job && (
+                      <p className="font-mono text-[11px] tracking-wider text-muted/70 uppercase">
+                        {install.state.job.phase}
+                      </p>
+                    )}
                     <div className="mt-1.5">
-                      <ProgressBar percent={percentOf(install.state.job)} />
+                      <ProgressBar percent={install.state.job ? percentOf(install.state.job) : null} />
                     </div>
                   </div>
                 )}
@@ -785,6 +769,7 @@ export function GamesScreen({
                 )}
 
                 {status.kind === "error" && <InlineError>{status.message}</InlineError>}
+                </div>
               </div>
             );
           })}

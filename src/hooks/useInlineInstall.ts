@@ -9,6 +9,13 @@ import { pollJob } from "../lib/pollJob";
 // andamento vale pra todos eles. `pendingGamePath` guarda qual jogo disparou
 // o clique, pra lançar assim que a instalação terminar (usuário não deveria
 // precisar clicar de novo).
+/** Os argumentos de `startInstall`, guardados para a ação "Tentar de novo". */
+export interface InstallRetry {
+  adapterId: string;
+  force: boolean;
+  pendingGamePath: string;
+}
+
 export type InstallState =
   | { kind: "idle" }
   | { kind: "confirm-hardware"; message: string; pendingGamePath: string; adapterId: string }
@@ -16,7 +23,13 @@ export type InstallState =
   // mas roda), sem BIOS o jogo nunca abre — confirma antes de tentar, em vez
   // de deixar clicar "Jogar" e só descobrir depois que falhou.
   | { kind: "confirm-bios"; pendingGamePath: string }
-  | { kind: "installing"; job: InstallJob; pendingGamePath: string }
+  // `job` é opcional de propósito (2026-09-11): o estado entra no ar no
+  // instante do clique, antes de `POST /emulators/{id}/install` responder —
+  // a chamada podia levar mais de 10 segundos e a tela ficava muda o tempo
+  // todo, sem nada dizendo que o clique foi recebido. Sem `job`, quem
+  // renderiza mostra o rótulo de "preparando" e a barra indeterminada; o job
+  // chega no primeiro `setState` seguinte.
+  | { kind: "installing"; job?: InstallJob; pendingGamePath: string }
   // 2026-09-09 (pedido do Douglas): o emulador acabou de ser instalado
   // automaticamente pelo clique em "Jogar", mas este console precisa de um
   // arquivo de BIOS que o ZeuX não fornece. Em vez de lançar mesmo assim (o
@@ -31,7 +44,13 @@ export type InstallState =
   // simplesmente não instala este, e o que a pessoa precisa é saber onde
   // baixar e onde colocar.
   | { kind: "manual-install"; adapterId: string; adapterName: string; consoleId: string }
-  | { kind: "error"; message: string };
+  // `retry` guarda os argumentos exatos do `startInstall` que falhou
+  // (2026-09-11): sem eles o `ErrorModal` só sabia dizer "não deu" e fechar,
+  // e a pessoa tinha que refazer o caminho inteiro até o botão "Jogar" para
+  // tentar de novo — sendo que a falha mais comum aqui é rede, que costuma
+  // passar na segunda tentativa. Ausente quando o erro não veio de uma
+  // instalação (não há o que repetir).
+  | { kind: "error"; message: string; retry?: InstallRetry };
 
 /**
  * M8 (docs/sprint-m-plano.md, 2026-08-07): fluxo de instalação inline do L8,
@@ -101,25 +120,34 @@ export function useInlineInstall({
     onLaunch(pendingGamePath);
   }
 
-  function pollInstallJob(jobId: string, pendingGamePath: string) {
+  function pollInstallJob(jobId: string, pendingGamePath: string, retry: InstallRetry) {
     pollJob(jobId, {
       onProgress: (job) => setState({ kind: "installing", job, pendingGamePath }),
       onDone: (job) => {
         setState({ kind: "idle" });
         void afterEmulatorInstalled(job.adapter_id, pendingGamePath);
       },
-      onFailed: (job) => setState({ kind: "error", message: job.error ?? "A instalação falhou." }),
-      onError: (message) => setState({ kind: "error", message }),
+      onFailed: (job) => setState({ kind: "error", message: job.error ?? "A instalação falhou.", retry }),
+      onError: (message) => setState({ kind: "error", message, retry }),
       networkErrorFallback: "Não foi possível acompanhar a instalação.",
     });
   }
 
   function startInstall(adapterId: string, force: boolean, pendingGamePath: string) {
+    const retry = { adapterId, force, pendingGamePath };
+    // ANTES do `await`, não depois: `installEmulator` chega a demorar mais de
+    // dez segundos (o servidor resolve o release antes de responder) e até
+    // 2026-09-11 nada mudava na tela nesse intervalo — o clique em "Jogar"
+    // parecia não ter funcionado, e o caminho natural era clicar de novo.
+    // Com o estado no ar já aqui, o botão sai do ar junto (é `undefined`
+    // enquanto houver instalação pendente para este jogo) e o duplo clique
+    // deixa de ser possível.
+    setState({ kind: "installing", pendingGamePath });
     api
       .installEmulator(adapterId, force)
       .then((job) => {
         setState({ kind: "installing", job, pendingGamePath });
-        pollInstallJob(job.id, pendingGamePath);
+        pollInstallJob(job.id, pendingGamePath, retry);
       })
       .catch((err) => {
         if (err instanceof ApiError && err.code === "hardware_insufficient") {
@@ -129,6 +157,7 @@ export function useInlineInstall({
         setState({
           kind: "error",
           message: err instanceof ApiError ? err.message : "Não foi possível iniciar a instalação.",
+          retry,
         });
       });
   }

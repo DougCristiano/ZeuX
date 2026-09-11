@@ -32,6 +32,9 @@ export const dict = {
   playedLabel: { "pt-BR": "JÁ JOGUEI", en: "PLAYED" },
   excludedLabel: { "pt-BR": "OCULTOS", en: "HIDDEN" },
   allPlatforms: { "pt-BR": "TODOS", en: "ALL" },
+  // 2026-09-10: rótulo da fileira de chips de console, separando-a da régua
+  // de controle acima ("isto filtra o quê aparece", não "como aparece").
+  platformFilterLabel: { "pt-BR": "CONSOLE", en: "CONSOLE" },
 
   matchCount: { "pt-BR": "{{count}} de {{total}}", en: "{{count}} of {{total}}" },
 } satisfies Dict;

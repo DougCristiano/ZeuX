@@ -65,6 +65,8 @@ export const dict = {
   // época e "tenho jogos deste console".
   filterByMaker: { "pt-BR": "Fabricante", en: "Manufacturer" },
   filterByEra: { "pt-BR": "Época", en: "Era" },
+  filterAllMakers: { "pt-BR": "Todos os fabricantes", en: "All manufacturers" },
+  filterAllEras: { "pt-BR": "Todas as épocas", en: "All eras" },
   familyOther: { "pt-BR": "Outros", en: "Others" },
   era70s80s: { "pt-BR": "Anos 70–80", en: "70s–80s" },
   era90s: { "pt-BR": "Anos 90", en: "90s" },
@@ -75,6 +77,13 @@ export const dict = {
     en: "I have games for this console",
   },
   clearFilters: { "pt-BR": "Limpar filtros", en: "Clear filters" },
+  // Rótulo do grupo do mostrador de prontidão (leitor de tela). O painel é
+  // resumo e filtro ao mesmo tempo — o nome precisa dizer as duas coisas.
+  readinessPanelLabel: {
+    "pt-BR": "Quantos consoles estão em cada etapa — clique para filtrar",
+    en: "How many consoles are at each step — click to filter",
+  },
+  refineLabel: { "pt-BR": "Refinar", en: "Refine" },
 
   // Card do console
   viewGames: { "pt-BR": "Ver jogos", en: "View games" },

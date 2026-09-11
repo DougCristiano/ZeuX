@@ -358,6 +358,38 @@ export function AmbientGlow({ opacity = 14 }: { opacity?: number }) {
 }
 
 /**
+ * "Céu" da tela (2026-09-10, achado do critico-design: o glow do shell é
+ * uniforme e não varia por tela, então o app inteiro continua lendo como
+ * "preto parelho").
+ *
+ * Diferente do `AmbientGlow`, que fica ancorado na JANELA e vale para todas as
+ * fases: este halo é ancorado no TOPO DO CONTEÚDO da tela — é o degrau que faz
+ * uma tela parecer diferente da anterior ao trocar de item na sidebar.
+ *
+ * A fórmula do gradiente é a mesma já calibrada no cabeçalho de
+ * `ConsoleDetailScreen` (`radial-gradient` + `color-mix` sobre a cor de
+ * identidade), só com a âncora no topo e a porcentagem mais baixa: o próprio
+ * crítico avisou que acima de ~10-12% isso lê como "sujo", não como clima.
+ *
+ * `accent` opcional: telas que têm uma cor de console usam a dela; sem isso
+ * cai no roxo `--accent` do tema. Decorativo, `aria-hidden`, nunca sobre
+ * texto medido — o pai precisa ser `relative`, e o conteúdo da tela vem
+ * depois no DOM.
+ */
+export function ScreenAtmosphere({ accent, opacity = 12 }: { accent?: string; opacity?: number }) {
+  const color = accent ?? "var(--accent)";
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 top-0 h-[420px]"
+      style={{
+        background: `radial-gradient(55% 35% at 50% 0%, color-mix(in srgb, ${color} ${opacity}%, transparent), transparent 70%)`,
+      }}
+    />
+  );
+}
+
+/**
  * N3 (docs/roadmap.md, Sprint N): antes, cada tela escolhia seu próprio teto
  * de largura e seu próprio espaçamento de topo — conferido por `grep`, eram
  * seis valores diferentes (`max-w-6xl`, `max-w-7xl`, `max-w-5xl`,
@@ -447,6 +479,21 @@ export function Card({
  * sinal chegar ANTES do clique. A cor nunca é o único sinal (o rótulo diz
  * "Remover" e um `ConfirmModal` sempre confirma), então não viola 1.4.1.
  */
+/**
+ * Barra de chrome do card: altura de 28px em vez dos 36px do `chrome` padrão.
+ * Um card de grade cabe 3 numa fileira (~290px de largura) e chega a ter
+ * cinco destes botões; na altura cheia eles ocupariam três linhas e
+ * empurrariam a ação de instalar/remover para fora do campo de visão. O piso
+ * de 24px da WCAG 2.2 AA (`web-target-size`) continua respeitado com folga.
+ *
+ * Morava em `EmulatorsScreen.tsx` até 2026-09-11, quando `ConsoleDetailScreen`
+ * passou a usar a mesma régua (os botões de "abrir a janela de outro
+ * programa" viraram `chrome` nas duas telas) — mora aqui pelo mesmo motivo
+ * que `CHROME_TINT_*`: duas telas com a mesma regra não podem ter duas
+ * definições dela.
+ */
+export const CARD_CHROME = "h-7! px-2! whitespace-nowrap";
+
 export const CHROME_TINT_INFO =
   "border-accent-secondary/50! text-accent-secondary! hover:border-accent-secondary! hover:bg-accent-secondary/10! hover:shadow-[0_0_14px_-4px_var(--accent-secondary),inset_0_1px_0_0_rgba(255,255,255,0.06)]!";
 export const CHROME_TINT_DANGER =
@@ -633,8 +680,18 @@ export function ScreenHeader({
       {back && <BackButton label={back.label} onClick={back.onClick} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+          {/* 2026-09-10 (achado do critico-design: "a voz pixel virou
+              resíduo, sobrevive só na abertura"): a fonte pixel volta ao
+              topo de TODA tela, não como exceção — mas só aqui, a 22px, onde
+              ela é legível de verdade (o motivo de tê-la tirado dos rótulos
+              pequenos em 2026-09-06/N17 continua válido abaixo deste
+              tamanho). `leading-relaxed` porque a altura-x da Press Start 2P
+              é maior que a de uma sans no mesmo tamanho de fonte — sem
+              folga extra a entrelinha lê apertada. Acentos (ç/ã/õ/é, pt-BR)
+              cobertos pelo subset `latin`/`latin-ext` que o `400.css` já
+              importa por inteiro (conferido: sem tofu). */}
+          <h1 className="font-pixel text-xl leading-relaxed tracking-[0.04em] text-ink">{title}</h1>
+          {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>
@@ -1414,7 +1471,10 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
   const accent = consoleAccentColor(verdict.console_id);
 
   return (
-    <Card className="flex flex-col gap-2" style={{ borderLeftColor: accent, borderLeftWidth: 3 }}>
+    // `filled` como todo card do app — era o último `<Card>` sem a prop, e
+    // sem ela este card ficava um degrau de superfície abaixo dos vizinhos na
+    // mesma tela (ver a escada de superfícies em src/index.css).
+    <Card filled className="flex flex-col gap-2" style={{ borderLeftColor: accent, borderLeftWidth: 3 }}>
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold text-ink">{verdict.name}</p>
         <Badge variant={isGoodTier ? "solid" : "default"}>{levelLabel(verdict.level)}</Badge>

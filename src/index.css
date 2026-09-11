@@ -67,7 +67,17 @@
   color-scheme: dark;
 
   --paper: #080c17;
-  --panel: #0f1629;
+  /* Escada de superfície recalibrada (2026-09-10, achado do critico-design:
+     "o app está muito escuro" era, na medição, `--panel`/`--fill` sendo o
+     MESMO hex — as três superfícies do app cabiam em 1,15:1 de contraste
+     entre si, então nenhum card lia como objeto pousado sobre o chassi, só
+     como o mesmo preto com um contorno quase invisível). Degraus de ~1,25×
+     em luminância relativa (fórmula WCAG, sRGB linearizado — mesma conta que
+     os comentários de `--muted`/`--control-border` abaixo já usam):
+     --paper L≈0.0037 → --panel L≈0.0119 (1,22:1) → --fill L≈0.0182 (1,13:1
+     sobre --panel, 1,37:1 sobre --paper) → --fill-strong L≈0.0272 (1,19:1
+     sobre --fill). Texto e foco não mudaram — só a massa das superfícies. */
+  --panel: #131c34;
   --ink: #e2e8f0;
   /* N1 (docs/roadmap.md, Sprint N): era #64748b — 4.10:1 contra --paper e
      3.78:1 contra --fill, abaixo do 4.5:1 que a WCAG AA exige para texto
@@ -98,10 +108,20 @@
      --fill (L=0.00752) → 3.4:1 ✅. O candidato #4a6394 do relatório ficava
      perto do limite sobre --fill, então subi o canal azul até os dois
      fundos passarem com folga. Mesma matiz azul da paleta, só mais claro —
-     "variar tom/brilho, nunca matiz" (src/lib/consoleColor.ts). */
-  --control-border: #4a6b9e;
-  --fill: #0f1629;
-  --fill-strong: #131d35;
+     "variar tom/brilho, nunca matiz" (src/lib/consoleColor.ts).
+
+     Recalibrado de novo em 2026-09-10, quando `--fill` subiu (ver comentário
+     de `--panel`, acima) — #4a6b9e caiu para 2.8:1 contra o novo --fill,
+     abaixo do piso. #5a7cb0 (mesma matiz, mais claro): 4.6:1 contra --paper,
+     3.98:1 contra --panel, 3.56:1 contra --fill — os três com folga de novo. */
+  --control-border: #5a7cb0;
+  /* --fill/--fill-strong recalibrados junto com --panel, acima (mesmo
+     achado): --fill agora é o "campo/inset" (inputs, prateleira de card) um
+     degrau acima de --panel, e --fill-strong outro degrau acima disso (hover
+     de linha de lista, realce). Antes os três (--panel/--fill/--fill-strong)
+     colapsavam em duas cores só. */
+  --fill: #1a2542;
+  --fill-strong: #22305a;
   --accent: #9d4eff;
   --accent-hover: #b174ff;
   /* Achado do critico-design em 2026-08-18: branco sobre --accent mede
@@ -157,7 +177,11 @@
   /* Mesmo roxo do FOCUS_RING (src/components/ui.tsx) — um anel de foco só
      na interface inteira, não um segundo tom introduzido pelo shadcn. */
   --ring: var(--accent);
-  --radius: 0.5rem;
+  /* 0.5rem → 0.25rem (2026-09-10, achado do critico-design): canto muito
+     arredondado é o que mais denuncia "web app moderno genérico" numa
+     direção retrô/pixelada — puxa junto --radius-sm/md/lg/xl (Tailwind v4
+     deriva os quatro a partir deste). */
+  --radius: 0.25rem;
 }
 
 @theme {
@@ -347,8 +371,14 @@ textarea {
   background-image:
     linear-gradient(to right, var(--ink) 1px, transparent 1px),
     linear-gradient(to bottom, var(--ink) 1px, transparent 1px);
-  background-size: 4px 4px;
-  opacity: 0.03;
+  background-size: 3px 3px;
+  /* 0.03 → 0.06 e passo 4px → 3px (2026-09-10, achado do critico-design): a
+     0.03 a malha é matematicamente abaixo do limiar de percepção — a decisão
+     de 2026-09-09 pede grade de pixels VISÍVEL, e a implementação original
+     fazia o oposto do que a motivou. A 6% sobre --panel a textura aparece de
+     perto e vira ruído neutro de longe, sem mexer em nenhuma medição de
+     contraste do que estiver por cima (ainda ~1,5 níveis de impacto). */
+  opacity: 0.06;
 }
 
 /*

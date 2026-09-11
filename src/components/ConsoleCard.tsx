@@ -1,7 +1,6 @@
-import { useState, type CSSProperties } from "react";
-import { consoleImageURL } from "../api";
+import type { CSSProperties } from "react";
 import type { ConsoleEntry } from "../api/types";
-import { consoleAccentColor } from "../lib/consoleColor";
+import { consoleAccentColor, consoleTextColor } from "../lib/consoleColor";
 import type { ConsoleReadiness } from "../lib/consoleReadiness";
 import { consoleIconLabel, FOCUS_RING } from "./ui";
 
@@ -35,10 +34,15 @@ export interface ConsoleCardLabels {
   noGames: string;
 }
 
-// A logo do IGDB não é pixel art: `image-rendering: pixelated` nela deixaria a
-// arte serrilhada, não retrô. A textura de "tela de ponto" desta tela vem do
-// `.zeux-pixel-grid` e da scanline no fundo do card, não da logo. (Decisão
-// registrada para o Douglas no relatório desta sessão.)
+// 2026-09-10 (decisão do Douglas, a partir do achado do critico-design): o
+// card não mostra mais a logo do IGDB. Era o único objeto claro do app
+// inteiro — uma chapa branca atrás de arte de terceiro, concentrando todo o
+// contraste da interface onde a identidade não é do ZeuX — e produzia dois
+// desenhos de card diferentes na mesma prateleira (com/sem logo). Agora todo
+// card mostra sempre a sigla em `font-pixel`, na cor de identidade do
+// console: é o mesmo elemento que já existia como fallback, promovido a
+// único caminho. A textura de "tela de ponto" continua vindo de
+// `.zeux-pixel-grid` e da scanline no fundo do compartimento.
 const LOGO_BOX_HEIGHT: Record<ConsoleCardSize, string> = {
   grande: "h-28",
   media: "h-24",
@@ -65,9 +69,12 @@ export function ConsoleCard({
   onOpen: () => void;
 }) {
   const accent = consoleAccentColor(entry.console_id);
+  // A sigla é TEXTO: usa a variante clara da mesma matiz (`consoleTextColor`,
+  // ≥4.5:1 sobre `--fill` — WCAG 1.4.3). O `accent` puro continua na borda, no
+  // glow e no gradiente do compartimento, onde é decoração e não precisa ser
+  // lido.
+  const labelColor = consoleTextColor(entry.console_id);
   const ready = readiness.step === "pronto";
-  const [imageFailed, setImageFailed] = useState(false);
-  const showImage = entry.has_image && !imageFailed;
 
   // A contagem toma o lugar do chip de pendência só quando há pasta E o
   // console está pronto: com uma peça ainda faltando, o que o usuário precisa
@@ -105,28 +112,9 @@ export function ConsoleCard({
         <div aria-hidden="true" className="zeux-pixel-grid pointer-events-none absolute inset-0" />
         <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
 
-        {showImage ? (
-          // PlÈ de fundo claro atrás da logo: a maioria das logos do IGDB foi
-          // desenhada para selo em fundo claro, e sobre o `--fill` quase preto
-          // a arte escura se perdia (mesmo achado de `ConsoleIcon`).
-          <span className="relative flex h-[76%] w-[76%] items-center justify-center rounded-sm bg-white/95 p-1.5">
-            <img
-              src={consoleImageURL(entry.console_id)}
-              alt=""
-              aria-hidden="true"
-              className="max-h-full max-w-full object-contain"
-              onError={() => setImageFailed(true)}
-            />
-          </span>
-        ) : (
-          <span
-            aria-hidden="true"
-            className="relative font-pixel text-sm leading-none"
-            style={{ color: accent }}
-          >
-            {consoleIconLabel(entry.console_id, entry.short_name)}
-          </span>
-        )}
+        <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: labelColor }}>
+          {consoleIconLabel(entry.console_id, entry.short_name)}
+        </span>
 
         {ready && (
           <span

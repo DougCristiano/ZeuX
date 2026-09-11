@@ -617,6 +617,15 @@ export function AllGamesScreen({
           title={t("failedToInstallEmulator")}
           message={install.state.message}
           onClose={() => install.setState({ kind: "idle" })}
+          /* Falha de instalação é quase sempre rede, e costuma passar na
+             segunda tentativa — sem isto a pessoa tinha que refazer o caminho
+             todo até "Jogar". `retry` guarda os argumentos exatos do
+             `startInstall` que falhou (ver `InstallState`). */
+          onRetry={
+            install.state.retry
+              ? ((r) => () => install.startInstall(r.adapterId, r.force, r.pendingGamePath))(install.state.retry)
+              : undefined
+          }
         />
       ) : (
         error && <ErrorModal title={t("failedToLoadLibrary")} message={error} onClose={() => setError(null)} />
@@ -758,10 +767,14 @@ export function AllGamesScreen({
               `aria-live` o leitor de tela não anuncia o progresso a menos que
               o usuário volte o foco ao elemento. */}
           <p className="text-sm text-ink" aria-live="polite">
-            Instalando {install.state.job.name}… {install.state.job.phase}
+            {/* Sem `job` é o instante entre o clique e a resposta do
+                servidor (ver `InstallState` em useInlineInstall). */}
+            {install.state.job
+              ? `Instalando ${install.state.job.name}… ${install.state.job.phase}`
+              : "Preparando a instalação do emulador…"}
           </p>
           <div className="mt-2">
-            <ProgressBar percent={percentOf(install.state.job)} />
+            <ProgressBar percent={install.state.job ? percentOf(install.state.job) : null} />
           </div>
         </div>
       ) : activeCoreDownload ? (
@@ -911,6 +924,9 @@ export function AllGamesScreen({
                   featuredVerdict?.adapter_id
                     ? () => install.handlePlay(featured, featuredVerdict, adapterEntryFor(featuredVerdict))
                     : undefined
+                }
+                installing={
+                  install.state.kind === "installing" && install.state.pendingGamePath === featured.path
                 }
               />
             );

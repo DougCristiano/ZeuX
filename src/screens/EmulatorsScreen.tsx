@@ -17,6 +17,7 @@ import {
   Button,
   Callout,
   Card,
+  CARD_CHROME,
   CHROME_TINT_DANGER,
   CHROME_TINT_INFO,
   ConfirmModal,
@@ -35,6 +36,7 @@ import {
   inputClass,
   Pagination,
   ProgressBar,
+  ScreenAtmosphere,
   ScreenContainer,
   ScreenHeader,
   SectionHeading,
@@ -75,15 +77,6 @@ const ALL_CONSOLES = "__all__";
  * filtro de console ao lado.
  */
 type StatusFilter = "" | "installed" | "available";
-
-/**
- * Barra de chrome do card: altura de 28px em vez dos 36px do `chrome` padrão.
- * Um card de grade cabe 3 numa fileira (~290px de largura) e chega a ter
- * cinco destes botões; na altura cheia eles ocupariam três linhas e
- * empurrariam a ação de instalar/remover para fora do campo de visão. O piso
- * de 24px da WCAG 2.2 AA (`web-target-size`) continua respeitado com folga.
- */
-const CARD_CHROME = "h-7! px-2! whitespace-nowrap";
 
 // Achado em 2026-08-04: um core podia estar ausente por um bug silencioso
 // (log de aviso, nunca erro) e nada avisava até o usuário tentar lançar um
@@ -877,7 +870,7 @@ function EmulatorCard({
   };
 
   return (
-    <Card className="flex flex-col gap-3" style={cardStyle}>
+    <Card filled className="flex flex-col gap-3" style={cardStyle}>
       <EmulatorCardHeader entry={entry} />
       <EmulatorCardConsoles entry={entry} verdictById={verdictById} onSelectConsole={onSelectConsole} />
       <EmulatorCardChrome entry={entry} />
@@ -1030,7 +1023,9 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   return (
     // N3 (docs/roadmap.md, Sprint N): teto centralizado em `ScreenContainer`
     // (src/components/ui.tsx) — mesmo teto escalonado que o O5 validou.
-    <ScreenContainer variant="listing">
+    <ScreenContainer variant="listing" className="relative">
+      {/* Céu da tela (2026-09-10) — halo ancorado no topo do conteúdo. */}
+      <ScreenAtmosphere />
       {/* B9 (achado do critico-design, 2026-08-18): mesma posição que
           GameDetailScreen — "Voltar" sozinho, à esquerda, acima do título
           (era ao lado do h1, à direita). */}
@@ -1054,7 +1049,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           de console fora do catálogo (internal/emulator/custom.go) — só
           faltava dizer isso em algum lugar. O mesmo bloco hospeda o formulário
           (novo ou em edição, vindo do card de um custom). */}
-      <div className="mb-5 rounded-lg border border-dashed border-line-strong bg-fill/40 p-4">
+      <div className="mb-5 rounded-lg border border-dashed border-line-strong bg-panel p-4">
         {formMode === "closed" ? (
           <>
             <p className="font-mono text-xs tracking-[0.2em] text-accent-secondary uppercase">

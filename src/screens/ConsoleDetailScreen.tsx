@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Pencil } from "lucide-react";
-import { api, ApiError, consoleImageURL } from "../api";
+import { api, ApiError } from "../api";
 import type {
   ConsoleEmulatorOption,
   ConsoleEntry,
@@ -12,16 +12,17 @@ import type {
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
+import { ConsoleHero } from "../components/ConsoleHero";
 import {
   BackButton,
   Badge,
   Button,
   Callout,
   Card,
+  CARD_CHROME,
   CardSkeleton,
   ConfirmModal,
   ConsoleVerdictCard,
-  consoleIconLabel,
   InlineError,
   InlineWarning,
   ProgressBar,
@@ -33,7 +34,6 @@ import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
-import { consoleAccentColor } from "../lib/consoleColor";
 import { percentOf } from "../lib/format";
 import { buildReadinessIndex, evaluateConsoleReadiness } from "../lib/consoleReadiness";
 import { useT } from "../i18n/i18n";
@@ -106,6 +106,7 @@ function EmulatorOptionCard({
 
   return (
     <Card
+      filled
       className="flex flex-col gap-3"
       // Barra esquerda de 3px, não a borda inteira em roxo (2026-09-07): o
       // contorno roxo fechado lia como "selecionado/em foco", competindo com o
@@ -150,8 +151,8 @@ function EmulatorOptionCard({
 
             {!core?.installed && coreState.kind === "idle" && (
               <Button
-                variant="secondary"
-                className="ml-auto shrink-0 px-2 py-1 text-xs"
+                variant="chrome"
+                className={`ml-auto shrink-0 ${CARD_CHROME}`}
                 onClick={() => coreInstall.installCore(option.core!)}
               >
                 {t("downloadCore")}
@@ -270,12 +271,12 @@ function EmulatorOptionCard({
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             {entry.configurable && (
-              <Button variant="secondary" onClick={() => setShowConfig((v) => !v)}>
+              <Button variant="chrome" className={CARD_CHROME} onClick={() => setShowConfig((v) => !v)}>
                 {showConfig ? t("hideConfig") : t("config")}
               </Button>
             )}
             {entry.bindable && (
-              <Button variant="secondary" onClick={() => setShowBindings((v) => !v)}>
+              <Button variant="chrome" className={CARD_CHROME} onClick={() => setShowBindings((v) => !v)}>
                 {showBindings ? t("hideBindings") : t("mapControls")}
               </Button>
             )}
@@ -301,8 +302,14 @@ function EmulatorOptionCard({
       <div className="flex flex-wrap items-center gap-2">
         {installed ? (
           <>
+            {/* 2026-09-11: era `primary`. A regra vem de `EmulatorsScreen`
+                (ver o comentário de `CARD_CHROME`, hoje em components/ui.tsx):
+                abrir a janela de OUTRO programa é chrome — o roxo é a ação
+                sobre o conteúdo do ZeuX, e aqui ele competia com o único roxo
+                que este card deve ter, o "Instalar". */}
             <Button
-              variant="primary"
+              variant="chrome"
+              className={CARD_CHROME}
               disabled={opening}
               onClick={openStandalone}
               title={t("openEmulatorTooltip")}
@@ -597,11 +604,6 @@ export function ConsoleDetailScreen({
   const [cores, setCores] = useState<RetroArchCoreStatus[]>([]);
   const [folders, setFolders] = useState<LibraryFolder[]>([]);
   const [error, setError] = useState<string | null>(null);
-  // `has_image` falso é o estado padrão até alguém rodar
-  // cmd/generate-console-images; este estado cobre o caso raro do arquivo
-  // embutido existir mas o <img> falhar em runtime. Os dois caem na sigla,
-  // nunca num espaço quebrado — mesma rede de segurança de `ConsolesScreen`.
-  const [heroImageFailed, setHeroImageFailed] = useState(false);
   // 2026-09-08: troca manual de logo (a pedido do Douglas — a busca
   // automática do IGDB erra a variante com frequência, ver
   // internal/verdict/data/console-images/README.md). `imageVersion` força o
@@ -624,7 +626,6 @@ export function ConsoleDetailScreen({
     setImageError(null);
     try {
       await api.setConsoleImage(consoleId, picked);
-      setHeroImageFailed(false);
       setImageVersion((v) => v + 1);
       reload(); // has_image pode virar true se o console não tinha imagem nenhuma antes
     } catch (err) {
@@ -639,7 +640,6 @@ export function ConsoleDetailScreen({
     setImageError(null);
     try {
       await api.resetConsoleImage(consoleId);
-      setHeroImageFailed(false);
       setImageVersion((v) => v + 1);
       reload();
     } catch (err) {
@@ -713,9 +713,7 @@ export function ConsoleDetailScreen({
   const coreByName = new Map(cores.map((c) => [c.name, c]));
   const consoleFolders = folders.filter((f) => f.console_id === consoleId);
   const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
-  const accent = consoleAccentColor(consoleId);
   const chosenEntry = readiness.chosen ? emulatorById.get(readiness.chosen.adapter_id) : undefined;
-  const showHeroImage = entry.has_image && !heroImageFailed;
   const requiresExternalFile = entry.requires_external_file ?? false;
 
   /**
@@ -780,112 +778,57 @@ export function ConsoleDetailScreen({
       {/* Achado do critico-design (2026-09-06): a cor de identidade por
           console — o ativo de marca mais distintivo do projeto
           (`consoleColor.ts`, 33 entradas por fabricante) — só aparecia como
-          uma borda de 3px em quatro telas. Esta é a única tela do produto
-          com direito legítimo a uma cor própria dominando o espaço (é a
-          página DESTE console); o gradiente usa o mesmo vocabulário do
-          `AmbientGlow` do shell, só trocando `--accent` por `--console-accent`
-          — vocabulário reaproveitado, não uma linguagem nova. Nenhum asset
-          novo: o "ícone" ao lado do título é a mesma caixa/sigla que
-          `ConsoleIcon` desenha em outras telas, só sem o `<button>` (não há
-          o que abrir clicando no ícone da própria tela que já é dele). */}
-      <div
-        className="relative mt-3 mb-6 overflow-hidden rounded-lg border border-line p-5"
-        // Borda esquerda de 3px na cor de identidade — o mesmo tratamento que
-        // `ConsoleVerdictCard` e `EmulatorCard` já dão a uma linha de lista,
-        // aplicado à tela que é DESTE console.
-        style={{ borderLeftColor: accent, borderLeftWidth: 3 }}
-      >
-        {/* A própria logo, gigante e desfocada, como arte de fundo — mesmo
-            recurso que `GameHero` usa com a capa do jogo (`blur-3xl`, nunca
-            um desfoque sutil). É o único asset de arte que esta tela tem, e
-            sem ele o cabeçalho era um gradiente e nada mais. Só entra quando
-            a logo existe de verdade: nos 3 consoles sem imagem cadastrada o
-            gradiente abaixo continua sozinho, como antes. */}
-        {showHeroImage && (
-          <img
-            src={consoleImageURL(consoleId, imageVersion || undefined)}
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-24 -left-10 h-72 w-72 object-contain opacity-40 blur-3xl saturate-[1.8]"
-            onError={() => setHeroImageFailed(true)}
-          />
-        )}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: `radial-gradient(65% 90% at 12% 25%, color-mix(in srgb, ${accent} 22%, transparent), transparent 70%)`,
-          }}
-        />
-        <div className="relative flex items-center gap-4">
-          {/* Achado desta sessão: quem clicava na logo oficial do console na
-              grade caía numa tela que mostrava "NINT" em sigla — as duas
-              telas exibiam identidades diferentes para o mesmo console. Mesma
-              caixa de 64px com fundo branco de `ConsolesScreen`/`ConsoleIcon`
-              (as logos do IGDB foram desenhadas para selo em fundo claro), e
-              a sigla — via `consoleIconLabel`, não `slice(0, 4)` à mão, que
-              ignorava o mapa de exceções do G5 — segue como fallback sobre
-              `--fill`. */}
-          <div className="relative shrink-0">
-            <span
-              aria-hidden="true"
-              style={{ borderColor: `${accent}66`, color: accent, backgroundColor: showHeroImage ? "#fff" : undefined }}
-              className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
-            >
-              {showHeroImage ? (
-                <img
-                  src={consoleImageURL(consoleId, imageVersion || undefined)}
-                  alt=""
-                  className="h-14 w-14 object-contain p-0.5"
-                  onError={() => setHeroImageFailed(true)}
-                />
-              ) : (
-                consoleIconLabel(consoleId, entry.short_name)
-              )}
-            </span>
-            {/* Troca manual de logo (2026-09-08): mesmo padrão visual de
-                FavoriteToggle (botão circular pequeno flutuando sobre a
-                arte) — aqui reposicionado no canto porque a caixa de 64px
-                já é pequena, um botão do mesmo tamanho por cima escondia a
-                logo inteira. */}
+          uma borda de 3px em quatro telas. Esta é a única tela do produto com
+          direito legítimo a uma cor própria dominando o espaço (é a página
+          DESTE console). O desenho do hero mora em `ConsoleHero` desde
+          2026-09-11, compartilhado com `GamesScreen`; o que é só desta tela
+          (trocar/restaurar a logo) entra por prop. */}
+      <ConsoleHero
+        /* `key` na versão da imagem: trocar/restaurar a logo precisa limpar o
+           "esta imagem falhou" que o hero guarda por dentro — sem isto, um
+           console que caiu na sigla continuaria na sigla depois de receber uma
+           logo nova, até recarregar a tela. */
+        key={imageVersion}
+        className="mt-3 mb-6"
+        consoleId={consoleId}
+        name={entry.name}
+        shortName={entry.short_name}
+        hasImage={entry.has_image}
+        imageVersion={imageVersion}
+        meta={t("consoleYearShortName", { year: entry.year, shortName: entry.short_name })}
+        logoOverlay={
+          /* Troca manual de logo (2026-09-08): mesmo padrão visual de
+             FavoriteToggle (botão circular pequeno flutuando sobre a arte) —
+             aqui reposicionado no canto porque a caixa de 64px já é pequena,
+             um botão do mesmo tamanho por cima escondia a logo inteira. */
+          <button
+            type="button"
+            disabled={imageBusy}
+            onClick={handleChangeImage}
+            aria-label={t("changeImage")}
+            title={t("changeImage")}
+            className="absolute -right-1.5 -bottom-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line-strong bg-black/70 text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Pencil size={11} aria-hidden="true" />
+          </button>
+        }
+        belowTitle={(showImage) =>
+          /* Só quando há uma logo de verdade (embutida ou customizada) —
+             "restaurar padrão" sem nada pra restaurar seria uma ação sem
+             efeito visível, mais confusa que útil. */
+          showImage ? (
             <button
               type="button"
               disabled={imageBusy}
-              onClick={handleChangeImage}
-              aria-label={t("changeImage")}
-              title={t("changeImage")}
-              className="absolute -right-1.5 -bottom-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-line-strong bg-black/70 text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleResetImage}
+              className="mt-1 font-mono text-xs tracking-wide text-muted underline decoration-dotted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Pencil size={11} aria-hidden="true" />
+              {t("restoreDefaultImage")}
             </button>
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-ink">{entry.name}</h1>
-            {/* `font-mono`: ano e sigla são dado de catálogo, não prosa — o
-                mesmo tratamento que o ano recebeu no tile da grade, para as
-                duas telas continuarem lendo como a mesma família. */}
-            <p className="mt-1 font-mono text-sm tracking-wide text-muted">
-              {t("consoleYearShortName", { year: entry.year, shortName: entry.short_name })}
-            </p>
-            {/* Só quando há uma logo de verdade (embutida ou customizada) —
-                "restaurar padrão" sem nada pra restaurar seria uma ação sem
-                efeito visível, mais confusa que útil. */}
-            {showHeroImage && (
-              <button
-                type="button"
-                disabled={imageBusy}
-                onClick={handleResetImage}
-                className="mt-1 font-mono text-xs tracking-wide text-muted underline decoration-dotted hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {t("restoreDefaultImage")}
-              </button>
-            )}
-          </div>
-        </div>
-        {imageError && (
-          <p className="relative mt-2 text-sm text-danger">{imageError}</p>
-        )}
-      </div>
+          ) : null
+        }
+        footer={imageError ? <p className="relative mt-2 text-sm text-danger">{imageError}</p> : null}
+      />
 
       {/* A prontidão abre a tela porque é a resposta à pergunta que trouxe o
           usuário aqui. Uma frase, e ela nomeia a peça que falta — nunca uma

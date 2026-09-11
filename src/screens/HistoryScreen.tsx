@@ -4,10 +4,12 @@ import type { ConsoleEntry, LibraryGame, Report } from "../api/types";
 import {
   Button,
   Card,
+  CardSkeleton,
   EmptyState,
   FOCUS_RING,
   GameCover,
   InlineError,
+  ScreenAtmosphere,
   ScreenContainer,
   ScreenHeader,
   SectionHeading,
@@ -106,16 +108,44 @@ export function HistoryScreen({
 
   const nothingYet = !loading && (recent?.length ?? 0) === 0 && totalSeconds === 0;
 
+  // Maior tempo do ranking — a régua das barras proporcionais abaixo. O
+  // ranking já vem ordenado, então é o primeiro.
+  const maxSeconds = consoleTotals.length > 0 ? consoleTotals[0][1] : 0;
+
   return (
-    <ScreenContainer variant="listing">
-      <ScreenHeader title={t("title")} subtitle={t("subtitle")} />
+    <ScreenContainer variant="listing" className="relative">
+      {/* Céu da tela (2026-09-10) — halo ancorado no topo do conteúdo. */}
+      <ScreenAtmosphere />
+
+      <ScreenHeader
+        title={t("title")}
+        subtitle={t("subtitle")}
+        actions={
+          <Button variant="chrome" onClick={onOpenLibrary}>
+            {t("seeAllGames")}
+          </Button>
+        }
+      />
 
       {error && <InlineError className="mb-4">{error}</InlineError>}
 
+      {/* Carregando na FORMA FINAL (2026-09-10, achado do critico-design): o
+          texto solto "Carregando o histórico…" fazia a tela pular de layout
+          quando o dado chegava. Mesmo padrão de skeleton das outras telas —
+          o painel de tempo e a fileira de capas já no lugar onde vão nascer.
+          `role="status"`/`sr-only`: um anúncio só, não um por bloco. */}
       {loading && (
-        <p className="text-sm text-muted" role="status" aria-live="polite">
-          {t("loading")}
-        </p>
+        <div className="flex flex-col gap-8">
+          <span className="sr-only" role="status" aria-live="polite">
+            {t("loading")}
+          </span>
+          <CardSkeleton className="h-52" />
+          <div className="flex gap-4 overflow-hidden">
+            {Array.from({ length: 6 }, (_, i) => (
+              <CardSkeleton key={i} className="h-56 w-[150px] shrink-0" />
+            ))}
+          </div>
+        </div>
       )}
 
       {nothingYet && (
@@ -132,14 +162,96 @@ export function HistoryScreen({
 
       {!loading && !nothingYet && (
         <div className="flex flex-col gap-8">
+          {/* Inversão da ordem (2026-09-10): o tempo total abre a tela. A
+              pergunta "quanto joguei?" tem uma resposta única e grande — é o
+              que dá identidade a esta tela, do mesmo jeito que o hero dá à
+              Home e o mostrador à de Consoles. "Onde eu parei" desce para
+              depois, como prateleira. */}
+          <section className="relative overflow-hidden rounded-lg">
+            <Card filled className="relative overflow-hidden">
+              {/* Textura local — mesmo vocabulário do `EmptyState`: halo roxo
+                  a 12% e scanlines só sobre o painel, nunca sobre a tela
+                  inteira. Decorativo, `aria-hidden`; o número por cima
+                  continua em `--ink` puro. */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(60% 90% at 15% 20%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%)",
+                }}
+              />
+              <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
+
+              <div className="relative">
+                <p className="font-mono text-xs tracking-wide text-muted uppercase">{t("totalPlaytime")}</p>
+                {/* `font-pixel` a 22px: o mesmo piso de legibilidade que o
+                    `ScreenHeader` usa (a Press Start 2P só lê bem acima
+                    disso). `leading-relaxed` pela mesma razão de lá — a
+                    altura-x maior aperta a entrelinha e corta descidas.
+                    `tabular-nums` mantém o número estável enquanto o tempo
+                    sobe de "58 min" para "1 h 02 min". */}
+                <p className="mt-2 font-pixel text-2xl leading-relaxed tracking-[0.04em] text-ink tabular-nums">
+                  {formatPlaytimeClean(totalSeconds)}
+                </p>
+              </div>
+
+              {consoleTotals.length > 0 && (
+                <div className="relative mt-5 border-t border-line pt-4">
+                  <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">
+                    {t("byConsoleHeading")}
+                  </p>
+                  {/* Barra proporcional, não bolinha + frase (2026-09-10): a
+                      bolinha de 10px só repetia a cor de identidade sem dizer
+                      nada sobre a proporção — a pergunta real ("onde foi meu
+                      tempo?") é comparativa. Cantos retos de propósito: é a
+                      direção retrô, nada de `rounded-full`. `ProgressBar` não
+                      serve aqui porque a cor é por console (`style`), não o
+                      roxo fixo dele — e ensinar cor ao componente só por causa
+                      desta tela seria a lógica errada no lugar errado. */}
+                  <ul className="flex flex-col gap-3">
+                    {consoleTotals.slice(0, TOP_CONSOLES).map(([consoleId, seconds]) => (
+                      <li key={consoleId}>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="truncate text-sm text-ink">{nameFor(consoleId)}</span>
+                          <span className="shrink-0 font-mono text-xs text-muted tabular-nums">
+                            {formatPlaytimeClean(seconds)}
+                          </span>
+                        </div>
+                        <div
+                          className="mt-1 h-1.5 w-full overflow-hidden bg-panel"
+                          role="img"
+                          aria-label={t("playtimeOnConsole", {
+                            time: formatPlaytimeClean(seconds),
+                            console: nameFor(consoleId),
+                          })}
+                        >
+                          <div
+                            className="h-full"
+                            style={{
+                              width: `${maxSeconds > 0 ? (seconds / maxSeconds) * 100 : 0}%`,
+                              background: consoleAccentColor(consoleId),
+                            }}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          </section>
+
           {recent && recent.length > 0 && (
             <section>
               <SectionHeading className="mb-3">{t("recentHeading")}</SectionHeading>
-              {/* Mesmos breakpoints da grade de "Todos os jogos", descontando
-                  a sidebar de 64px (CLAUDE.md, layout responsivo): `lg` (não
-                  `xl`) é o degrau que dispara de verdade no tamanho padrão da
-                  janela. */}
-              <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+              {/* Fileira rolável, não grade (2026-09-10): mesmo vocabulário da
+                  prateleira "Seus consoles" da Home — "onde eu parei" é um
+                  resumo curto, e a biblioteca inteira ordenada por último
+                  jogado já mora em "Todos os jogos" (o botão do cabeçalho).
+                  `shrink-0` em cada item, senão o flex esmaga as capas em vez
+                  de rolar. */}
+              <div className="flex gap-4 overflow-x-auto pb-1">
                 {recent.map((game) => {
                   const consoleName = nameFor(game.console_id);
                   const shortName = shortNameFor(game.console_id);
@@ -149,7 +261,7 @@ export function HistoryScreen({
                       key={game.id}
                       role="button"
                       tabIndex={0}
-                      className={`group flex cursor-pointer flex-col gap-2 rounded-lg text-left ${FOCUS_RING}`}
+                      className={`group flex w-[150px] shrink-0 cursor-pointer flex-col gap-2 rounded-lg text-left ${FOCUS_RING}`}
                       aria-label={t("playedOn", { console: consoleName, date: lastPlayed ?? "—" })}
                       onClick={() => onOpenGame(game, consoleName, shortName)}
                       onKeyDown={(e) => {
@@ -180,33 +292,6 @@ export function HistoryScreen({
               </div>
             </section>
           )}
-
-          <section>
-            <SectionHeading className="mb-3">{t("playtimeHeading")}</SectionHeading>
-            <Card filled>
-              <div>
-                <p className="font-mono text-xs tracking-wide text-muted uppercase">{t("totalPlaytime")}</p>
-                <p className="mt-0.5 font-mono text-2xl text-ink">{formatPlaytimeClean(totalSeconds)}</p>
-              </div>
-              {consoleTotals.length > 0 && (
-                <ul className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
-                  {consoleTotals.slice(0, TOP_CONSOLES).map(([consoleId, seconds]) => (
-                    <li key={consoleId} className="flex items-center gap-2 text-sm text-ink">
-                      <span
-                        aria-hidden="true"
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ background: consoleAccentColor(consoleId) }}
-                      />
-                      {t("playtimeOnConsole", {
-                        time: formatPlaytimeClean(seconds),
-                        console: nameFor(consoleId),
-                      })}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          </section>
         </div>
       )}
     </ScreenContainer>

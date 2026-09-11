@@ -6,7 +6,6 @@ import { consoleAccentColor } from "../lib/consoleColor";
 import type { BulkMatchedFolder, ConsoleEntry, LibraryFolder, LibraryGame, Report } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import {
-  BackButton,
   Button,
   Callout,
   Card,
@@ -19,6 +18,7 @@ import {
   FOCUS_RING,
   InlineError,
   ScreenContainer,
+  ScreenHeader,
   SectionHeading,
   ZSelect,
 } from "../components/ui";
@@ -576,36 +576,28 @@ export function LibraryScreen({
   return (
     // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado.
     <ScreenContainer variant="listing">
-      {/* B9 (achado do critico-design, 2026-08-18): "Voltar" ficava à
-          direita do h1 aqui/Emuladores/Jogos, e sozinho à esquerda acima do
-          título em GameDetailScreen — duas convenções para o mesmo botão.
-          Padronizado na posição de GameDetailScreen: mais legível numa app
-          com sidebar (o olho lê "voltar" antes do título da tela nova).
-          Rótulo corrigido em 2026-08-04: onBack volta pra Biblioteca
-          (all-games), não pro Parecer/Especificações — ficou desatualizado
-          desde a reestruturação da sidebar (Sprint 1). */}
-      <BackButton label={t("back")} onClick={onBack} />
-      {/* 2026-09-07 (redesenho): o título vinha sozinho e "Ver nomes de pasta
-          aceitos" flutuava num `-mt-2 justify-end` logo abaixo do cartão do
-          atalho — grudado no cartão errado (é ajuda sobre a tela inteira, não
-          sobre aquele resultado) e num `quiet` que quase não se lê como
-          botão. Vira a ação de cabeçalho da tela, na mesma linha do `h1`
-          (padrão de `ScreenHeader`), em `chrome`.
-          A linha de resumo responde "quantos dos 33 já estão apontados?" sem
-          contar linha por linha. Descritiva, nunca avaliativa. */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">{t("library")}</h1>
-          {folders && (
-            <p className="mt-1 font-mono text-xs tracking-wide text-muted">
+      {/* 2026-09-10 (achado do critico-design): esta tela montava o próprio
+          `<h1>` + `BackButton` avulso à mão, e por isso ficou de fora quando
+          o `ScreenHeader` passou a desenhar o título em `font-pixel` — era a
+          única tela do app com um título em Inter. Mesmo conteúdo (voltar,
+          título, resumo, ação de ajuda), agora pela anatomia única de
+          cabeçalho. */}
+      <ScreenHeader
+        back={{ label: t("back"), onClick: onBack }}
+        title={t("library")}
+        subtitle={
+          folders ? (
+            <span className="font-mono text-xs tracking-wide">
               {t("screenSummary", { configured: configuredIds.length, total: allConsoles.length })}
-            </p>
-          )}
-        </div>
-        <Button type="button" variant="chrome" onClick={() => setShowNameGuide(true)}>
-          {t("seeFolderNamesAccepted")}
-        </Button>
-      </div>
+            </span>
+          ) : undefined
+        }
+        actions={
+          <Button type="button" variant="chrome" onClick={() => setShowNameGuide(true)}>
+            {t("seeFolderNamesAccepted")}
+          </Button>
+        }
+      />
 
       <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
 

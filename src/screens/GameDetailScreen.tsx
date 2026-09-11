@@ -534,7 +534,13 @@ export function GameDetailScreen({
             </form>
           ) : (
             <div className="flex items-start gap-2">
-              <h1 className="text-3xl font-semibold text-balance text-ink sm:text-4xl">{title}</h1>
+              {/* O título aqui é o NOME DO JOGO — dado do disco do usuário, não voz
+                de marca: segue em Inter, e quem carrega a identidade acima
+                dele é o badge do console (logo abaixo, com a cor do console).
+                O tamanho volta para a escala de 6 degraus do index.css
+                (`--text-2xl`): `text-3xl sm:text-4xl` inventava dois degraus
+                que não existem no sistema. */}
+              <h1 className="text-2xl font-semibold text-balance text-ink">{title}</h1>
               {/* `chrome` (chrome de arquivo, não ação sobre conteúdo) — mesma
                   família de "Abrir pasta"/"Trocar capa". */}
               <Button
@@ -613,11 +619,16 @@ export function GameDetailScreen({
 
         {pendingInstall && install.state.kind === "installing" && (
           <div className="w-full max-w-md">
-            <p className="font-mono text-xs tracking-wider text-muted uppercase">
-              {t("installingEmulatorPhase", { phase: install.state.job.phase })}
-            </p>
+            {/* Sem `job`, a instalação acabou de ser pedida (ver
+                `InstallState` em useInlineInstall): a fase ainda não existe,
+                mas a barra indeterminada já diz que algo começou. */}
+            {install.state.job && (
+              <p className="font-mono text-xs tracking-wider text-muted uppercase">
+                {t("installingEmulatorPhase", { phase: install.state.job.phase })}
+              </p>
+            )}
             <div className="mt-1.5">
-              <ProgressBar percent={percentOf(install.state.job)} />
+              <ProgressBar percent={install.state.job ? percentOf(install.state.job) : null} />
             </div>
           </div>
         )}
@@ -696,6 +707,15 @@ export function GameDetailScreen({
           title={t("couldNotInstallEmulator")}
           message={install.state.message}
           onClose={() => install.setState({ kind: "idle" })}
+          /* Falha de instalação é quase sempre rede, e costuma passar na
+             segunda tentativa — sem isto a pessoa tinha que refazer o caminho
+             todo até "Jogar". `retry` guarda os argumentos exatos do
+             `startInstall` que falhou (ver `InstallState`). */
+          onRetry={
+            install.state.retry
+              ? ((r) => () => install.startInstall(r.adapterId, r.force, r.pendingGamePath))(install.state.retry)
+              : undefined
+          }
         />
       ) : (
         error && <ErrorModal title={t("errorReadingStats")} message={error} onClose={() => setError(null)} />
@@ -904,7 +924,7 @@ export function GameDetailScreen({
         <div className={`flex flex-col gap-6 ${verdict ? "" : "lg:col-span-3"}`}>
           <section>
             <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
-            <Card>
+            <Card filled>
               {/* Empilhado em linhas rotuladas, não em três colunas: na
                   coluna estreita da grade os valores ("nunca jogado",
                   "07/09/2026 21:14") quebravam em duas linhas cada um e
@@ -945,7 +965,7 @@ export function GameDetailScreen({
               CLAUDE.md — só revela o que já está no disco do usuário). */}
           <section>
             <SectionHeading className="mb-3">{t("fileHeading")}</SectionHeading>
-            <Card>
+            <Card filled>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap gap-2">
                   <Button variant="chrome" onClick={openGameFolder} className="w-fit">
@@ -981,7 +1001,7 @@ export function GameDetailScreen({
             <SectionHeading className="mb-3">
               {excluded ? t("restoreHeading") : t("removeHeading")}
             </SectionHeading>
-            <Card>
+            <Card filled>
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-muted">
                   {excluded ? t("restoreToLibraryHelp") : t("removeFromLibraryHelp")}
