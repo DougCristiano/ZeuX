@@ -23,11 +23,13 @@ import {
 } from "../components/ui";
 import { ConsoleCard } from "../components/ConsoleCard";
 import { GameHero } from "../components/GameHero";
+import { ManualEmulatorFormModal } from "../components/ManualEmulatorFormModal";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { buildReadinessIndex, evaluateConsoleReadiness } from "../lib/consoleReadiness";
+import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
 import { faseExtraDeDownload, formatPlaytimeClean, percentOf } from "../lib/format";
 import { useT } from "../i18n/i18n";
 import { dict } from "./HomeScreen.i18n";
@@ -103,8 +105,22 @@ export function HomeScreen({
       .catch(() => setPlaytimeByConsole({}));
   }, []);
 
-  const { statusFor, launch, activeCoreDownload, cancelCoreDownload, launchError, clearLaunchError, retryLaunch } =
-    useLaunchGame({ onLaunched: loadFeatured });
+  const {
+    statusFor,
+    launch,
+    activeCoreDownload,
+    cancelCoreDownload,
+    launchError,
+    launchErrorCode,
+    lastGame,
+    clearLaunchError,
+    retryLaunch,
+  } = useLaunchGame({ onLaunched: loadFeatured });
+
+  // B2 (docs/pendencias.md): guarda console/adapter esperados para
+  // pré-preencher o `ManualEmulatorForm` quando ele abre a partir do
+  // `ErrorModal` de lançamento ou do `ManualInstallModal` — `null` fechado.
+  const [manualFormPrefill, setManualFormPrefill] = useState<{ name?: string; consoles?: string[] } | null>(null);
 
   function nameFor(consoleId: string): string {
     return (
@@ -228,7 +244,27 @@ export function HomeScreen({
   return (
     <ScreenContainer variant="listing">
       {launchError ? (
-        <ErrorModal title={t("failedToOpenGame")} message={launchError} onClose={clearLaunchError} onRetry={retryLaunch} />
+        <ErrorModal
+          title={t("failedToOpenGame")}
+          message={launchError}
+          onClose={clearLaunchError}
+          onRetry={retryLaunch}
+          extraAction={
+            isEmulatorMissingErrorCode(launchErrorCode)
+              ? {
+                  label: t("alreadyHaveEmulatorPointIt"),
+                  onClick: () => {
+                    const verdict = lastGame ? verdictFor(lastGame.console_id) : undefined;
+                    setManualFormPrefill({
+                      name: verdict?.emulator,
+                      consoles: lastGame ? [lastGame.console_id] : undefined,
+                    });
+                    clearLaunchError();
+                  },
+                }
+              : undefined
+          }
+        />
       ) : install.state.kind === "error" ? (
         <ErrorModal
           title={t("failedToInstallEmulator")}
@@ -257,6 +293,22 @@ export function HomeScreen({
             const entry = consoleCatalog.find((c) => c.console_id === consoleId);
             install.setState({ kind: "idle" });
             if (entry) onOpenConsole(entry.console_id, entry.name, entry.short_name);
+          }}
+          onPointManually={() => {
+            const { adapterName, consoleId } = install.state as { adapterName: string; consoleId: string };
+            setManualFormPrefill({ name: adapterName, consoles: [consoleId] });
+            install.setState({ kind: "idle" });
+          }}
+        />
+      )}
+
+      {manualFormPrefill && (
+        <ManualEmulatorFormModal
+          prefill={manualFormPrefill}
+          onClose={() => setManualFormPrefill(null)}
+          onSaved={() => {
+            setManualFormPrefill(null);
+            api.getEmulators().then((res) => setEmulators(res.emulators)).catch(() => {});
           }}
         />
       )}

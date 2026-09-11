@@ -22,10 +22,12 @@ import {
   SectionHeading,
   Toast,
 } from "../components/ui";
+import { ManualEmulatorFormModal } from "../components/ManualEmulatorFormModal";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
+import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { useT } from "../i18n/i18n";
@@ -121,7 +123,7 @@ export function GameDetailScreen({
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   // 2026-09-09: recarrega a contagem de sessões quando o jogo abre de fato —
   // era o único número desta tela que ficava velho até um F5.
-  const { statusFor, launch, cancelCoreDownload, launchError, clearLaunchError } = useLaunchGame({
+  const { statusFor, launch, cancelCoreDownload, launchError, launchErrorCode, clearLaunchError } = useLaunchGame({
     onLaunched: () => {
       api
         .getSessions()
@@ -129,6 +131,11 @@ export function GameDetailScreen({
         .catch(() => {});
     },
   });
+  // B2 (docs/pendencias.md): mesmo papel do estado equivalente em
+  // HomeScreen/AllGamesScreen — pré-preenche o cadastro manual. Aqui `game` é
+  // um prop fixo (uma tela por jogo), então não precisa do `lastGame` que as
+  // outras duas telas usam para saber qual jogo falhou.
+  const [manualFormPrefill, setManualFormPrefill] = useState<{ name?: string; consoles?: string[] } | null>(null);
   const { toastMessage, showToast } = useToast();
   // Estado próprio, não `game.cover_url` direto: o prop `game` vem de um
   // snapshot guardado no App.tsx no momento do clique e não muda sozinho
@@ -701,7 +708,22 @@ export function GameDetailScreen({
         />
       )}
       {launchError ? (
-        <ErrorModal title={t("errorOpeningGame")} message={launchError} onClose={clearLaunchError} />
+        <ErrorModal
+          title={t("errorOpeningGame")}
+          message={launchError}
+          onClose={clearLaunchError}
+          extraAction={
+            isEmulatorMissingErrorCode(launchErrorCode)
+              ? {
+                  label: t("alreadyHaveEmulatorPointIt"),
+                  onClick: () => {
+                    setManualFormPrefill({ name: verdict?.emulator, consoles: [game.console_id] });
+                    clearLaunchError();
+                  },
+                }
+              : undefined
+          }
+        />
       ) : install.state.kind === "error" ? (
         <ErrorModal
           title={t("couldNotInstallEmulator")}
@@ -825,6 +847,22 @@ export function GameDetailScreen({
                 }
               : undefined
           }
+          onPointManually={() => {
+            const { adapterName, consoleId } = install.state as { adapterName: string; consoleId: string };
+            setManualFormPrefill({ name: adapterName, consoles: [consoleId] });
+            install.setState({ kind: "idle" });
+          }}
+        />
+      )}
+
+      {manualFormPrefill && (
+        <ManualEmulatorFormModal
+          prefill={manualFormPrefill}
+          onClose={() => setManualFormPrefill(null)}
+          onSaved={() => {
+            setManualFormPrefill(null);
+            api.getEmulators().then((res) => setEmulators(res.emulators)).catch(() => {});
+          }}
         />
       )}
 

@@ -18,6 +18,7 @@ import {
   ManualInstallModal,
   Toast,
 } from "../components/ui";
+import { ManualEmulatorFormModal } from "../components/ManualEmulatorFormModal";
 import {
   LibraryToolbar,
   useGridColumns,
@@ -40,6 +41,7 @@ import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
+import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
 
 // M15 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): 24 nunca
 // fechava fileira numa grade de 5 ou 6 colunas; 30 é múltiplo dos dois. O
@@ -221,13 +223,26 @@ export function AllGamesScreen({
   // "Continue jogando" — não a tela inteira, e sem tocar `restoredScrollRef`
   // (que já travou na primeira restauração do M4), então a rolagem do
   // usuário fica onde está.
-  const { statusFor, launch, activeCoreDownload, cancelCoreDownload, launchError, clearLaunchError, retryLaunch } =
-    useLaunchGame({
-      onLaunched: () => {
-        loadGames();
-        loadRecentGames();
-      },
-    });
+  const {
+    statusFor,
+    launch,
+    activeCoreDownload,
+    cancelCoreDownload,
+    launchError,
+    launchErrorCode,
+    lastGame,
+    clearLaunchError,
+    retryLaunch,
+  } = useLaunchGame({
+    onLaunched: () => {
+      loadGames();
+      loadRecentGames();
+    },
+  });
+  // B2 (docs/pendencias.md): mesmo papel do estado equivalente em
+  // HomeScreen/GameDetailScreen — pré-preenche o cadastro manual quando ele
+  // abre a partir do ErrorModal de lançamento ou do ManualInstallModal.
+  const [manualFormPrefill, setManualFormPrefill] = useState<{ name?: string; consoles?: string[] } | null>(null);
   const { toastMessage, showToast } = useToast();
   const [scrapeJob, setScrapeJob] = useState<ScrapeJob | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
@@ -611,6 +626,21 @@ export function AllGamesScreen({
           message={launchError}
           onClose={clearLaunchError}
           onRetry={retryLaunch}
+          extraAction={
+            isEmulatorMissingErrorCode(launchErrorCode)
+              ? {
+                  label: t("alreadyHaveEmulatorPointIt"),
+                  onClick: () => {
+                    const verdict = lastGame ? verdictFor(lastGame.console_id) : undefined;
+                    setManualFormPrefill({
+                      name: verdict?.emulator,
+                      consoles: lastGame ? [lastGame.console_id] : undefined,
+                    });
+                    clearLaunchError();
+                  },
+                }
+              : undefined
+          }
         />
       ) : install.state.kind === "error" ? (
         <ErrorModal
@@ -655,6 +685,22 @@ export function AllGamesScreen({
                 }
               : undefined
           }
+          onPointManually={() => {
+            const { adapterName, consoleId } = install.state as { adapterName: string; consoleId: string };
+            setManualFormPrefill({ name: adapterName, consoles: [consoleId] });
+            install.setState({ kind: "idle" });
+          }}
+        />
+      )}
+
+      {manualFormPrefill && (
+        <ManualEmulatorFormModal
+          prefill={manualFormPrefill}
+          onClose={() => setManualFormPrefill(null)}
+          onSaved={() => {
+            setManualFormPrefill(null);
+            api.getEmulators().then((res) => setEmulators(res.emulators)).catch(() => {});
+          }}
         />
       )}
 

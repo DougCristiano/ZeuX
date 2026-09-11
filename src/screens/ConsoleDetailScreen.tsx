@@ -12,6 +12,7 @@ import type {
   Report,
   RetroArchCoreStatus,
 } from "../api/types";
+import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { ConsoleHero } from "../components/ConsoleHero";
 import {
   BackButton,
@@ -617,6 +618,29 @@ export function ConsoleDetailScreen({
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
+  // B2 (docs/pendencias.md): "já tenho um emulador deste console, aponte
+  // o executável" — cadastro manual acessível em 1 clique ao fim da coluna
+  // "Como rodar", em vez de só existir a 4 cliques em EmulatorsScreen.
+  // `existingIds`/`placeholders` vêm do mesmo `GET /custom-emulators` que
+  // `EmulatorsScreen` já consultava.
+  const [manualFormOpen, setManualFormOpen] = useState(false);
+  const [customIds, setCustomIds] = useState<string[]>([]);
+  const [customPlaceholders, setCustomPlaceholders] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    api
+      .getCustomEmulators()
+      .then((res) => {
+        setCustomIds(res.custom_emulators.map((c) => c.id));
+        setCustomPlaceholders(res.placeholders);
+      })
+      .catch(() => {
+        // Degrada para uma lista vazia — só afeta a desambiguação de id de
+        // um cadastro novo (`ManualEmulatorForm.resolveID`), não impede o
+        // formulário de abrir.
+      });
+  }, []);
+
   async function handleChangeImage() {
     const picked = await open({
       multiple: false,
@@ -922,6 +946,31 @@ export function ConsoleDetailScreen({
               <SectionHeading>{t("savesHeading")}</SectionHeading>
               <SaveDataPanel adapterId={readiness.chosen.adapter_id} />
             </div>
+          )}
+
+          {/* B2 (docs/pendencias.md): "já tenho o emulador, num drive que a
+              varredura não alcança" não tinha saída nesta tela — o único
+              caminho era EmulatorsScreen, a 4 cliques. Mesmo padrão de
+              abrir/fechar/pré-preencher que EmulatorsScreen usa para o
+              mesmo formulário. */}
+          {manualFormOpen ? (
+            <Card filled className="flex flex-col gap-2">
+              <SectionHeading>{t("manualEmulatorFormTitle")}</SectionHeading>
+              <ManualEmulatorForm
+                prefill={{ consoles: [consoleId] }}
+                existingIds={customIds}
+                placeholders={customPlaceholders}
+                onSaved={() => {
+                  setManualFormOpen(false);
+                  reload();
+                }}
+                onCancel={() => setManualFormOpen(false)}
+              />
+            </Card>
+          ) : (
+            <Button type="button" variant="chrome" className="w-fit" onClick={() => setManualFormOpen(true)}>
+              {t("manualEmulatorButton", { consoleName: entry.short_name })}
+            </Button>
           )}
         </div>
 

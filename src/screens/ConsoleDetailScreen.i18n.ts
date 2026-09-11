@@ -277,6 +277,14 @@ export const dict = {
     "pt-BR": "Como rodar — {{count}} opções",
     en: "How to run — {{count}} options",
   },
+  manualEmulatorButton: {
+    "pt-BR": "Já tenho um emulador de {{consoleName}} — apontar o executável.",
+    en: "I already have a {{consoleName}} emulator — point to the executable.",
+  },
+  manualEmulatorFormTitle: {
+    "pt-BR": "Apontar o executável",
+    en: "Point to the executable",
+  },
   noEmulatorKnown: {
     "pt-BR":
       "O ZeuX ainda não conhece nenhum emulador para {{consoleName}}. Nada a instalar por aqui — quando um adapter para este console existir, ele aparece nesta tela sozinho.",

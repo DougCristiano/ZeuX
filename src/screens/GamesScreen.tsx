@@ -32,9 +32,11 @@ import {
 import { ConsoleHero } from "../components/ConsoleHero";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
+import { ManualEmulatorFormModal } from "../components/ManualEmulatorFormModal";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
+import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { useT } from "../i18n/i18n";
@@ -141,6 +143,13 @@ export function GamesScreen({
   // Erro de lançamento vira modal, não texto discreto na linha do jogo —
   // achado em 2026-08-04, um texto inline passava despercebido.
   const [launchError, setLaunchError] = useState<string | null>(null);
+  // B2 (docs/pendencias.md): `code` da falha, separado da mensagem — só
+  // `binary_not_found`/`not_installed`/`emulator_unavailable` oferecem a
+  // ação extra do `ErrorModal` (cadastro manual do emulador).
+  const [launchErrorCode, setLaunchErrorCode] = useState<string | null>(null);
+  // Pré-preenchimento do cadastro manual (nome do emulador + este console),
+  // aberto a partir do ErrorModal de lançamento ou do ManualInstallModal.
+  const [manualFormPrefill, setManualFormPrefill] = useState<{ name?: string; consoles?: string[] } | null>(null);
   const { toastMessage, showToast } = useToast();
 
   const accent = consoleAccentColor(consoleId);
@@ -192,6 +201,7 @@ export function GamesScreen({
       const message = err instanceof ApiError ? err.message : t("couldNotCancelDownload");
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
       setLaunchError(message);
+      setLaunchErrorCode(null);
     }
   }
 
@@ -214,6 +224,7 @@ export function GamesScreen({
         const message = job.error ?? t("coreDownloadedNotFound");
         setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
         setLaunchError(message);
+        setLaunchErrorCode(null);
         return;
       }
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "downloading-core", job } }));
@@ -222,6 +233,7 @@ export function GamesScreen({
       const message = err instanceof ApiError ? err.message : t("coreDownloadedNotFound");
       setRowStatus((prev) => ({ ...prev, [gameId]: { kind: "error", message } }));
       setLaunchError(message);
+      setLaunchErrorCode(null);
     }
   }
 
@@ -243,6 +255,7 @@ export function GamesScreen({
           const message = t("coreDownloadedNotFound");
           setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
           setLaunchError(message);
+          setLaunchErrorCode(null);
           return;
         }
         setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "downloading-core", job: result.install_job } }));
@@ -259,6 +272,9 @@ export function GamesScreen({
       const message = err instanceof ApiError ? err.message : t("couldNotLaunchGame");
       setRowStatus((prev) => ({ ...prev, [game.id]: { kind: "error", message } }));
       setLaunchError(message);
+      // B2 (docs/pendencias.md): `code` (docs/api.md) diferencia "emulador não
+      // encontrado" de qualquer outro motivo de falha.
+      setLaunchErrorCode(err instanceof ApiError ? err.code : null);
     }
   }
 
@@ -317,7 +333,26 @@ export function GamesScreen({
        */}
       {toastMessage && <Toast message={toastMessage} />}
       {launchError ? (
-        <ErrorModal title={t("couldNotLaunchGameTitle")} message={launchError} onClose={() => setLaunchError(null)} />
+        <ErrorModal
+          title={t("couldNotLaunchGameTitle")}
+          message={launchError}
+          onClose={() => {
+            setLaunchError(null);
+            setLaunchErrorCode(null);
+          }}
+          extraAction={
+            isEmulatorMissingErrorCode(launchErrorCode)
+              ? {
+                  label: t("alreadyHaveEmulatorPointIt"),
+                  onClick: () => {
+                    setManualFormPrefill({ name: verdict?.emulator, consoles: [consoleId] });
+                    setLaunchError(null);
+                    setLaunchErrorCode(null);
+                  },
+                }
+              : undefined
+          }
+        />
       ) : install.state.kind === "error" ? (
         <ErrorModal
           title={t("couldNotInstallEmulator")}
@@ -383,6 +418,25 @@ export function GamesScreen({
                 }
               : undefined
           }
+          onPointManually={() => {
+            const { adapterName, consoleId: manualConsoleId } = install.state as {
+              adapterName: string;
+              consoleId: string;
+            };
+            setManualFormPrefill({ name: adapterName, consoles: [manualConsoleId] });
+            install.setState({ kind: "idle" });
+          }}
+        />
+      )}
+
+      {manualFormPrefill && (
+        <ManualEmulatorFormModal
+          prefill={manualFormPrefill}
+          onClose={() => setManualFormPrefill(null)}
+          onSaved={() => {
+            setManualFormPrefill(null);
+            api.getEmulators().then((res) => setEmulators(res.emulators)).catch(() => {});
+          }}
         />
       )}
 

@@ -47,6 +47,10 @@ export const dict = {
     "pt-BR": "Não foi possível abrir o jogo",
     en: "Could not launch game",
   },
+  alreadyHaveEmulatorPointIt: {
+    "pt-BR": "Já tenho esse emulador — apontar onde ele está",
+    en: "I already have this emulator — point to it",
+  },
   couldNotInstallEmulator: {
     "pt-BR": "Não foi possível instalar o emulador",
     en: "Could not install emulator",
