@@ -133,9 +133,19 @@ mouse/teclado. Ver `decisoes.md`. **Continua em aberto:** marcar
 `data-gamepad-start` nas telas que não receberam (Consoles, Emuladores,
 Configurações) — uma linha por tela.
 
-### B2 — Saída no `ErrorModal` de lançamento + cadastro manual acessível
+### B2 — Saída no `ErrorModal` de lançamento + cadastro manual acessível — **FEITO (2026-09-11)**
 
-**O problema:** clicar em "Jogar" e falhar com "emulador não encontrado"
+Implementado via sessão multiagente (ambiente remoto, sem Windows —
+`tsc`/`npm run build` conferidos, sem verificação visual real): as três
+partes do escopo abaixo, mais `ManualEmulatorFormModal.tsx` novo (Dialog
+que embrulha `ManualEmulatorForm` para as quatro telas de lançamento, que
+não tinham superfície de "formulário aberto" como `ConsoleDetailScreen`/
+`EmulatorsScreen` já tinham) e `lib/emulatorMissingError.ts` (um lugar só
+checando os três `code` de emulador ausente, em vez de repetir em cada
+tela). **Resta:** confirmar visualmente numa máquina de verdade — nenhuma
+sessão de IA rodou o app.
+
+**O problema (histórico):** clicar em "Jogar" e falhar com "emulador não encontrado"
 (`AllGamesScreen`/`GamesScreen`/`GameDetailScreen`) leva a um modal com só
 "Fechar" e "Tentar de novo" — relançar exatamente o que falhou. Quem **já
 tem** o emulador instalado num drive que o `findBinary` não alcança (outro
@@ -327,9 +337,21 @@ documentado no arquivo.
 
 **Depende de:** nada · **Bloqueia:** nada
 
-### B5 — Indicador "um jogo está rodando agora" no shell
+### B5 — Indicador "um jogo está rodando agora" no shell — **FEITO (2026-09-11)**
 
-**O problema:** o backend tem sessão e `is_running` (`GET /sessions`), a
+Implementado junto com a oferta de instalar o VC++ Redistributable (mesma
+sessão multiagente) — os dois compartilham `useSessionWatcher.ts`, um poll
+só de `GET /sessions` alimentando as duas necessidades (evita duplicar a
+chamada de rede). `RunningGameBanner` é `fixed`, some sozinha, não reserva
+espaço. A parte do VC++: quando uma sessão morre nos últimos 20s com o
+texto "Visual C++ Redistributable" em `exit_error` (o mesmo texto de
+`describeExitCode`, comparado por substring pra não quebrar se a redação em
+volta mudar), oferece `POST /system/vcredist/install` num modal —
+dispensável por sessão (`dismissVcredist`), não reabre sozinho. **Resta:**
+verificação visual numa máquina de verdade — nenhuma sessão de IA rodou o
+app nem viu um 0xC0000135 de verdade acontecer com essa UI na tela.
+
+**O problema (histórico):** o backend tem sessão e `is_running` (`GET /sessions`), a
 tela de Histórico existe, mas o shell não mostra nada. Quem minimiza o ZeuX
 com o emulador aberto volta a uma tela idêntica à de antes.
 
@@ -345,9 +367,18 @@ com o emulador aberto volta a uma tela idêntica à de antes.
 
 **Depende de:** nada · **Bloqueia:** nada
 
-### B6 — `prefers-contrast` + toggle "Efeitos visuais"
+### B6 — `prefers-contrast` + toggle "Efeitos visuais" — **FEITO (2026-09-11)**
 
-**O problema:** `index.css` respeita `prefers-reduced-motion` com rigor e
+Implementado via sessão multiagente: bloco `@media (prefers-contrast: more)`
++ espelho `[data-visual-effects="reduced"]` em `index.css`, hook
+`useVisualEffects.ts` novo (lê/persiste/aplica), aplicado cedo em
+`main.tsx` para não piscar no primeiro render. Chave de `localStorage`:
+`zeux.visual-effects` (`"full"`/`"reduced"`); atributo no root:
+`data-visual-effects="reduced"` (ausente = completo). Controle em
+Configurações, seção "Efeitos visuais". **Resta:** verificação visual numa
+máquina de verdade.
+
+**O problema (histórico):** `index.css` respeita `prefers-reduced-motion` com rigor e
 **ignora `prefers-contrast`**. As scanlines/glow são decorativas fixas, sem
 escape — problema real para quem joga em sala clara ou tem fotossensibilidade.
 
@@ -976,13 +1007,15 @@ clique que dispara a rota. **Nunca testado ao vivo** — foi escrito sem
 Windows disponível; o doc comment da função e a entrada correspondente em
 `decisoes.md` (a fazer quando alguém verificar) carregam essa ressalva.
 
+**Frontend feito (2026-09-11), via `useSessionWatcher`/`VCRedistOffer` em
+App.tsx** — ver B5 acima, os dois foram implementados juntos.
+
 **Falta:**
 - Testar de verdade numa máquina Windows: o download, a elevação UAC, o
-  instalador abrindo, o comportamento se o runtime já estiver instalado.
-- **Frontend:** o `ErrorModal` de lançamento que mostra a frase de
-  `describeExitCode` (0xC0000135) precisa ganhar um botão "Instalar o
-  Visual C++ Redistributable" que chama a rota nova — hoje o usuário só lê a
-  instrução em texto e precisa achar o link sozinho.
+  instalador abrindo, o comportamento se o runtime já estiver instalado. A
+  detecção do lado do front (`useSessionWatcher.ts`, comparação por
+  substring "Visual C++ Redistributable" em `exit_error`) também nunca viu
+  um 0xC0000135 de verdade — só foi verificada por `tsc`/`build`.
 
 ### Ver saves dentro do ZeuX — MVP de inspeção (não gerência)
 
@@ -997,12 +1030,17 @@ palpite de caminho, princípio 4.
 **Decisão do Douglas:** começar só por listar/inspecionar (memory card e
 save state juntos), sem gerência (apagar/exportar) nesta primeira rodada.
 
+**Frontend feito (2026-09-11):** `SaveDataPanel.tsx`, seção "Saves" em
+`ConsoleDetailScreen` (visível quando há emulador resolvido) — mostra os
+dois diretórios e a lista de arquivos (nome/tamanho/data) quando
+`known:true`, e a frase da API quando `known:false`. Edição
+(`POST /emulators/{id}/save-data`) liberada só pra `retroarch` — a decisão
+tomada foi um `Set` fixo de adapters graváveis no componente, não uma
+sondagem ao vivo, porque `EmulatorEntry` não anuncia a capacidade
+`SaveDataConfigurableAdapter` e disparar um `POST` só pra descobrir a
+resposta arriscaria um efeito colateral real escondido numa checagem.
+
 **Falta:**
-- **Frontend:** nenhuma tela consome a rota ainda. Um lugar razoável é uma
-  seção "Saves" em `ConsoleDetailScreen` (ou `EmulatorsScreen`) para
-  consoles cujo adapter resolvido tem `known:true` — mostrando os arquivos
-  com tamanho e data, e a frase honesta de "ainda não sei onde procurar"
-  para o resto.
 - **Ampliar cobertura:** cada adapter novo (DuckStation, RetroArch, Dolphin…)
   exige o mesmo método já registrado em `pcsx2DataDir()` — rodar o binário
   de verdade, fotografar antes/depois, documentar em `decisoes.md`. Não dá
