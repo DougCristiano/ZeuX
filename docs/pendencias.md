@@ -844,6 +844,126 @@ medido há menos de 24h e `checksum_verified` volta a significar algo; o
 **Depende de:** infraestrutura de CI/hospedagem do asset · **Bloqueia:** nada
 (o remendo do `warning` já desbloqueia o usuário)
 
+## Pesquisa (não verificada): save/continuidade e configuração 100% pelo ZeuX, por emulador (2026-09-11)
+
+**Origem:** pedido do Douglas na mesma sessão — "veja como funciona o save de
+todos os emuladores... quero um resumo de como podemos configurar cada
+emulador por dentro do zeux somente. como persistiria para cada emulador."
+
+**Método e aviso, leia antes de usar isto para estimar algo:** tudo abaixo
+vem de busca na web (wikis oficiais, docs, fórum) numa sessão sem Windows e
+sem os binários instalados — **nada foi confirmado rodando o emulador de
+verdade**, o único padrão que este projeto aceita como fato (ver o método de
+`pcsx2DataDir`/`flycastBiosDir` em `bios_dir.go` e `pcsx2_config.go`, e a
+ressalva já registrada para o Vita3K/`decisoes.md`). Trate cada linha como
+"o que a documentação diz", não "o que o ZeuX vai encontrar" — a tabela erra
+sozinha se o Documentos do usuário estiver redirecionado (OneDrive), se a
+versão instalada mudou de comportamento (Cemu passou de portátil-por-padrão
+a não-portátil entre versões, achado abaixo), ou se a distro/instalador
+divergir do que o wiki descreve. Antes de qualquer um destes virar código
+real, repetir o método já usado para PCSX2/Flycast: rodar o binário de
+verdade, fotografar antes/depois, registrar em `decisoes.md`.
+
+### Onde cada emulador guarda save (memory card / cartão + save state)
+
+| Adapter | Save "nativo" (memory card / SAVEDATA / .sav) | Save state | Config principal | Portátil? |
+|---|---|---|---|---|
+| **duckstation** | `<user dir>/memcards/*.mcd` | `<user dir>/savestates/` | `settings.ini` | Sim, via `portable.txt` — já é o que `seedDuckStationPortable` ativa; sem ele, hoje o padrão passou de `Documents\DuckStation` para `%LocalAppData%\DuckStation` (mudou de versão para versão — mais um motivo para manter modo portátil). |
+| **pcsx2** | `Documents\PCSX2\memcards\` | `Documents\PCSX2\sstates\` | `Documents\PCSX2\inis\PCSX2.ini` | **Não** — confirmado ao vivo em 2026-09-11 que o PCSX2 ignora modo portátil nesta máquina (ver `pcsx2_config.go`). Único já com `ResolveSaveDataDirs` implementado. |
+| **ppsspp** | `<memstick>/PSP/SAVEDATA/` | `<memstick>/PSP/PPSSPP_STATE/` | `ppsspp.ini` (dentro do memstick) | Sim — sem instalador, o "Memory Stick" já fica ao lado do `.exe`; só cai em `Documents\PPSSPP` se a pasta do exe não for gravável (ex.: Program Files). |
+| **dolphin** | cartão de memória GC é um **arquivo único** (`MemcardA.raw` etc.), caminho gravado em `Dolphin.ini` (`MemcardAPath`) — padrão em `Documents\Dolphin Emulator\GC\`; saves de Wii ficam dentro de `Wii/title/.../data/` (estrutura NAND emulada) | `Documents\Dolphin Emulator\StateSaves\` | `Documents\Dolphin Emulator\Config\Dolphin.ini` (+ `GFX.ini`, `GameSettings/*.ini` por jogo) | Existe modo portátil (`portable.txt`), não pesquisado a fundo aqui. |
+| **flycast** | `vmu_save_A1.bin` (e B1/C1/D1) soltos na pasta `data/` ao lado do executável (standalone) — **por design, um VMU por slot, compartilhado entre jogos**, não por jogo | não encontrado documentado para o standalone nesta pesquisa | `emu.cfg` | Comportamento standalone parece já ser "ao lado do exe" por padrão — precisa confirmar. |
+| **rpcs3** | `dev_hdd0/home/00000001/savedata/<ID do jogo>/` dentro da pasta de instalação (a árvore `dev_hdd0` é o "HD emulado") | citado como existente (RPCS3 tem save state próprio), local não confirmado nesta pesquisa | `config.yml` | RPCS3 é portátil por padrão (tudo relativo à pasta do executável), mas há um bug conhecido no macOS que grava fora dela — vale checar o equivalente no Windows antes de confiar. |
+| **melonds** | `.sav` ao lado da ROM, ou pasta configurável (`Documents\melonDS\saves\` como default comum) — **local final é o que o usuário configurou na primeira execução**, não fixo | não pesquisado a fundo | `melonDS.ini` | Sem confirmação de portátil. |
+| **azahar** | `sdmc/Nintendo 3DS/.../title/.../data/` dentro do "User Directory" (`%AppData%\Azahar\` no Windows) | não pesquisado a fundo | `qt-config.ini` (dentro de `config/`) | `seedAzahar` grava `qt-config.ini` na pasta gerenciada — mas se o User Directory real é `%AppData%\Azahar`, o mesmo risco do PCSX2 pode se aplicar aqui (arquivo semeado no lugar errado). **Precisa do mesmo teste ao vivo que corrigiu o PCSX2.** |
+| **xemu** | disco rígido emulado (`xbox_hdd.qcow2`, formato qcow2) guarda tudo, caminho em `sys.files.hdd_path` no `xemu.toml`; `eeprom.bin` guarda config de console (região, etc.), não save de jogo | não pesquisado | `xemu.toml` | Caminho default citado (`$HOME/.local/share/xemu/...`) é de Linux; Windows não confirmado. |
+| **vita3k** | `ux0/user/00/savedata/<Title ID>/`, dentro de `%AppData%/Vita3K/` (caminho customizável via `pref-path` no `config.yml`) | não pesquisado | `config.yml` (ao lado do exe) | Filesystem emulado fica em AppData por padrão, não ao lado do exe — atenção, mesmo padrão de risco do PCSX2/Azahar. |
+| **xenia** | `Documents\Xenia\content\` (ou ao lado do exe, se houver `portable.txt`) | não pesquisado a fundo | `Documents\Xenia\xenia.config.toml` (ou ao lado do exe em modo portátil) | Sim, via `portable.txt` — mesmo mecanismo que `seedXenia` já pressupõe, mas **não confirmado se o ZeuX ativa esse portable.txt** (não vi isso no `firstrun.go` atual). |
+| **cemu** | `mlc01/usr/save/` dentro do MLC (path configurável) | não pesquisado | `settings.xml` | **Mudou de comportamento entre versões**: Cemu passou a ser não-portátil por padrão no Windows (`%AppData%\Roaming\Cemu`), com portátil ainda disponível via pasta `portable` ao lado do exe — `seedCemu` hoje só cria `mlc01` dentro do `installDir`, o que pode não ser onde o Cemu moderno olha. **Precisa verificação ao vivo, mesmo padrão do PCSX2.** |
+| **rmg** | não pesquisado a fundo (Mupen64Plus core guarda save por jogo, formato `.sra`/`.mpk` conforme o tipo) | `.../RMG/Save/State` | `.../RMG/config/mupen64plus.cfg` (ou local, se portátil) | A doc citada diz que a versão portátil guarda tudo dentro da própria pasta — consistente com `seedRMG`. |
+| **retroarch** | `savefile_directory` no `retroarch.cfg` (pode ser `default` = ao lado da ROM, ou um caminho fixo) | `savestate_directory`, mesma regra | `retroarch.cfg` | O ZeuX ainda **não lê nem grava** essas duas chaves (`retroarch_config.go` não as menciona) — é o maior buraco da lista, porque RetroArch cobre a maioria dos consoles do catálogo. |
+
+### O padrão de risco que se repete
+
+Pelo menos três adapters (**cemu, azahar, vita3k**) guardam o "diretório de
+usuário" de verdade em `%AppData%`, não na pasta onde o ZeuX instala — o
+mesmo formato de erro que já foi encontrado e corrigido no PCSX2
+(`decisoes.md`, "O assistente do PCSX2 aparecia porque `seedPCSX2` semeava
+no lugar errado", 2026-09-11). Antes de prometer save states desses três,
+vale repetir o teste ao vivo que resolveu o PCSX2 — sem isso, `seedCemu` e
+`seedAzahar` de hoje podem estar semeando um arquivo que o binário real nunca
+lê, do mesmo jeito que `seedPCSX2` fazia antes da correção.
+
+### Resumo: configurar cada emulador só pelo ZeuX (sem abrir a GUI dele)
+
+O mecanismo já existe e está em produção para **um** adapter: `ConfigurableAdapter`
+(`adapter.go`) + `iniconfig.go` (parser de INI que preserva o resto do
+arquivo) + `configbackup.go` (backup do original antes da primeira escrita,
+restaurável). Hoje só `pcsx2` implementa — `TestOrdinaryStandaloneAdapterDoesNotSatisfyConfigurableAdapter`
+trava explicitamente que DuckStation **não** satisfaz a interface ainda.
+
+Como cada formato de config se encaixaria no mesmo padrão (parser +
+backup), por formato de arquivo:
+
+- **INI** (duckstation `settings.ini`, dolphin `Dolphin.ini`, ppsspp
+  `ppsspp.ini`, flycast `emu.cfg`, melonds `melonDS.ini`, azahar
+  `qt-config.ini`, vita3k tem seu próprio, rmg `mupen64plus.cfg`, retroarch
+  `retroarch.cfg`) — `iniconfig.go` já é genérico o bastante para ler
+  qualquer um destes; falta só mapear, por adapter, **quais chaves** valem a
+  pena expor (mesmo trabalho que `pcsx2ReadConfig` fez: achar a chave real
+  rodando o binário, nunca supor pelo nome). É o maior grupo — a maioria dos
+  emuladores do catálogo usa INI.
+- **YAML** (rpcs3 `config.yml`, vita3k `config.yml`) — precisa de um parser
+  novo (`internal/emulator` não tem um hoje); Go tem `gopkg.in/yaml.v3` como
+  opção, mas isso é dependência nova, então checar com o Douglas antes (regra
+  do CLAUDE.md sobre não somar dependência sem perguntar não é só para
+  Rust/Node).
+- **TOML** (xemu `xemu.toml`, xenia `xenia.config.toml`) — mesma situação:
+  parser novo, dependência nova (`BurntSushi/toml` ou similar), perguntar
+  antes.
+- **XML** (cemu `settings.xml`) — `encoding/xml` já é biblioteca padrão do Go,
+  sem dependência nova; mas XML é mais verboso para edição pontual que
+  preserve o resto do arquivo intacto (o que `parseINI` faz de propósito) —
+  precisaria de um cuidado equivalente para não perder configuração que o
+  usuário já tinha.
+
+**Ordem sugerida, se isto virar trabalho de verdade:** RetroArch primeiro —
+não por ser tecnicamente mais simples (é INI, então empata com o grupo
+grande), mas porque é o adapter que **mais consoles atende**, então mapear
+`savefile_directory`/`savestate_directory` ali destrava "onde estão os
+saves" para o maior naco do catálogo de uma vez, em vez de emulador por
+emulador. Cemu, Azahar e Vita3K vêm depois **e primeiro precisam da
+verificação ao vivo** da seção acima — mapear chave de config antes de saber
+se o arquivo semeado é sequer o que o binário lê seria trabalho perdido.
+
+**Depende de:** acesso a uma máquina Windows com cada emulador de verdade
+(o método que já resolveu PCSX2/Flycast não tem atalho) · **Bloqueia:**
+qualquer promessa de "voltar de onde parou" além do PCSX2.
+
+Sources: [DuckStation README](https://github.com/stenzek/duckstation/blob/master/README.md) ·
+[PulseGeek — DuckStation save folders](https://pulsegeek.com/articles/duckstation-save-folders-on-windows-mac-and-linux/) ·
+[Dolphin Emulator Wiki — GameINI](https://wiki.dolphin-emu.org/index.php?title=GameINI) ·
+[PCGamingWiki — Dolphin](https://www.pcgamingwiki.com/wiki/Dolphin) ·
+[PPSSPP — Save data and storage on Windows](https://www.ppsspp.org/docs/getting-started/save-data-and-storage-windows/) ·
+[Libretro Docs — Directory Configuration](https://docs.libretro.com/guides/change-directories/) ·
+[RPCS3 Wiki — Help:Save State](https://wiki.rpcs3.net/index.php?title=Help%3ASave_State) ·
+[RPCS3 Quickstart](https://rpcs3.net/quickstart) ·
+[Cemu Wiki — Folder structure](https://wiki.cemu.info/wiki/Folder_structure) ·
+[Cemu PR #1252 — Windows default to non-portable](https://github.com/cemu-project/Cemu/pull/1252) ·
+[Xenia Manager Wiki — FAQ](https://github.com/xenia-manager/xenia-manager/wiki/FAQ) ·
+[Xenia Manager — Save Files guide](https://xeniamanager.wiki/xenia-save-files/) ·
+[melonDS board — save file location](https://melonds.kuribo64.net/board/thread.php?id=245) ·
+[GitHub issue — Flycast VMU save location](https://github.com/libretro/flycast/issues/1017) ·
+[RetroPie forum — lr-flycast VMU data](https://retropie.org.uk/forum/topic/24848/where-does-lr-flycast-store-vmu-data) ·
+[Vita3K FAQ](https://vita3k.org/faq) ·
+[Vita3K Wiki — FAQ](https://github.com/Vita3K/Vita3K/wiki/FAQ) ·
+[xemu Docs — EEPROM Settings](https://xemu.app/docs/eeprom/) ·
+[xemu Docs — Troubleshooting](https://xemu.app/docs/troubleshooting/) ·
+[Azahar — User Directory (Citra wiki archive)](https://citra.azahar-emu.org/wiki/user-directory/) ·
+[EmuDeck — Azahar tips](https://manual.emudeck.com/tricks/azahar/) ·
+[RMG GitHub](https://github.com/rosalie241/RMG) ·
+[EmuDeck — RMG](https://emudeck.github.io/emulators/steamos/rmg/)
+
 ## Backend pronto, interface pendente: VC++ Redistributable e visão de saves (2026-09-11)
 
 **Origem:** pedido do Douglas na sessão remota de 2026-09-11 (ambiente Linux,
