@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/shirou/gopsutil/v4 v4.26.7
+	github.com/ulikunitz/xz v0.5.15
 	modernc.org/sqlite v1.55.0
 )
 
@@ -28,7 +29,6 @@ require (
 	github.com/stangelandcl/ppmd v0.1.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
-	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20260112195520-a5071408f32f // indirect
 	golang.org/x/sys v0.46.0 // indirect

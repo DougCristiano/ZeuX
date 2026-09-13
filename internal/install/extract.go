@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/bodgit/sevenzip"
+	"github.com/ulikunitz/xz"
 )
 
 // maxExtractedBytes limita o total descompactado, defesa contra um arquivo
@@ -83,6 +84,8 @@ func Extract(archivePath, destDir string, kind Archive) error {
 		return extract7z(archivePath, destDir)
 	case ArchiveTarGz:
 		return extractTarGz(archivePath, destDir)
+	case ArchiveTarXz:
+		return extractTarXz(archivePath, destDir)
 	case ArchiveAppImage:
 		return installAppImage(archivePath, destDir)
 	default:
@@ -221,6 +224,60 @@ func extractTarGz(archivePath, destDir string) error {
 	}
 }
 
+// extractTarXz trata o pacote do PCSX2 para macOS, que sai como .tar.xz em vez
+// do .tar.gz mais comum nos outros emuladores — mesmo formato de tar, só troca
+// o descompressor.
+func extractTarXz(archivePath, destDir string) error {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	xzReader, err := xz.NewReader(file)
+	if err != nil {
+		return fmt.Errorf("abrindo o tar.xz: %w", err)
+	}
+
+	reader := tar.NewReader(xzReader)
+	var written int64
+
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		target, err := safeJoin(destDir, header.Name)
+		if err != nil {
+			return err
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			n, err := writeEntry(target, reader, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+			if written += n; written > maxExtractedBytes {
+				return fmt.Errorf("o pacote descompactado passou do tamanho aceito")
+			}
+		default:
+			// Links simbólicos são ignorados de propósito, pelo mesmo motivo do
+			// extractTarGz: um link apontando para fora do destino seria outra
+			// forma de escapar do diretório.
+			continue
+		}
+	}
+}
+
 // installAppImage trata o caso do AppImage, que não é um pacote e sim o próprio
 // executável — basta colocá-lo no lugar com permissão de execução.
 func installAppImage(archivePath, destDir string) error {
@@ -263,13 +320,22 @@ func writeEntry(target string, source io.Reader, mode os.FileMode) (int64, error
 //
 // Sem isso, a descoberta encontraria o binário só por causa da busca de um
 // nível, e a pasta gerenciada ficaria com um nível a mais que o esperado.
+//
+// Exceção: uma pasta ".app" não é uma pasta-wrapper qualquer, é o próprio
+// bundle do macOS — achatá-la copia "Contents" para a raiz e apaga o
+// ".app", que é exatamente o caminho ("DuckStation.app/Contents/MacOS/...")
+// que binaryNames (discovery.go) espera encontrar. Confirmado baixando o
+// pacote real do DuckStation para macOS: o zip traz só "DuckStation.app" na
+// raiz, e sem esta exceção a instalação 1-click ficava com o binário no
+// lugar errado em todo emulador mac empacotado assim (DuckStation, PPSSPP,
+// Flycast, melonDS, xemu, Azahar, PCSX2).
 func flattenSingleRoot(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
 
-	if len(entries) != 1 || !entries[0].IsDir() {
+	if len(entries) != 1 || !entries[0].IsDir() || strings.HasSuffix(entries[0].Name(), ".app") {
 		return nil
 	}
 

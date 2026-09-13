@@ -47,6 +47,7 @@ const (
 	ArchiveZip      Archive = "zip"
 	Archive7z       Archive = "7z"
 	ArchiveTarGz    Archive = "tar.gz"
+	ArchiveTarXz    Archive = "tar.xz"
 	ArchiveAppImage Archive = "appimage"
 )
 

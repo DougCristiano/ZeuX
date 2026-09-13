@@ -1303,6 +1303,64 @@ máquina sem toolchain Go/mise instalado — revisão só estática).
 `go test ./...` neste projeto, no Windows, com uma instalação real do ZeuX
 na máquina, pode apagar emuladores instalados de verdade.
 
+### Descoberta de emulador no macOS quebrada para todo `.app` — corrigida (2026-09-13)
+
+Motivada por um teste real do Douglas: o instalador 1-click do PCSX2 recusava
+com "não tenho isso para esse SO" no macOS, e mesmo com o PCSX2 instalado à
+mão o ZeuX não o encontrava. Baixando os pacotes reais (PCSX2 e DuckStation,
+ambos publicados no GitHub Releases) apareceram três problemas distintos, os
+três presentes desde que o macOS ganhou entradas no catálogo:
+
+1. **`sources.json` não tinha `darwin/*` para o PCSX2** — só `windows/amd64` e
+   `linux/amd64`. O release oficial publica `pcsx2-vX.Y.Z-macos-Qt.tar.xz`,
+   universal (sem separar `amd64`/`arm64`), confirmado em duas releases
+   diferentes (v2.9.40 e v2.9.45) para garantir que o nome não muda a cada
+   versão.
+2. **`Extract` não sabia abrir `.tar.xz`** — só `zip`, `7z`, `tar.gz` e
+   AppImage. O PCSX2 é o primeiro emulador do catálogo cujo pacote de macOS
+   vem nesse formato; os demais (DuckStation, PPSSPP, Flycast, melonDS,
+   xemu, Azahar) usam `.zip`. Resolvido com `github.com/ulikunitz/xz`, que já
+   estava no `go.mod` como dependência indireta (puxada por outra lib) —
+   virou direta.
+3. **`flattenSingleRoot` desmontava o bundle `.app`** — a função existe para
+   tirar uma pasta-wrapper de pacotes tipo `DuckStation-1.0/duckstation-qt.exe`,
+   mas trata qualquer pasta única na raiz como wrapper descartável. Um `.app`
+   é a única entrada na raiz do zip/tar.xz de todo emulador mac do catálogo
+   (confirmado baixando o do PCSX2 e o do DuckStation), então a função
+   "achatava" o bundle — copiava `Contents/` para a raiz e apagava o
+   `.app` — destruindo exatamente a estrutura que a busca esperava
+   encontrar. Corrigido pulando o achatamento quando a única entrada termina
+   em `.app`.
+4. **O nome do binário dentro do bundle não é o nome genérico do Linux** —
+   `binaryNames` montava o caminho como `"<Bundle>.app/Contents/MacOS/<base>"`,
+   usando `base` (ex.: `"pcsx2-qt"`, `"duckstation-qt"`). O binário real
+   dentro do bundle chama como o próprio app (`PCSX2`, `DuckStation` — o
+   `CFBundleExecutable`), confirmado nos dois pacotes baixados. Trocado para
+   usar o nome do bundle também como nome do binário — ainda um palpite
+   para os adapters não baixados individualmente (Dolphin, PPSSPP, Flycast,
+   RPCS3, melonDS, Azahar, xemu, Vita3K, Cemu), mas um palpite melhor que o
+   anterior, que estava provadamente errado nos dois casos verificados.
+5. **O nome do bundle do PCSX2 carrega a versão** — o release publica
+   `PCSX2-v2.9.45.app`, não `PCSX2.app`, e a versão muda a cada lançamento.
+   `findBinary` já tinha um glob equivalente para o nome versionado do
+   AppImage no Linux (achado em D11 — ver entrada mais antiga deste log);
+   ganhou um glob irmão para bundle `.app` versionado, preservando fixo só o
+   miolo `Contents/MacOS/<binário>`.
+
+**O que quebra se desfizer:** os itens 2 e 3 valem para todo o catálogo mac,
+não só o PCSX2 — desfazer a exceção do `.app` em `flattenSingleRoot` volta a
+quebrar a instalação 1-click de DuckStation, PPSSPP, Flycast, melonDS, xemu e
+Azahar no macOS, mesmo sem mexer em mais nada.
+
+**Ainda não verificado nesta sessão:** os itens 1, 4 e 5 foram confirmados
+baixando o pacote real do PCSX2; o item 4 (nome do binário = nome do bundle)
+foi confirmado também no DuckStation, mas não nos demais sete adapters com
+`macBundle` — é o padrão observado em dois de nove, não uma regra
+documentada pela Apple que se aplique aos outros sete de bandeja. Nenhum
+destes caminhos foi exercitado num macOS de verdade (esta sessão rodou em
+Linux; a validação foi cross-compile + testes com os bytes reais dos pacotes
+baixados, não um `go run` na plataforma).
+
 ---
 
 ## O que fica fora deste log, de propósito

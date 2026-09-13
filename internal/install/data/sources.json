@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-09-06",
+  "updated_at": "2026-09-13",
   "_comment": "Fontes oficiais de download por emulador. Os padrões de asset foram derivados dos nomes reais publicados nos repositórios em 2026-08-01. 'exclude' é tão importante quanto 'include': as releases misturam builds de depuração, pacotes de símbolos e instaladores junto do binário que queremos.",
   "sources": [
     {
@@ -32,7 +32,9 @@
           "exclude": "symbols|installer",
           "archive": "7z"
         },
-        "linux/amd64": { "include": "linux-appimage-x64-Qt\\.AppImage$", "archive": "appimage" }
+        "linux/amd64": { "include": "linux-appimage-x64-Qt\\.AppImage$", "archive": "appimage" },
+        "darwin/amd64": { "include": "macos-Qt\\.tar\\.xz$", "archive": "tar.xz" },
+        "darwin/arm64": { "include": "macos-Qt\\.tar\\.xz$", "archive": "tar.xz" }
       }
     },
     {

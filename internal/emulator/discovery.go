@@ -136,6 +136,27 @@ func findBinary(ctx context.Context, adapterID string, consoles []string, names 
 		if matches, _ := filepath.Glob(filepath.Join(managedDir, "*.AppImage")); len(matches) == 1 && isExecutableFile(matches[0]) {
 			return matches[0], true, readVersionMarker(managedDir), true
 		}
+
+		// Mesmo problema, versão macOS: o PCSX2 publica o bundle como
+		// "PCSX2-v2.9.45.app" — a versão faz parte do nome da pasta, não só
+		// do arquivo — confirmado baixando o pacote real do release. O
+		// caminho fixo em `names` ("PCSX2.app/Contents/MacOS/PCSX2") nunca
+		// bate, e names não pode cravar a versão porque ela muda a cada
+		// release. Glob no nome do bundle, mantendo fixo o miolo
+		// "Contents/MacOS/<binário>", resolve do mesmo jeito que o glob de
+		// AppImage acima resolve o nome versionado do Linux.
+		const bundleMarker = ".app" + string(filepath.Separator)
+		for _, name := range names {
+			idx := strings.Index(name, bundleMarker)
+			if idx == -1 {
+				continue
+			}
+			rest := name[idx+len(bundleMarker):]
+			matches, _ := filepath.Glob(filepath.Join(managedDir, "*.app", rest))
+			if len(matches) == 1 && isExecutableFile(matches[0]) {
+				return matches[0], true, readVersionMarker(managedDir), true
+			}
+		}
 	}
 
 	// O índice foi construído sem extraDirs (nenhum adapter embutido passa
@@ -422,13 +443,22 @@ func IsExecutableFile(path string) bool {
 // binaryNames adapta os nomes de executável ao sistema operacional. No macOS os
 // emuladores vêm empacotados em .app, e o binário real fica enterrado dentro do
 // bundle.
+//
+// Dentro do bundle, o binário costuma se chamar como o próprio app (o
+// CFBundleExecutable), não como o executável "genérico" usado em Linux — o
+// `base` deste helper. Confirmado baixando pacotes reais: o PCSX2 traz
+// "PCSX2.app/Contents/MacOS/PCSX2" (não "pcsx2-qt"), e o DuckStation traz
+// "DuckStation.app/Contents/MacOS/DuckStation" (não "duckstation-qt"). Usar
+// `base` aqui fazia a busca nunca encontrar o binário dentro do bundle em
+// nenhum dos dois — e provavelmente nos demais adapters com macBundle, que
+// seguem o mesmo padrão sem terem sido baixados e checados um a um ainda.
 func binaryNames(base string, windowsNames []string, macBundle string) []string {
 	switch runtime.GOOS {
 	case "windows":
 		return windowsNames
 	case "darwin":
 		if macBundle != "" {
-			return []string{filepath.Join(macBundle+".app", "Contents", "MacOS", base), base}
+			return []string{filepath.Join(macBundle+".app", "Contents", "MacOS", macBundle), base}
 		}
 		return []string{base}
 	default:
