@@ -137,6 +137,13 @@ export function persistAllGamesView(patch: Partial<AllGamesViewState>) {
  * Paginada (não scroll infinito), com page_size fixo — GET /library/games
  * sem console_id (ver internal/api/server.go, handleListLibraryGames).
  *
+ * É o destino direto do item "Biblioteca" da sidebar desde 2026-09-14 —
+ * entre 2026-09-10 e essa data existia uma `HomeScreen` intermediária
+ * (hero + prateleira de consoles + botão "Ver todos os jogos" escondido no
+ * rodapé) que o Douglas pediu para desfazer por não fazer sentido de
+ * UI/UX. O hero "Continue jogando" logo abaixo já cobre o "último jogado"
+ * que a `HomeScreen` também mostrava — não sobrou nada que só ela tinha.
+ *
  * Sprint 2 do plano de migração visual (2026-08-04 —
  * /home/douglas/.claude/plans/sleepy-roaming-pearl.md): busca por título
  * (`?q=` no backend — acha o jogo em qualquer página, não só na carregada)

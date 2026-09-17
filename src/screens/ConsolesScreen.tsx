@@ -18,7 +18,7 @@ import {
   ZSelect,
 } from "../components/ui";
 import { SelectItem } from "../components/ui/select";
-import { ConsoleCard, type ConsoleCardSize } from "../components/ConsoleCard";
+import { ConsoleCard } from "../components/ConsoleCard";
 import { consoleFamily, type ConsoleFamily } from "../lib/consoleColor";
 import {
   buildReadinessIndex,
@@ -311,11 +311,17 @@ export function ConsolesScreen({
     noGames: t("cardNoGames"),
   };
 
+  // 2026-09-14 (pedido do Douglas: "gosto do tamanho de 4 [por linha]"): as
+  // três faixas usavam tamanho de card e coluna mínima diferentes (prontos
+  // com 4 por linha; as outras duas com 5, cards menores) — agora é uma
+  // coluna mínima só, `260px`, a mesma que dava 4 por linha na faixa de
+  // prontos. `ConsoleCard` também perdeu o parâmetro de tamanho (ver o doc
+  // comment do componente).
+  const CARD_MIN_COL = "260px";
+
   function renderSection(
     items: Avaliado[],
     titleKey: "sectionReady" | "sectionNeedsSetup" | "sectionCatalog",
-    size: ConsoleCardSize,
-    minCol: string,
     // Legenda opcional ao lado do título — só a faixa dos prontos tem o pingo
     // aceso para explicar.
     legend?: ReactNode,
@@ -334,13 +340,15 @@ export function ConsolesScreen({
               : t("sectionReadyCountPlural", { count: items.length })}
           </span>
         </div>
-        <div className="mt-3 grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${minCol}, 1fr))` }}>
+        <div
+          className="mt-3 grid gap-3"
+          style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_COL}, 1fr))` }}
+        >
           {items.map(({ entry, readiness, hasFolder, gameCount }) => (
             <ConsoleCard
               key={entry.console_id}
               entry={entry}
               readiness={readiness}
-              size={size}
               hasFolder={hasFolder}
               gameCount={gameCount}
               labels={cardLabels}
@@ -537,14 +545,11 @@ export function ConsolesScreen({
         </div>
       )}
 
-      {/* Card grande na faixa dos prontos (logo grande + contagem + "Ver
-          jogos"), médio no "falta configurar", denso no catálogo. `auto-fill`
-          nas três — imune à regra de breakpoint do CLAUDE.md. */}
+      {/* Mesmo card nas três faixas (ver `CARD_MIN_COL` acima). `auto-fill` —
+          imune à regra de breakpoint do CLAUDE.md. */}
       {renderSection(
         prontos,
         "sectionReady",
-        "grande",
-        "260px",
         // Legenda do pingo aceso — cor sozinha nunca é informação (WCAG
         // 1.4.1). Fica ao lado do título desta faixa, e não solta acima da
         // tela: é aqui que os pingos aparecem.
@@ -556,8 +561,8 @@ export function ConsolesScreen({
           {t("readyLegend")}
         </span>,
       )}
-      {renderSection(faltaConfigurar, "sectionNeedsSetup", "media", "210px")}
-      {renderSection(catalogo, "sectionCatalog", "densa", "190px")}
+      {renderSection(faltaConfigurar, "sectionNeedsSetup")}
+      {renderSection(catalogo, "sectionCatalog")}
     </ScreenContainer>
   );
 }

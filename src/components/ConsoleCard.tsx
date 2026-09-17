@@ -13,18 +13,27 @@ import { consoleIconLabel, FOCUS_RING } from "./ui";
  * sobre o gradiente radial na cor de identidade do console (a mesma fórmula
  * do herói de `ConsoleDetailScreen`) e o chassi de borda reta.
  *
- * Três tamanhos, um por faixa da tela: `grande` para "Prontos para jogar"
- * (logo grande + contagem + "Ver jogos"), `media` para "Falta configurar"
- * (chip de pendência visível já aqui) e `densa` para o catálogo. Nenhum deles
- * repete o que o detalhe já diz antes do clique — a faixa que sobe do rodapé
- * no hover mostra `readiness.detail`, e some de novo ao sair.
+ * Um tamanho só, 2026-09-14 (pedido do Douglas): as três faixas de
+ * `ConsolesScreen` tinham tamanhos de card diferentes (a de prontos com 4
+ * por linha, as outras duas com 5 e menores) — "não fez sentido, gosto do
+ * tamanho de 4". As três agora usam o mesmo card. `ConsoleCardSize`
+ * (`grande`/`media`/`densa`) existiu até aqui para diferenciá-las e foi
+ * removido — nada mais passa um tamanho diferente.
+ *
+ * A logo cobre o compartimento de ponta a ponta (`object-cover`, mesmo
+ * pedido: "o cover poderia ser full"). Até aqui ela entrava numa placa
+ * branca pequena, centralizada (decisão de 2026-09-10/11, revertida agora a
+ * pedido direto do Douglas) — a placa evitava que a arte de terceiro
+ * dominasse o card, mas o resultado lia como "ícone pequeno perdido num
+ * cartão grande" em vez de arte de capa. Nenhum dos dois motivos do
+ * reverte-e-volta desapareceu (a chapa clara ainda concentra contraste, a
+ * arte ainda não é da identidade do ZeuX) — só passou a valer menos que o
+ * pedido de agora.
  *
  * O card **não** julga hardware: `readiness` responde "o ZeuX tem as peças no
  * lugar?", nunca "esta máquina aguenta?" (princípio 2). A contagem de jogos é
  * dado do disco do usuário, em coluna monoespaçada.
  */
-
-export type ConsoleCardSize = "grande" | "media" | "densa";
 
 export interface ConsoleCardLabels {
   /** Ex.: "Ver jogos" — afordância do card grande. */
@@ -35,40 +44,13 @@ export interface ConsoleCardLabels {
   noGames: string;
 }
 
-// 2026-09-10 (decisão do Douglas, a partir do achado do critico-design): o
-// card deixou de mostrar a logo do IGDB por um tempo — a chapa branca atrás
-// de arte de terceiro concentrava todo o contraste da interface onde a
-// identidade não é do ZeuX, e produzia dois desenhos de card diferentes na
-// mesma prateleira (com/sem logo).
-//
-// 2026-09-11 (pedido do Douglas): revertido de novo — a Home/grade de
-// consoles era a única tela do app onde o card não mostrava a logo real,
-// enquanto `ConsoleHero` (detalhe do console) e a linha de identidade da
-// Biblioteca (`LibraryScreen`) sempre mostraram. Em vez de repetir a mesma
-// chapa branca em tela cheia que motivou o primeiro achado, a imagem aqui
-// entra numa placa pequena (mesma proporção da caixa de 64px do
-// `ConsoleHero`), centralizada sobre o compartimento com gradiente/textura —
-// a arte de terceiro fica contida, a identidade do ZeuX (grade de pixels,
-// scanline, cor de acento) continua sendo o que preenche o card. A sigla em
-// `font-pixel` continua sendo o fallback: consoles sem logo cadastrada, ou
-// cuja imagem falhar ao carregar (`onError`), caem nela — nunca um card
-// quebrado.
-const LOGO_BOX_HEIGHT: Record<ConsoleCardSize, string> = {
-  grande: "h-28",
-  media: "h-24",
-  densa: "h-20",
-};
-
-const LOGO_PLATE_SIZE: Record<ConsoleCardSize, string> = {
-  grande: "h-16 w-16",
-  media: "h-14 w-14",
-  densa: "h-12 w-12",
-};
+// Altura do compartimento da logo — ver o doc comment do arquivo (tamanho
+// único desde 2026-09-14, era `grande`/`media`/`densa` por faixa da tela).
+const LOGO_BOX_HEIGHT = "h-28";
 
 export function ConsoleCard({
   entry,
   readiness,
-  size,
   gameCount,
   hasFolder,
   labels,
@@ -76,7 +58,6 @@ export function ConsoleCard({
 }: {
   entry: ConsoleEntry;
   readiness: ConsoleReadiness;
-  size: ConsoleCardSize;
   /** Contagem real de jogos deste console; `null` quando não pôde ser lida. */
   gameCount: number | null;
   /** Há pelo menos uma pasta apontada para este console. */
@@ -117,23 +98,23 @@ export function ConsoleCard({
       // nunca do `style` inline (inline venceria o `group-hover:` por
       // especificidade).
       style={{ "--console-accent": accent } as CSSProperties}
-      // `w-full` (achado ao vivo, 2026-09-11: Douglas reportou espaçamento
-      // desigual na prateleira "Seus consoles" da Home): `<button>` é
-      // controle de formulário — mesmo com `display: flex`, `width: auto`
-      // encolhe até o conteúdo (shrink-to-fit), então cada card ficava do
-      // tamanho do NOME do console, não dos 210px do `<div>` wrapper em
-      // `HomeScreen.tsx`. Só não aparecia em `ConsolesScreen` porque lá o
-      // card é filho de um `grid`, que estica o item independente da
-      // largura intrínseca do botão.
+      // `w-full` (achado ao vivo, 2026-09-11, numa prateleira de rolagem
+      // horizontal que existia então): `<button>` é controle de formulário —
+      // mesmo com `display: flex`, `width: auto` encolhe até o conteúdo
+      // (shrink-to-fit), então cada card ficava do tamanho do NOME do
+      // console, não da largura do `<div>` wrapper ao redor. Só não aparecia
+      // em `ConsolesScreen` porque lá o card é filho de um `grid`, que
+      // estica o item independente da largura intrínseca do botão.
       className={`group relative flex w-full flex-col overflow-hidden rounded-md border bg-panel text-left transition duration-150 hover:border-[var(--console-accent)] hover:shadow-[0_0_20px_-6px_var(--console-accent)] focus-visible:border-[var(--console-accent)] [[data-gamepad-focused]_&]:border-[var(--console-accent)] ${
         ready ? "border-[color-mix(in_srgb,var(--console-accent)_55%,var(--line))]" : "border-line"
       } ${FOCUS_RING}`}
     >
       <div
-        className={`relative flex w-full shrink-0 items-center justify-center overflow-hidden border-b border-line ${LOGO_BOX_HEIGHT[size]}`}
+        className={`relative flex w-full shrink-0 items-center justify-center overflow-hidden border-b border-line ${LOGO_BOX_HEIGHT}`}
         // O gradiente radial na cor de identidade — a mesma fórmula do herói
         // do detalhe (ConsoleDetailScreen). É o fundo do "compartimento" da
-        // arte do sistema.
+        // arte do sistema — só aparece de verdade no fallback sem imagem,
+        // já que a logo agora cobre o compartimento inteiro.
         style={{
           background: `radial-gradient(65% 90% at 12% 25%, color-mix(in srgb, ${accent} 22%, transparent), transparent 70%), var(--fill)`,
         }}
@@ -144,17 +125,18 @@ export function ConsoleCard({
         <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
 
         {showImage ? (
-          <span
-            aria-hidden="true"
-            className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-md bg-white ${LOGO_PLATE_SIZE[size]}`}
-          >
-            <img
-              src={consoleImageURL(entry.console_id)}
-              alt=""
-              className="h-full w-full object-contain p-1.5"
-              onError={() => setImageFailed(true)}
-            />
-          </span>
+          // `object-cover` de ponta a ponta no compartimento (pedido do
+          // Douglas, 2026-09-14: "o cover poderia ser full") — antes entrava
+          // numa placa branca pequena e centralizada (ver doc comment do
+          // arquivo). `absolute inset-0`, não `h-full w-full` em fluxo: o
+          // compartimento é `flex items-center justify-center` para o
+          // fallback de sigla, que continua precisando ficar centrado.
+          <img
+            src={consoleImageURL(entry.console_id)}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImageFailed(true)}
+          />
         ) : (
           <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: labelColor }}>
             {consoleIconLabel(entry.console_id, entry.short_name)}
@@ -185,21 +167,21 @@ export function ConsoleCard({
           ) : (
             // Chip de pendência visível já na grade (pedido do item 1/6): a
             // faixa de hover traz a frase inteira, mas o selo curto fica
-            // sempre à vista nos cards médios e densos.
+            // sempre à vista no card.
             <span className="rounded-sm border border-line px-1.5 py-0.5 font-mono text-[10px] tracking-wide text-muted uppercase">
               {readiness.badge}
             </span>
           )}
         </div>
 
-        {size === "grande" && (
-          <span className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] tracking-wide text-accent-secondary uppercase">
-            {labels.viewGames}
-            <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">
-              →
-            </span>
+        {/* Antes só nos cards `grande` — tamanho único desde 2026-09-14 (ver
+            doc comment do arquivo), então vale para todo card agora. */}
+        <span className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] tracking-wide text-accent-secondary uppercase">
+          {labels.viewGames}
+          <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">
+            →
           </span>
-        )}
+        </span>
       </div>
 
       {/* Faixa que sobe do rodapé no hover/foco: a frase que antes só existia

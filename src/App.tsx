@@ -30,7 +30,6 @@ import { EmulatorsScreen } from "./screens/EmulatorsScreen";
 import { GameDetailScreen } from "./screens/GameDetailScreen";
 import { GamesScreen } from "./screens/GamesScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
-import { HomeScreen } from "./screens/HomeScreen";
 import { LibraryScreen } from "./screens/LibraryScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ErrorScreen, LoadingScreen } from "./screens/StatusScreen";
@@ -51,16 +50,16 @@ type Phase =
   | "declined"
   | "scanning"
   | "scan-error"
-  // "home" é a tela inicial desde 2026-09-10 (A1, docs/pendencias.md — pedido
-  // do Douglas: "quero mais destaque pro console" + "faltam motivos pra usar
-  // num PC zerado"). Sempre a entrada, com ou sem histórico — sem nenhum jogo
-  // jogado e nenhuma pasta configurada, ela vira o onboarding (HomeScreen
-  // decide isso sozinha). "Todos os jogos" continua existindo, alcançado a
-  // partir daqui ("Ver todos os jogos"), não mais o destino direto da
-  // sidebar.
-  | "home"
-  // O parecer de compatibilidade continua existindo, alcançável a partir da
-  // home.
+  // "all-games" é a tela inicial da Biblioteca desde 2026-09-14 (pedido do
+  // Douglas: a versão anterior enfiava uma prateleira de consoles entre a
+  // entrada e os jogos, com "Ver todos os jogos" escondido no rodapé — "não
+  // fez sentido de UI/UX"). Volta a ser destino direto da sidebar: hero do
+  // último jogado + a biblioteca inteira logo abaixo, mesma tela, sem escala
+  // intermediária. Sem nenhum jogo jogado e nenhuma pasta configurada, ela
+  // vira o onboarding (a própria `AllGamesScreen` decide isso, ver
+  // `trulyEmpty`). Um `HomeScreen` com prateleira de consoles existiu entre
+  // 2026-09-10 e 2026-09-14 — removido; "Seus consoles" continua alcançável
+  // pelo item "Consoles" da sidebar.
   | "all-games"
   | "verdict"
   | "consoles"
@@ -151,7 +150,7 @@ function App() {
   // apresentação" (`onReplayTour`) para quem quiser ver por conta própria.
   const [tourVisible, setTourVisible] = useState(false);
   useEffect(() => {
-    if (phase === "home" && !hasSeenTour()) {
+    if (phase === "all-games" && !hasSeenTour()) {
       setTourVisible(true);
     }
   }, [phase]);
@@ -217,16 +216,12 @@ function App() {
   // pra onde ir — "all-games" é a origem mais comum agora (2026-08-04), mas
   // a tela por console (LibraryScreen) continua existindo.
   const [gamesOrigin, setGamesOrigin] = useState<"all-games" | "library" | "console-detail">("all-games");
-  // "library" (fase de gerenciar pastas) agora é alcançada tanto da home
-  // quanto de "Todos os jogos" (2026-09-10, A1) — "Voltar" precisa saber pra
-  // qual das duas devolver, mesmo padrão de `gamesOrigin`.
-  const [libraryOrigin, setLibraryOrigin] = useState<"home" | "all-games">("home");
   // Jogo aberto em "game-detail" (Sprint 3, 2026-08-04). M5
   // (docs/sprint-m-plano.md, 2026-08-07): até aqui só vinha de
   // AllGamesScreen; agora GamesScreen também abre detalhe (mesmo GameTile,
   // ver M5) — "Voltar" precisa saber pra qual fase retornar, senão sempre
   // devolveria pra "all-games" mesmo vindo de dentro de um console.
-  const [gameDetailOrigin, setGameDetailOrigin] = useState<"home" | "all-games" | "games" | "history">("home");
+  const [gameDetailOrigin, setGameDetailOrigin] = useState<"all-games" | "games" | "history">("all-games");
   const [selectedGame, setSelectedGame] = useState<{
     game: LibraryGame;
     consoleName: string;
@@ -333,7 +328,7 @@ function App() {
       await api.scanHardware();
       const nextReport = await api.getVerdicts();
       setReport(nextReport);
-      setPhase("home");
+      setPhase("all-games");
     } catch (err) {
       setErrorMessage(err instanceof ApiError ? err.message : t("scanError"));
       setPhase("scan-error");
@@ -404,10 +399,9 @@ function App() {
   }
 
   function navigateSidebar(id: NavID) {
-    // "library" é o nome de NavID (item da sidebar), não da Phase — a home
-    // (2026-09-10, decisão do Douglas) é quem esse item abre agora;
-    // "all-games" virou sub-visão, alcançada de dentro da home.
-    if (id === "library") setPhase("home");
+    // "library" é o nome de NavID (item da sidebar), não da Phase — quem esse
+    // item abre é "all-games", a tela de biblioteca de verdade.
+    if (id === "library") setPhase("all-games");
     if (id === "verdict") setPhase("verdict");
     if (id === "consoles") {
       setCameFromDeclined(false);
@@ -497,7 +491,7 @@ function App() {
           // que quem aceitou — só sem parecer de hardware (`report` fica
           // `null`; as telas de biblioteca já toleram isso, ver
           // AllGamesScreen/LibraryScreen/GamesScreen/GameDetailScreen).
-          onContinueWithoutConsent={() => setPhase("home")}
+          onContinueWithoutConsent={() => setPhase("all-games")}
         />
       );
       break;
@@ -510,38 +504,12 @@ function App() {
       screen = <ErrorScreen message={errorMessage} onRetry={runScan} />;
       break;
 
-    case "home":
-      screen = (
-        <HomeScreen
-          report={report ?? undefined}
-          consoleCatalog={consoles}
-          onOpenLibrary={() => {
-            setLibraryOrigin("home");
-            setPhase("library");
-          }}
-          onOpenConsole={abrirConsolePorID}
-          onOpenAllGames={() => setPhase("all-games")}
-          onOpenGame={(game, consoleName, shortName) => {
-            const year =
-              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
-              consoles.find((c) => c.console_id === game.console_id)?.year;
-            setGameDetailOrigin("home");
-            setSelectedGame({ game, consoleName, shortName, year });
-            setPhase("game-detail");
-          }}
-        />
-      );
-      break;
-
     case "all-games":
       screen = (
         <AllGamesScreen
           report={report ?? undefined}
           consoleCatalog={consoles}
-          onOpenLibrary={() => {
-            setLibraryOrigin("all-games");
-            setPhase("library");
-          }}
+          onOpenLibrary={() => setPhase("library")}
           onOpenConsole={abrirConsolePorID}
           view={allGamesView}
           onViewChange={handleAllGamesViewChange}
@@ -635,7 +603,7 @@ function App() {
         <LibraryScreen
           consoleCatalog={consoles}
           report={report ?? undefined}
-          onBack={() => setPhase(libraryOrigin)}
+          onBack={() => setPhase("all-games")}
           onOpenGames={(id, name, shortName) => {
             setSelectedConsole({ id, name, shortName });
             setGamesOrigin("library");
@@ -918,8 +886,7 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
   declined: "Consentimento recusado",
   scanning: "Lendo o computador",
   "scan-error": "Erro na leitura do computador",
-  home: "Biblioteca",
-  "all-games": "Todos os jogos",
+  "all-games": "Biblioteca",
   "game-detail": "Detalhe do jogo",
   history: "Histórico",
   verdict: "Especificações",
@@ -934,7 +901,6 @@ const PHASE_TITLES: Partial<Record<Phase, string>> = {
 };
 
 const SIDEBAR_PHASES: Phase[] = [
-  "home",
   "all-games",
   "verdict",
   "consoles",
