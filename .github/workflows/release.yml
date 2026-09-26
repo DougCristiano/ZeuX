@@ -113,13 +113,30 @@ jobs:
   # latest.json que o plugin de updater consulta é gerado a partir desse
   # "version" do build, não da tag; com os dois lados (app instalado e
   # manifesto) sempre em "0.1.0", a comparação de versão do updater nunca via
-  # diferença. O passo "Sincronizar versão do build com a tag" em cada job
-  # de build escreve a versão real (extraída da tag) nos dois arquivos antes
-  # do build do Tauri — ver scripts/sync-version.mjs.
-  build-windows:
-    name: Windows 10/11 - instalador
+  # diferença. O passo "Sincronizar versão do build com a tag" escreve a
+  # versão real (extraída da tag) nos dois arquivos antes do build do
+  # Tauri — ver scripts/sync-version.mjs.
+  #
+  # Matriz em vez de três jobs copiados (2026-09-26): os três só diferiam no
+  # runner e nas dependências de sistema do Linux, e a retentativa de upload
+  # abaixo teria que ser copiada três vezes junto.
+  build:
+    name: ${{ matrix.name }}
     needs: create-release
-    runs-on: windows-latest
+    strategy:
+      # Sem isto, a falha de upload de um SO cancelaria o build dos outros
+      # dois no meio — e a Release ficaria sem instalador de SO nenhum em vez
+      # de sem um só.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows 10/11 - instalador
+          - os: ubuntu-latest
+            name: Linux - AppImage, DEB e RPM
+          - os: macos-latest
+            name: macOS - instalador DMG
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -147,68 +164,10 @@ jobs:
       - name: Instalar Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Instalar dependências do front-end
-        run: npm ci
-
-      - name: Build do instalador Tauri
-        # Até o ADR 0015 (R4), esta etapa podia carregar ZEUX_BUNDLE_RETROARCH=1
-        # para empacotar RetroArch + os 24 cores no instalador (ADR 0012) — o
-        # bundling foi retirado (cores baixados sob demanda pelo zeuxd,
-        # RetroArch volta a ser instalação manual), então o build é sempre o
-        # rápido, sem essa opção.
-        uses: tauri-apps/tauri-action@v0.5.24
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Credencial de teste do IGDB compartilhada por quem não conecta a
-          # própria conta (internal/igdb/credentials.go) — chega aqui só
-          # como secret do GitHub, nunca escrita no repositório
-          # (2026-09-08: corrigido depois da anterior, hardcoded no
-          # código-fonte, ter sido extraída e a chave suspensa no Twitch).
-          # beforeBuildCommand (tauri.conf.json) chama scripts/build-zeuxd.mjs,
-          # que lê estas duas e as injeta via -ldflags -X. Ausentes (secret
-          # não cadastrado ainda) só significa build sem credencial padrão —
-          # nunca falha, ver o comentário do próprio script.
-          IGDB_DEFAULT_CLIENT_ID: ${{ secrets.IGDB_DEFAULT_CLIENT_ID }}
-          IGDB_DEFAULT_CLIENT_SECRET: ${{ secrets.IGDB_DEFAULT_CLIENT_SECRET }}
-        with:
-          tagName: ${{ needs.create-release.outputs.tag }}
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-  build-linux:
-    name: Linux - AppImage, DEB e RPM
-    needs: create-release
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.create-release.outputs.tag }}
-
-      - name: Instalar Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.5"
-
-      - name: Instalar Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24.18.1"
-
-      - name: Sincronizar versão do build com a tag (auto-updater)
-        # package.json e tauri.conf.json ficavam travados em "0.1.0" — ver
-        # comentário em scripts/sync-version.mjs para o bug que isso causava
-        # no auto-updater.
-        env:
-          RELEASE_TAG: ${{ needs.create-release.outputs.tag }}
-        run: node .github/workflows/scripts/sync-version.mjs
-
-      - name: Instalar Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      # Ver build-linux.yml: libdbus-1-dev e pkg-config faltavam aqui até
-      # 2026-08-04, achado testando build local numa Ubuntu limpa.
+      # libdbus-1-dev e pkg-config faltavam aqui até 2026-08-04, achado
+      # testando build local numa Ubuntu limpa.
       - name: Instalar dependências de sistema do Tauri
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -227,12 +186,37 @@ jobs:
       - name: Instalar dependências do front-end
         run: npm ci
 
+      # Achado real (v0.1.29, runs #38 e #39, 2026-09-17): o build compilou
+      # nos três SOs e falhou só no upload dos instaladores para a Release —
+      # 500 do GitHub ("Unicorn!"), "other side closed" no AppImage de 90 MB,
+      # "Error saving asset" no .msi. Sem retentativa nenhuma, uma falha
+      # passageira da API de upload derrubava o job inteiro, e a v0.1.29
+      # ficou sem instalador de Windows e com um latest.json só de Linux — o
+      # que deixa o auto-updater de Windows/macOS sem atualização.
+      #
+      # Duas camadas, porque uma só não cobre os dois jeitos que o upload
+      # falhou:
+      # - `retryAttempts` repete o upload de cada arquivo que falhou. Cobre o
+      #   erro passageiro comum.
+      # - Não cobre o 500 que, mesmo assim, salvou o arquivo (foi o que
+      #   aconteceu com o .sig do macOS): a retentativa daria "already
+      #   exists", porque o tauri-action só apaga assets existentes antes do
+      #   primeiro upload. Por isso a primeira tentativa inteira tem
+      #   `continue-on-error` e, se falhar, o action roda de novo depois de
+      #   uma pausa — o que relista a Release, apaga o que ficou pela metade
+      #   e reenvia. O `target/` do cargo já está pronto, então a segunda vez
+      #   é só empacotar e subir, não recompilar tudo.
+      # Se a segunda tentativa também falhar, o job falha de verdade — erro
+      # de compilação cai aqui também, só que depois de duas tentativas.
+      #
+      # Até o ADR 0015 (R4), esta etapa podia carregar ZEUX_BUNDLE_RETROARCH=1
+      # para empacotar RetroArch + os 24 cores no instalador (ADR 0012) — o
+      # bundling foi retirado (cores baixados sob demanda pelo zeuxd,
+      # RetroArch volta a ser instalação manual), então o build é sempre o
+      # rápido, sem essa opção.
       - name: Build do instalador Tauri
-        # Até o ADR 0015 (R4), esta etapa podia carregar ZEUX_BUNDLE_RETROARCH=1
-        # para empacotar RetroArch + os 24 cores no instalador (ADR 0012) — o
-        # bundling foi retirado (cores baixados sob demanda pelo zeuxd,
-        # RetroArch volta a ser instalação manual), então o build é sempre o
-        # rápido, sem essa opção.
+        id: tauri
+        continue-on-error: true
         uses: tauri-apps/tauri-action@v0.5.24
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -252,63 +236,25 @@ jobs:
         with:
           tagName: ${{ needs.create-release.outputs.tag }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
-  build-macos:
-    name: macOS - instalador DMG
-    needs: create-release
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.create-release.outputs.tag }}
+          retryAttempts: 3
 
-      - name: Instalar Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.5"
+      - name: Aguardar antes da segunda tentativa
+        if: steps.tauri.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::warning::A primeira tentativa de build/upload falhou; tentando de novo em 60 s."
+          sleep 60
 
-      - name: Instalar Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24.18.1"
-
-      - name: Sincronizar versão do build com a tag (auto-updater)
-        # package.json e tauri.conf.json ficavam travados em "0.1.0" — ver
-        # comentário em scripts/sync-version.mjs para o bug que isso causava
-        # no auto-updater.
-        env:
-          RELEASE_TAG: ${{ needs.create-release.outputs.tag }}
-        run: node .github/workflows/scripts/sync-version.mjs
-
-      - name: Instalar Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Instalar dependências do front-end
-        run: npm ci
-
-      - name: Build do instalador Tauri
-        # Até o ADR 0015 (R4), esta etapa podia carregar ZEUX_BUNDLE_RETROARCH=1
-        # para empacotar RetroArch + os 24 cores no instalador (ADR 0012) — o
-        # bundling foi retirado (cores baixados sob demanda pelo zeuxd,
-        # RetroArch volta a ser instalação manual), então o build é sempre o
-        # rápido, sem essa opção.
+      - name: Build do instalador Tauri (segunda tentativa)
+        if: steps.tauri.outcome == 'failure'
         uses: tauri-apps/tauri-action@v0.5.24
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Credencial de teste do IGDB compartilhada por quem não conecta a
-          # própria conta (internal/igdb/credentials.go) — chega aqui só
-          # como secret do GitHub, nunca escrita no repositório
-          # (2026-09-08: corrigido depois da anterior, hardcoded no
-          # código-fonte, ter sido extraída e a chave suspensa no Twitch).
-          # beforeBuildCommand (tauri.conf.json) chama scripts/build-zeuxd.mjs,
-          # que lê estas duas e as injeta via -ldflags -X. Ausentes (secret
-          # não cadastrado ainda) só significa build sem credencial padrão —
-          # nunca falha, ver o comentário do próprio script.
           IGDB_DEFAULT_CLIENT_ID: ${{ secrets.IGDB_DEFAULT_CLIENT_ID }}
           IGDB_DEFAULT_CLIENT_SECRET: ${{ secrets.IGDB_DEFAULT_CLIENT_SECRET }}
         with:
           tagName: ${{ needs.create-release.outputs.tag }}
           releaseId: ${{ needs.create-release.outputs.release_id }}
-
+          retryAttempts: 3

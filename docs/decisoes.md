@@ -406,6 +406,27 @@ impossível diagnosticar isso sem inspecionar o binário por fora; Configuraçõ
 agora mostra "Versão instalada: X.Y.Z" (via `getVersion()`,
 `@tauri-apps/api/app` — mesma fonte que o próprio auto-updater consulta).
 
+**Achado real (2026-09-17, v0.1.29):** a release falhou em Windows e macOS
+duas vezes seguidas (runs #38 e #39) sem nenhum erro de código — os três
+SOs compilaram, e o que caiu foi o upload dos instaladores para a Release
+(500 do GitHub, "other side closed", "Error saving asset"). O workflow não
+tinha retentativa nenhuma, e a v0.1.29 ficou sem instalador de Windows e
+com um `latest.json` só com as plataformas de Linux — e como o updater lê
+`releases/latest/download/latest.json`, quem está no Windows ou no macOS
+ficou sem ver a atualização.
+
+**Corrigido (2026-09-26)** em `release.yml`: os três jobs de build viraram
+uma matriz (`fail-fast: false`), com `retryAttempts: 3` no `tauri-action` e
+uma segunda execução inteira do action se a primeira falhar. A segunda
+camada existe porque a primeira não cobre o 500 que mesmo assim salvou o
+arquivo (o `.sig` do macOS): a retentativa interna daria "already exists",
+já que o action só apaga assets existentes antes do primeiro upload; rodar
+o action de novo relista a Release e apaga o que ficou pela metade.
+
+**O que quebra se desfizer:** qualquer instabilidade passageira do upload
+do GitHub volta a derrubar a release de um SO inteiro, e o `latest.json`
+sai sem as plataformas desse SO.
+
 ### Teste de controle: SVG desenhado do zero, não vendorizado de terceiro
 
 Pedido do Douglas (2026-09-07): toast de conectado/desconectado (referência:
