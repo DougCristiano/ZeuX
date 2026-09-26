@@ -455,7 +455,7 @@ export function GameDetailScreen({
             boxShadow: `0 0 0 1px color-mix(in srgb, ${accent} 55%, var(--line-strong)), 0 0 34px -10px color-mix(in srgb, ${accent} 90%, transparent)`,
           }}
         >
-          <GameCover label={shortName} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
+          <GameCover label={shortName} title={game.title} consoleId={game.console_id} coverUrl={heroCoverUrl} size="lg" />
           <FavoriteToggle favorite={favorite} onToggle={toggleFavorite} className="absolute top-1.5 right-1.5" />
         </div>
         {favoriteError && <InlineError className="mt-1">{favoriteError}</InlineError>}

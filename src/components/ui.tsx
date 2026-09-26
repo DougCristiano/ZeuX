@@ -968,9 +968,9 @@ export function GameCover({
    * aparece abrindo o detalhe do jogo — console/última vez jogado — some
    * numa faixa que sobe do rodapé no hover/foco, sobre a capa real. Ausente
    * = nenhuma faixa (ex.: jogo nunca jogado, sem dado extra que valha
-   * antecipar). Só entra com `coverUrl`: sem capa real, a sigla + o título em
-   * pixel font já ocupam o rodapé (ver ramo `!coverUrl` abaixo) — duas faixas
-   * disputando o mesmo espaço.
+   * antecipar). Só entra com `coverUrl`: sem capa real, a etiqueta de
+   * cartucho (ramo `!coverUrl` abaixo) e o selo de status do `GameTile` já
+   * ocupam a célula.
    */
   hoverInfo?: ReactNode;
 }) {
@@ -1051,32 +1051,60 @@ export function GameCover({
             }}
             aria-hidden="true"
           />
+          {/* M15 (docs/sprint-m-plano.md, 2026-08-07): a scanline só entra
+              sobre o placeholder — ela existe para dar textura ao vazio,
+              não para degradar a capa que o usuário acabou de baixar (G1). */}
+          <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
+          {/* Etiqueta de cartucho (2026-09-26), mesma linguagem do
+              `ConsoleCard`. Até aqui o placeholder era a sigla do console a
+              25% de opacidade no meio e o título em pixel branco no rodapé —
+              que o selo de status do `GameTile` cobria ("Super Metroi[d]"),
+              e sem capa (o estado de todo usuário novo sem IGDB) a grade
+              inteira lia como retângulos vazios. A etiqueta começa abaixo
+              da sigla/estrela e termina acima do selo de status, então nada
+              mais se sobrepõe; o título impresso nela é o que identifica o
+              jogo, legível de longe. */}
           <div
-            className={`absolute inset-0 flex items-center justify-center font-pixel text-muted opacity-25 ${
-              size === "lg" ? "text-4xl" : "text-lg"
+            className={`pointer-events-none absolute flex flex-col overflow-hidden rounded-sm bg-cart-label shadow-[0_2px_0_rgb(0_0_0/0.35)] ${
+              size === "lg" ? "inset-x-4 top-4 bottom-[34%]" : "inset-x-2.5 top-2.5 bottom-[34%]"
             }`}
             aria-hidden="true"
           >
-            {label}
+            {/* A faixa leva a sigla do console, impressa como numa etiqueta
+                de verdade — substitui o selo solto do canto, que o ramo com
+                capa real continua usando (ver abaixo). */}
+            <div
+              className={`flex shrink-0 items-center font-pixel text-[11px] leading-none text-white ${size === "lg" ? "h-8 px-3" : "h-6 px-2"}`}
+              style={{ background: accent ?? "var(--accent)" }}
+            >
+              {label}
+            </div>
+            {/* `px-1` + `tracking-tighter`: a Press Start 2P tem largura fixa
+                e o piso de 11px (src/index.css), então é o espaço lateral que
+                decide se "EarthBound" cabe inteiro na densidade P, em vez de
+                quebrar no meio da palavra. */}
+            <div className="flex min-h-0 flex-1 items-center justify-center px-1 py-1.5">
+              <p
+                className={`line-clamp-4 text-center font-pixel leading-relaxed tracking-tighter break-words text-cart-label-ink ${
+                  size === "lg" ? "text-sm" : "text-[11px]"
+                }`}
+              >
+                {title ?? label}
+              </p>
+            </div>
           </div>
-          {/* M15 (docs/sprint-m-plano.md, 2026-08-07): a scanline só entra
-              sobre o placeholder de sigla — ela existe para dar textura ao
-              vazio, não para degradar a capa que o usuário acabou de baixar
-              (G1). Movida pra dentro deste ramo do ternário; antes era
-              irmã dos dois ramos e caía por cima de qualquer capa real
-              também. */}
-          <div className="game-cover-scanline pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
+          {/* Ranhuras de pegada do casco, entre a etiqueta e o selo de
+              status — é o que faz o retângulo ler como cartucho, não como
+              papel. Só textura: `aria-hidden`, sem cor própria. */}
+          <div
+            className={`pointer-events-none absolute top-[70%] ${size === "lg" ? "inset-x-8 h-10" : "inset-x-5 h-5"}`}
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.09) 0 2px, transparent 2px 5px)",
+            }}
+            aria-hidden="true"
+          />
         </>
-      )}
-      {/* Órfão do M7 corrigido nesta sessão: este gradiente existia para dar
-          contraste ao título escrito por cima da arte — mas o M7 já move
-          esse título para fora da capa (GameTile.tsx, comentário abaixo)
-          sempre que existe `coverUrl`. Ficou aplicado incondicionalmente e
-          escurecia o rodapé de toda capa real sem nenhum texto para
-          proteger — só entra agora quando falta capa de verdade, junto com
-          o título em pixel font que ele existe para sustentar. */}
-      {!coverUrl && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-black/75 to-transparent" />
       )}
 
       {/* Badge de plataforma (2026-08-05) — cor de identidade do console,
@@ -1086,23 +1114,15 @@ export function GameCover({
           9px → 11px — o piso da fonte pixel (src/index.css, "nada abaixo de
           11px"). Fica ~20% maior sobre a capa; "podemos alterar depois se
           não ficar bom" foi a condição do próprio Douglas. */}
-      <span
-        className="pointer-events-none absolute top-1.5 left-1.5 rounded-sm border px-1.5 py-0.5 font-pixel text-[11px]"
-        style={{ borderColor: accent ?? "var(--line-strong)", color: accent ?? "var(--muted)", background: "rgba(0,0,0,0.7)" }}
-      >
-        {label}
-      </span>
-
-      {/* M7: título sobre a arte só quando NÃO há capa real — com capa, ele
-          duplicava o rótulo em Inter que AllGamesScreen já desenha embaixo
-          do tile (um title longo, sem truncamento, ainda subia sobre a
-          arte). `line-clamp-3` deixa a "capa de texto" (placeholder de
-          sigla) legível sem estourar a célula. */}
-      {!coverUrl && (
-        <div className="pointer-events-none absolute right-1.5 bottom-1.5 left-1.5 line-clamp-3 font-pixel text-[11px] text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.8)]">
-          {title ?? label}
-        </div>
+      {coverUrl && (
+        <span
+          className="pointer-events-none absolute top-1.5 left-1.5 rounded-sm border px-1.5 py-0.5 font-pixel text-[11px]"
+          style={{ borderColor: accent ?? "var(--line-strong)", color: accent ?? "var(--muted)", background: "rgba(0,0,0,0.7)" }}
+        >
+          {label}
+        </span>
       )}
+
       {showPlayOverlay &&
         (() => {
           const circleClass = `flex h-11 w-11 items-center justify-center rounded-full border-2 ${

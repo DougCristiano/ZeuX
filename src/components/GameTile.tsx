@@ -119,8 +119,12 @@ export function GameTile({
             onOpenDetail();
           }}
         >
-          {/* M8: esmaecida quando bloqueado — a capa em si, não o tile
-              inteiro, pra estrela de favorito continuar com contraste normal. */}
+          {/* Esmaecida só com o arquivo ausente (2026-09-26). O M8 esmaecia
+              todo jogo bloqueado — mas "falta instalar o emulador" é o
+              estado de TODO jogo de quem acabou de instalar o ZeuX, e a
+              primeira tela virava uma grade apagada. O selo de status já diz
+              o que falta; esmaecer fica para o único caso em que o jogo de
+              fato não está lá. */}
           <GameCover
             label={shortName}
             title={game.title}
@@ -128,7 +132,7 @@ export function GameTile({
             coverUrl={coverImageURL(game.cover_url)}
             showPlayOverlay
             onPlay={onPlay}
-            className={blocked ? "opacity-50" : ""}
+            className={reason === "missing" ? "opacity-50" : ""}
             hoverInfo={hoverInfo}
           />
         </div>

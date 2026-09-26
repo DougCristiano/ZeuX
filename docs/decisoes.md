@@ -990,6 +990,28 @@ IGDB — foi assim que as 20 afetadas do repositório foram cortadas.
 esconde as pretas; tirar o corte do gerador faz a próxima geração devolver
 as molduras vazias, e as logos quadradas voltam a sair pequenas.
 
+### Capa provisória do jogo também vira cartucho; bloqueado não esmaece mais — 2026-09-26
+
+Achado da revisão de design tela por tela, rodando o app como usuário novo
+(sem capas do IGDB, sem emulador instalado): a biblioteca inteira lia como
+retângulos quase pretos. Três causas somadas: o placeholder era a sigla do
+console a 25% de opacidade; o título em pixel ficava no rodapé da capa,
+onde o selo de status ("instalar emulador") o cobria; e o `GameTile`
+esmaecia a 50% todo jogo bloqueado — que, para quem acabou de instalar, é
+todo jogo.
+
+`GameCover` sem `coverUrl` agora desenha um cartucho, na mesma linguagem do
+`ConsoleCard`: etiqueta creme na parte de cima com a sigla impressa na
+faixa na cor do console, o título do jogo em pixel escuro (`--cart-label-ink`)
+no meio dela, e ranhuras de pegada no casco abaixo. A etiqueta termina
+acima do selo de status, então nada se sobrepõe. O selo solto de sigla no
+canto só aparece com capa real (sem ela, a faixa já diz o console).
+Esmaecer ficou só para arquivo ausente (`reason === "missing"`) — o selo já
+diz o que falta nos outros casos.
+
+**O que quebra se desfizer:** a primeira tela de todo usuário novo volta a
+ser uma grade apagada, com o título dos jogos escondido atrás do selo.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do
