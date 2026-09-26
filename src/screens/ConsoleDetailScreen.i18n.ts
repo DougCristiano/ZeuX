@@ -240,8 +240,8 @@ export const dict = {
     en: 'Console "{{consoleId}}" is not in ZeuX\'s catalog.',
   },
   backConsoles: {
-    "pt-BR": "← Consoles",
-    en: "← Consoles",
+    "pt-BR": "Consoles",
+    en: "Consoles",
   },
   loadingConsole: {
     "pt-BR": "Carregando console…",

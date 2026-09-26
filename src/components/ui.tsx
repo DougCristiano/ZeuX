@@ -658,7 +658,7 @@ export function BackButton({
  *
  * `back` é `{ label, onClick }`, não um texto fixo "Voltar": os rótulos já
  * existentes variam por tela de propósito (`ConsoleDetailScreen` usa
- * "← Consoles", mais específico que um "Voltar" genérico) — o componente
+ * "Consoles", mais específico que um "Voltar" genérico) — o componente
  * não deveria ser mais rígido que o que já existia. `data-nav-back` (A11y
  * 2.1.4, alvo do botão B do controle) fica embutido aqui, não repetido em
  * cada chamador.

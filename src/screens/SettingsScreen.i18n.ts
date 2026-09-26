@@ -115,8 +115,8 @@ export const dict = {
     en: "On macOS, uninstalling is as simple as moving ZeuX.app to the Trash, like any other app.",
   },
   uninstallLinuxDescription: {
-    "pt-BR": "No Linux, desinstale pelo mesmo gerenciador de pacotes usado para instalar (ex.: seu gerenciador de .deb/.rpm, ou apague o AppImage). Isso não apaga a pasta acima — apague-a manualmente se também quiser remover emuladores instalados, saves e biblioteca.",
-    en: "On Linux, uninstall using the same package manager you used to install (e.g., your .deb/.rpm manager, or delete the AppImage). This won't delete the folder above — delete it manually if you also want to remove installed emulators, saves, and library.",
+    "pt-BR": "No Linux, desinstale pelo mesmo gerenciador de pacotes usado para instalar (ex.: seu gerenciador de .deb/.rpm, ou apague o AppImage).",
+    en: "On Linux, uninstall using the same package manager you used to install (e.g., your .deb/.rpm manager, or delete the AppImage).",
   },
   uninstallSuffix: {
     "pt-BR": "Isso não apaga a pasta acima — apague-a manualmente se também quiser remover emuladores instalados, saves e biblioteca.",
