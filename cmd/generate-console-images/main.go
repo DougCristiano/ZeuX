@@ -40,16 +40,22 @@ func main() {
 	outDir := flag.String("out", defaultImagesDir(), "pasta onde escrever as imagens")
 	timeout := flag.Duration("timeout", 30*time.Second, "tempo máximo por requisição")
 	force := flag.Bool("force", false, "baixa de novo mesmo o console que já tem arquivo")
+	trimOnly := flag.Bool("trim-only", false, "só corta a moldura vazia das imagens que já existem, sem acessar o IGDB")
 	flag.Parse()
-
-	if *clientID == "" || *clientSecret == "" {
-		fmt.Fprintln(os.Stderr, "informe -client-id e -client-secret (ou IGDB_CLIENT_ID/IGDB_CLIENT_SECRET) — a mesma credencial pessoal que Configurações > IGDB aceita.")
-		os.Exit(1)
-	}
 
 	catalog, err := verdict.LoadCatalog()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "lendo o catálogo embutido: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *trimOnly {
+		trimExisting(*outDir, catalog.Consoles)
+		return
+	}
+
+	if *clientID == "" || *clientSecret == "" {
+		fmt.Fprintln(os.Stderr, "informe -client-id e -client-secret (ou IGDB_CLIENT_ID/IGDB_CLIENT_SECRET) — a mesma credencial pessoal que Configurações > IGDB aceita.")
 		os.Exit(1)
 	}
 
@@ -85,6 +91,9 @@ func main() {
 			continue
 		}
 		cancel()
+		if _, err := trimMargin(dest); err != nil {
+			fmt.Fprintf(os.Stderr, "%s: cortando a moldura: %v\n", console.ID, err)
+		}
 		ok = append(ok, console.ID)
 	}
 
@@ -137,6 +146,27 @@ func fetchConsoleImage(ctx context.Context, client *igdb.Client, name, dest stri
 		return fmt.Errorf("baixando a logo: %w", err)
 	}
 	return nil
+}
+
+// trimExisting aplica trimMargin às imagens já baixadas — para reprocessar o
+// que foi gerado antes do corte existir, sem precisar de credencial IGDB.
+func trimExisting(dir string, consoles []verdict.Console) {
+	var trimmed int
+	for _, console := range consoles {
+		path := filepath.Join(dir, console.ID+".png")
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		changed, err := trimMargin(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", console.ID, err)
+			continue
+		}
+		if changed {
+			trimmed++
+		}
+	}
+	fmt.Printf("moldura cortada em %d imagens\n", trimmed)
 }
 
 // defaultImagesDir acha internal/verdict/data/console-images a partir da

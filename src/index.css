@@ -137,6 +137,12 @@
   --amber: #ff6b1a;
   --amber-bg: #241a0f;
   --amber-line: #4a3320;
+  /* Etiqueta de cartucho do ConsoleCard (2026-09-26). Metade das logos do
+     IGDB é preta sobre transparente (PS1, PS3, PSP, Vita, DS, Game Boy...) e
+     some sobre --fill; a etiqueta clara é o que as torna legíveis. Creme em
+     vez de branco puro para não estourar numa grade de 33 cards sobre um
+     tema escuro — e porque etiqueta de cartucho envelhecida é creme. */
+  --cart-label: #e6e1d3;
   --danger: #f0554a;
   /* N5 (docs/roadmap.md, Sprint N): --danger sozinho não serve de fundo de
      botão sólido com texto branco — 3.44:1 contra #fff, abaixo do 4.5:1 da
@@ -203,6 +209,7 @@
   --color-amber: var(--amber);
   --color-amber-bg: var(--amber-bg);
   --color-amber-line: var(--amber-line);
+  --color-cart-label: var(--cart-label);
   --color-danger: var(--danger);
   --color-danger-strong: var(--danger-strong);
 

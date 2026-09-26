@@ -20,15 +20,17 @@ import { consoleIconLabel, FOCUS_RING } from "./ui";
  * (`grande`/`media`/`densa`) existiu até aqui para diferenciá-las e foi
  * removido — nada mais passa um tamanho diferente.
  *
- * A logo cobre o compartimento de ponta a ponta (`object-cover`, mesmo
- * pedido: "o cover poderia ser full"). Até aqui ela entrava numa placa
- * branca pequena, centralizada (decisão de 2026-09-10/11, revertida agora a
- * pedido direto do Douglas) — a placa evitava que a arte de terceiro
- * dominasse o card, mas o resultado lia como "ícone pequeno perdido num
- * cartão grande" em vez de arte de capa. Nenhum dos dois motivos do
- * reverte-e-volta desapareceu (a chapa clara ainda concentra contraste, a
- * arte ainda não é da identidade do ZeuX) — só passou a valer menos que o
- * pedido de agora.
+ * A logo vai inteira numa etiqueta de cartucho (2026-09-26, escolhida pelo
+ * Douglas entre três protótipos). Histórico: placa branca pequena e
+ * centralizada (2026-09-10/11) lia como "ícone perdido num cartão grande";
+ * `object-cover` de ponta a ponta (2026-09-14) resolveu o tamanho mas
+ * cortava toda logo larga ("BOY AD", "EGA DRI") e deixava as pretas
+ * (PS1, DS, PSP, Game Boy) quase invisíveis sobre `--fill`. A etiqueta é
+ * grande — ocupa o compartimento, deixando só a borda do "casco" na cor do
+ * console — então resolve o contraste sem voltar a ser ícone pequeno, e a
+ * faixa no topo mantém a identidade de cor que o `cover` dava. Desfoque
+ * ambiente atrás da logo foi o terceiro protótipo: ótimo nas coloridas,
+ * sem contraste nas pretas.
  *
  * O card **não** julga hardware: `readiness` responde "o ZeuX tem as peças no
  * lugar?", nunca "esta máquina aguenta?" (princípio 2). A contagem de jogos é
@@ -112,9 +114,8 @@ export function ConsoleCard({
       <div
         className={`relative flex w-full shrink-0 items-center justify-center overflow-hidden border-b border-line ${LOGO_BOX_HEIGHT}`}
         // O gradiente radial na cor de identidade — a mesma fórmula do herói
-        // do detalhe (ConsoleDetailScreen). É o fundo do "compartimento" da
-        // arte do sistema — só aparece de verdade no fallback sem imagem,
-        // já que a logo agora cobre o compartimento inteiro.
+        // do detalhe (ConsoleDetailScreen). Com imagem, é o "casco" do
+        // cartucho em volta da etiqueta; sem imagem, o fundo da sigla.
         style={{
           background: `radial-gradient(65% 90% at 12% 25%, color-mix(in srgb, ${accent} 22%, transparent), transparent 70%), var(--fill)`,
         }}
@@ -125,18 +126,23 @@ export function ConsoleCard({
         <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
 
         {showImage ? (
-          // `object-cover` de ponta a ponta no compartimento (pedido do
-          // Douglas, 2026-09-14: "o cover poderia ser full") — antes entrava
-          // numa placa branca pequena e centralizada (ver doc comment do
-          // arquivo). `absolute inset-0`, não `h-full w-full` em fluxo: o
-          // compartimento é `flex items-center justify-center` para o
-          // fallback de sigla, que continua precisando ficar centrado.
-          <img
-            src={consoleImageURL(entry.console_id)}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-            onError={() => setImageFailed(true)}
-          />
+          // Etiqueta de cartucho — ver doc comment do arquivo. `absolute`,
+          // não em fluxo: o compartimento é `flex items-center
+          // justify-center` para o fallback de sigla. `object-contain` é o
+          // ponto da mudança: as logos vão de 1:1 a quase 9:1 (GBA), e
+          // qualquer `cover` corta alguma. `mix-blend-multiply` porque
+          // algumas logos (Fliperama, Mega Drive, SNES) vêm com fundo branco
+          // chapado: multiplicado, o branco vira o creme da etiqueta em vez
+          // de um retângulo branco dentro dela; preto e cor mudam quase nada.
+          <div className="absolute inset-x-3.5 top-2.5 bottom-2.5 flex overflow-hidden rounded-sm bg-cart-label px-2.5 pt-3.5 pb-2 shadow-[0_2px_0_rgb(0_0_0/0.35)]">
+            <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5" style={{ background: accent }} />
+            <img
+              src={consoleImageURL(entry.console_id)}
+              alt=""
+              className="h-full min-h-0 w-full min-w-0 object-contain mix-blend-multiply"
+              onError={() => setImageFailed(true)}
+            />
+          </div>
         ) : (
           <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: labelColor }}>
             {consoleIconLabel(entry.console_id, entry.short_name)}
@@ -146,7 +152,9 @@ export function ConsoleCard({
         {ready && (
           <span
             aria-hidden="true"
-            className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-accent-secondary ring-1 ring-black/30 shadow-[0_0_5px_var(--accent-secondary)]"
+            // Canto do casco, fora da etiqueta (que começa a 10px do topo e
+            // 14px da direita) — dentro dela o ciano some contra o creme.
+            className="absolute top-1 right-1 h-2 w-2 rounded-full bg-accent-secondary ring-1 ring-black/30 shadow-[0_0_5px_var(--accent-secondary)]"
           />
         )}
       </div>

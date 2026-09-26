@@ -962,6 +962,34 @@ Fallback para a sigla via `onError`, mesmo padrão de sempre.
 inconsistente com o resto do app — e como da última vez, ninguém vai saber
 por quê a menos que leia o comentário do componente.
 
+### Logo do console numa etiqueta de cartucho, inteira — 2026-09-26
+
+Depois da placa pequena (acima), o card passou em 2026-09-14 a mostrar a
+logo em `object-cover` de ponta a ponta, a pedido do Douglas. Na prática,
+isso cortou toda logo larga ("BOY AD", "PS one" virando "S on", "EGA DRI")
+e deixou quase invisíveis as logos pretas sobre fundo transparente
+(PS1, PS3, PSP, Vita, DS, 3DS, Game Boy — cerca de metade do catálogo) em
+cima do `--fill` escuro.
+
+Três protótipos com as logos reais, escolha do Douglas pela terceira:
+desfoque ambiente da própria logo + logo inteira na frente (ótimo nas
+coloridas, sem contraste nas pretas); etiqueta clara grande; etiqueta +
+faixa no topo na cor de identidade do console. A etiqueta ocupa quase todo o
+compartimento, então não volta a ser "ícone perdido num cartão grande", e
+fica na cor creme `--cart-label` em vez de branco puro. A logo entra em
+`object-contain` com `mix-blend-multiply`, para que as que vêm com fundo
+branco chapado (Fliperama, Mega Drive, SNES) se fundam na etiqueta.
+
+Junto disso, `cmd/generate-console-images` passou a cortar a moldura vazia
+de cada logo (`trim.go`): várias vêm do IGDB num quadrado de 160×160 com a
+marca numa faixa fina (PS2 ocupa 3,6% dos pixels) e sairiam minúsculas em
+`contain`. `-trim-only` reprocessa as imagens já baixadas sem credencial do
+IGDB — foi assim que as 20 afetadas do repositório foram cortadas.
+
+**O que quebra se desfizer:** voltar a `cover` corta as logos largas e
+esconde as pretas; tirar o corte do gerador faz a próxima geração devolver
+as molduras vazias, e as logos quadradas voltam a sair pequenas.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do
