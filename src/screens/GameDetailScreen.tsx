@@ -498,8 +498,15 @@ export function GameDetailScreen({
           responsivo): a coluna continua encolhendo livre com a janela — o teto
           só impede que o texto alcance a faixa direita do gradiente do hero,
           onde a arte volta a aparecer e o contraste deixa de ser garantido.
-          Mesma precaução de `GameHero`. */}
-      <div className="flex min-w-0 max-w-3xl flex-1 flex-col justify-center gap-4">
+          Mesma precaução de `GameHero`.
+
+          `justify-start` desde 2026-09-26 (pedido do Douglas: alinhamento em
+          todas as telas): o `justify-center` centralizava o texto na coluna
+          inteira da esquerda — capa MAIS os dois botões de capa embaixo —,
+          então o título não casava nem com o topo nem com o meio da arte, e
+          sobrava um vão acima dele. Agora o título começa na linha do topo
+          da capa, como a página de jogo de Steam/GOG. */}
+      <div className="flex min-w-0 max-w-3xl flex-1 flex-col justify-start gap-4 sm:pt-1">
         <div>
           {editingTitle ? (
             <form
@@ -1006,15 +1013,19 @@ export function GameDetailScreen({
             <SectionHeading className="mb-3">{t("fileHeading")}</SectionHeading>
             <Card filled>
               <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="chrome" onClick={openGameFolder} className="w-fit">
+                {/* Pilha de largura cheia, não `flex-wrap` + `w-fit`: a coluna
+                    (≤360px) não comporta os dois lado a lado, e o wrap os
+                    empilhava com larguras diferentes, cada um terminando num
+                    lugar. Mesmo par "Trocar capa"/"Buscar capa" do hero. */}
+                <div className="flex flex-col gap-2">
+                  <Button variant="chrome" onClick={openGameFolder} className="w-full">
                     {t("openGameFolder")}
                   </Button>
                   <Button
                     variant="chrome"
                     disabled={rescanState.kind === "rescanning"}
                     onClick={rescanFolder}
-                    className="w-fit"
+                    className="w-full"
                   >
                     {rescanState.kind === "rescanning" ? t("rescanning") : t("rescanFolder")}
                   </Button>

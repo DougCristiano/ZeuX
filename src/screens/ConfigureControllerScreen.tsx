@@ -263,13 +263,13 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
       {gamepad.connected ? (
         <p className="mb-4 text-sm text-muted">{t("connectedAs", { name: gamepad.name ?? "" })}</p>
       ) : (
-        <Callout label="—" className="mb-4">
+        <Callout label={t("statusLabel")} className="mb-4">
           {t("noController")}
         </Callout>
       )}
 
       {startError && (
-        <Callout label="—" tone="amber" className="mb-4">
+        <Callout label={t("errorLabel")} tone="amber" className="mb-4">
           {startError}
         </Callout>
       )}
@@ -304,7 +304,7 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
       </div>
 
       {semBindable && (
-        <Callout label="—" tone="amber" className="mb-4">
+        <Callout label={t("statusLabel")} tone="amber" className="mb-4">
           {t("noBindableEmulators")}
         </Callout>
       )}

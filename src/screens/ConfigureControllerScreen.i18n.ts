@@ -67,4 +67,8 @@ export const dict = {
   target_dpadDown: { "pt-BR": "Direcional para baixo", en: "D-pad down" },
   target_dpadLeft: { "pt-BR": "Direcional para a esquerda", en: "D-pad left" },
   target_dpadRight: { "pt-BR": "Direcional para a direita", en: "D-pad right" },
+  // Rótulos das caixas de aviso: eram "—" literal (mesmo achado já corrigido
+  // em ControllerTestScreen), que não diz nada a quem lê nem a leitor de tela.
+  statusLabel: { "pt-BR": "Situação", en: "Status" },
+  errorLabel: { "pt-BR": "Erro", en: "Error" },
 } satisfies Dict;

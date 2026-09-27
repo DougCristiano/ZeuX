@@ -901,13 +901,18 @@ function EmulatorCard({
       <EmulatorCardConsoles entry={entry} verdictById={verdictById} onSelectConsole={onSelectConsole} />
       <EmulatorCardChrome entry={entry} />
 
-      <EmulatorCardActions
-        entry={entry}
-        source={source}
-        customDef={customDef}
-        onChanged={onChanged}
-        onEditCustom={onEditCustom}
-      />
+      {/* `mt-auto`: a ação desce para a base do card, e numa mesma fileira
+          todo "Instalar" fica na mesma altura — ver o comentário da grade
+          (`items-stretch`) em `EmulatorsScreen`. */}
+      <div className="mt-auto flex flex-col gap-3">
+        <EmulatorCardActions
+          entry={entry}
+          source={source}
+          customDef={customDef}
+          onChanged={onChanged}
+          onEditCustom={onEditCustom}
+        />
+      </div>
     </Card>
   );
 }
@@ -1229,8 +1234,16 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
               fileira alta, e DuckStation/PCSX2 (só um botão "Instalar")
               esticavam junto, com a borda acompanhando mas o conteúdo colado
               no topo — metade do card vazia por dentro. Com `items-start`,
-              cada card fica só do tamanho do próprio conteúdo. */}
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
+              cada card fica só do tamanho do próprio conteúdo.
+
+              Voltou ao `stretch` padrão em 2026-09-26 (pedido do Douglas:
+              alinhamento em todas as telas): com `items-start`, numa mesma
+              fileira cada card terminava numa altura e cada "Instalar" ficava
+              num lugar. O problema de 09-06 era o conteúdo colado no topo com
+              a metade de baixo vazia; agora a barra de ação tem `mt-auto`
+              (`EmulatorCard`) e desce para a base, então o card esticado fica
+              com identidade em cima, ação embaixo, e o respiro entre os dois. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
             {pageItems.map((entry) => (
               <EmulatorCard
                 key={entry.adapter_id}

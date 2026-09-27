@@ -1068,6 +1068,36 @@ maiúsculas acentuadas ("MÁQUINA" saía sem acento).
 **O que quebra se desfizer:** volta a coexistirem duas linguagens de botão
 para o mesmo papel, e cada tela nova escolhe uma por instinto.
 
+### Passada de alinhamento nas telas — 2026-09-26
+
+Pedido do Douglas a partir do detalhe do console: o card "Jogos de PS2"
+não alinhava com o card vizinho. Causa: a coluna da esquerda começava com
+um título de seção ("Como rodar") e a da direita direto num card, com o
+título "Jogos de PS2" dentro dele. Regra adotada para telas de duas
+colunas: **toda seção é título (`SectionHeading`) + conteúdo a `gap-3`, e
+as seções ficam a `gap-6` entre si** — antes a mesma tela tinha três ritmos
+(`gap-2`, `gap-3`, `gap-4`).
+
+Revisão das outras telas, com o que mudou:
+
+- **Emuladores:** a grade voltou ao `stretch` (revertendo o `items-start`
+  de 2026-09-06), com a barra de ação em `mt-auto`. Com `items-start`, cada
+  card de uma fileira terminava numa altura e cada "Instalar" num lugar; o
+  problema de 09-06 (conteúdo colado no topo, metade de baixo vazia) não
+  volta, porque a ação desce para a base.
+- **Detalhe do jogo:** o texto do hero deixou de ser centralizado na
+  vertical — centralizava na coluna capa + dois botões, sem casar com a
+  capa — e passou a começar no topo dela. Os botões de "Arquivo" viraram
+  pilha de largura cheia (o `flex-wrap` os empilhava com larguras
+  diferentes).
+- **Detalhe do console:** o hero tinha `mt-3` a mais que a lista de jogos
+  do console, com o mesmo botão de voltar em cima.
+- **Configurar controle:** três caixas de aviso tinham "—" literal como
+  rótulo; viraram "Situação"/"Erro".
+
+**O que quebra se desfizer:** o topo dos cards vizinhos volta a desalinhar
+sempre que uma coluna tem título e a outra não.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do

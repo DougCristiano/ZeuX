@@ -416,90 +416,96 @@ function GamesFolderSection({
   }
 
   return (
-    <Card filled className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-semibold text-ink">{t("gamesForConsole", { shortName })}</p>
+    // Título de seção FORA do card (2026-09-26, achado do Douglas): quando
+    // "Jogos de PS2" era texto dentro do card, a coluna da direita começava
+    // no card e a da esquerda no título "Como rodar" — o topo dos dois
+    // cards vizinhos ficava ~30px desalinhado. Toda seção das duas colunas
+    // agora é o mesmo par título + conteúdo.
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <SectionHeading>{t("gamesForConsole", { shortName })}</SectionHeading>
         {count !== null && (
-          <span className="text-sm text-muted">
+          <span className="font-mono text-xs text-muted">
             {count === 1 ? t("gameCountSingular") : t("gameCountPlural", { count })}
           </span>
         )}
       </div>
+      <Card filled className="flex flex-col gap-3">
+        {error && <InlineError>{error}</InlineError>}
 
-      {error && <InlineError>{error}</InlineError>}
-
-      {folders.length === 0 ? (
-        <p className="text-sm text-muted">
-          {t("noFoldersAssigned")}
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {folders.map((folder) => (
-            <li key={folder.id} className="flex items-center justify-between gap-2 text-sm">
-              <span className="truncate text-muted" title={folder.path}>
-                {folder.path}
-              </span>
-              <span className="flex shrink-0 gap-1">
-                {/* "Revarrer", não "Varrer de novo" (achado testando com o
-                    Douglas, 2026-09-06): mesma ação que LibraryScreen/
-                    GameDetailScreen já chamam de "Revarrer"/"Revarrer
-                    pasta" — duas frases diferentes pra a mesma coisa em
-                    telas diferentes. */}
-                <Button
-                  variant="quiet"
-                  disabled={busy}
-                  onClick={() => runFolderAction(api.rescanLibraryFolder(folder.id), t("couldNotScanFolder"))}
-                >
-                  {t("rescan")}
-                </Button>
-                <Button variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
-                  {t("remove")}
-                </Button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {confirmingRemove !== null && (
-        <ConfirmModal
-          title={t("removeFolderTitle")}
-          message={t("removeFolderMessage")}
-          onClose={() => setConfirmingRemove(null)}
-          actions={
-            <>
-              <Button variant="chrome" onClick={() => setConfirmingRemove(null)}>
-                {t("cancel")}
-              </Button>
-              <Button
-                variant="danger"
-                autoFocus
-                onClick={() =>
-                  runFolderAction(api.removeLibraryFolder(confirmingRemove), t("couldNotRemoveFolder"))
-                }
-              >
-                {t("removeAnyway")}
-              </Button>
-            </>
-          }
-        />
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        {/* Sem pasta nenhuma, apontar uma é O que a tela pede — segue
-            `primary` (guideline `primary-action`: um CTA primário por tela).
-            Já tendo pasta, apontar outra vira chrome de arquivo, como os
-            outros botões de pasta do app. */}
-        <Button variant={folders.length === 0 ? "primary" : "chrome"} disabled={busy} onClick={pickFolder}>
-          {folders.length === 0 ? t("chooseFolder") : t("assignAnotherFolder")}
-        </Button>
-        {onOpenGames && folders.length > 0 && (
-          <Button variant="chrome" onClick={onOpenGames}>
-            {t("seeGames")}
-          </Button>
+        {folders.length === 0 ? (
+          <p className="text-sm text-muted">
+            {t("noFoldersAssigned")}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {folders.map((folder) => (
+              <li key={folder.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="truncate text-muted" title={folder.path}>
+                  {folder.path}
+                </span>
+                <span className="flex shrink-0 gap-1">
+                  {/* "Revarrer", não "Varrer de novo" (achado testando com o
+                      Douglas, 2026-09-06): mesma ação que LibraryScreen/
+                      GameDetailScreen já chamam de "Revarrer"/"Revarrer
+                      pasta" — duas frases diferentes pra a mesma coisa em
+                      telas diferentes. */}
+                  <Button
+                    variant="quiet"
+                    disabled={busy}
+                    onClick={() => runFolderAction(api.rescanLibraryFolder(folder.id), t("couldNotScanFolder"))}
+                  >
+                    {t("rescan")}
+                  </Button>
+                  <Button variant="quiet" disabled={busy} onClick={() => setConfirmingRemove(folder.id)}>
+                    {t("remove")}
+                  </Button>
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
-    </Card>
+
+        {confirmingRemove !== null && (
+          <ConfirmModal
+            title={t("removeFolderTitle")}
+            message={t("removeFolderMessage")}
+            onClose={() => setConfirmingRemove(null)}
+            actions={
+              <>
+                <Button variant="chrome" onClick={() => setConfirmingRemove(null)}>
+                  {t("cancel")}
+                </Button>
+                <Button
+                  variant="danger"
+                  autoFocus
+                  onClick={() =>
+                    runFolderAction(api.removeLibraryFolder(confirmingRemove), t("couldNotRemoveFolder"))
+                  }
+                >
+                  {t("removeAnyway")}
+                </Button>
+              </>
+            }
+          />
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {/* Sem pasta nenhuma, apontar uma é O que a tela pede — segue
+              `primary` (guideline `primary-action`: um CTA primário por tela).
+              Já tendo pasta, apontar outra vira chrome de arquivo, como os
+              outros botões de pasta do app. */}
+          <Button variant={folders.length === 0 ? "primary" : "chrome"} disabled={busy} onClick={pickFolder}>
+            {folders.length === 0 ? t("chooseFolder") : t("assignAnotherFolder")}
+          </Button>
+          {onOpenGames && folders.length > 0 && (
+            <Button variant="chrome" onClick={onOpenGames}>
+              {t("seeGames")}
+            </Button>
+          )}
+        </div>
+      </Card>
+    </section>
   );
 }
 
@@ -816,7 +822,6 @@ export function ConsoleDetailScreen({
            console que caiu na sigla continuaria na sigla depois de receber uma
            logo nova, até recarregar a tela. */
         key={imageVersion}
-        className="mt-3 mb-6"
         consoleId={consoleId}
         name={entry.name}
         shortName={entry.short_name}
@@ -907,45 +912,49 @@ export function ConsoleDetailScreen({
           esquerda. BIOS é requisito pra rodar, no mesmo grupo semântico do
           card do emulador ("o que este console precisa"); a direita fica
           só com "sobre a sua biblioteca/máquina" (Jogos + Nesta máquina). */}
+      {/* Ritmo único das duas colunas (2026-09-26): cada seção é título +
+          conteúdo a `gap-3`, e as seções ficam a `gap-6` entre si. Antes a
+          esquerda usava `gap-3` para tudo, a direita `gap-4`, e "Nesta
+          máquina" `gap-2` entre título e card — três ritmos na mesma tela,
+          e o primeiro card de cada coluna começava numa altura diferente. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_minmax(280px,360px)]">
-        <div className="flex flex-col gap-3">
-          {/* `SectionHeading`, não um `<h2>` montado à mão: os dois títulos
-              desta tela eram a última cópia manual do degrau intermediário da
-              escala (17px, caixa alta, ciano) que o componente já resolve. */}
-          <SectionHeading>
-            {entry.emulators.length === 1 ? t("howToRun") : t("howToRunOptions", { count: entry.emulators.length })}
-          </SectionHeading>
+        <div className="flex flex-col gap-6">
+          <section className="flex flex-col gap-3">
+            <SectionHeading>
+              {entry.emulators.length === 1 ? t("howToRun") : t("howToRunOptions", { count: entry.emulators.length })}
+            </SectionHeading>
 
-          {entry.emulators.length === 0 ? (
-            <Card filled>
-              <p className="text-sm text-muted">
-                {t("noEmulatorKnown", { consoleName: entry.name })}
-              </p>
-            </Card>
-          ) : (
-            entry.emulators.map((option) => (
-              <EmulatorOptionCard
-                key={option.adapter_id}
-                option={option}
-                entry={emulatorById.get(option.adapter_id)}
-                source={sources[option.adapter_id]}
-                core={option.core ? coreByName.get(option.core) : undefined}
-                isChosen={entry.emulators.length > 1 && readiness.chosen?.adapter_id === option.adapter_id}
-                onChanged={reload}
-              />
-            ))
-          )}
+            {entry.emulators.length === 0 ? (
+              <Card filled>
+                <p className="text-sm text-muted">
+                  {t("noEmulatorKnown", { consoleName: entry.name })}
+                </p>
+              </Card>
+            ) : (
+              entry.emulators.map((option) => (
+                <EmulatorOptionCard
+                  key={option.adapter_id}
+                  option={option}
+                  entry={emulatorById.get(option.adapter_id)}
+                  source={sources[option.adapter_id]}
+                  core={option.core ? coreByName.get(option.core) : undefined}
+                  isChosen={entry.emulators.length > 1 && readiness.chosen?.adapter_id === option.adapter_id}
+                  onChanged={reload}
+                />
+              ))
+            )}
 
-          <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} />
+            <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} />
+          </section>
 
           {/* Saves (docs/pendencias.md, "Ver saves dentro do ZeuX — MVP de
               inspeção"): só aparece com um emulador resolvido — sem isso não
               há `adapter_id` para perguntar à rota. */}
           {readiness.chosen && (
-            <div className="flex flex-col gap-3">
+            <section className="flex flex-col gap-3">
               <SectionHeading>{t("savesHeading")}</SectionHeading>
               <SaveDataPanel adapterId={readiness.chosen.adapter_id} />
-            </div>
+            </section>
           )}
 
           {/* B2 (docs/pendencias.md): "já tenho o emulador, num drive que a
@@ -974,7 +983,7 @@ export function ConsoleDetailScreen({
           )}
         </div>
 
-        <aside className="flex flex-col gap-4">
+        <aside className="flex flex-col gap-6">
           <GamesFolderSection
             consoleId={consoleId}
             shortName={entry.short_name}
@@ -988,13 +997,13 @@ export function ConsoleDetailScreen({
               Especificações usa — nunca uma segunda formatação da mesma
               informação. Ausente sem consentimento/scan. */}
           {verdict && (
-            <div className="flex flex-col gap-2">
+            <section className="flex flex-col gap-3">
               <SectionHeading>{t("onThisMachine")}</SectionHeading>
               <ConsoleVerdictCard verdict={verdict} />
               {!THRESHOLDS_CALIBRATED && (
                 <Callout label={t("estimateLabel")}>{t("thresholdsNotCalibrated")}</Callout>
               )}
-            </div>
+            </section>
           )}
         </aside>
       </div>
