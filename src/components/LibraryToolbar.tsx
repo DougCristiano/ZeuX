@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { Clock, EyeOff, FileX, LayoutGrid, List, Star } from "lucide-react";
+import { Check, ChevronDown, Clock, EyeOff, FileX, LayoutGrid, List, SlidersHorizontal, Star } from "lucide-react";
+import { DropdownMenu } from "radix-ui";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { useT } from "../i18n/i18n";
 import { dict } from "./LibraryToolbar.i18n";
@@ -150,6 +151,13 @@ type Toggle = { on: boolean; onToggle: () => void };
  * densidade). `-mx-3 px-3`: a rolagem chega até a borda do chassi sem cortar
  * o padding do container, mesmo truque de faixa horizontal que `HomeScreen`
  * usa na prateleira de consoles.
+ *
+ * 2026-09-26 (revisão de design tela por tela): duas linhas com papéis fixos.
+ * A de cima é só "como aparece" (busca que cresce + ordem, grade/lista,
+ * densidade); a de baixo, "o que aparece" (Favoritos, Já joguei, consoles).
+ * Ausentes e Ocultos — vistas de manutenção — saíram dos chips para o menu
+ * "Mais" no fim da segunda linha. Antes eram dez controles do mesmo peso
+ * numa linha que quebrava de forma irregular na janela padrão.
  */
 export function LibraryToolbar({
   search,
@@ -190,8 +198,23 @@ export function LibraryToolbar({
 }) {
   const t = useT(dict);
 
+  // Segunda linha só existe quando há o que filtrar além dos raros: a tela de
+  // um console só (`GamesScreen`) passa no máximo "Ausentes", e um menu "Mais"
+  // sozinho numa linha própria seria mais chrome que conteúdo — ali o chip
+  // continua na linha de cima, como sempre foi.
+  const hasFilterRow = Boolean(favorites || played || (platforms && platforms.length > 1 && onPlatformFilterChange));
+  const rareToggles = [
+    missing && { key: "missing", toggle: missing, label: t("missingLabel"), icon: <FileX size={12} aria-hidden="true" /> },
+    excluded && { key: "excluded", toggle: excluded, label: t("excludedLabel"), icon: <EyeOff size={12} aria-hidden="true" /> },
+  ].filter(Boolean) as { key: string; toggle: Toggle; label: string; icon: ReactNode }[];
+
   return (
     <div className="mb-5 flex flex-col gap-2.5 rounded-lg border border-line bg-fill/60 px-3 py-2.5">
+      {/* Linha 1 — "como a grade aparece". A busca cresce (`flex-1`) e os
+          controles de exibição ficam juntos à direita; antes a busca tinha
+          largura fixa e os filtros vinham na mesma linha, que então quebrava
+          de forma irregular no tamanho padrão da janela ("Já joguei" e
+          "Ocultos" sozinhos numa segunda linha, 2026-09-26). */}
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor="library-search" className="sr-only">
           {t("searchPlaceholder")}
@@ -204,159 +227,211 @@ export function LibraryToolbar({
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder={t("searchPlaceholder")}
-          className={`${inputClass} max-w-xs`}
+          className={`${inputClass} min-w-48 flex-1 basis-56`}
         />
 
-        <ZSelect
-          ariaLabel={t("sortByLabel")}
-          value={sort}
-          onValueChange={(v) => onSortChange(v as SortValue)}
-          className="w-fit"
-        >
-          {SORT_VALUES.map((value) => (
-            <SelectItem key={value} value={value}>
-              {t(value === "recentes" ? "sortRecentes" : value === "titulo" ? "sortTitulo" : "sortTempoJogado")}
-            </SelectItem>
-          ))}
-        </ZSelect>
+        <div className="flex flex-wrap items-center gap-3">
+          <ZSelect
+            ariaLabel={t("sortByLabel")}
+            value={sort}
+            onValueChange={(v) => onSortChange(v as SortValue)}
+            className="w-fit"
+          >
+            {SORT_VALUES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {t(value === "recentes" ? "sortRecentes" : value === "titulo" ? "sortTitulo" : "sortTempoJogado")}
+              </SelectItem>
+            ))}
+          </ZSelect>
 
-        {/* Grade / lista — segmento de chassi, mesma linguagem dos chips. */}
-        <div
-          className="flex h-9 items-center gap-1 rounded-sm border-[1.5px] border-control-border p-0.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
-          role="group"
-          aria-label={t("viewModeLabel")}
-        >
-          {VIEW_MODES.map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={viewMode === mode}
-              aria-label={mode === "grade" ? t("gridMode") : t("listMode")}
-              onClick={() => onViewModeChange(mode)}
-              className={`flex h-full items-center gap-1.5 rounded-sm px-2.5 font-mono text-xs font-medium tracking-wider uppercase transition duration-150 active:translate-y-px ${FOCUS_RING} ${
-                viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
-              }`}
-            >
-              {mode === "grade" ? <LayoutGrid size={12} aria-hidden="true" /> : <List size={12} aria-hidden="true" />}
-              {mode === "grade" ? t("gridMode") : t("listMode")}
-            </button>
-          ))}
-        </div>
-
-        {/* Densidade — só faz sentido na grade; some no modo lista. */}
-        {viewMode === "grade" && (
+          {/* Grade / lista — segmento de chassi, mesma linguagem dos chips. */}
           <div
             className="flex h-9 items-center gap-1 rounded-sm border-[1.5px] border-control-border p-0.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
             role="group"
-            aria-label={t("densityLabel")}
+            aria-label={t("viewModeLabel")}
           >
-            {COVER_DENSITIES.map((d) => (
+            {VIEW_MODES.map((mode) => (
               <button
-                key={d}
+                key={mode}
                 type="button"
-                aria-pressed={coverDensity === d}
-                title={
-                  d === "compacta"
-                    ? t("densitySmallTitle")
-                    : d === "media"
-                      ? t("densityMediumTitle")
-                      : t("densityLargeTitle")
-                }
-                onClick={() => onCoverDensityChange(d)}
-                className={`h-full w-7 rounded-sm font-mono text-xs font-medium uppercase transition duration-150 active:translate-y-px ${FOCUS_RING} ${
-                  coverDensity === d ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
+                aria-pressed={viewMode === mode}
+                aria-label={mode === "grade" ? t("gridMode") : t("listMode")}
+                onClick={() => onViewModeChange(mode)}
+                className={`flex h-full items-center gap-1.5 rounded-sm px-2.5 font-mono text-xs font-medium tracking-wider uppercase transition duration-150 active:translate-y-px ${FOCUS_RING} ${
+                  viewMode === mode ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
                 }`}
               >
-                {d === "compacta" ? t("densitySmall") : d === "media" ? t("densityMedium") : t("densityLarge")}
+                {mode === "grade" ? <LayoutGrid size={12} aria-hidden="true" /> : <List size={12} aria-hidden="true" />}
+                {mode === "grade" ? t("gridMode") : t("listMode")}
               </button>
             ))}
           </div>
-        )}
 
-        {/* Divisor fino antes dos toggles de filtro (2026-09-10): separa
-            "como a grade aparece" (busca, ordem, grade/lista, densidade — à
-            esquerda) de "o que aparece nela" (favoritos/ausentes/jogado/
-            oculto — à direita), que antes liam como um só bloco de sete
-            controles do mesmo peso. */}
-        {(favorites || missing || played || excluded) && (
-          <span aria-hidden="true" className="hidden h-5 w-px shrink-0 bg-line sm:block" />
-        )}
-        {favorites && (
-          <Chip on={favorites.on} onToggle={favorites.onToggle} label={t("favoritesLabel")}>
-            <Star size={11} fill={favorites.on ? "currentColor" : "none"} aria-hidden="true" />
-          </Chip>
-        )}
-        {missing && (
-          <Chip on={missing.on} onToggle={missing.onToggle} label={t("missingLabel")}>
-            <FileX size={11} aria-hidden="true" />
-          </Chip>
-        )}
-        {played && (
-          <Chip on={played.on} onToggle={played.onToggle} label={t("playedLabel")}>
-            <Clock size={11} aria-hidden="true" />
-          </Chip>
-        )}
-        {excluded && (
-          <Chip on={excluded.on} onToggle={excluded.onToggle} label={t("excludedLabel")}>
-            <EyeOff size={11} aria-hidden="true" />
-          </Chip>
-        )}
+          {/* Densidade — só faz sentido na grade; some no modo lista. */}
+          {viewMode === "grade" && (
+            <div
+              className="flex h-9 items-center gap-1 rounded-sm border-[1.5px] border-control-border p-0.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+              role="group"
+              aria-label={t("densityLabel")}
+            >
+              {COVER_DENSITIES.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={coverDensity === d}
+                  title={
+                    d === "compacta"
+                      ? t("densitySmallTitle")
+                      : d === "media"
+                        ? t("densityMediumTitle")
+                        : t("densityLargeTitle")
+                  }
+                  onClick={() => onCoverDensityChange(d)}
+                  className={`h-full w-7 rounded-sm font-mono text-xs font-medium uppercase transition duration-150 active:translate-y-px ${FOCUS_RING} ${
+                    coverDensity === d ? "bg-accent text-accent-ink" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {d === "compacta" ? t("densitySmall") : d === "media" ? t("densityMedium") : t("densityLarge")}
+                </button>
+              ))}
+            </div>
+          )}
 
-        {matchCount && (
-          <p
-            aria-live="polite"
-            className="font-mono text-xs tracking-wider text-muted uppercase tabular-nums"
-          >
-            {t("matchCount", { count: matchCount.count, total: matchCount.total })}
-          </p>
-        )}
+          {!hasFilterRow &&
+            rareToggles.map(({ key, toggle, label, icon }) => (
+              <Chip key={key} on={toggle.on} onToggle={toggle.onToggle} label={label}>
+                {icon}
+              </Chip>
+            ))}
+
+          {matchCount && (
+            <p
+              aria-live="polite"
+              className="font-mono text-xs tracking-wider text-muted uppercase tabular-nums"
+            >
+              {t("matchCount", { count: matchCount.count, total: matchCount.total })}
+            </p>
+          )}
+        </div>
       </div>
 
-      {platforms && platforms.length > 1 && onPlatformFilterChange && (
+      {/* Linha 2 — "o que aparece": os filtros de uso comum, os consoles
+          (rolagem horizontal, nunca quebra — decisão de 2026-09-10 abaixo) e,
+          no fim, "Mais" com os filtros de manutenção (Ausentes, Ocultos),
+          que antes ocupavam o mesmo espaço e peso dos de todo dia. */}
+      {hasFilterRow && (
         <div className="-mx-3 flex items-center gap-2 border-t border-line/60 px-3 pt-2.5">
-          {/* Rótulo curto, fora da linha rolável: âncora visual que separa
-              esta fileira ("filtra o quê aparece") da régua de controle
-              acima ("muda como aparece") sem precisar de outro painel. */}
-          <span className="shrink-0 font-mono text-[11px] tracking-wide text-muted uppercase">
-            {t("platformFilterLabel")}
-          </span>
-          <div className="flex flex-nowrap gap-1.5 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => onPlatformFilterChange(null)}
-              aria-pressed={platformFilter == null}
-              className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${platformFilter == null ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
-            >
-              {t("allPlatforms")}
-            </button>
-            {platforms.map(({ id, label }) => {
-              const active = platformFilter === id;
-              const accent = consoleAccentColor(id);
-              return (
+          {favorites && (
+            <Chip on={favorites.on} onToggle={favorites.onToggle} label={t("favoritesLabel")}>
+              <Star size={11} fill={favorites.on ? "currentColor" : "none"} aria-hidden="true" />
+            </Chip>
+          )}
+          {played && (
+            <Chip on={played.on} onToggle={played.onToggle} label={t("playedLabel")}>
+              <Clock size={11} aria-hidden="true" />
+            </Chip>
+          )}
+
+          {platforms && platforms.length > 1 && onPlatformFilterChange && (
+            <>
+              {(favorites || played) && <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-line" />}
+              {/* Rótulo curto, fora da faixa rolável: âncora que diz o que
+                  os chips seguintes filtram. */}
+              <span className="shrink-0 font-mono text-[11px] tracking-wide text-muted uppercase">
+                {t("platformFilterLabel")}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto">
                 <button
-                  key={id}
                   type="button"
-                  onClick={() => onPlatformFilterChange(id)}
-                  aria-pressed={active}
-                  style={
-                    active
-                      ? ({
-                          borderColor: accent,
-                          background: `${accent}1a`,
-                          boxShadow: `0 0 12px -4px ${accent}`,
-                        } as CSSProperties)
-                      : undefined
-                  }
-                  className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${active ? "text-ink" : FILTER_CHIP_OFF}`}
+                  onClick={() => onPlatformFilterChange(null)}
+                  aria-pressed={platformFilter == null}
+                  className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${platformFilter == null ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
                 >
-                  {label.toUpperCase()}
+                  {t("allPlatforms")}
                 </button>
-              );
-            })}
-          </div>
+                {platforms.map(({ id, label }) => {
+                  const active = platformFilter === id;
+                  const accent = consoleAccentColor(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => onPlatformFilterChange(id)}
+                      aria-pressed={active}
+                      style={
+                        active
+                          ? ({
+                              borderColor: accent,
+                              background: `${accent}1a`,
+                              boxShadow: `0 0 12px -4px ${accent}`,
+                            } as CSSProperties)
+                          : undefined
+                      }
+                      className={`shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${active ? "text-ink" : FILTER_CHIP_OFF}`}
+                    >
+                      {label.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {rareToggles.length > 0 && <MoreFilters toggles={rareToggles} label={t("moreFiltersLabel")} />}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * "Mais": os filtros de manutenção (arquivo ausente, jogo escondido) num
+ * menu, não em chips sempre visíveis. Acende como chip ligado — com o nome
+ * do filtro ativo — quando algum está valendo: uma vista filtrada escondida
+ * atrás de um menu fechado seria uma grade "estranha" sem explicação.
+ */
+function MoreFilters({
+  toggles,
+  label,
+}: {
+  toggles: { key: string; toggle: Toggle; label: string; icon: ReactNode }[];
+  label: string;
+}) {
+  const active = toggles.filter(({ toggle }) => toggle.on);
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger
+        className={`ml-auto shrink-0 ${FILTER_CHIP_BASE} ${FOCUS_RING} ${active.length > 0 ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
+      >
+        <SlidersHorizontal size={12} aria-hidden="true" />
+        {active.length > 0 ? active.map((a) => a.label).join(" · ") : label}
+        <ChevronDown size={12} aria-hidden="true" />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        {/* Mesmo vocabulário do popover do `Select` (ui/select.tsx): borda +
+            fundo sólido, sem sombra de outro design system. */}
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={6}
+          className="z-50 min-w-44 rounded-sm border-[1.5px] border-control-border bg-fill p-1"
+        >
+          {toggles.map(({ key, toggle, label: itemLabel, icon }) => (
+            <DropdownMenu.CheckboxItem
+              key={key}
+              checked={toggle.on}
+              onCheckedChange={() => toggle.onToggle()}
+              className="flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 font-mono text-xs tracking-wider text-ink uppercase outline-none select-none data-highlighted:bg-accent/15"
+            >
+              {icon}
+              <span className="flex-1">{itemLabel}</span>
+              <DropdownMenu.ItemIndicator>
+                <Check size={12} aria-hidden="true" className="text-accent-hover" />
+              </DropdownMenu.ItemIndicator>
+            </DropdownMenu.CheckboxItem>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 

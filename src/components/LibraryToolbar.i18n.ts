@@ -35,6 +35,8 @@ export const dict = {
   // 2026-09-10: rótulo da fileira de chips de console, separando-a da régua
   // de controle acima ("isto filtra o quê aparece", não "como aparece").
   platformFilterLabel: { "pt-BR": "CONSOLE", en: "CONSOLE" },
+  // Menu dos filtros de manutenção (Ausentes, Ocultos).
+  moreFiltersLabel: { "pt-BR": "MAIS", en: "MORE" },
 
   matchCount: { "pt-BR": "{{count}} de {{total}}", en: "{{count}} of {{total}}" },
 } satisfies Dict;
