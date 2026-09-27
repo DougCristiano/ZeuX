@@ -305,7 +305,8 @@ export function ConsolesScreen({
   }
 
   const cardLabels = {
-    viewGames: t("viewGames"),
+    openConsole: t("openConsole"),
+    setUpConsole: t("setUpConsole"),
     gameCount: (count: number) =>
       count === 1 ? t("cardGameCountSingular", { count }) : t("cardGameCountPlural", { count }),
     noGames: t("cardNoGames"),

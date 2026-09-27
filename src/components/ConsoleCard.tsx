@@ -38,8 +38,10 @@ import { consoleIconLabel, FOCUS_RING } from "./ui";
  */
 
 export interface ConsoleCardLabels {
-  /** Ex.: "Ver jogos" — afordância do card grande. */
-  viewGames: string;
+  /** Afordância quando o console está pronto — ex.: "Ver console". */
+  openConsole: string;
+  /** Afordância quando falta alguma peça — ex.: "Configurar". */
+  setUpConsole: string;
   /** Recebe a contagem e devolve "1 jogo" / "12 jogos". */
   gameCount: (count: number) => string;
   /** Ex.: "sem jogos nesta pasta" — quando a pasta existe mas está vazia. */
@@ -182,10 +184,12 @@ export function ConsoleCard({
           )}
         </div>
 
-        {/* Antes só nos cards `grande` — tamanho único desde 2026-09-14 (ver
-            doc comment do arquivo), então vale para todo card agora. */}
+        {/* Afordância de todo card (tamanho único desde 2026-09-14). Diz o
+            destino real do clique, que é sempre o detalhe do console:
+            "Configurar" enquanto falta peça, "Ver console" quando pronto. Até
+            2026-09-26 dizia "Ver jogos", e o clique nunca abria os jogos. */}
         <span className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] tracking-wide text-accent-secondary uppercase">
-          {labels.viewGames}
+          {ready ? labels.openConsole : labels.setUpConsole}
           <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5">
             →
           </span>

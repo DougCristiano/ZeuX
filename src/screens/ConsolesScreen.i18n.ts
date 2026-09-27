@@ -86,7 +86,11 @@ export const dict = {
   refineLabel: { "pt-BR": "Refinar", en: "Refine" },
 
   // Card do console
-  viewGames: { "pt-BR": "Ver jogos", en: "View games" },
+  // Afordância do card: diz para onde o clique leva de verdade — o detalhe
+  // do console. Era "Ver jogos" (2026-09-26, revisão de design), mas o card
+  // nunca abriu a lista de jogos: prometia um destino e entregava outro.
+  openConsole: { "pt-BR": "Ver console", en: "View console" },
+  setUpConsole: { "pt-BR": "Configurar", en: "Set up" },
   cardGameCountSingular: { "pt-BR": "{{count}} jogo", en: "{{count}} game" },
   cardGameCountPlural: { "pt-BR": "{{count}} jogos", en: "{{count}} games" },
   cardNoGames: { "pt-BR": "sem jogos na pasta", en: "no games in folder" },
