@@ -8,10 +8,10 @@ import type { ConsoleVerdict, EmulatorEntry, LibraryGame } from "../api/types";
  * a grade sinaliza sem bloquear o clique (princípio 5 do `CLAUDE.md`:
  * informar, não bloquear).
  *
- * Ordem de checagem espelha exatamente `GamesScreen.handlePlay`: arquivo
- * ausente vence tudo, depois "sem preset automático" (nem vale checar
- * emulador instalado se não há preset pra aplicar), depois emulador não
- * instalado, depois BIOS vazia.
+ * Ordem de checagem (a mesma cadeia que `useInlineInstall.handlePlay`
+ * consome): arquivo ausente vence tudo, depois emulador não instalado,
+ * depois "sem preset automático", depois BIOS vazia. Até 2026-09-26 "sem
+ * preset" vinha antes — ver o comentário no corpo da função.
  */
 export type LaunchBlockReason =
   | "missing"
@@ -73,20 +73,11 @@ export function evaluateGameLaunchability(
     };
   }
 
-  const canAutoConfigure = Boolean(verdict?.adapter_id && verdict.options);
-  if (!canAutoConfigure) {
-    const bottleneck = verdict?.bottlenecks?.[0];
-    const shortLabel = bottleneck ? shortBottleneckLabel(bottleneck) : undefined;
-    return {
-      launchable: false,
-      reason: "no_preset",
-      badge: shortLabel ? `sem preset — ${shortLabel}` : "sem preset automático",
-      title: bottleneck
-        ? `O ZeuX ainda não escolheu uma configuração para este console. ${bottleneck}`
-        : "O ZeuX ainda não escolheu uma configuração para este console — o hardware não alcançou nenhum patamar de compatibilidade conhecido.",
-    };
-  }
-
+  // Emulador ausente vem ANTES de "sem preset" (2026-09-26): na ordem
+  // inversa, um PS2 numa máquina abaixo do primeiro patamar e sem PCSX2
+  // mostrava "jogar assim mesmo" — e o clique tentava abrir um emulador que
+  // não existe. Sem emulador, nenhuma outra pendência importa. Só funciona
+  // porque o parecer "improvável" passou a dizer o emulador (verdict.go).
   if (adapterEntry && !adapterEntry.installed) {
     const nome = adapterEntry.name || verdict?.emulator || "O emulador";
 
@@ -107,6 +98,20 @@ export function evaluateGameLaunchability(
       reason: "not_installed",
       badge: "instalar emulador",
       title: `${nome} ainda não está instalado nesta máquina. Clicar em jogar instala e abre o jogo.`,
+    };
+  }
+
+  const canAutoConfigure = Boolean(verdict?.adapter_id && verdict.options);
+  if (!canAutoConfigure) {
+    const bottleneck = verdict?.bottlenecks?.[0];
+    const shortLabel = bottleneck ? shortBottleneckLabel(bottleneck) : undefined;
+    return {
+      launchable: false,
+      reason: "no_preset",
+      badge: shortLabel ? `sem preset — ${shortLabel}` : "sem preset automático",
+      title: bottleneck
+        ? `O ZeuX ainda não escolheu uma configuração para este console. ${bottleneck}`
+        : "O ZeuX ainda não escolheu uma configuração para este console — o hardware não alcançou nenhum patamar de compatibilidade conhecido.",
     };
   }
 

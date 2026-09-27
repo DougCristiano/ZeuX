@@ -64,9 +64,14 @@ func (systemProbe) Detect(ctx context.Context) (HardwareInfo, error) {
 	info.GPUs = gpus
 	info.Warnings = append(info.Warnings, warnings...)
 
+	// Só a consequência, não a causa: `detectGPUs` de cada SO já disse por que
+	// a placa não foi lida (e o que fazer). Até 2026-09-26 os dois avisos
+	// abriam com a mesma frase e a tela de Especificações mostrava a GPU
+	// "não identificada" duas vezes, falando de um "veredito abaixo" que
+	// nem existia naquela tela.
 	if len(gpus) == 0 {
 		info.Warnings = append(info.Warnings,
-			"Não foi possível identificar a placa de vídeo. O veredito abaixo considera apenas processador e memória, e por isso é menos preciso.")
+			"Sem a placa de vídeo, o parecer dos consoles considera apenas processador e memória, e por isso é menos preciso.")
 	}
 
 	// Q3 (docs/roadmap.md, Sprint Q): o monitor entra na mesma categoria da

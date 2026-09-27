@@ -33,8 +33,12 @@ type ConsoleVerdict struct {
 	// L9 (docs/roadmap.md) usa isto para mostrar o aviso genérico na biblioteca.
 	RequiresExternalFile bool `json:"requires_external_file,omitempty"`
 
-	// Emulator e Preset ficam vazios quando o nível é "improvavel": não faz
-	// sentido sugerir configuração para algo que não deve rodar.
+	// Preset e Options ficam vazios quando o nível é "improvavel": não faz
+	// sentido sugerir configuração para algo que não deve rodar. Emulator,
+	// AdapterID e Core, não (2026-09-26): vêm do patamar menos exigente,
+	// porque o princípio 5 deixa o usuário seguir por conta e risco — e sem
+	// saber QUAL emulador falta, a interface oferecia "jogar assim mesmo"
+	// para um PS2 cujo PCSX2 nem estava instalado.
 	Emulator  string `json:"emulator,omitempty"`
 	AdapterID string `json:"adapter_id,omitempty"`
 	Core      string `json:"core,omitempty"`
@@ -150,12 +154,16 @@ func evaluateConsole(console Console, info hardware.HardwareInfo) ConsoleVerdict
 		return result
 	}
 
-	// Nenhum patamar atendido: o gargalo é o do patamar menos exigente.
+	// Nenhum patamar atendido: o gargalo é o do patamar menos exigente, e o
+	// emulador também — é o que o usuário instalaria para tentar mesmo assim.
 	if len(console.Tiers) > 0 {
 		lowest := console.Tiers[len(console.Tiers)-1]
 		blockers, _ := checkRequirements(lowest.Requires, info)
 		result.NextLevel = lowest.Level
 		result.Bottlenecks = blockers
+		result.Emulator = lowest.Emulator
+		result.AdapterID = lowest.AdapterID
+		result.Core = lowest.Core
 	}
 
 	result.Headline = result.Level.Headline()

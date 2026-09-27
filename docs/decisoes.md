@@ -1012,6 +1012,26 @@ diz o que falta nos outros casos.
 **O que quebra se desfizer:** a primeira tela de todo usuário novo volta a
 ser uma grade apagada, com o título dos jogos escondido atrás do selo.
 
+### Parecer "improvável" passa a dizer qual emulador usar — 2026-09-26
+
+Até aqui, um console sem nenhum patamar atendido saía do parecer sem
+`emulator`/`adapter_id`/`core` — só `level: "improvavel"` e o gargalo. A
+biblioteca usa o `adapter_id` para saber se o emulador está instalado, então
+para esses consoles ela não sabia o que faltava: um PS2 numa máquina abaixo
+do primeiro patamar, sem PCSX2 instalado, aparecia com "jogar assim mesmo",
+e o clique caía num erro de lançamento. A tela do console sabia ("PCSX2 atende
+este console, mas não está instalado") porque lê o catálogo, não o parecer.
+
+Agora o parecer "improvável" traz o emulador do patamar menos exigente —
+o que o usuário instalaria para tentar por conta e risco (princípio 5). O
+preset e as `options` continuam vazios: não se sugere configuração para o
+que não deve rodar, e `toInput` no servidor segue lançando sem preset. No
+front, `evaluateGameLaunchability` passou a checar "emulador não instalado"
+antes de "sem preset".
+
+**O que quebra se desfizer:** volta a oferecer "jogar assim mesmo" para jogo
+cujo emulador nem está instalado.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do

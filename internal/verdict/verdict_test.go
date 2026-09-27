@@ -122,6 +122,33 @@ func TestModestPCReachesRetroButNotHeavyConsoles(t *testing.T) {
 	}
 }
 
+// Trava que "improvável" ainda diz QUAL emulador usar (o do patamar menos
+// exigente), mas nunca um preset. Sem o emulador, a interface não sabia que
+// faltava instalar o PCSX2 e oferecia "jogar assim mesmo" — princípio 5
+// (deixar seguir por conta e risco) exige saber o que instalar. Sem o preset
+// continua valendo: não se sugere configuração para o que não deve rodar.
+func TestImprovavelNamesEmulatorButNoPreset(t *testing.T) {
+	report := evaluate(t, modestPC())
+	catalog, err := LoadCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ps2 := findVerdict(t, report, "ps2")
+	if ps2.Level != LevelImprovavel {
+		t.Fatalf("PS2: nível = %q, esperado %q", ps2.Level, LevelImprovavel)
+	}
+	console, _ := catalog.ConsoleByID("ps2")
+	lowest := console.Tiers[len(console.Tiers)-1]
+	if ps2.AdapterID != lowest.AdapterID || ps2.Emulator != lowest.Emulator {
+		t.Errorf("PS2 improvável: emulador = %q/%q, esperado o do patamar mais baixo %q/%q",
+			ps2.AdapterID, ps2.Emulator, lowest.AdapterID, lowest.Emulator)
+	}
+	if ps2.Options != nil || ps2.Preset != "" {
+		t.Errorf("PS2 improvável não deveria trazer preset: options=%v preset=%q", ps2.Options, ps2.Preset)
+	}
+}
+
 func TestHighEndPCReachesTopTier(t *testing.T) {
 	report := evaluate(t, highEndPC())
 

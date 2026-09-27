@@ -43,7 +43,7 @@ func detectGPUs(ctx context.Context) ([]GPUInfo, []string) {
 
 	if len(gpus) == 0 {
 		warnings = append(warnings,
-			"Não foi possível identificar a placa de vídeo. Instalar o pacote pciutils (comando lspci) melhora a precisão do veredito.")
+			"Não foi possível identificar a placa de vídeo. Instalar o pacote pciutils (comando lspci) resolve isso.")
 		return gpus, warnings
 	}
 
