@@ -1,19 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "../api";
 import type { HardwareInfo, Report } from "../api/types";
 import {
   Button,
   Callout,
-  Card,
-  CardSkeleton,
   InlineError,
   PartialNotice,
   ScreenContainer,
   ScreenHeader,
-  SectionHeading,
 } from "../components/ui";
 import { useT } from "../i18n/i18n";
 import { dict } from "./VerdictScreen.i18n";
+import { formatFileDate } from "../lib/format";
 
 function formatBytes(bytes: number, unknownText: string): string {
   if (bytes <= 0) return unknownText;
@@ -36,6 +34,9 @@ function formatBytes(bytes: number, unknownText: string): string {
  * página e ganhou uma grade própria (`sm:grid-cols-2 lg:grid-cols-3`) em vez
  * da pilha de uma coluna só — a largura cheia que sobrou é isso que resolve
  * o desequilíbrio, não um layout novo.
+ *
+ * 2026-09-26: a grade de cards virou uma tela de POST (`PostScreen`, abaixo)
+ * — uma linha por componente, com "LIDO"/"NÃO LIDO" à direita.
  */
 function SpecsPanel() {
   const t = useT(dict);
@@ -51,164 +52,207 @@ function SpecsPanel() {
 
   if (error) {
     return (
-      <Card filled>
+      <PostScreen title={t("postTitle")}>
         <InlineError>{error}</InlineError>
-      </Card>
+      </PostScreen>
     );
   }
 
   if (!hardware) {
-    // B10 (achado do critico-design, 2026-08-18): era um único "Lendo
-    // hardware…" — o painel tem forma fixa e conhecida (4 cards: Sistema,
-    // Processador, Memória, Placa de vídeo), então o skeleton na mesma
-    // forma evita o conteúdo saltar quando os dados chegam.
+    // A forma de carregando é o próprio monitor com o cursor, não um
+    // skeleton de cards: é o "a máquina está sendo lida" da tela de POST.
     return (
-      <div role="status" aria-live="polite" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <span className="sr-only">{t("loadingHardware")}</span>
-        <CardSkeleton className="h-32" />
-        <CardSkeleton className="h-44" />
-        <CardSkeleton className="h-24" />
-        <CardSkeleton className="h-36" />
-      </div>
+      <PostScreen title={t("postTitle")}>
+        <p role="status" aria-live="polite" className="text-muted">
+          {t("loadingHardware")}
+          <Cursor />
+        </p>
+      </PostScreen>
     );
   }
 
+  const unknown = t("unknown");
+  const gpus = hardware.gpus ?? [];
+  const displays = hardware.displays ?? [];
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <Card filled>
-        <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">{t("system")}</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          <dt className="text-muted">{t("platform")}</dt>
-          <dd className="text-ink">{hardware.os.platform}</dd>
-          <dt className="text-muted">{t("version")}</dt>
-          <dd className="text-ink">{hardware.os.version}</dd>
-          <dt className="text-muted">{t("architecture")}</dt>
-          <dd className="text-ink">{hardware.os.arch}</dd>
-        </dl>
-      </Card>
+    <PostScreen title={t("postTitle")} meta={t("scannedAt", { date: formatFileDate(hardware.scanned_at) })}>
+      <dl className="flex flex-col">
+        <PostRow label={t("system")} read={t("statusRead")}>
+          <PostValue>
+            {hardware.os.platform} {hardware.os.version}
+          </PostValue>
+          <PostDetail>{hardware.os.arch}</PostDetail>
+        </PostRow>
 
-      <Card filled>
-        <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">{t("processor")}</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          <dt className="text-muted">{t("model")}</dt>
-          <dd className="text-ink">{hardware.cpu.model}</dd>
-          <dt className="text-muted">{t("vendor")}</dt>
-          <dd className="text-ink">{hardware.cpu.vendor}</dd>
-          <dt className="text-muted">{t("physicalCores")}</dt>
-          <dd className="text-ink">{hardware.cpu.physical_cores}</dd>
-          <dt className="text-muted">{t("logicalCores")}</dt>
-          <dd className="text-ink">{hardware.cpu.logical_cores}</dd>
-          <dt className="text-muted">{t("baseClock")}</dt>
-          <dd className="text-ink">
-            {hardware.cpu.base_clock_mhz > 0 ? `${(hardware.cpu.base_clock_mhz / 1000).toFixed(2)} GHz` : t("unknown")}
-          </dd>
-        </dl>
-      </Card>
+        <PostRow label={t("processor")} read={t("statusRead")}>
+          <PostValue>{hardware.cpu.model}</PostValue>
+          <PostDetail>
+            {[
+              hardware.cpu.vendor,
+              t("coresLine", { physical: hardware.cpu.physical_cores, logical: hardware.cpu.logical_cores }),
+              hardware.cpu.base_clock_mhz > 0 ? `${(hardware.cpu.base_clock_mhz / 1000).toFixed(2)} GHz` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </PostDetail>
+        </PostRow>
 
-      <Card filled>
-        <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">{t("memory")}</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-          <dt className="text-muted">{t("total")}</dt>
-          <dd className="text-ink">{formatBytes(hardware.memory.total_bytes, t("unknown"))}</dd>
-          <dt className="text-muted">{t("available")}</dt>
-          <dd className="text-ink">{formatBytes(hardware.memory.available_bytes, t("unknown"))}</dd>
-        </dl>
-      </Card>
+        <PostRow label={t("memory")} read={t("statusRead")}>
+          <PostValue>{formatBytes(hardware.memory.total_bytes, unknown)}</PostValue>
+          <PostDetail>{t("memoryAvailable", { amount: formatBytes(hardware.memory.available_bytes, unknown) })}</PostDetail>
+        </PostRow>
 
-      {hardware.gpus && hardware.gpus.length > 0 ? (
-        hardware.gpus.map((gpu, i) => (
-          <Card filled key={`${gpu.model}-${i}`}>
-            <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">
-              {t("gpuCard")}{hardware.gpus!.length > 1 ? ` ${i + 1}` : ""}
-            </p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-              <dt className="text-muted">{t("model")}</dt>
-              <dd className="text-ink">{gpu.model}</dd>
-              <dt className="text-muted">{t("vendor")}</dt>
-              <dd className="text-ink">{gpu.vendor}</dd>
-              <dt className="text-muted">{t("vram")}</dt>
-              <dd className="text-ink">{formatBytes(gpu.vram_bytes, t("unknown"))}</dd>
-              <dt className="text-muted">{t("type")}</dt>
-              <dd className="text-ink">{gpu.integrated ? t("integrated") : t("dedicated")}</dd>
-              {gpu.driver_version && (
-                <>
-                  <dt className="text-muted">{t("driver")}</dt>
-                  <dd className="text-ink">{gpu.driver_version}</dd>
-                </>
-              )}
-              <dt className="text-muted">{t("readingSource")}</dt>
-              <dd className="text-ink">{gpu.source}</dd>
-            </dl>
-          </Card>
-        ))
-      ) : (
-        <Card filled>
-          <p className="mb-2 font-mono text-xs tracking-wide text-muted uppercase">{t("gpuCard")}</p>
-          <p className="text-sm text-muted">{t("gpuNotIdentified")}</p>
-        </Card>
-      )}
+        {gpus.length > 0 ? (
+          gpus.map((gpu, i) => (
+            <PostRow
+              key={`${gpu.model}-${i}`}
+              label={`${t("gpuCard")}${gpus.length > 1 ? ` ${i + 1}` : ""}`}
+              read={t("statusRead")}
+            >
+              <PostValue>{gpu.model}</PostValue>
+              <PostDetail>
+                {[
+                  gpu.vendor,
+                  `${t("vram")} ${formatBytes(gpu.vram_bytes, unknown)}`,
+                  gpu.integrated ? t("integrated") : t("dedicated"),
+                  gpu.driver_version ? `${t("driver")} ${gpu.driver_version}` : null,
+                  `${t("readingSource")}: ${gpu.source}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </PostDetail>
+            </PostRow>
+          ))
+        ) : (
+          <PostRow label={t("gpuCard")} notRead={t("statusNotRead")}>
+            <PostDetail>{t("gpuNotIdentified")}</PostDetail>
+          </PostRow>
+        )}
 
-      {/* Q3 (docs/roadmap.md, Sprint Q): o monitor entra ao lado de CPU/GPU/
-          memória porque é a quarta peça que decide a configuração do jogo — o
-          preset de resolução interna é ajustado por ela. Cai no mesmo padrão
-          dos outros: quando não pôde ser lido, diz isso em vez de sumir. */}
-      {hardware.displays && hardware.displays.length > 0 ? (
-        hardware.displays.map((display, i) => (
-          <Card filled key={`${display.name ?? "tela"}-${i}`}>
-            <p className="mb-3 font-mono text-xs tracking-wide text-muted uppercase">
-              {t("display")}{hardware.displays!.length > 1 ? ` ${i + 1}` : ""}
-            </p>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-              <dt className="text-muted">{t("resolution")}</dt>
-              <dd className="text-ink">
+        {/* Q3 (docs/roadmap.md, Sprint Q): o monitor entra ao lado de CPU/
+            GPU/memória porque é a quarta peça que decide a configuração do
+            jogo — o preset de resolução interna é ajustado por ela. */}
+        {displays.length > 0 ? (
+          displays.map((display, i) => (
+            <PostRow
+              key={`${display.name ?? "tela"}-${i}`}
+              label={`${t("display")}${displays.length > 1 ? ` ${i + 1}` : ""}`}
+              read={t("statusRead")}
+            >
+              <PostValue>
                 {display.width}×{display.height}
-              </dd>
-              {/* Ausente quando o sistema não reportou — no Linux fora do
-                  X11 o caminho pelo sysfs só informa resolução. Some em vez
-                  de mostrar um zero que pareceria medição. */}
-              {display.refresh_hz ? (
-                <>
-                  <dt className="text-muted">{t("refreshRate")}</dt>
-                  <dd className="text-ink">{display.refresh_hz} {t("hz")}</dd>
-                </>
-              ) : null}
-              {display.name && (
-                <>
-                  <dt className="text-muted">{t("output")}</dt>
-                  <dd className="text-ink">{display.name}</dd>
-                </>
-              )}
-              {display.primary && (
-                <>
-                  <dt className="text-muted">{t("primary")}</dt>
-                  <dd className="text-ink">{t("yes")}</dd>
-                </>
-              )}
-              <dt className="text-muted">{t("readingSource")}</dt>
-              <dd className="text-ink">{display.source}</dd>
-            </dl>
-          </Card>
-        ))
-      ) : (
-        <Card filled>
-          <p className="mb-2 font-mono text-xs tracking-wide text-muted uppercase">{t("display")}</p>
-          <p className="text-sm text-muted">{t("displayNotIdentified")}</p>
-        </Card>
-      )}
+                {/* Ausente quando o sistema não reportou — no Linux fora do
+                    X11 o caminho pelo sysfs só informa resolução. Some em vez
+                    de mostrar um zero que pareceria medição. */}
+                {display.refresh_hz ? ` @ ${display.refresh_hz} ${t("hz")}` : ""}
+              </PostValue>
+              <PostDetail>
+                {[
+                  display.name ? `${t("output")} ${display.name}` : null,
+                  display.primary ? t("primary") : null,
+                  `${t("readingSource")}: ${display.source}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </PostDetail>
+            </PostRow>
+          ))
+        ) : (
+          <PostRow label={t("display")} notRead={t("statusNotRead")}>
+            <PostDetail>{t("displayNotIdentified")}</PostDetail>
+          </PostRow>
+        )}
+      </dl>
 
       {hardware.warnings.length > 0 && (
-        // `sm:col-span-2 lg:col-span-3`: um aviso de texto solto não deveria
-        // ficar espremido numa célula de card — ocupa a largura cheia da
-        // grade, como qualquer aviso de tela inteira do resto do app.
-        <Callout label={t("hardwareWarnings")} className="sm:col-span-2 lg:col-span-3">
-          <ul className="list-disc space-y-1 pl-4">
+        <div className="mt-4 border-t border-dashed border-line pt-3">
+          <p className="mb-1.5 text-[11px] tracking-wider text-muted uppercase">{t("hardwareWarnings")}</p>
+          <ul className="flex flex-col gap-1">
             {hardware.warnings.map((line) => (
-              <li key={line}>{line}</li>
+              <li key={line} className="flex gap-2 text-amber">
+                <span aria-hidden="true">!</span>
+                <span>{line}</span>
+              </li>
             ))}
           </ul>
-        </Callout>
+        </div>
       )}
+
+      <p className="mt-4 text-ink">
+        {t("readyLine")}
+        <Cursor />
+      </p>
+    </PostScreen>
+  );
+}
+
+/**
+ * Moldura de "monitor" da tela de POST (2026-09-26, revisão de design tela
+ * por tela: "Especificações" era a maior oportunidade retrô do app e lia como
+ * painel de SaaS — seis cards de chave/valor soltos). Uma tela só, fundo mais
+ * escuro que `--paper` (tubo desligado), tudo em mono, scanlines por cima, e
+ * uma linha por componente como a contagem de memória de um BIOS dos anos 90.
+ * As scanlines obedecem ao "efeitos reduzidos" pela classe `.zeux-scanlines`
+ * (src/index.css).
+ */
+function PostScreen({ title, meta, children }: { title: string; meta?: string; children: ReactNode }) {
+  return (
+    <div className="relative overflow-hidden rounded-lg border-[1.5px] border-control-border bg-[#04060c] font-mono text-sm shadow-[inset_0_0_60px_rgba(0,0,0,0.6)]">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-5 py-3">
+        <p className="font-pixel text-xs text-accent-secondary">ZeuX · {title}</p>
+        {meta && <p className="text-xs text-muted">{meta}</p>}
+      </div>
+      <div className="relative px-5 py-4">{children}</div>
+      <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-60" />
     </div>
+  );
+}
+
+/**
+ * Uma linha de componente: rótulo com pontilhado até o valor (a "régua" de
+ * tela de BIOS) e, à direita, se o ZeuX conseguiu ler aquilo. Em janela
+ * estreita o rótulo sobe para cima do valor em vez de espremer os três.
+ */
+function PostRow({
+  label,
+  read,
+  notRead,
+  children,
+}: {
+  label: string;
+  read?: string;
+  notRead?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 border-b border-line/40 py-2.5 last:border-b-0 sm:grid-cols-[13rem_1fr_auto]">
+      <dt className="col-span-2 flex items-baseline gap-2 text-[11px] tracking-wider text-muted uppercase sm:col-span-1">
+        <span className="shrink-0">{label}</span>
+        <span aria-hidden="true" className="hidden flex-1 border-b border-dotted border-line-strong sm:block" />
+      </dt>
+      <dd className="min-w-0">{children}</dd>
+      <dd
+        className={`self-start text-[11px] tracking-wider whitespace-nowrap ${notRead ? "text-amber" : "text-accent-secondary"}`}
+      >
+        [ {notRead ?? read} ]
+      </dd>
+    </div>
+  );
+}
+
+function PostValue({ children }: { children: ReactNode }) {
+  return <p className="break-words text-ink">{children}</p>;
+}
+
+function PostDetail({ children }: { children: ReactNode }) {
+  return <p className="mt-0.5 break-words text-xs text-muted">{children}</p>;
+}
+
+// `motion-safe:`: o cursor pisca só para quem não pediu movimento reduzido.
+function Cursor() {
+  return (
+    <span aria-hidden="true" className="ml-1 inline-block h-[1em] w-[0.6em] translate-y-[0.15em] bg-current motion-safe:animate-pulse" />
   );
 }
 
@@ -266,10 +310,8 @@ export function VerdictScreen({ report, onAuthorize }: { report?: Report; onAuth
             </div>
           )}
 
-          {/* Redesenho arcade/CRT (2026-09-09): degrau de seção em ciano
-              ("aqui o sistema informa") entre o `<h1>` e a grade de cards — o
-              mesmo `SectionHeading` que Configurações/Emuladores já usam. */}
-          <SectionHeading className="mb-3">{t("componentsHeading")}</SectionHeading>
+          {/* O título de seção "Componentes" saiu em 2026-09-26: o painel de
+              POST tem título próprio no cabeçalho do "monitor". */}
           <SpecsPanel />
         </>
       )}

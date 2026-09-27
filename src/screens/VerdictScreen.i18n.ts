@@ -6,7 +6,6 @@ export const dict = {
     "pt-BR": "O retrato desta máquina, como o ZeuX a leu.",
     en: "This machine's readout, as ZeuX scanned it.",
   },
-  componentsHeading: { "pt-BR": "Componentes", en: "Components" },
   system: { "pt-BR": "Sistema", en: "System" },
   processor: { "pt-BR": "Processador", en: "Processor" },
   memory: { "pt-BR": "Memória", en: "Memory" },
@@ -47,8 +46,8 @@ export const dict = {
     en: "Hardware scan warnings",
   },
   partialPrecision: {
-    "pt-BR": "Nem tudo pôde ser lido desta máquina — o parecer abaixo é uma estimativa.",
-    en: "Not everything could be read from this machine — the verdict below is an estimate.",
+    "pt-BR": "Nem tudo pôde ser lido desta máquina — o parecer dos consoles é uma estimativa.",
+    en: "Not everything could be read from this machine — the console verdicts are an estimate.",
   },
   loadingHardware: { "pt-BR": "Lendo hardware…", en: "Loading hardware…" },
   errorLoadingHardware: {
@@ -71,4 +70,16 @@ export const dict = {
     en: "You chose not to authorize reading this computer. Without this reading, ZeuX cannot compute specifications or the per-console compatibility verdict.",
   },
   authorizeNow: { "pt-BR": "Autorizar agora", en: "Authorize now" },
+  // Painel estilo tela de POST (2026-09-26). "LIDO"/"NÃO LIDO" diz se o
+  // ZeuX conseguiu ler o componente — nunca se ele é bom (princípios 2 e 4).
+  postTitle: { "pt-BR": "Leitura de hardware", en: "Hardware scan" },
+  scannedAt: { "pt-BR": "lido em {{date}}", en: "read on {{date}}" },
+  statusRead: { "pt-BR": "LIDO", en: "READ" },
+  statusNotRead: { "pt-BR": "NÃO LIDO", en: "NOT READ" },
+  coresLine: {
+    "pt-BR": "{{physical}} núcleos físicos · {{logical}} lógicos",
+    en: "{{physical}} physical cores · {{logical}} logical",
+  },
+  memoryAvailable: { "pt-BR": "{{amount}} livres", en: "{{amount}} free" },
+  readyLine: { "pt-BR": "Pronto.", en: "Ready." },
 } satisfies Dict;
