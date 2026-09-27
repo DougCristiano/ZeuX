@@ -183,7 +183,7 @@ function ConfiguredConsoleRow({
           onClose={() => setConfirmingRemove(null)}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setConfirmingRemove(null)}>
+              <Button variant="chrome" onClick={() => setConfirmingRemove(null)}>
                 {t("cancel")}
               </Button>
               <Button

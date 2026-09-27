@@ -171,7 +171,7 @@ function EmulatorOptionCard({
               </span>
               <Button
                 variant="quiet"
-                className="shrink-0 px-1.5 py-0.5 text-xs"
+                size="sm" className="shrink-0"
                 disabled={coreState.kind === "canceling"}
                 onClick={() => coreInstall.cancelCore(option.core!, coreState.job)}
               >
@@ -201,7 +201,7 @@ function EmulatorOptionCard({
           onClose={() => setState({ kind: "idle" })}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+              <Button variant="chrome" onClick={() => setState({ kind: "idle" })}>
                 {t("cancel")}
               </Button>
               <Button variant="primary" autoFocus onClick={() => install(true)}>
@@ -219,7 +219,7 @@ function EmulatorOptionCard({
           onClose={() => setState({ kind: "idle" })}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+              <Button variant="chrome" onClick={() => setState({ kind: "idle" })}>
                 {t("cancel")}
               </Button>
               <Button variant="danger" autoFocus onClick={remove}>
@@ -320,7 +320,7 @@ function EmulatorOptionCard({
             </Button>
             {canRemove && (
               <Button
-                variant="secondary"
+                variant="chrome"
                 disabled={state.kind === "removing"}
                 onClick={() => setState({ kind: "confirm-remove" })}
               >
@@ -468,7 +468,7 @@ function GamesFolderSection({
           onClose={() => setConfirmingRemove(null)}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setConfirmingRemove(null)}>
+              <Button variant="chrome" onClick={() => setConfirmingRemove(null)}>
                 {t("cancel")}
               </Button>
               <Button
@@ -494,7 +494,7 @@ function GamesFolderSection({
           {folders.length === 0 ? t("chooseFolder") : t("assignAnotherFolder")}
         </Button>
         {onOpenGames && folders.length > 0 && (
-          <Button variant="secondary" onClick={onOpenGames}>
+          <Button variant="chrome" onClick={onOpenGames}>
             {t("seeGames")}
           </Button>
         )}

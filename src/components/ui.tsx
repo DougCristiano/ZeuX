@@ -203,123 +203,85 @@ export const FILTER_CHIP_ON =
 export const FILTER_CHIP_OFF =
   "border-control-border text-muted hover:border-accent hover:bg-accent/10 hover:text-ink";
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "quiet" | "danger" | "chrome";
+type ButtonVariant = "primary" | "ghost" | "quiet" | "danger" | "chrome";
+type ButtonSize = "sm" | "md" | "lg";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
-};
-
-const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border border-accent bg-accent font-semibold text-accent-ink hover:bg-accent-hover",
-  // A11y 1.4.11: `border-control-border` (≥3:1 sobre --paper e --fill) em vez
-  // de `border-line-strong` — a borda é o único contorno deste botão.
-  secondary: "border border-control-border bg-transparent text-ink hover:bg-fill",
-  // `ghost` foi desenhado como bloco tracejado de placeholder (slot vazio,
-  // "adicione algo aqui") — achado do critico-design em 2026-08-18: virou,
-  // na prática, "botão terciário genérico" em lugares que não são slot
-  // nenhum ("Revarrer"/"Remover" de pasta, "Ver cores"), e duas bordas
-  // tracejadas lado a lado numa linha de pasta lêem como área de
-  // arrastar-e-soltar. `quiet` é o terciário de verdade: sem borda, só o
-  // texto ganha peso no hover — ghost continua reservado para placeholder.
-  ghost: "border border-dashed border-line-strong bg-transparent text-muted hover:text-ink hover:border-ink",
-  quiet: "border border-transparent bg-transparent text-muted hover:text-ink",
-  // N5 (docs/roadmap.md, Sprint N): antes, toda ação destrutiva ("Excluir
-  // mesmo assim", "Remover", "Desconectar") usava `primary` — a mesma cor do
-  // botão de jogar, sem sinal visual antes de um clique irreversível.
-  // `--danger-strong`, não `--danger` puro (comentário em src/index.css) —
-  // é o fundo que mede ≥ 4.5:1 contra o texto branco.
-  danger: "border border-danger-strong bg-danger-strong font-semibold text-white hover:brightness-110",
-  // `chrome` (achado do Douglas, 2026-09-07, testando o app de verdade: "os
-  // botões de voltar e pasta, buscar capas está destoando ainda"). A régua
-  // de filtros de `AllGamesScreen` foi redesenhada na linguagem arcade/CRT —
-  // canto reto (`rounded-sm`), rótulo miúdo em caixa alta com `tracking-wide`,
-  // borda que acende no roxo — e os botões de chrome logo acima e ao lado
-  // dela continuaram em `secondary`: canto arredondado de 8px, rótulo de
-  // 16px em caixa mista, cinza que nunca acende. Lado a lado, liam como
-  // dois aplicativos diferentes.
-  //
-  // Não é "secondary com outra cor": é o papel de **chrome de navegação e de
-  // arquivo** (voltar, apontar/abrir pasta, buscar capas) — ação sobre o
-  // aplicativo, não sobre o conteúdo da tela. `primary`/`danger` continuam
-  // sendo o conteúdo ("Jogar", "Instalar", "Remover"), e por isso não mudam:
-  // a hierarquia depende de o chrome ser visivelmente mais leve que eles
-  // (guideline `primary-action` do ui-ux-pro-max — um CTA primário por tela,
-  // ações secundárias visualmente subordinadas).
-  //
-  // O glow no hover/foco usa `--accent` (roxo), nunca `--accent-secondary`
-  // (ciano): a regra da paleta em src/index.css é "roxo é 'aqui você age',
-  // ciano é 'aqui o sistema informa'". Mesmo vocabulário de halo que o chip
-  // de plataforma ativo e a capa em hover já usam — nenhum efeito novo entra
-  // no projeto, só passa a valer também aqui.
-  //
-  // A11y: `border-control-border` em repouso (≥3:1, WCAG 1.4.11) e
-  // `text-ink` no rótulo — a versão em `text-muted` foi descartada porque o
-  // rótulo em 12px caixa alta já é o texto mais difícil da tela; cor não
-  // deveria somar dificuldade (o peso menor sozinho já subordina).
-  //
-  // Segunda rodada (2026-09-07, achado do Douglas: "quero... de uma ideia
-  // de botão mais retro ainda"): `border` (1px) virou `border-[1.5px]`
-  // (mais chapado, lê como chassi de hardware, não como contorno de campo de
-  // formulário) e ganhou `font-mono` (fonte monoespaçada do sistema, não
-  // `font-pixel`/Press Start 2P — o pixel bitmap já foi tirado dos rótulos
-  // de chip em 2026-09-06 por legibilidade ruim a 11px colorido; monoespaçada
-  // comum não tem esse problema e ainda lê como terminal/menu de console).
-  // `shadow-[inset...]` desenha um friso claro de 1px no topo por dentro —
-  // truque clássico de botão físico (luz vindo de cima), e `active:` some
-  // com ele e desce o botão 1px: o clique agora tem uma resposta tátil, não
-  // só a mudança de cor do `:hover`.
-  //
-  // 2026-09-09: `font-mono` deixou de cair na monoespaçada do SO e passou a
-  // resolver IBM Plex Mono embutida (`--font-mono` em index.css) — o rótulo
-  // do chrome agora tem a mesma voz de mostrador em qualquer máquina.
-  //
-  // `border-[1.5px]`, não `border-2`: 2px
-  // exatos empurrariam o texto/ícone 0.5px a mais que os outros variants
-  // (ainda em `border`/1px) e desalinharia baseline entre botões vizinhos de
-  // variants diferentes numa mesma linha.
-  chrome:
-    "border-[1.5px] border-control-border bg-transparent font-mono font-medium tracking-wider text-ink uppercase shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] hover:border-accent hover:bg-accent/10 hover:shadow-[0_0_14px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.06)] active:translate-y-px active:shadow-none",
+  size?: ButtonSize;
 };
 
 /**
- * Geometria por variante. `chrome` é o único que sai do botão de 16px com
- * canto de 8px: precisa medir como os chips da régua de filtros
- * (`rounded-sm`, `text-xs`), não como um botão de conteúdo. Fica aqui, e não
- * concatenado em `buttonVariants`, porque a ordem de duas classes Tailwind
- * conflitantes na mesma string (`rounded-lg` + `rounded-sm`) é decidida pela
- * ordem no CSS gerado, não pela ordem na string — o resultado seria estável
- * por acaso, não por desenho.
+ * Um formato de botão só, desde 2026-09-26 (revisão de design tela por
+ * tela). Até aqui conviviam duas linguagens para o mesmo papel: `secondary`
+ * (sans, caixa mista, 16px, canto de 8px — ~45 usos) e `chrome` (mono, caixa
+ * alta, 12px, canto reto — ~31 usos), e uma mesma tela chegava a mostrar
+ * quatro estilos lado a lado ("Instalar", "APONTAR OUTRA PASTA", "Ver
+ * jogos", "Revarrer"). `secondary` deixou de existir: virou `chrome`, que já
+ * era a voz retrô do app (ver histórico abaixo).
  *
- * `h-9` (2026-09-07: subiu de `py-1.5`/altura implícita ~28px — achado do
- * Douglas, "nem na mesma altura e tamanho dos selects") deixa `chrome` com a
- * mesma altura de 36px que `inputClass`/`ZSelect` e os chips da própria
- * régua de filtros (`AllGamesScreen`) usam agora — um só valor de altura
- * para toda a barra de controles da tela, em vez de cada família de
- * controle ter a sua. `px-3` sozinho (sem `py`) mantém o alvo de clique
- * dentro do mínimo de 24×24 CSS px da WCAG 2.2 AA (`web-target-size`) com
- * folga, já que `h-9` (36px) já é maior que o piso.
+ * Agora TODA variante compartilha a geometria do chrome — canto reto, borda
+ * de 1.5px, rótulo mono em caixa alta, friso claro de 1px no topo por dentro
+ * (luz vindo de cima, botão físico) e `active:translate-y-px` (o clique
+ * "afunda"). As variantes diferem só em cor e peso, que é o que a hierarquia
+ * precisa: `primary` cheio e com sombra de 2px embaixo (a tecla que salta da
+ * placa), `chrome` contornado, `quiet` só texto.
+ *
+ * Histórico do `chrome` (2026-09-07, achado do Douglas testando o app: "os
+ * botões de voltar e pasta, buscar capas está destoando ainda", e depois
+ * "quero uma ideia de botão mais retro ainda"): `border-[1.5px]` lê como
+ * chassi de hardware, não como contorno de campo de formulário; `font-mono`
+ * (IBM Plex Mono embutida, `--font-mono` em index.css) e não `font-pixel` —
+ * a Press Start 2P foi tirada de rótulo pequeno em 2026-09-06 por
+ * legibilidade ruim a 11px colorido.
+ *
+ * A11y: `border-control-border` em repouso (≥3:1, WCAG 1.4.11) e `text-ink`
+ * no rótulo do chrome — rótulo de 12px em caixa alta já é o texto mais
+ * difícil da tela; cor não deveria somar dificuldade. Glow de hover em
+ * `--accent` (roxo = "aqui você age"), nunca ciano ("o sistema informa").
  */
-const buttonShapes: Record<ButtonVariant, string> = {
-  primary: "rounded-lg px-4 py-2 text-base",
-  secondary: "rounded-lg px-4 py-2 text-base",
-  ghost: "rounded-lg px-4 py-2 text-base",
-  quiet: "rounded-lg px-4 py-2 text-base",
-  danger: "rounded-lg px-4 py-2 text-base",
-  chrome: "h-9 gap-1.5 rounded-sm px-3 text-xs",
+const buttonVariants: Record<ButtonVariant, string> = {
+  primary:
+    "border-accent bg-accent font-semibold text-accent-ink shadow-[inset_0_1px_0_0_rgba(255,255,255,0.3),0_2px_0_0_rgb(0_0_0/0.5)] hover:border-accent-hover hover:bg-accent-hover hover:shadow-[0_0_16px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.3),0_2px_0_0_rgb(0_0_0/0.5)] active:shadow-none",
+  // N5 (docs/roadmap.md, Sprint N): ação destrutiva nunca usa a cor do botão
+  // de jogar. `--danger-strong`, não `--danger` puro — é o fundo que mede
+  // ≥ 4.5:1 contra o texto branco (comentário em src/index.css).
+  danger:
+    "border-danger-strong bg-danger-strong font-semibold text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_2px_0_0_rgb(0_0_0/0.5)] hover:brightness-110 active:shadow-none",
+  chrome:
+    "border-control-border bg-transparent font-medium text-ink shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] hover:border-accent hover:bg-accent/10 hover:shadow-[0_0_14px_-4px_var(--accent),inset_0_1px_0_0_rgba(255,255,255,0.06)] active:shadow-none",
+  // `quiet` é o terciário: sem borda visível, só o texto ganha peso no hover
+  // ("Revarrer"/"Remover" de pasta). `ghost` fica reservado ao bloco
+  // tracejado de placeholder — slot vazio, "adicione algo aqui" (achado do
+  // critico-design em 2026-08-18: usado como terciário genérico, duas bordas
+  // tracejadas lado a lado liam como área de arrastar-e-soltar).
+  quiet: "border-transparent bg-transparent font-medium text-muted hover:text-ink",
+  ghost: "border-dashed border-line-strong bg-transparent font-medium text-muted hover:border-ink hover:text-ink",
 };
 
-export function Button({ variant = "secondary", className = "", ...props }: ButtonProps) {
+/**
+ * `md` (36px) é a altura de `inputClass`/`ZSelect` e dos chips da régua de
+ * filtros (2026-09-07, achado do Douglas: "nem na mesma altura e tamanho dos
+ * selects") — um valor só para toda linha de controles. `sm` é o de dentro
+ * de card/linha de lista (o mesmo 28px de `CARD_CHROME`), `lg` é o CTA de
+ * tela ("Jogar" no detalhe do jogo). Tamanho é prop, não `className`: classes
+ * de padding/altura conflitantes na mesma string são decididas pela ordem no
+ * CSS gerado, não pela ordem na string.
+ */
+const buttonSizes: Record<ButtonSize, string> = {
+  sm: "h-7 gap-1 px-2 text-[11px]",
+  md: "h-9 gap-1.5 px-3.5 text-xs",
+  lg: "h-12 gap-2 px-6 text-sm",
+};
+
+export function Button({ variant = "chrome", size = "md", className = "", ...props }: ButtonProps) {
   return (
     <button
-      // A11y 2.5.8 (Target Size, WCAG 2.2 AA): piso de 24px de altura em todo
-      // botão, mesmo os "compactos" que passam `py-0.5`/`py-1` + `text-xs` via
-      // `className` (lista de cores do RetroArch, painel de mapeamento) — esses
-      // ficavam em ~20px. `inline-flex`/`items-center` mantém o rótulo centrado
-      // quando o `min-h` passa a mandar na altura.
-      // `transition-colors` virou `transition` (2026-09-07): `chrome` acende
-      // um `box-shadow` no hover, e `transition-colors` não cobre sombra — o
-      // halo apareceria de uma vez, sem a mesma inércia das cores ao lado.
-      className={`inline-flex min-h-[24px] items-center justify-center transition duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${buttonShapes[variant]} ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
+      // A11y 2.5.8 (Target Size, WCAG 2.2 AA): `min-h-[24px]` segura o piso
+      // mesmo se alguém passar altura menor por `className`.
+      // `transition`, não `transition-colors`: o glow de hover é
+      // `box-shadow`, que `transition-colors` não cobre.
+      className={`inline-flex min-h-[24px] items-center justify-center rounded-sm border-[1.5px] font-mono tracking-wider whitespace-nowrap uppercase transition duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0 ${buttonSizes[size]} ${buttonVariants[variant]} ${FOCUS_RING} ${className}`}
       {...props}
     />
   );
@@ -614,7 +576,7 @@ export function PartialNotice({ children }: { children: ReactNode }) {
  * "Voltar" — um componente, não cinco cópias (2026-09-07). O botão existia
  * em seis lugares (`ScreenHeader`, `LibraryScreen`, `GamesScreen`,
  * `GameDetailScreen` e duas vezes em `ConsoleDetailScreen`), sempre como
- * `<Button variant="secondary" className="mb-4">` copiado à mão — e as
+ * `<Button variant="chrome" className="mb-4">` copiado à mão — e as
  * cópias já tinham divergido: `GameDetailScreen` e `ConsoleDetailScreen`
  * estavam sem `data-nav-back`, ou seja, o botão B do controle não voltava
  * dessas duas telas (A11y 2.1.4). Com um componente só, o atributo e o
@@ -724,10 +686,25 @@ export function ScreenHeader({
  * `index.css`. Contraste medido a 12.7:1 contra `--paper`, folga maior que
  * o `text-muted` que saiu daqui (7.62:1) — troca de identidade, não de
  * legibilidade.
+ *
+ * Voltou à pixel font em 2026-09-26 (revisão de design tela por tela: era o
+ * último degrau da hierarquia em sans, e as telas liam como painel de SaaS
+ * abaixo do título pixel do `ScreenHeader`) — agora a 14px, não 11px, que
+ * era o problema real da primeira vez: a Press Start 2P tem caixa alta e
+ * larga, e a 14px já pesa como um degrau entre o `<h1>` de 22px e o corpo.
+ * O quadrado antes do texto é um pixel de 8px na mesma cor — marcador de
+ * menu de console, não ícone. Sem `uppercase` de propósito: a Press Start 2P
+ * embutida não tem maiúsculas acentuadas ("NESTA MÁQUINA" saía sem acento,
+ * "ESTATÍSTICAS" com um "í" de outra fonte) — em caixa mista os acentos
+ * existem, e a fonte já é larga o bastante para ler como título.
  */
 export function SectionHeading({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <h2 className={`text-lg font-semibold tracking-wide text-accent-secondary uppercase ${className}`}>{children}</h2>
+    <h2
+      className={`flex items-center gap-2.5 font-pixel text-sm leading-snug text-accent-secondary before:size-2 before:shrink-0 before:bg-current before:content-[''] ${className}`}
+    >
+      {children}
+    </h2>
   );
 }
 
@@ -793,12 +770,12 @@ export function ErrorModal({
         <DialogDescription className="text-base text-ink">{message}</DialogDescription>
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           {extraAction && (
-            <Button variant="secondary" onClick={extraAction.onClick}>
+            <Button variant="chrome" onClick={extraAction.onClick}>
               {extraAction.label}
             </Button>
           )}
           {onRetry && (
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="chrome" onClick={onClose}>
               {t("close")}
             </Button>
           )}
@@ -849,11 +826,11 @@ export function ManualInstallModal({
       onClose={onClose}
       actions={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="chrome" onClick={onClose}>
             {t("close")}
           </Button>
           {onPointManually && (
-            <Button variant="secondary" onClick={onPointManually}>
+            <Button variant="chrome" onClick={onPointManually}>
               {t("alreadyInstalledPointManually")}
             </Button>
           )}
@@ -1247,13 +1224,13 @@ export function Pagination({
   if (totalPages <= 1) return null;
   return (
     <div className="mt-6 flex items-center justify-center gap-3">
-      <Button variant="secondary" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+      <Button variant="chrome" disabled={page <= 1} onClick={() => onChange(page - 1)}>
         {t("previousPage")}
       </Button>
       <span className="font-mono text-sm text-muted">
         {t("pageIndicator", { page, totalPages })}
       </span>
-      <Button variant="secondary" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+      <Button variant="chrome" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
         {t("nextPage")}
       </Button>
     </div>

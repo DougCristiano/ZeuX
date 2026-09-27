@@ -243,7 +243,7 @@ function RetroArchCoresList() {
               variant="quiet"
               // A11y 2.5.8: `py-1` (não `py-0.5`) + `min-h-[24px]` do Button
               // base — o `py-0.5` deixava o alvo em ~20px de altura.
-              className="px-1.5 py-1 text-xs"
+              size="sm"
               onClick={() => {
                 bulkStopped.current = true;
               }}
@@ -315,7 +315,7 @@ function RetroArchCoresList() {
                   <Button
                     variant="quiet"
                     // A11y 2.5.8: `py-1` + `min-h-[24px]` do Button base.
-                    className="shrink-0 px-1.5 py-1 text-xs"
+                    size="sm" className="shrink-0"
                     disabled={state.kind === "canceling"}
                     onClick={() => cancelCore(core.name, state.job)}
                   >
@@ -694,7 +694,7 @@ function EmulatorCardActions({
           onClose={() => setState({ kind: "idle" })}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+              <Button variant="chrome" onClick={() => setState({ kind: "idle" })}>
                 {t("cancel")}
               </Button>
               <Button variant="primary" autoFocus onClick={() => install(true)}>
@@ -781,7 +781,7 @@ function EmulatorCardActions({
                 onClose={() => setConfirmingDelete(false)}
                 actions={
                   <>
-                    <Button variant="secondary" onClick={() => setConfirmingDelete(false)}>
+                    <Button variant="chrome" onClick={() => setConfirmingDelete(false)}>
                       {t("cancel")}
                     </Button>
                     <Button variant="danger" autoFocus disabled={deleting} onClick={deleteCustom}>
@@ -819,7 +819,7 @@ function EmulatorCardActions({
               onClose={() => setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => setState({ kind: "idle" })}>
                     {t("cancel")}
                   </Button>
                   <Button variant="danger" autoFocus onClick={remove}>

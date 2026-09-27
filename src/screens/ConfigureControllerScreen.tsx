@@ -283,7 +283,7 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
             <Button variant="primary" onClick={advance}>
               {t("skipButton")}
             </Button>
-            <Button variant="secondary" onClick={() => stop("idle")}>
+            <Button variant="chrome" onClick={() => stop("idle")}>
               {t("cancelButton")}
             </Button>
             <p className="max-w-prose text-sm text-muted">

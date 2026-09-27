@@ -505,7 +505,7 @@ export function ConsolesScreen({
           // herda a voz monoespaçada em caixa alta do resto dela.
           <Button
             variant="quiet"
-            className="font-mono text-xs tracking-wider uppercase"
+            
             onClick={clearFilters}
           >
             {t("clearFilters")}
@@ -536,7 +536,7 @@ export function ConsolesScreen({
             message={t("noConsolesFound")}
             action={
               anyFilterActive ? (
-                <Button variant="secondary" onClick={clearFilters}>
+                <Button variant="chrome" onClick={clearFilters}>
                   {t("clearFilters")}
                 </Button>
               ) : undefined

@@ -169,7 +169,7 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
             onClose={() => setConfirmingRestore(false)}
             actions={
               <>
-                <Button variant="secondary" onClick={() => setConfirmingRestore(false)}>
+                <Button variant="chrome" onClick={() => setConfirmingRestore(false)}>
                   {t("cancel")}
                 </Button>
                 <Button variant="danger" autoFocus disabled={restoring} onClick={restore}>
@@ -179,7 +179,7 @@ export function EmulatorConfigPanel({ adapterId, adapterName }: { adapterId: str
             }
           />
         ) : (
-          <Button variant="secondary" onClick={() => setConfirmingRestore(true)}>
+          <Button variant="chrome" onClick={() => setConfirmingRestore(true)}>
             {t("restoreDefault")}
           </Button>
         )}

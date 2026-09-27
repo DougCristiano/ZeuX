@@ -388,7 +388,7 @@ export function GamesScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("cancel")}
                   </Button>
                   <Button
@@ -450,7 +450,7 @@ export function GamesScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("cancel")}
                   </Button>
                   {/* Continua `secondary`, e não `chrome` como os outros
@@ -459,7 +459,7 @@ export function GamesScreen({
                       do primário — nessa fileira o que manda é as três
                       ações terem a mesma altura, não a variante de chrome. */}
                   {adapterEntry?.bios_dir && (
-                    <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
+                    <Button variant="chrome" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
                       {t("openBiosFolder")}
                     </Button>
                   )}
@@ -491,11 +491,11 @@ export function GamesScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("close")}
                   </Button>
                   {s.biosDir && (
-                    <Button variant="secondary" onClick={() => openBiosFolder(s.biosDir!)}>
+                    <Button variant="chrome" onClick={() => openBiosFolder(s.biosDir!)}>
                       {t("openBiosFolder")}
                     </Button>
                   )}

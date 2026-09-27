@@ -1032,6 +1032,42 @@ antes de "sem preset".
 **O que quebra se desfizer:** volta a oferecer "jogar assim mesmo" para jogo
 cujo emulador nem está instalado.
 
+### Um formato de botão só; `secondary` deixa de existir — 2026-09-26
+
+Achado da revisão de design tela por tela: `Button` tinha seis variantes, e
+duas faziam o mesmo papel com linguagens opostas — `secondary` (sans, caixa
+mista, 16px, canto de 8px, ~45 usos) e `chrome` (mono, caixa alta, 12px,
+canto reto, ~31 usos). O detalhe do console chegava a mostrar quatro
+estilos lado a lado. As entradas de 2026-09-07 acima migraram tela a tela de
+`secondary` para `chrome`; esta termina o trabalho no próprio componente.
+
+- `secondary` saiu do tipo; os usos viraram `chrome`, que passa a ser a
+  variante padrão.
+- Toda variante compartilha a geometria do chrome (canto reto, borda de
+  1.5px, mono em caixa alta, friso de luz no topo, `active:translate-y-px`).
+  Diferem só em cor e peso: `primary` e `danger` cheios, com sombra de 2px
+  embaixo (tecla que salta da placa); `chrome` contornado; `quiet` só texto;
+  `ghost` tracejado, reservado a placeholder.
+- Tamanho virou prop (`size`: `sm` 28px, `md` 36px — a altura de input,
+  select e chip —, `lg` 48px para o CTA de tela), no lugar de `px-*/py-*/
+  text-*` passados por `className`, cuja precedência dependia da ordem no
+  CSS gerado.
+- O seletor Completo/Reduzido de Configurações usava as duas variantes para
+  marcar a opção ativa, e não dava para saber qual valia; virou chip de
+  filtro (`role="radio"`), o controle de alternância do app.
+- "Remover da biblioteca" no detalhe do jogo desceu de `danger` cheio para
+  chrome com `CHROME_TINT_DANGER`: é raro e reversível, e era o segundo
+  elemento mais chamativo da tela. O vermelho cheio fica no "confirmar" do
+  modal.
+
+Junto disso, `SectionHeading` voltou à fonte pixel, a 14px (a primeira
+tentativa, a 11px, ficava menor que o corpo), com um pixel de 8px como
+marcador e **sem** `uppercase`: a Press Start 2P embutida não tem
+maiúsculas acentuadas ("MÁQUINA" saía sem acento).
+
+**O que quebra se desfizer:** volta a coexistirem duas linguagens de botão
+para o mesmo papel, e cada tela nova escolhe uma por instinto.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do

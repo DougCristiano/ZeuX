@@ -376,8 +376,8 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Button
-            variant="secondary"
-            className="px-2 py-1 text-xs"
+            variant="chrome"
+            size="sm"
             disabled={listeningKeyFor !== null && listeningKeyFor !== action}
             onClick={() => setListeningKeyFor(action)}
           >
@@ -387,14 +387,14 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
               Esc também cancela (ver o listener acima), este botão é o
               caminho para mouse/toque. */}
           {listeningKeyFor === action && (
-            <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => setListeningKeyFor(null)}>
+            <Button variant="chrome" size="sm" onClick={() => setListeningKeyFor(null)}>
               {t("cancelButton")}
             </Button>
           )}
           {gamepadConnected && (
             <Button
-              variant="secondary"
-              className="px-2 py-1 text-xs"
+              variant="chrome"
+              size="sm"
               disabled={listeningButtonFor !== null}
               onClick={() => setListeningButtonFor(action)}
             >
@@ -470,7 +470,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
               <span className="text-xs text-muted tabular-nums">
                 {t("sequenceProgress", { index: sequence.index + 1, total: sequence.actions.length, action: sequence.actions[sequence.index] })}
               </span>
-              <Button variant="quiet" className="px-2 py-1 text-xs" onClick={pararSequencia}>
+              <Button variant="quiet" size="sm" onClick={pararSequencia}>
                 {t("stopButton")}
               </Button>
             </div>
@@ -480,8 +480,8 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
                terminar. A ação por ação continua disponível abaixo, para
                corrigir um vínculo só sem refazer o resto. */
             <Button
-              variant="secondary"
-              className="px-2 py-1 text-xs"
+              variant="chrome"
+              size="sm"
               disabled={listeningButtonFor !== null || actions.length === 0}
               onClick={iniciarSequencia}
             >
@@ -515,7 +515,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
             >
               {t("switchButton")}
             </Button>
-            <Button variant="secondary" onClick={() => setConflict(null)}>
+            <Button variant="chrome" onClick={() => setConflict(null)}>
               {t("cancelButton")}
             </Button>
           </div>

@@ -231,7 +231,7 @@ export function GameHero({
                 </Button>
               )
             )}
-            <Button variant="secondary" onClick={onOpenDetail}>
+            <Button variant="chrome" onClick={onOpenDetail}>
               {t("seeDetails")}
             </Button>
             <FavoriteToggle favorite={game.favorite} onToggle={onToggleFavorite} />

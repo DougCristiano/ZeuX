@@ -864,7 +864,7 @@ function VCRedistOffer({ consoleName, onClose }: { consoleName: string; onClose:
           </Button>
         ) : (
           <>
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="chrome" onClick={onClose}>
               {t("close")}
             </Button>
             <Button variant="primary" autoFocus onClick={handleInstall} disabled={state === "installing"}>

@@ -7,7 +7,7 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
-import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, InlineError, inputClass, ScreenAtmosphere, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
+import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, FILTER_CHIP_BASE, FILTER_CHIP_OFF, FILTER_CHIP_ON, FOCUS_RING, InlineError, inputClass, ScreenAtmosphere, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
 import { useToast } from "../hooks/useToast";
@@ -289,23 +289,23 @@ export function SettingsScreen({
       <Card filled className="mb-6">
         <SectionHeading className="mb-2">{t("visualEffectsHeading")}</SectionHeading>
         <p className="mb-4 text-sm text-muted">{t("visualEffectsDescription")}</p>
+        {/* Chip de filtro, não `Button`: é alternância de estado, e o chip
+            é o único controle do app que mostra "ligado" (acende em roxo).
+            Antes eram duas variantes de botão diferentes, e não dava para
+            dizer qual das duas opções estava valendo. */}
         <div role="radiogroup" aria-label={t("visualEffectsHeading")} className="flex w-fit gap-2">
-          <Button
-            type="button"
-            variant={visualEffects === "full" ? "chrome" : "secondary"}
-            aria-pressed={visualEffects === "full"}
-            onClick={() => setVisualEffects("full")}
-          >
-            {t("visualEffectsFull")}
-          </Button>
-          <Button
-            type="button"
-            variant={visualEffects === "reduced" ? "chrome" : "secondary"}
-            aria-pressed={visualEffects === "reduced"}
-            onClick={() => setVisualEffects("reduced")}
-          >
-            {t("visualEffectsReduced")}
-          </Button>
+          {(["full", "reduced"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={visualEffects === mode}
+              onClick={() => setVisualEffects(mode)}
+              className={`${FILTER_CHIP_BASE} ${visualEffects === mode ? FILTER_CHIP_ON : FILTER_CHIP_OFF} ${FOCUS_RING}`}
+            >
+              {t(mode === "full" ? "visualEffectsFull" : "visualEffectsReduced")}
+            </button>
+          ))}
         </div>
       </Card>
 
@@ -504,7 +504,7 @@ export function SettingsScreen({
                 onClose={() => setConfirmingDisconnect(false)}
                 actions={
                   <>
-                    <Button variant="secondary" disabled={saving} onClick={() => setConfirmingDisconnect(false)}>
+                    <Button variant="chrome" disabled={saving} onClick={() => setConfirmingDisconnect(false)}>
                       {t("cancel")}
                     </Button>
                     <Button variant="danger" disabled={saving} onClick={handleDisconnect}>

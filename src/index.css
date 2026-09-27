@@ -94,7 +94,7 @@
   --line-strong: #2c3f66;
   /* A11y 1.4.11 (auditoria de acessibilidade, 2026-09-06): `--line-strong`
      (#2c3f66) é o contorno de todo <input>/<textarea>/<select> estilizado e
-     do Button variant="secondary" — mede 1.89:1 sobre --paper e 1.76:1 sobre
+     do Button variant="chrome" — mede 1.89:1 sobre --paper e 1.76:1 sobre
      --fill, abaixo do 3:1 que a WCAG AA (Non-text Contrast) exige para o
      limite visual de um controle de formulário. Quem tem baixa visão não
      enxerga onde clicar/digitar. Token dedicado só para borda de controle

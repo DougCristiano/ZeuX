@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  CHROME_TINT_DANGER,
   ConfirmModal,
   ConsoleVerdictCard,
   ErrorModal,
@@ -523,7 +524,7 @@ export function GameDetailScreen({
                 <Button type="submit" variant="primary" disabled={savingTitle || titleDraft.trim() === ""}>
                   {savingTitle ? t("savingTitle") : t("saveTitle")}
                 </Button>
-                <Button type="button" variant="secondary" disabled={savingTitle} onClick={() => setEditingTitle(false)}>
+                <Button type="button" variant="chrome" disabled={savingTitle} onClick={() => setEditingTitle(false)}>
                   {t("cancelTitle")}
                 </Button>
                 {titleOverride !== "" && (
@@ -583,7 +584,7 @@ export function GameDetailScreen({
           // sem preset deixa o clique cair no lançamento sem `options` (o
           // emulador abre na config padrão dele). Princípio 5.
           onClick={() => install.handlePlay(game, verdict, adapterEntry)}
-          className="flex w-fit items-center gap-2 px-8 py-3 text-lg"
+          size="lg" className="w-fit"
         >
           {/* N14 (docs/roadmap.md, Sprint N): era o caractere "▶".
               A4 (achado do critico-design, 2026-08-18): o botão só
@@ -658,7 +659,7 @@ export function GameDetailScreen({
             </div>
             <Button
               className="mt-2"
-              variant="secondary"
+              variant="chrome"
               onClick={() => cancelCoreDownload(game.id, status.job)}
             >
               {t("cancelDownload")}
@@ -690,7 +691,7 @@ export function GameDetailScreen({
           onClose={() => setConfirmingExclude(false)}
           actions={
             <>
-              <Button variant="secondary" onClick={() => setConfirmingExclude(false)}>
+              <Button variant="chrome" onClick={() => setConfirmingExclude(false)}>
                 {t("cancelRemove")}
               </Button>
               <Button
@@ -756,7 +757,7 @@ export function GameDetailScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("cancelRemove")}
                   </Button>
                   <Button
@@ -778,11 +779,11 @@ export function GameDetailScreen({
           onClose={() => install.setState({ kind: "idle" })}
           actions={
             <>
-              <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+              <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                 {t("cancelRemove")}
               </Button>
               {adapterEntry?.bios_dir && (
-                <Button variant="secondary" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
+                <Button variant="chrome" onClick={() => openBiosFolder(adapterEntry.bios_dir!)}>
                   {t("openBiosFolder")}
                 </Button>
               )}
@@ -812,11 +813,11 @@ export function GameDetailScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("cancelRemove")}
                   </Button>
                   {s.biosDir && (
-                    <Button variant="secondary" onClick={() => openBiosFolder(s.biosDir!)}>
+                    <Button variant="chrome" onClick={() => openBiosFolder(s.biosDir!)}>
                       {t("openBiosFolder")}
                     </Button>
                   )}
@@ -1054,11 +1055,16 @@ export function GameDetailScreen({
                     {excluding ? t("removing") : t("restoreToLibrary")}
                   </Button>
                 ) : (
+                  // Contornado, não vermelho cheio (2026-09-26): esconder da
+                  // biblioteca é raro e reversível (filtro "Ocultos"), e o
+                  // botão cheio era o segundo elemento mais chamativo da tela,
+                  // logo depois do "Jogar". O vermelho cheio fica para o
+                  // "confirmar" do modal, que é onde a decisão acontece.
                   <Button
-                    variant="danger"
+                    variant="chrome"
                     disabled={excluding}
                     onClick={() => setConfirmingExclude(true)}
-                    className="w-fit"
+                    className={`w-fit ${CHROME_TINT_DANGER}`}
                   >
                     {excluding ? t("removing") : t("removeFromLibrary")}
                   </Button>

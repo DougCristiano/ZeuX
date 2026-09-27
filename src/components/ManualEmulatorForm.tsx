@@ -228,7 +228,7 @@ export function ManualEmulatorForm({
             onChange={(e) => setBinaryPath(e.target.value)}
             className={inputClass}
           />
-          <Button type="button" variant="secondary" onClick={pickBinary} className="shrink-0">
+          <Button type="button" variant="chrome" onClick={pickBinary} className="shrink-0">
             {t("chooseFile")}
           </Button>
         </div>
@@ -293,7 +293,7 @@ export function ManualEmulatorForm({
         <Button type="submit" variant="primary" disabled={saving}>
           {saving ? t("saving") : t("save")}
         </Button>
-        <Button type="button" variant="secondary" onClick={onCancel} disabled={saving}>
+        <Button type="button" variant="chrome" onClick={onCancel} disabled={saving}>
           {t("cancel")}
         </Button>
       </div>

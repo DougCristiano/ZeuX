@@ -146,7 +146,7 @@ export function SaveDataPanel({ adapterId }: { adapterId: string }) {
                 {saving ? t("saving") : t("save")}
               </Button>
             )}
-            <Button variant="secondary" onClick={() => setEditing(false)}>
+            <Button variant="chrome" onClick={() => setEditing(false)}>
               {t("cancel")}
             </Button>
           </div>
@@ -170,7 +170,7 @@ export function SaveDataPanel({ adapterId }: { adapterId: string }) {
           </div>
 
           <div>
-            <Button variant="secondary" onClick={startEditing}>
+            <Button variant="chrome" onClick={startEditing}>
               {t("changeLocation")}
             </Button>
           </div>

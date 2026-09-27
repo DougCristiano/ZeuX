@@ -721,7 +721,7 @@ export function AllGamesScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("cancel")}
                   </Button>
                   <Button
@@ -749,11 +749,11 @@ export function AllGamesScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("cancel")}
                   </Button>
                   {pendingAdapterEntry?.bios_dir && (
-                    <Button variant="secondary" onClick={() => openBiosFolder(pendingAdapterEntry.bios_dir!)}>
+                    <Button variant="chrome" onClick={() => openBiosFolder(pendingAdapterEntry.bios_dir!)}>
                       {t("openBiosFolder")}
                     </Button>
                   )}
@@ -785,11 +785,11 @@ export function AllGamesScreen({
               onClose={() => install.setState({ kind: "idle" })}
               actions={
                 <>
-                  <Button variant="secondary" onClick={() => install.setState({ kind: "idle" })}>
+                  <Button variant="chrome" onClick={() => install.setState({ kind: "idle" })}>
                     {t("closeButton")}
                   </Button>
                   {s.biosDir && (
-                    <Button variant="secondary" onClick={() => openBiosFolder(s.biosDir!)}>
+                    <Button variant="chrome" onClick={() => openBiosFolder(s.biosDir!)}>
                       {t("openBiosFolder")}
                     </Button>
                   )}
@@ -848,8 +848,8 @@ export function AllGamesScreen({
             />
           </div>
           <Button
-            className="mt-2 w-full text-xs"
-            variant="secondary"
+            className="mt-2 w-full"
+            variant="chrome"
             onClick={() => cancelCoreDownload(activeCoreDownload.gameId, activeCoreDownload.job)}
           >
             {t("cancelDownload")}
@@ -1088,7 +1088,7 @@ export function AllGamesScreen({
               }
               action={
                 <Button
-                  variant="secondary"
+                  variant="chrome"
                   onClick={() =>
                     onViewChange({
                       search: "",
