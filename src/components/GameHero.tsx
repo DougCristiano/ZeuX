@@ -6,7 +6,7 @@ import { consoleAccentColor } from "../lib/consoleColor";
 import { formatLastPlayedShort, formatPlaytime } from "../lib/format";
 import type { GameLaunchability } from "../lib/gameLaunchability";
 import { dict } from "./GameHero.i18n";
-import { Badge, Button, FavoriteToggle } from "./ui";
+import { Badge, Button, FavoriteToggle, GameCover } from "./ui";
 
 /**
  * Faixa de retomada da biblioteca (2026-09-07, redesenho da tela inicial a
@@ -148,25 +148,23 @@ export function GameHero({
             destino, com nome acessível de verdade (mesmo padrão do overlay ▶
             de `GameCover`). `shrink-0` + largura própria: peça de tamanho fixo
             por desenho, não área que deveria crescer com a janela (CLAUDE.md,
-            exceções de layout responsivo). */}
+            exceções de layout responsivo).
+            2026-09-28 (revisão de design): a capa é o mesmo `GameCover` da
+            grade logo abaixo. Antes o destaque tinha placeholder próprio —
+            só a sigla do console num gradiente —, enquanto a grade já
+            desenhava o cartucho com o título impresso; o mesmo jogo aparecia
+            de dois jeitos na mesma tela, e o destaque, que devia ser o mais
+            reconhecível, era o que menos dizia qual jogo era. Com capa real,
+            idem: fundo desfocado + arte inteira + selo do console, igual à
+            célula da grade. */}
         <button
           type="button"
           onClick={onOpenDetail}
           tabIndex={-1}
           aria-hidden="true"
-          className="w-28 shrink-0 cursor-pointer overflow-hidden rounded-lg border transition-transform duration-150 hover:scale-[1.03] sm:w-36"
-          style={{ borderColor: `color-mix(in srgb, ${accent} 60%, var(--line-strong))` }}
+          className="w-28 shrink-0 cursor-pointer rounded-lg transition-transform duration-150 hover:scale-[1.03] sm:w-36"
         >
-          {cover ? (
-            <img src={cover} alt="" className="aspect-[3/4] w-full object-cover" />
-          ) : (
-            <div
-              className="flex aspect-[3/4] w-full items-center justify-center bg-fill"
-              style={{ background: `linear-gradient(160deg, ${accent}44, var(--fill) 70%)` }}
-            >
-              <span className="font-pixel text-[11px] text-ink">{shortName}</span>
-            </div>
-          )}
+          <GameCover label={shortName} title={game.title} consoleId={game.console_id} coverUrl={cover} />
         </button>
 
         {/* `max-w-2xl` é teto, não largura: a coluna continua encolhendo
@@ -180,10 +178,13 @@ export function GameHero({
 
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
             <Badge accentColor={accent}>{shortName.toUpperCase()}</Badge>
-            <span>{formatPlaytime(game.playtime_seconds)}</span>
+            {/* Mesma regra do `GameTile` (2026-09-28): "nunca jogado" não
+                entra. O destaque só existe para jogo já jogado, então isto é
+                guarda de borda, não caso comum. */}
+            {game.playtime_seconds > 0 && <span>{formatPlaytime(game.playtime_seconds)}</span>}
             {lastPlayed && (
               <>
-                <span aria-hidden="true">·</span>
+                {game.playtime_seconds > 0 && <span aria-hidden="true">·</span>}
                 <span>{t("lastPlayed", { date: lastPlayed })}</span>
               </>
             )}
