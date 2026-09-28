@@ -33,9 +33,11 @@ import {
 import { useToast } from "../hooks/useToast";
 import { useT } from "../i18n/i18n";
 import { dict } from "./AllGamesScreen.i18n";
+import { FirstStepsChecklist } from "../components/FirstStepsChecklist";
 import { GameHero } from "../components/GameHero";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
+import { useFirstSteps } from "../hooks/useFirstSteps";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { consoleAccentColor } from "../lib/consoleColor";
@@ -286,6 +288,12 @@ export function AllGamesScreen({
   }
 
   useEffect(loadRecentGames, []);
+
+  const firstSteps = useFirstSteps({
+    consoles: consoleCatalog,
+    emulators,
+    recentlyPlayed: recentGames ? recentGames.length > 0 : null,
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
@@ -934,6 +942,15 @@ export function AllGamesScreen({
         </InlineError>
       )}
 
+      {firstSteps.progress && (
+        <FirstStepsChecklist
+          progress={firstSteps.progress}
+          onChooseFolder={onOpenLibrary}
+          onOpenConsole={(consoleId) => onOpenConsole?.(consoleId)}
+          onDismiss={firstSteps.dismiss}
+        />
+      )}
+
       {recentGames && recentGames.length > 0 && (
         // 2026-09-09 (pedido do Douglas): a seção "Continue jogando" mostra
         // só UM jogo — o último jogado — num `GameHero` de destaque. Antes
@@ -1033,18 +1050,22 @@ export function AllGamesScreen({
           if (trulyEmpty) {
             return (
               // 2026-09-09 (docs/pendencias.md, "Onboarding para quem abre o
-              // app sem nenhuma ROM"): não é um wizard — o `EmptyState`
-              // apresenta o app em 3 passos curtos antes da ação. Os passos
-              // agora vão pela prop `steps` (era gambiarra pela prop `action`);
-              // sem vocabulário de emulador, sem dizer de onde tirar jogo
+              // app sem nenhuma ROM"): o `EmptyState` apresentava o app em 3
+              // passos numerados. Desde 2026-09-28 quem ensina o caminho é a
+              // `FirstStepsChecklist`, logo acima — com o estado real de cada
+              // passo, e não uma lista fixa. Repetir os passos aqui deixava
+              // duas listas de "comece por aqui" na mesma tela, que ainda por
+              // cima divergiam quando uma delas era dispensada. Sem
+              // vocabulário de emulador e sem dizer de onde tirar jogo
               // (princípio 6): a pasta é a que já existe no computador.
               <EmptyState
                 kicker={t("emptyKicker")}
-                title={t("emptyTitle")}
-                message={t("noGamesInLibrary")}
-                steps={[t("emptyStep1"), t("emptyStep2"), t("emptyStep3")]}
+                title={t("noGamesInLibrary")}
+                message={t("emptyMessage")}
                 action={
-                  <Button variant="primary" onClick={onOpenLibrary}>
+                  // Um CTA primário por tela: com a lista de primeiros passos
+                  // acima, o "Escolher pasta" dela já é o primário.
+                  <Button variant={firstSteps.progress ? "chrome" : "primary"} onClick={onOpenLibrary}>
                     {t("chooseFolderWithGames")}
                   </Button>
                 }

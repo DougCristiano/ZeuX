@@ -642,7 +642,7 @@ export function LibraryScreen({
             {configuredConsoles.length === 0 ? (
               // Sem botão de ação aqui — a linha "Adicionar console" (a ação
               // que resolve este vazio) fica sempre visível logo abaixo.
-              <EmptyState variant="inline" title={t("noConsolesFolderYet")} />
+              <EmptyState variant="inline" title={t("noConsolesFolderYet")} message={t("noConsolesFolderYetHelp")} />
             ) : (
               /* Uma superfície emoldurada com as linhas de console dentro,
                  `grid-cols-1` sempre (redesenho retrô 2026-09-09, achado 2 do

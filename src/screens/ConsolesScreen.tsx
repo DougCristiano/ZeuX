@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleEntry, EmulatorEntry, LibraryFolder, Report, RetroArchCoreStatus } from "../api/types";
+import { FirstVisitTip } from "../components/FirstVisitTip";
 import {
   Button,
   CardSkeleton,
@@ -376,6 +377,10 @@ export function ConsolesScreen({
       />
 
       {error && <InlineError>{error}</InlineError>}
+
+      <FirstVisitTip id="consoles" title={t("tipTitle")} className="mb-4">
+        {t("tipBody")}
+      </FirstVisitTip>
 
       {/* Mostrador de prontidão — resumo E filtro na mesma peça (ver o doc
           comment do componente). Chassi único, células separadas por fios de

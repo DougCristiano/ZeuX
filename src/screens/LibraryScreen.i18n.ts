@@ -118,6 +118,12 @@ export const dict = {
     "pt-BR": "Consoles configurados",
     en: "Configured consoles",
   },
+  noConsolesFolderYetHelp: {
+    "pt-BR":
+      'Use "Selecionar pasta para todos os jogos" se cada console tem a própria subpasta, ou "Adicionar console" para apontar um de cada vez.',
+    en:
+      'Use "Select folder for all games" if each console has its own subfolder, or "Add console" to point to one at a time.',
+  },
   noConsolesFolderYet: {
     "pt-BR": "Nenhum console com pasta apontada ainda.",
     en: "No console with a folder assigned yet.",

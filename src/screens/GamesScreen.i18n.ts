@@ -127,6 +127,20 @@ export const dict = {
     "pt-BR": "Nenhum jogo achado ainda para este console.",
     en: "No games found yet for this console.",
   },
+  // Console com pasta apontada e nenhum jogo lido dela. Não diz quais
+  // extensões o ZeuX reconhece (a API não as expõe) e não culpa a pasta: diz o
+  // que conferir e onde fazer isso.
+  noGamesInFolderTitle: {
+    "pt-BR": "Nenhum jogo de {{shortName}} encontrado",
+    en: "No {{shortName}} games found",
+  },
+  noGamesInFolderHelp: {
+    "pt-BR":
+      "O ZeuX não leu nenhum arquivo de {{shortName}} da pasta apontada. Confira se ela é a pasta com os jogos deste console e, se os arquivos são recentes, use Revarrer no detalhe do console.",
+    en:
+      "ZeuX didn't read any {{shortName}} file from the folder you pointed to. Check that it's the folder holding this console's games and, if the files are new, use Rescan on the console page.",
+  },
+  checkFolders: { "pt-BR": "Conferir pastas", en: "Check folders" },
   noGamesTitle: {
     "pt-BR": "Nada para mostrar aqui",
     en: "Nothing to show here",

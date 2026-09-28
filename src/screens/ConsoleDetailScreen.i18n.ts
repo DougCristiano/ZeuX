@@ -169,11 +169,21 @@ export const dict = {
     "pt-BR": "{{count}} jogos encontrados",
     en: "{{count}} games found",
   },
+  // Dica de primeira visita, logo abaixo da trilha Emulador · Core · BIOS ·
+  // Pasta. Explica o vocabulário da trilha — em especial "o ZeuX não sabe",
+  // que descreve o que o ZeuX não consegue ler, não uma falta (princípio 4).
+  tipTrailTitle: { "pt-BR": "Como ler a linha acima", en: "How to read the line above" },
+  tipTrailBody: {
+    "pt-BR":
+      "Cada etiqueta é uma peça que este console precisa: emulador, core, BIOS e pasta de jogos. \"Falta\" é o que você resolve aqui embaixo; \"o ZeuX não sabe\" quer dizer que ele não consegue verificar aquela peça — não que esteja faltando.",
+    en:
+      "Each tag is a piece this console needs: emulator, core, BIOS and games folder. \"Missing\" is what you fix below; \"ZeuX doesn't know\" means it can't verify that piece — not that it's missing.",
+  },
   noFoldersAssigned: {
     "pt-BR":
-      "Nenhuma pasta apontada ainda. O ZeuX lê os jogos direto de onde eles já estão no seu disco — nada é copiado nem movido.",
+      "Nenhuma pasta apontada ainda. Escolha a pasta que tem os jogos de {{shortName}}: o ZeuX lê os arquivos direto de onde já estão no seu disco — nada é copiado nem movido.",
     en:
-      "No folder assigned yet. ZeuX reads games directly from where they are on your disk — nothing is copied or moved.",
+      "No folder assigned yet. Choose the folder that holds your {{shortName}} games: ZeuX reads the files directly from where they are on your disk — nothing is copied or moved.",
   },
   rescan: {
     "pt-BR": "Revarrer",

@@ -34,6 +34,19 @@ export const dict = {
       "The four screens shown the first time ZeuX opens — what it configures for you, the hardware verdict, the library and the social layer.",
   },
   replayTour: { "pt-BR": "Rever apresentação", en: "Replay walkthrough" },
+  replayTips: { "pt-BR": "Rever dicas", en: "Replay tips" },
+  tipsReplayed: {
+    "pt-BR": "Pronto — as dicas e a lista de primeiros passos voltam a aparecer na próxima vez que você abrir cada tela.",
+    en: "Done — tips and the getting-started list will show again the next time you open each screen.",
+  },
+  // Dica de primeira visita desta tela (FirstVisitTip).
+  tipTitle: { "pt-BR": "O que dá para ajustar aqui", en: "What you can adjust here" },
+  tipBody: {
+    "pt-BR":
+      "Idioma e efeitos visuais, a conta do IGDB (capas e informações dos jogos), o mapeamento dos controles e as atualizações. Nada aqui é obrigatório — o ZeuX já funciona com o que vem de fábrica.",
+    en:
+      "Language and visual effects, the IGDB account (game covers and info), controller mapping and updates. Nothing here is required — ZeuX already works out of the box.",
+  },
   updatesDescription: {
     "pt-BR": "Confira as releases oficiais do ZeuX no GitHub e instale uma versão nova diretamente pelo aplicativo.",
     en: "Check the official ZeuX releases on GitHub and install a new version directly from the app.",

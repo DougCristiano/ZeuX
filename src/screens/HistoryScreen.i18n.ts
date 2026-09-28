@@ -19,8 +19,10 @@ export const dict = {
   seeAllGames: { "pt-BR": "Ver todos os jogos", en: "See all games" },
   loading: { "pt-BR": "Carregando o histórico…", en: "Loading history…" },
   empty: {
-    "pt-BR": "O histórico aparece aqui depois que você abrir o primeiro jogo.",
-    en: "Your history shows up here after you open your first game.",
+    "pt-BR":
+      "Aqui ficam o tempo total de jogo e o ponto onde você parou em cada jogo. Abra qualquer jogo da biblioteca e o histórico começa a se preencher.",
+    en:
+      "This is where your total play time and where you left off in each game show up. Open any game from the library and the history starts filling in.",
   },
   emptyTitle: {
     "pt-BR": "Nada jogado ainda",

@@ -7,6 +7,8 @@ import { api, ApiError } from "../api";
 import type { EmulatorEntry, SystemInfo } from "../api/types";
 import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
+import { FirstVisitTip } from "../components/FirstVisitTip";
+import { resetHints } from "../lib/hints";
 import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, FILTER_CHIP_BASE, FILTER_CHIP_OFF, FILTER_CHIP_ON, FOCUS_RING, InlineError, inputClass, ScreenAtmosphere, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
@@ -95,6 +97,7 @@ export function SettingsScreen({
   // scripts/sync-version.mjs) — é a fonte de verdade que o próprio
   // auto-updater usa para decidir se há algo mais novo.
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [tipsReplayed, setTipsReplayed] = useState(false);
 
   useEffect(() => {
     getVersion()
@@ -274,12 +277,21 @@ export function SettingsScreen({
     }
   }
 
+  function handleReplayTips() {
+    resetHints();
+    setTipsReplayed(true);
+  }
+
   return (
     <ScreenContainer variant="listing" className="relative">
       {/* Céu da tela (2026-09-10) — halo ancorado no topo do conteúdo. */}
       <ScreenAtmosphere />
       {toastMessage && <Toast message={toastMessage} />}
       <ScreenHeader title={t("title")} />
+
+      <FirstVisitTip id="settings" title={t("tipTitle")} className="mb-6">
+        {t("tipBody")}
+      </FirstVisitTip>
 
       {/* Ordem (2026-09-28): do que muda a cara do app ao que quase ninguém
           abre. Idioma e efeitos visuais primeiro, lado a lado (são curtos, e
@@ -543,9 +555,19 @@ export function SettingsScreen({
         <Card filled>
           <SectionHeading className="mb-2">{t("tourHeading")}</SectionHeading>
           <p className="mb-4 text-sm text-muted">{t("tourDescription")}</p>
-          <Button variant="chrome" className="w-fit" onClick={onReplayTour}>
-            {t("replayTour")}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="chrome" className="w-fit" onClick={onReplayTour}>
+              {t("replayTour")}
+            </Button>
+            <Button variant="chrome" className="w-fit" onClick={handleReplayTips}>
+              {t("replayTips")}
+            </Button>
+          </div>
+          {tipsReplayed && (
+            <p role="status" className="mt-2 text-sm text-muted">
+              {t("tipsReplayed")}
+            </p>
+          )}
         </Card>
 
         <Card filled>

@@ -32,6 +32,7 @@ import {
   SectionHeading,
 } from "../components/ui";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { FirstVisitTip } from "../components/FirstVisitTip";
 import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { SaveDataPanel } from "../components/SaveDataPanel";
@@ -439,7 +440,7 @@ function GamesFolderSection({
 
         {folders.length === 0 ? (
           <p className="text-sm text-muted">
-            {t("noFoldersAssigned")}
+            {t("noFoldersAssigned", { shortName })}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -917,6 +918,12 @@ export function ConsoleDetailScreen({
           ))}
         </ul>
       </Card>
+
+      {/* Dica logo abaixo da trilha que ela explica — o `mb-6` do card acima
+          já separa da dica, então o espaço para a coluna vem daqui. */}
+      <FirstVisitTip id="console-detail" title={t("tipTrailTitle")} className="-mt-2 mb-6">
+        {t("tipTrailBody")}
+      </FirstVisitTip>
 
       {/* O6 (Sprint O) e a regra de layout responsivo do CLAUDE.md: coluna
           lateral com teto, nunca largura fixa; `lg` e não `xl` porque esta

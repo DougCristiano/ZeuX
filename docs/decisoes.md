@@ -1298,6 +1298,58 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### Primeiros passos, dicas de primeira visita e estados vazios que ensinam — 2026-09-28
+
+Pergunta do Douglas: "falta explicação maior de como o ZeuX funciona? um vídeo
+tutorial ou algo mais interativo?". A resposta foi três peças no próprio app,
+nenhuma delas um vídeo:
+
+1. **Lista de primeiros passos** (`FirstStepsChecklist`, acima da grade de
+   "Todos os jogos"): aponte a pasta · deixe um console pronto · abra o
+   primeiro jogo. Cada item se marca sozinho pelo estado real da máquina e
+   leva ao lugar onde se resolve. A regra é `lib/firstSteps.ts` e o passo do
+   meio **reaproveita `evaluateConsoleReadiness`** — a lista e a tela de
+   consoles dizem a mesma frase sobre o que falta. Some no primeiro jogo com
+   tempo medido, ou em "Dispensar".
+2. **Dicas de primeira visita** (`FirstVisitTip`): uma faixa por tela em
+   Consoles, detalhe do console (logo abaixo da trilha que explica) e
+   Configurações. "Entendi" a esconde para sempre; "Rever dicas", em
+   Configurações, traz de volta as dicas e a lista.
+3. **Estados vazios que ensinam**: histórico sem jogos, console com pasta mas
+   nenhum jogo lido, console sem pasta e a tela de pastas sem console agora
+   dizem o que aparece ali, o que conferir e onde resolver.
+
+**Por quê sem vídeo:** o visual mudou duas vezes em três dias, e vídeo
+envelhece a cada redesenho, precisaria de uma versão por idioma e quase
+ninguém o vê antes de jogar. Uma lista que lê o estado da máquina não
+envelhece.
+
+**Por quê faixa, e não balão apontando para um elemento:** o balão precisa
+medir o layout, e o layout muda a cada redesenho. A faixa é posicionada pelo
+próprio JSX e acompanha a tela sem manutenção.
+
+**Decisões pequenas que importam:**
+- A lista **não bloqueia**: "abrir o primeiro jogo" nunca espera o passo do
+  emulador, porque o RetroArch baixa o core sozinho ao abrir o jogo (princípio
+  5). Exigir o core antes seria mais rígido que o próprio ZeuX.
+- Se `GET /retroarch/cores` (ou qualquer dado da lista) falha, a lista **não
+  aparece** em vez de tratar a falha como "sem core" — afirmaria uma falta que
+  ela não verificou (princípio 4).
+- "Já jogou?" conta só sessão com duração medida > 0, então uma sessão que
+  morreu ao abrir ou foi encerrada sem duração (ver a entrada abaixo) não
+  encerra a lista.
+- Sem `localStorage`, a dica **não aparece** (erra para "já vi"), o oposto do
+  tour: uma dica por tela que voltasse a cada visita e não pudesse ser
+  dispensada seria um incômodo permanente.
+- O `EmptyState` da biblioteca vazia perdeu os três passos numerados que tinha
+  (2026-09-09): com a lista logo acima, eram duas listas de "comece por aqui"
+  que divergiam quando uma delas era dispensada.
+
+**O que quebra se desfizer:** tirar a lista deixa quem abre o ZeuX pela
+primeira vez de novo sem ver "o que falta" fora da tela de consoles; tirar a
+regra compartilhada com `consoleReadiness` faz a lista e a tela de consoles
+divergirem calada.
+
 ### Sessões abertas por uma execução anterior são encerradas ao subir o daemon — 2026-09-28
 
 Ao iniciar, o `zeuxd` encerra toda sessão com `ended_at` nulo

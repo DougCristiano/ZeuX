@@ -717,8 +717,12 @@ como dívida.
 **Fica de fora (de propósito):**
 - Console/jogo de exemplo com dado plausível — a preocupação já registrada
   acima: lê como dado falso. Ilustração esquemática não corre esse risco.
-- Tour contextual por tela ("dicas" que aparecem na primeira visita a cada
-  tela). É outro produto, e multiplica a superfície de manutenção.
+- ~~Tour contextual por tela~~ — **entrou em 2026-09-28**, a pedido do
+  Douglas, em versão enxuta: três faixas de dica (Consoles, detalhe do
+  console, Configurações) e uma lista de primeiros passos na biblioteca. Não
+  é balão apontando para elemento nem passo a passo sobre a tela; ver
+  `decisoes.md`, "Primeiros passos, dicas de primeira visita e estados vazios
+  que ensinam".
 - Vídeo, animação de produto, narração.
 - Repetir o tour por biblioteca vazia — isso já é coberto pelo `EmptyState`
   com passos numerados, entregue em 2026-09-09.

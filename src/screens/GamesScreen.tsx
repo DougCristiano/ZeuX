@@ -614,7 +614,17 @@ export function GamesScreen({
       )}
 
       {games && games.length === 0 && (
-        <EmptyState title={t("noGamesTitle")} message={t("noGamesFound")} />
+        <EmptyState
+          title={t("noGamesInFolderTitle", { shortName })}
+          message={t("noGamesInFolderHelp", { shortName })}
+          action={
+            onOpenConsole ? (
+              <Button variant="primary" onClick={onOpenConsole}>
+                {t("checkFolders")}
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       {games && games.length > 0 && (

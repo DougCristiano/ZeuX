@@ -6,6 +6,15 @@ export const dict = {
     "pt-BR": "O que cada console precisa para rodar nesta máquina: emulador, core, BIOS e pasta de jogos.",
     en: "What each console needs to run on this machine: emulator, core, BIOS, and games folder.",
   },
+  // Dica de primeira visita (FirstVisitTip): o que o mostrador e os cards
+  // querem dizer, sem julgar a máquina — só descreve o que o ZeuX tem no lugar.
+  tipTitle: { "pt-BR": "O que esta tela mostra", en: "What this screen shows" },
+  tipBody: {
+    "pt-BR":
+      "Cada card diz o que falta para aquele console abrir jogos, na ordem em que as peças se destravam: emulador, core, BIOS e pasta. Os números acima filtram a lista; clique num console para resolver a peça que falta.",
+    en:
+      "Each card says what a console still needs to open games, in the order the pieces unlock: emulator, core, BIOS and folder. The numbers above filter the list; click a console to fix the missing piece.",
+  },
   seeByEmulator: { "pt-BR": "Ver por emulador", en: "View by emulator" },
   seeConsole: { "pt-BR": "Ver console", en: "View console" },
   searchConsoleOrEmulator: {
