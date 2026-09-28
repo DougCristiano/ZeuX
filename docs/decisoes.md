@@ -1248,6 +1248,35 @@ Aumentar a largura do tour ou tirar o `ring` da moldura (trocando por
 módulos separados de propósito (o controle deriva dele as regiões do
 mapeamento).
 
+### Capa e informações do jogo viram etapas separadas da busca — 2026-09-28
+
+**O quê:** a busca em lote (`internal/igdb/scrape.go`) passou a ter duas
+etapas independentes por jogo: a **capa** (libretro-thumbnails primeiro, IGDB
+só se lá não houver) e as **informações** (sempre do IGDB, quando há conta):
+ano de lançamento, resumo, gêneros e desenvolvedora. Gravadas em colunas
+novas de `library_games` (migração 0010), com `metadata_status` no mesmo
+molde de `cover_status`. O lote inclui jogos que já têm capa mas nunca
+tiveram as informações buscadas (`library.ScrapeCandidates`). A busca no
+IGDB é feita no máximo uma vez por jogo — a etapa das informações reaproveita
+a consulta da capa quando houve. O detalhe do jogo mostra "desenvolvedora ·
+ano" abaixo do título e uma seção "Sobre o jogo" com gêneros e resumo.
+
+**Por quê:** o IGDB só era consultado quando o libretro não achava a capa, e
+mesmo então o ano era descartado — a maior parte da biblioteca nunca tinha
+dado nenhum sobre o jogo, e a tela chegou a mostrar o ano do *console* como
+se fosse do jogo. O resumo fica em inglês por decisão do Douglas (o IGDB só
+mantém esse idioma), com `lang="en"` e uma legenda dizendo a origem.
+
+Só a empresa marcada `developer` em `involved_companies` vira
+desenvolvedora: a lista também traz publicadoras e portadoras. Sem conta do
+IGDB (build local sem a credencial de teste), nada disso aparece — a seção
+some, nunca mostra palpite (princípio 4).
+
+**O que quebra se desfizer:** voltar a consultar o IGDB só como segunda fonte
+de capa deixa sem ano e sem resumo todo jogo cuja capa o libretro achou.
+Tirar o `metadata_status` faz o lote reconsultar para sempre os jogos que o
+IGDB não tem.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do

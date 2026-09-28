@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -93,7 +94,7 @@ func TestSearchGameNotFound(t *testing.T) {
 	if found {
 		t.Fatal("SearchGame: não deveria ter encontrado nada")
 	}
-	if match != (Match{}) {
+	if !reflect.DeepEqual(match, Match{}) {
 		t.Fatalf("SearchGame: esperado Match zerado, veio %+v", match)
 	}
 }

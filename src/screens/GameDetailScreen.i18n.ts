@@ -180,4 +180,11 @@ export const dict = {
     "pt-BR": "Não foi possível remover o jogo da biblioteca.",
     en: "Could not remove the game from the library.",
   },
+  // Seção de informações do IGDB (2026-09-28).
+  aboutGame: { "pt-BR": "Sobre o jogo", en: "About the game" },
+  genresLabel: { "pt-BR": "Gêneros", en: "Genres" },
+  summarySource: {
+    "pt-BR": "Resumo do IGDB — por enquanto só em inglês.",
+    en: "Summary from IGDB.",
+  },
 } satisfies Dict;

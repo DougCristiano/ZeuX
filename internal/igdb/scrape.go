@@ -99,7 +99,7 @@ func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error
 	// sobrescrever o quê — ver o comentário grande em processGame.
 	batch := len(gameIDs) == 0
 
-	games, err := m.resolveGames(ctx, gameIDs)
+	games, err := m.resolveGames(ctx, gameIDs, configured)
 	if err != nil {
 		return nil, err
 	}
@@ -136,9 +136,12 @@ func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error
 	return m.snapshot(job.ID), nil
 }
 
-func (m *ScrapeManager) resolveGames(ctx context.Context, gameIDs []int64) ([]library.Game, error) {
+// resolveGames devolve os jogos do lote (gameIDs vazio) ou os pedidos. No
+// lote, com conta do IGDB, entram também os jogos com capa mas sem as
+// informações buscadas — ver library.ScrapeCandidates.
+func (m *ScrapeManager) resolveGames(ctx context.Context, gameIDs []int64, configured bool) ([]library.Game, error) {
 	if len(gameIDs) == 0 {
-		return m.library.UncoveredGames(ctx)
+		return m.library.ScrapeCandidates(ctx, configured)
 	}
 
 	games := make([]library.Game, 0, len(gameIDs))
@@ -229,9 +232,13 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, configured bool, games 
 //     depois de uma troca manual.
 func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configured bool, root string, game library.Game, batch bool) GameResult {
 	result := GameResult{GameID: game.ID, Title: game.Title}
-	destDir := emulator.GameCoverDir(root, game.ConsoleID, game.ID)
-	destPath := filepath.Join(destDir, "cover.jpg")
 
+	// Capa e informações são duas etapas independentes desde 2026-09-28: a
+	// capa pode vir do libretro-thumbnails (sem conta), mas ano, resumo,
+	// gêneros e desenvolvedora só existem no IGDB. Antes o IGDB só era
+	// consultado quando o libretro não achava a capa — e a maior parte da
+	// biblioteca nunca ganhava essas informações.
+	coverNeeded, metaNeeded := true, configured
 	if batch {
 		fresh, ok, err := m.library.GameByID(ctx, game.ID)
 		if err != nil {
@@ -244,21 +251,53 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configu
 			result.Message = "jogo removido da biblioteca durante a busca"
 			return result
 		}
-		if fresh.CoverPath != "" {
+		coverNeeded = fresh.CoverPath == "" && fresh.CoverStatus == ""
+		metaNeeded = configured && fresh.MetadataStatus == ""
+		if !coverNeeded {
+			// O resultado reportado ao job é sempre o da capa (é o que a
+			// barra de progresso da tela conta); a busca de informações, se
+			// ainda faltar, segue abaixo sem mudar isso.
 			result.Status = "found"
-			return result
-		}
-		if fresh.CoverStatus != "" {
-			result.Status = fresh.CoverStatus
-			return result
+			if fresh.CoverPath == "" {
+				result.Status = fresh.CoverStatus
+			}
 		}
 	}
 
-	// Libretro-thumbnails primeiro (thumbnails.go): sem conta, sem cota
-	// compartilhada. Só segue pro IGDB abaixo se esta fonte não achar nada
-	// para este console/nome de arquivo — nunca ao contrário, e uma falha de
-	// rede aqui não impede a tentativa pelo IGDB (mesma regra de "erro de
-	// uma fonte não pode travar a busca do jogo", só vira log).
+	// A busca no IGDB é feita no máximo uma vez por jogo: se a etapa da capa
+	// precisou dela, a etapa das informações reaproveita o resultado.
+	var (
+		match     Match
+		found     bool
+		searched  bool
+		searchErr error
+	)
+	search := func() {
+		if !searched {
+			match, found, searchErr = client.SearchGame(ctx, game.Title)
+			searched = true
+		}
+	}
+
+	if coverNeeded {
+		result = m.resolveCover(ctx, client, configured, root, game, batch, search, &match, &found, &searchErr)
+	}
+	if metaNeeded {
+		search()
+		m.saveMetadata(ctx, game.ID, match, found, searchErr)
+	}
+	return result
+}
+
+// resolveCover é a etapa da capa de processGame: libretro-thumbnails
+// primeiro (sem conta, sem cota compartilhada) e, só se lá não houver nada,
+// o IGDB. Uma falha de rede no libretro não impede a tentativa pelo IGDB —
+// erro de uma fonte não trava a busca do jogo, só vira log.
+func (m *ScrapeManager) resolveCover(ctx context.Context, client *Client, configured bool, root string, game library.Game, batch bool, search func(), match *Match, found *bool, searchErr *error) GameResult {
+	result := GameResult{GameID: game.ID, Title: game.Title}
+	destDir := emulator.GameCoverDir(root, game.ConsoleID, game.ID)
+	destPath := filepath.Join(destDir, "cover.jpg")
+
 	thumbFound, thumbErr := FetchLibretroThumbnail(ctx, game.ConsoleID, library.RawBaseName(game.Path), destPath)
 	if thumbErr != nil {
 		m.logger.Warn("libretro-thumbnails falhou, seguindo pro IGDB", "jogo", game.ID, "erro", thumbErr)
@@ -278,37 +317,21 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configu
 		// tentar a segunda fonte — não é um erro deste jogo (SearchGame
 		// nunca chegou a ser chamado), é "não achamos, e por quê":
 		// conectar uma conta em Configurações destrava o restante.
-		var setErr error
-		if batch {
-			_, setErr = m.library.SetCoverStatusIfUncovered(ctx, game.ID, "not_found")
-		} else {
-			setErr = m.library.SetCoverStatus(ctx, game.ID, "not_found")
-		}
-		if setErr != nil {
-			m.logger.Error("gravando status de capa não encontrada", "jogo", game.ID, "erro", setErr)
-		}
+		m.markCoverStatus(ctx, game.ID, "not_found", batch)
 		result.Status = "not_found"
 		result.Message = "não encontrada em libretro-thumbnails; conecte uma conta do IGDB em Configurações para tentar também essa fonte"
 		return result
 	}
 
-	match, found, err := client.SearchGame(ctx, game.Title)
-	if err != nil {
-		m.markError(ctx, game.ID, err, batch)
+	search()
+	if *searchErr != nil {
+		m.markError(ctx, game.ID, *searchErr, batch)
 		result.Status = "error"
-		result.Message = err.Error()
+		result.Message = (*searchErr).Error()
 		return result
 	}
-	if !found || match.ImageID == "" {
-		var setErr error
-		if batch {
-			_, setErr = m.library.SetCoverStatusIfUncovered(ctx, game.ID, "not_found")
-		} else {
-			setErr = m.library.SetCoverStatus(ctx, game.ID, "not_found")
-		}
-		if setErr != nil {
-			m.logger.Error("gravando status de capa não encontrada", "jogo", game.ID, "erro", setErr)
-		}
+	if !*found || match.ImageID == "" {
+		m.markCoverStatus(ctx, game.ID, "not_found", batch)
 		result.Status = "not_found"
 		return result
 	}
@@ -328,6 +351,43 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configu
 
 	result.Status = "found"
 	return result
+}
+
+// markCoverStatus grava 'not_found' na capa — condicional no lote, para não
+// passar por cima de uma capa escolhida à mão no meio da busca (ver
+// processGame), incondicional no pedido de um jogo só.
+func (m *ScrapeManager) markCoverStatus(ctx context.Context, gameID int64, status string, batch bool) {
+	var err error
+	if batch {
+		_, err = m.library.SetCoverStatusIfUncovered(ctx, gameID, status)
+	} else {
+		err = m.library.SetCoverStatus(ctx, gameID, status)
+	}
+	if err != nil {
+		m.logger.Error("gravando status de capa", "jogo", gameID, "status", status, "erro", err)
+	}
+}
+
+// saveMetadata é a etapa das informações de processGame. Falha aqui nunca
+// muda o resultado da capa — é um dado a mais, não o motivo do job.
+func (m *ScrapeManager) saveMetadata(ctx context.Context, gameID int64, match Match, found bool, searchErr error) {
+	var err error
+	switch {
+	case searchErr != nil:
+		err = m.library.SetMetadataStatus(ctx, gameID, "error")
+	case !found:
+		err = m.library.SetMetadataStatus(ctx, gameID, "not_found")
+	default:
+		err = m.library.SetMetadata(ctx, gameID, library.Metadata{
+			ReleaseYear: match.ReleaseYear,
+			Summary:     match.Summary,
+			Genres:      match.Genres,
+			Developer:   match.Developer,
+		})
+	}
+	if err != nil {
+		m.logger.Error("gravando as informações do jogo", "jogo", gameID, "erro", err)
+	}
 }
 
 // saveResolvedCover grava no banco o caminho (relativo a root) de uma capa

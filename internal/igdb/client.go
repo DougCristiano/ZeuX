@@ -95,11 +95,17 @@ func waitRateLimit(ctx context.Context) error {
 	}
 }
 
-// Match é o resultado de uma busca por título no IGDB.
+// Match é o resultado de uma busca por título no IGDB. Tudo além de Name é
+// opcional — o IGDB não tem todos os campos de todo jogo, e o que faltar fica
+// no zero-value (desconhecido), nunca preenchido com palpite.
 type Match struct {
 	Name        string
 	ImageID     string
 	ReleaseYear int
+	// Summary vem em inglês: é o único idioma que o IGDB mantém.
+	Summary   string
+	Genres    []string
+	Developer string
 }
 
 // Client fala com a API do IGDB usando a credencial de um usuário.
@@ -240,10 +246,22 @@ type coverField struct {
 	ImageID string `json:"image_id"`
 }
 
+type namedField struct {
+	Name string `json:"name"`
+}
+
+type involvedCompany struct {
+	Developer bool       `json:"developer"`
+	Company   namedField `json:"company"`
+}
+
 type gameResult struct {
-	Name             string      `json:"name"`
-	FirstReleaseDate int64       `json:"first_release_date"`
-	Cover            *coverField `json:"cover"`
+	Name              string            `json:"name"`
+	FirstReleaseDate  int64             `json:"first_release_date"`
+	Cover             *coverField       `json:"cover"`
+	Summary           string            `json:"summary"`
+	Genres            []namedField      `json:"genres"`
+	InvolvedCompanies []involvedCompany `json:"involved_companies"`
 }
 
 // SearchGame procura um jogo pelo título. Nenhum resultado não é erro — é
@@ -257,7 +275,7 @@ func (c *Client) SearchGame(ctx context.Context, title string) (Match, bool, err
 		return Match{}, false, err
 	}
 
-	body := fmt.Sprintf("search %q; fields name,cover.image_id,first_release_date; limit 1;", title)
+	body := fmt.Sprintf("search %q; fields name,cover.image_id,first_release_date,summary,genres.name,involved_companies.developer,involved_companies.company.name; limit 1;", title)
 
 	reqURL := igdbAPIBase + "/games"
 	if err := checkHost(reqURL); err != nil {
@@ -279,6 +297,21 @@ func (c *Client) SearchGame(ctx context.Context, title string) (Match, bool, err
 	}
 	if game.Cover != nil {
 		match.ImageID = game.Cover.ImageID
+	}
+	match.Summary = strings.TrimSpace(game.Summary)
+	for _, genre := range game.Genres {
+		if genre.Name != "" {
+			match.Genres = append(match.Genres, genre.Name)
+		}
+	}
+	// Só a empresa marcada como desenvolvedora — `involved_companies` também
+	// traz publicadoras e portadoras, e "Capcom" como desenvolvedora de um
+	// jogo que ela só publicou seria informação errada.
+	for _, company := range game.InvolvedCompanies {
+		if company.Developer && company.Company.Name != "" {
+			match.Developer = company.Company.Name
+			break
+		}
 	}
 
 	return match, true, nil

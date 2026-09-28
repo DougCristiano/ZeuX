@@ -13,6 +13,7 @@ package library
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -36,10 +37,10 @@ type Folder struct {
 // Game é uma entrada encontrada na varredura de uma Folder. Path aponta para
 // o arquivo no disco do usuário — nunca uma cópia.
 type Game struct {
-	ID        int64     `json:"id"`
-	FolderID  int64     `json:"folder_id"`
-	ConsoleID string    `json:"console_id"`
-	Path      string    `json:"path"`
+	ID        int64  `json:"id"`
+	FolderID  int64  `json:"folder_id"`
+	ConsoleID string `json:"console_id"`
+	Path      string `json:"path"`
 
 	// Title é o título de EXIBIÇÃO já resolvido: o override manual quando
 	// existe, senão o derivado do nome do arquivo. Quem lê Title nunca precisa
@@ -86,6 +87,79 @@ type Game struct {
 	// varredura seguinte não desfaz a flag (ver SyncFolder). Sempre presente
 	// no JSON mesmo quando `false`, mesmo motivo de Favorite.
 	Excluded bool `json:"excluded"`
+
+	// Informações do IGDB (2026-09-28). Zero/vazio = desconhecido — o IGDB
+	// não achou o jogo, não há conta configurada, ou ainda não foi buscado;
+	// `omitempty` faz o campo sumir do JSON nesse caso, para a tela nunca
+	// mostrar um "0" ou um ano que não é deste jogo. O resumo vem em inglês
+	// (é o que o IGDB tem), decisão do Douglas.
+	ReleaseYear int      `json:"release_year,omitempty"`
+	Summary     string   `json:"summary,omitempty"`
+	Genres      []string `json:"genres,omitempty"`
+	Developer   string   `json:"developer,omitempty"`
+
+	// MetadataStatus é o `CoverStatus` das informações: '' nunca tentou,
+	// 'found', 'not_found', 'error'. Fica fora do JSON como CoverStatus.
+	MetadataStatus string `json:"-"`
+}
+
+// Metadata é o que a busca no IGDB grava de um jogo (SetMetadata).
+type Metadata struct {
+	ReleaseYear int
+	Summary     string
+	Genres      []string
+	Developer   string
+}
+
+// gameColumns e scanGame existem porque a mesma lista de colunas era copiada
+// em cinco consultas, cada uma com seu `Scan` — um campo novo exigia cinco
+// edições idênticas, e esquecer uma quebrava só aquela tela.
+const gameColumns = `id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded, release_year, summary, genres, developer, metadata_status`
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanGame(row rowScanner) (Game, error) {
+	var (
+		game     Game
+		addedAt  string
+		missing  int
+		favorite int
+		excluded int
+		genres   string
+	)
+	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded, &game.ReleaseYear, &game.Summary, &genres, &game.Developer, &game.MetadataStatus); err != nil {
+		return Game{}, err
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, addedAt)
+	if err != nil {
+		return Game{}, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
+	}
+	game.AddedAt = parsed
+	game.Missing = missing != 0
+	game.Favorite = favorite != 0
+	game.Excluded = excluded != 0
+	if genres != "" && genres != "[]" {
+		if err := json.Unmarshal([]byte(genres), &game.Genres); err != nil {
+			return Game{}, fmt.Errorf("interpretando os gêneros do jogo %d: %w", game.ID, err)
+		}
+	}
+	return game, nil
+}
+
+// scanGames lê todas as linhas de uma consulta feita com gameColumns.
+func scanGames(rows *sql.Rows) ([]Game, error) {
+	defer rows.Close()
+	var games []Game
+	for rows.Next() {
+		game, err := scanGame(rows)
+		if err != nil {
+			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
+		}
+		games = append(games, game)
+	}
+	return games, rows.Err()
 }
 
 // NewGame é o que a varredura (L2) precisa fornecer para gravar uma entrada;
@@ -387,7 +461,7 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 		conditions = append(conditions, `excluded = 0`)
 	}
 
-	sqlQuery := `SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded FROM library_games`
+	sqlQuery := `SELECT ` + gameColumns + ` FROM library_games`
 	if len(conditions) > 0 {
 		sqlQuery += " WHERE " + strings.Join(conditions, " AND ")
 	}
@@ -397,32 +471,7 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 	if err != nil {
 		return nil, fmt.Errorf("lendo jogos: %w", err)
 	}
-	defer rows.Close()
-
-	var games []Game
-	for rows.Next() {
-		var (
-			game     Game
-			addedAt  string
-			missing  int
-			favorite int
-			excluded int
-		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
-			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
-		}
-		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
-		if err != nil {
-			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
-		}
-		game.AddedAt = parsed
-		game.Missing = missing != 0
-		game.Favorite = favorite != 0
-		game.Excluded = excluded != 0
-		games = append(games, game)
-	}
-
-	return games, rows.Err()
+	return scanGames(rows)
 }
 
 // escapeLike escapa os curingas do SQLite LIKE (`%`, `_`) e o próprio
@@ -439,7 +488,7 @@ func escapeLike(s string) string {
 // antigos.
 func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT `+gameColumns+`
 		FROM library_games
 		WHERE console_id = ? AND excluded = 0
 		ORDER BY id DESC
@@ -447,32 +496,7 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 	if err != nil {
 		return nil, fmt.Errorf("lendo jogos: %w", err)
 	}
-	defer rows.Close()
-
-	var games []Game
-	for rows.Next() {
-		var (
-			game     Game
-			addedAt  string
-			missing  int
-			favorite int
-			excluded int
-		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
-			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
-		}
-		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
-		if err != nil {
-			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
-		}
-		game.AddedAt = parsed
-		game.Missing = missing != 0
-		game.Favorite = favorite != 0
-		game.Excluded = excluded != 0
-		games = append(games, game)
-	}
-
-	return games, rows.Err()
+	return scanGames(rows)
 }
 
 // GameByID devolve um jogo pelo identificador, ou false se não existir —
@@ -480,33 +504,17 @@ func (s *Store) ListGames(ctx context.Context, consoleID string) ([]Game, error)
 // título antes de disparar a consulta ao IGDB.
 func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT `+gameColumns+`
 		FROM library_games WHERE id = ?
 	`, id)
 
-	var (
-		game     Game
-		addedAt  string
-		missing  int
-		favorite int
-		excluded int
-	)
-	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
+	game, err := scanGame(row)
+	if err != nil {
 		if err == sql.ErrNoRows {
 			return Game{}, false, nil
 		}
 		return Game{}, false, fmt.Errorf("procurando o jogo %d: %w", id, err)
 	}
-
-	parsed, err := time.Parse(time.RFC3339Nano, addedAt)
-	if err != nil {
-		return Game{}, false, fmt.Errorf("interpretando added_at do jogo %d: %w", id, err)
-	}
-	game.AddedAt = parsed
-	game.Missing = missing != 0
-	game.Favorite = favorite != 0
-	game.Excluded = excluded != 0
-
 	return game, true, nil
 }
 
@@ -516,39 +524,14 @@ func (s *Store) GameByID(ctx context.Context, id int64) (Game, bool, error) {
 // conseguir consultá-las.
 func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT `+gameColumns+`
 		FROM library_games
 		WHERE folder_id = ?
 	`, folderID)
 	if err != nil {
 		return nil, fmt.Errorf("lendo jogos da pasta %d: %w", folderID, err)
 	}
-	defer rows.Close()
-
-	var games []Game
-	for rows.Next() {
-		var (
-			game     Game
-			addedAt  string
-			missing  int
-			favorite int
-			excluded int
-		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
-			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
-		}
-		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
-		if err != nil {
-			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
-		}
-		game.AddedAt = parsed
-		game.Missing = missing != 0
-		game.Favorite = favorite != 0
-		game.Excluded = excluded != 0
-		games = append(games, game)
-	}
-
-	return games, rows.Err()
+	return scanGames(rows)
 }
 
 // UncoveredGames devolve os jogos ainda elegíveis para a busca em lote (G1):
@@ -558,7 +541,7 @@ func (s *Store) GamesByFolder(ctx context.Context, folderID int64) ([]Game, erro
 // específico via ClearCover.
 func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded
+		SELECT `+gameColumns+`
 		FROM library_games
 		WHERE cover_path = '' AND cover_status = '' AND excluded = 0
 		ORDER BY id
@@ -566,32 +549,61 @@ func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 	if err != nil {
 		return nil, fmt.Errorf("lendo jogos sem capa: %w", err)
 	}
-	defer rows.Close()
+	return scanGames(rows)
+}
 
-	var games []Game
-	for rows.Next() {
-		var (
-			game     Game
-			addedAt  string
-			missing  int
-			favorite int
-			excluded int
-		)
-		if err := rows.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded); err != nil {
-			return nil, fmt.Errorf("lendo linha de jogo: %w", err)
-		}
-		parsed, err := time.Parse(time.RFC3339Nano, addedAt)
-		if err != nil {
-			return nil, fmt.Errorf("interpretando added_at do jogo %d: %w", game.ID, err)
-		}
-		game.AddedAt = parsed
-		game.Missing = missing != 0
-		game.Favorite = favorite != 0
-		game.Excluded = excluded != 0
-		games = append(games, game)
+// ScrapeCandidates é UncoveredGames mais os jogos que já têm capa mas nunca
+// tiveram as informações do IGDB buscadas (2026-09-28) — só quando há conta
+// do IGDB (withMetadata), porque sem ela não há de onde tirar esses dados e o
+// lote passaria por jogo nenhum de útil. Sem isso, uma biblioteca com todas as
+// capas já resolvidas (pelo libretro-thumbnails) nunca ganharia ano/resumo.
+func (s *Store) ScrapeCandidates(ctx context.Context, withMetadata bool) ([]Game, error) {
+	if !withMetadata {
+		return s.UncoveredGames(ctx)
 	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+gameColumns+`
+		FROM library_games
+		WHERE excluded = 0 AND ((cover_path = '' AND cover_status = '') OR metadata_status = '')
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("lendo jogos para a busca: %w", err)
+	}
+	return scanGames(rows)
+}
 
-	return games, rows.Err()
+// SetMetadata grava as informações do IGDB de um jogo e marca a busca como
+// feita. Os gêneros viram array JSON (a coluna é TEXT).
+func (s *Store) SetMetadata(ctx context.Context, gameID int64, meta Metadata) error {
+	genres := meta.Genres
+	if genres == nil {
+		genres = []string{}
+	}
+	encoded, err := json.Marshal(genres)
+	if err != nil {
+		return fmt.Errorf("codificando os gêneros do jogo %d: %w", gameID, err)
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE library_games
+		SET release_year = ?, summary = ?, genres = ?, developer = ?, metadata_status = 'found'
+		WHERE id = ?
+	`, meta.ReleaseYear, meta.Summary, string(encoded), meta.Developer, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando as informações do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+// SetMetadataStatus marca a busca de informações como 'not_found' ou 'error'
+// sem apagar o que já havia — um erro de rede numa nova busca não deveria
+// sumir com o ano que uma busca anterior já achou.
+func (s *Store) SetMetadataStatus(ctx context.Context, gameID int64, status string) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET metadata_status = ? WHERE id = ?`, status, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando o status das informações do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
 }
 
 // SetCover grava a capa resolvida para um jogo — path é relativo a
@@ -608,7 +620,7 @@ func (s *Store) SetCover(ctx context.Context, gameID int64, path string) error {
 }
 
 // SetCoverIfUncovered é SetCover, só que condicional: só grava se o jogo
-// ainda estiver "sem capa nem status" (cover_path='' AND cover_status='')
+// ainda estiver "sem capa nem status" (cover_path=” AND cover_status=”)
 // no exato momento da escrita. Existe para o lote automático de busca
 // (2026-09-08): entre o instante em que um jogo entra na lista de
 // UncoveredGames e o instante em que este lote termina de baixar a capa

@@ -578,6 +578,14 @@ export type LibraryGame = {
    * quando a capa ainda não foi resolvida ou o IGDB não tem o jogo; a tela
    * cai no placeholder de sigla. */
   cover_url?: string;
+  /** Informações do IGDB (2026-09-28). Todas ausentes quando desconhecidas —
+   * sem conta do IGDB, jogo não achado, ou ainda não buscado. Nunca um
+   * valor de palpite: a tela omite o que não vier. */
+  release_year?: number;
+  /** Em inglês — é o único idioma que o IGDB mantém (decisão do Douglas). */
+  summary?: string;
+  genres?: string[];
+  developer?: string;
 };
 
 // --- Scraper de metadados IGDB (G1, docs/roadmap.md) ---

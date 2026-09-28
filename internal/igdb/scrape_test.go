@@ -5,11 +5,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/doufl/zeux/internal/emulator"
 	"github.com/doufl/zeux/internal/library"
 	"github.com/doufl/zeux/internal/store"
 )
@@ -266,7 +268,7 @@ func TestScrapeRunsWithoutAnyCredentialFallingBackToNotFound(t *testing.T) {
 	setManagedRootEnv(t)
 	lib := newTestLibrary(t)
 	credsStore := newTestCredentialsStore(t) // nunca Save() — sem credencial pessoal
-	withDefaultCredentials(t, "", "")         // e sem credencial padrão embutida
+	withDefaultCredentials(t, "", "")        // e sem credencial padrão embutida
 
 	game := seedGame(t, lib, "nes", "Jogo Sem Capa Em Lugar Nenhum")
 
@@ -437,5 +439,117 @@ func TestScrapeEmptyBatchResultsIsNeverNil(t *testing.T) {
 	}
 	if len(done.Results) != 0 {
 		t.Fatalf("esperava lote vazio, veio %d resultados", len(done.Results))
+	}
+}
+
+// igdbWithMetadata responde a busca de "Chrono Trigger" com ano, resumo,
+// gêneros e uma publicadora que NÃO é desenvolvedora antes da que é.
+func igdbWithMetadata(t *testing.T) {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/token", tokenHandler)
+	mux.HandleFunc("/v4/games", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[{"name":"Chrono Trigger","first_release_date":795052800,"cover":{"id":1,"image_id":"abcd1234"},` +
+			`"summary":"  A time-travel RPG.  ","genres":[{"name":"Role-playing (RPG)"},{"name":"Adventure"}],` +
+			`"involved_companies":[{"developer":false,"company":{"name":"Nintendo"}},{"developer":true,"company":{"name":"Square"}}]}]`))
+	})
+	mux.HandleFunc("/images/upload/t_cover_big/abcd1234.jpg", imageEndpoint())
+	fakeIGDBServer(t, mux)
+}
+
+func libretroHasChronoTrigger(t *testing.T) {
+	t.Helper()
+	thumbMux := http.NewServeMux()
+	thumbMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/Nintendo - Super Nintendo Entertainment System/Named_Boxarts/Chrono Trigger.png" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write([]byte("capa-libretro"))
+	})
+	fakeLibretroThumbnailsServer(t, thumbMux)
+}
+
+// Trava a separação de 2026-09-28: a capa vir do libretro-thumbnails não
+// pode mais impedir a busca das informações no IGDB — antes o IGDB só era
+// consultado quando o libretro não achava capa, e ano/resumo nunca apareciam
+// para a maior parte da biblioteca. Trava também que só a empresa marcada
+// como desenvolvedora vira `Developer` (a publicadora vem antes na lista).
+func TestScrapeFetchesMetadataEvenWhenCoverComesFromLibretro(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	credsStore := newTestCredentialsStore(t)
+	if err := credsStore.Save(testCredentials()); err != nil {
+		t.Fatalf("Save credenciais: %v", err)
+	}
+	game := seedGame(t, lib, "snes", "Chrono Trigger")
+	igdbWithMetadata(t)
+	libretroHasChronoTrigger(t)
+
+	manager := NewScrapeManager(lib, credsStore, silentLogger())
+	job, err := manager.Start(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	waitJobDone(t, manager, job.ID)
+
+	got, _, err := lib.GameByID(context.Background(), game.ID)
+	if err != nil {
+		t.Fatalf("GameByID: %v", err)
+	}
+	root, err := emulator.ManagedRoot()
+	if err != nil {
+		t.Fatalf("ManagedRoot: %v", err)
+	}
+	cover, err := os.ReadFile(filepath.Join(root, got.CoverPath))
+	if err != nil || string(cover) != "capa-libretro" {
+		t.Fatalf("a capa deveria ter vindo do libretro-thumbnails, veio %q (err %v)", cover, err)
+	}
+	if got.ReleaseYear != 1995 || got.Summary != "A time-travel RPG." || got.Developer != "Square" {
+		t.Fatalf("informações = ano %d, resumo %q, desenvolvedora %q; esperado 1995, \"A time-travel RPG.\", \"Square\"",
+			got.ReleaseYear, got.Summary, got.Developer)
+	}
+	if len(got.Genres) != 2 || got.Genres[0] != "Role-playing (RPG)" {
+		t.Fatalf("gêneros = %v", got.Genres)
+	}
+	if got.MetadataStatus != "found" {
+		t.Fatalf("metadata_status = %q, esperado \"found\"", got.MetadataStatus)
+	}
+}
+
+// Trava que uma biblioteca já com capa em tudo (o caso de quem usou o ZeuX
+// antes desta mudança) ainda ganha as informações no próximo lote — sem
+// isso, ScrapeCandidates só olharia jogo sem capa e ninguém veria o ano.
+func TestScrapeBatchPicksUpCoveredGamesMissingMetadata(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	credsStore := newTestCredentialsStore(t)
+	if err := credsStore.Save(testCredentials()); err != nil {
+		t.Fatalf("Save credenciais: %v", err)
+	}
+	game := seedGame(t, lib, "snes", "Chrono Trigger")
+	if err := lib.SetCover(context.Background(), game.ID, "covers/snes/1/cover.jpg"); err != nil {
+		t.Fatalf("SetCover: %v", err)
+	}
+	igdbWithMetadata(t)
+	fakeLibretroThumbnailsServer(t, http.NewServeMux())
+
+	manager := NewScrapeManager(lib, credsStore, silentLogger())
+	job, err := manager.Start(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if job.Total != 1 {
+		t.Fatalf("Total = %d, esperado 1 (jogo com capa mas sem informações)", job.Total)
+	}
+	waitJobDone(t, manager, job.ID)
+
+	got, _, _ := lib.GameByID(context.Background(), game.ID)
+	if got.CoverPath != "covers/snes/1/cover.jpg" {
+		t.Fatalf("a capa existente não pode ser trocada pelo lote: %q", got.CoverPath)
+	}
+	if got.ReleaseYear != 1995 {
+		t.Fatalf("release_year = %d, esperado 1995", got.ReleaseYear)
 	}
 }

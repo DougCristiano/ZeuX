@@ -380,6 +380,7 @@ export function GameDetailScreen({
 
   const status = statusFor(game.id);
   const verdict = report?.verdicts.find((v) => v.console_id === game.console_id);
+  const hasAbout = Boolean(game.summary || (game.genres && game.genres.length > 0));
   const heroCoverUrl = coverImageURL(coverUrl, coverVersion || undefined);
   const accent = consoleAccentColor(game.console_id);
 
@@ -576,6 +577,14 @@ export function GameDetailScreen({
             <Badge accentColor={accent}>{consoleName}</Badge>
             {game.missing && <Badge>{t("missingFile")}</Badge>}
           </div>
+          {/* Ano e desenvolvedora DO JOGO, vindos do IGDB (2026-09-28). O
+              ano do console deixou de aparecer aqui por ser lido como ano do
+              jogo; este só aparece quando o IGDB o informou. */}
+          {(game.release_year || game.developer) && (
+            <p className="mt-2 font-mono text-sm tracking-wide text-muted">
+              {[game.developer, game.release_year].filter(Boolean).join(" · ")}
+            </p>
+          )}
         </div>
 
         <Button
@@ -954,17 +963,52 @@ export function GameDetailScreen({
             consoles da VerdictScreen, um card solto embaixo do hero não
             dizia sozinho o que ele responde. O título fala do jogo, nunca da
             máquina (princípio 2 do CLAUDE.md). */}
-        {verdict && (
-          <section className="lg:col-span-2">
-            <SectionHeading className="mb-3">{t("howItRuns")}</SectionHeading>
-            <ConsoleVerdictCard verdict={verdict} />
-          </section>
+        {(verdict || hasAbout) && (
+          <div className="flex flex-col gap-6 lg:col-span-2">
+            {/* "Sobre o jogo" (2026-09-28): gêneros e resumo vindos do IGDB.
+                Some por inteiro quando não há nada — sem conta do IGDB, ou
+                jogo que o IGDB não tem —, nunca uma seção vazia nem texto de
+                palpite. O resumo é em inglês (o IGDB só tem esse idioma,
+                decisão do Douglas): `lang="en"` para o leitor de tela
+                pronunciar certo, e a legenda diz de onde veio e por que está
+                em inglês. */}
+            {hasAbout && (
+              <section>
+                <SectionHeading className="mb-3">{t("aboutGame")}</SectionHeading>
+                <Card filled className="flex flex-col gap-3">
+                  {game.genres && game.genres.length > 0 && (
+                    <ul className="flex flex-wrap gap-1.5" aria-label={t("genresLabel")}>
+                      {game.genres.map((genre) => (
+                        <li key={genre}>
+                          <Badge>{genre}</Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {game.summary && (
+                    <>
+                      <p lang="en" className="max-w-prose text-sm leading-relaxed whitespace-pre-line text-ink">
+                        {game.summary}
+                      </p>
+                      <p className="font-mono text-[11px] tracking-wide text-muted">{t("summarySource")}</p>
+                    </>
+                  )}
+                </Card>
+              </section>
+            )}
+
+            {verdict && (
+              <section>
+                <SectionHeading className="mb-3">{t("howItRuns")}</SectionHeading>
+                <ConsoleVerdictCard verdict={verdict} />
+              </section>
+            )}
+          </div>
         )}
 
-        {/* Sem parecer (console fora do catálogo, ou relatório sem esse
-            console), a coluna de serviço ocupa a largura toda em vez de
-            deixar duas colunas vazias à esquerda dela. */}
-        <div className={`flex flex-col gap-6 ${verdict ? "" : "lg:col-span-3"}`}>
+        {/* Sem parecer nem informações do jogo, a coluna de serviço ocupa a
+            largura toda em vez de deixar duas colunas vazias à esquerda. */}
+        <div className={`flex flex-col gap-6 ${verdict || hasAbout ? "" : "lg:col-span-3"}`}>
           <section>
             <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
             <Card filled>
