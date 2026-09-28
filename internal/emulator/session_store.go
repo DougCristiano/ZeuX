@@ -66,6 +66,46 @@ func (s *SQLiteSessions) Close(ctx context.Context, id string, endedAt time.Time
 	return nil
 }
 
+// OrphanedSessionMessage vai em exit_error das sessões encerradas por
+// CloseOrphaned, para o histórico dizer por que aquela sessão não tem
+// duração em vez de mostrar um zero sem explicação.
+const OrphanedSessionMessage = "O ZeuX foi fechado com o jogo aberto, então a duração desta sessão não pôde ser medida."
+
+// CloseOrphaned encerra as sessões que ficaram abertas de uma execução
+// anterior do daemon e devolve quantas eram.
+//
+// Quem fecha uma sessão é a goroutine `supervise`, esperando o processo do
+// emulador — e ela morre junto com o daemon. Se o ZeuX é fechado (ou
+// reiniciado por uma atualização) com o jogo aberto, a linha fica com
+// ended_at nulo para sempre: a interface mostrava o jogo "em andamento" dias
+// depois, e o Playtime somava time.Since(started_at), fazendo o tempo jogado
+// crescer sozinho. Relatado pelo Douglas em 2026-09-28 depois de atualizar
+// para a v0.1.30.
+//
+// Nenhum processo novo do daemon consegue acompanhar o emulador antigo (o pid
+// não é gravado, e mesmo que fosse, não daria para esperar um processo que
+// não é filho deste), então a única resposta honesta é encerrar a sessão.
+// ended_at = started_at, e não "agora": o fim real é desconhecido, e somar
+// zero ao tempo jogado deixa de contar um tempo que não foi medido, em vez de
+// inventar um (princípio 4 do CLAUDE.md).
+//
+// Precisa rodar ao subir o daemon, antes de qualquer Launch — depois disso,
+// uma sessão aberta é uma sessão viva deste processo.
+func (s *SQLiteSessions) CloseOrphaned(ctx context.Context) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE sessions SET ended_at = started_at, exit_error = ? WHERE ended_at IS NULL
+	`, OrphanedSessionMessage)
+	if err != nil {
+		return 0, fmt.Errorf("encerrando sessões que ficaram abertas: %w", err)
+	}
+
+	closed, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("contando sessões encerradas: %w", err)
+	}
+	return closed, nil
+}
+
 // List devolve todas as sessões, da mais recente para a mais antiga.
 func (s *SQLiteSessions) List(ctx context.Context) ([]Session, error) {
 	rows, err := s.db.QueryContext(ctx, `

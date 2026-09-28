@@ -99,7 +99,15 @@ func run(addr string, parentStdinWatchdog bool, logger *slog.Logger) error {
 		return fmt.Errorf("semeando perfis de controle: %w", err)
 	}
 
-	launcher := emulator.NewLauncher(registry, emulator.NewSQLiteSessions(db), userConfig, logger)
+	sessions := emulator.NewSQLiteSessions(db)
+	orphaned, err := sessions.CloseOrphaned(context.Background())
+	if err != nil {
+		return err
+	}
+	if orphaned > 0 {
+		logger.Info("sessões abertas por uma execução anterior foram encerradas", "quantidade", orphaned)
+	}
+	launcher := emulator.NewLauncher(registry, sessions, userConfig, logger)
 
 	sources, err := install.LoadCatalog()
 	if err != nil {

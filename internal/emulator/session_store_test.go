@@ -138,3 +138,66 @@ func TestSQLiteSessionsCloseRejectsInvalidID(t *testing.T) {
 		t.Error("esperava erro ao fechar um id em formato inválido")
 	}
 }
+
+// Uma sessão que ficou aberta quando o daemon morreu não pode continuar "em
+// andamento" para sempre nem somar tempo jogado sozinha — e o tempo que não
+// foi medido não pode ser inventado. Sessões já encerradas ficam intactas.
+func TestSQLiteSessionsCloseOrphaned(t *testing.T) {
+	db, err := store.OpenAt(filepath.Join(t.TempDir(), "zeux.db"))
+	if err != nil {
+		t.Fatalf("OpenAt: %v", err)
+	}
+	defer db.Close()
+
+	repo := NewSQLiteSessions(db)
+	ctx := context.Background()
+
+	started := time.Date(2026, 9, 27, 21, 0, 0, 0, time.UTC)
+	orphanID, err := repo.Insert(ctx, Session{ConsoleID: "n64", AdapterID: "retroarch", Emulator: "RetroArch", ROMPath: "/jogos/zelda.z64", StartedAt: started})
+	if err != nil {
+		t.Fatalf("Insert (órfã): %v", err)
+	}
+	closedID, err := repo.Insert(ctx, Session{ConsoleID: "snes", AdapterID: "retroarch", Emulator: "RetroArch", ROMPath: "/jogos/metroid.sfc", StartedAt: started})
+	if err != nil {
+		t.Fatalf("Insert (encerrada): %v", err)
+	}
+	if err := repo.Close(ctx, closedID, started.Add(time.Hour), ""); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	n, err := repo.CloseOrphaned(ctx)
+	if err != nil {
+		t.Fatalf("CloseOrphaned: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("CloseOrphaned encerrou %d sessões, queria 1", n)
+	}
+
+	sessions, err := repo.List(ctx)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, s := range sessions {
+		switch s.ID {
+		case orphanID:
+			if s.Running() {
+				t.Error("a sessão órfã continua em andamento")
+			}
+			if s.Duration() != 0 {
+				t.Errorf("a sessão órfã ganhou duração %v; o tempo não medido não pode ser inventado", s.Duration())
+			}
+			if s.ExitError != OrphanedSessionMessage {
+				t.Errorf("ExitError = %q, queria a explicação da sessão órfã", s.ExitError)
+			}
+		case closedID:
+			if s.Duration() != time.Hour || s.ExitError != "" {
+				t.Errorf("a sessão já encerrada foi alterada: duração %v, erro %q", s.Duration(), s.ExitError)
+			}
+		}
+	}
+
+	// Rodar de novo (o próximo início do daemon) não mexe em mais nada.
+	if n, err := repo.CloseOrphaned(ctx); err != nil || n != 0 {
+		t.Errorf("segunda chamada: %d sessões, erro %v; queria 0 e nil", n, err)
+	}
+}

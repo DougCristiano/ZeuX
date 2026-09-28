@@ -1298,6 +1298,27 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### Sessões abertas por uma execução anterior são encerradas ao subir o daemon — 2026-09-28
+
+Ao iniciar, o `zeuxd` encerra toda sessão com `ended_at` nulo
+(`SQLiteSessions.CloseOrphaned`), com `ended_at = started_at` e uma
+explicação em `exit_error`.
+
+**Por quê:** quem fecha a sessão é a goroutine que espera o processo do
+emulador, e ela morre com o daemon. Fechar o ZeuX com o jogo aberto — ou uma
+atualização reiniciar o app — deixava a sessão "em andamento" para sempre: o
+Douglas viu *The Legend of Zelda* (N64) marcado como em andamento depois de
+atualizar para a v0.1.30, com outro jogo no "Continue jogando". Pior, o
+tempo jogado somava `time.Since(started_at)` e crescia sozinho.
+
+A duração fica zero porque o fim real é desconhecido: deixar de contar um
+tempo não medido é honesto, inventar um não é (princípio 4). O daemon novo
+também não tem como voltar a acompanhar o emulador antigo — o pid não é
+gravado, e o processo não é filho dele.
+
+**O que quebra se desfizer:** qualquer sessão interrompida volta a aparecer
+como em andamento e a inflar o tempo jogado indefinidamente.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do
