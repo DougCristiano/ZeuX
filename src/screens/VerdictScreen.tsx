@@ -262,8 +262,9 @@ function Cursor() {
 // mudar, a tela precisa dizer isso, sempre — não é o mesmo aviso da
 // `precision: "parcial"` (que é sobre o que não pôde ser lido desta máquina
 // específica); este é sobre o catálogo inteiro, em toda máquina. O aviso
-// correspondente (`estimateLabel`/`thresholdsNotCalibrated`) migrou junto
-// com o próprio parecer para `ConsoleDetailScreen` — ver comentário lá.
+// correspondente mora hoje dentro do próprio `ConsoleVerdictCard`
+// (`VerdictCaveat`, em components/ui.tsx), então aparece onde quer que o
+// parecer apareça.
 
 /**
  * Tela 01 do wireframe (docs/wireframe.html): o retrato desta máquina.

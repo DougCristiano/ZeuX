@@ -7,7 +7,7 @@ Logo oficial de cada plataforma (IGDB, campo `platform_logo`), um arquivo
 **Vazio até alguém rodar o gerador.** Decisão do Douglas em 2026-09-07 (ver
 `docs/decisoes.md`, "Identidade visual por console"): reverte a decisão
 anterior de nunca usar marca de fabricante — risco de marca aceito e
-conhecido, não ignorado. `ConsoleIcon` (sigla estilizada) continua como
+conhecido, não ignorado. A sigla do console (em `ConsoleLabel`) continua como
 reserva sempre que o console não tiver imagem aqui — sem IGDB configurado ao
 rodar o gerador, plataforma sem `platform_logo` no IGDB, ou falha de rede
 pontual.

@@ -1131,6 +1131,123 @@ Revisão das outras telas, com o que mudou:
 **O que quebra se desfizer:** o topo dos cards vizinhos volta a desalinhar
 sempre que uma coluna tem título e a outra não.
 
+### Etiqueta de cartucho como desenho único de logo de console — 2026-09-28
+
+**O quê:** toda logo de console no app passa por `ConsoleLabel` (etiqueta
+creme com faixa na cor do console): card da grade, cabeçalho do console
+(`ConsoleHero`, 112×64), cards da tela de Emuladores (96×56) e linhas da tela
+"Pastas de jogos" (64×40). Saíram a caixa branca de 64px do hero e os
+quadrados brancos de `ConsoleIcon`/pastas. Junto: a tela de Emuladores
+deixou de paginar (14 cards numa rolagem só), o bloco "Emulador fora da
+lista" desceu do topo para o pé da grade, sem painel, e o chip de pendência
+do card de console virou status (pixel âmbar + texto), sem borda.
+
+**Por quê:** eram três desenhos para a mesma coisa, e o console mudava de
+cara entre a grade e o detalhe. Nos quadrados, as logos largas (PS2, PSP)
+viravam um risco ilegível; a etiqueta é retangular porque a maioria das
+logos é horizontal, e o creme resolve as logos pretas sem estourar como o
+branco. A paginação fazia virar página para responder "o que já está
+instalado?". O cadastro manual é ação rara e, no topo, empurrava a lista e
+competia com o "Instalar". O chip com borda tinha desenho de botão e não
+fazia nada; o clique é o card inteiro.
+
+A logo do SNES continua sendo a foto do aparelho: nenhuma fonte da logo foi
+alcançável deste ambiente (Wikimedia recusada pelo proxy). Trocar é rodar
+`cmd/generate-console-images` com uma fonte melhor e `-trim-only`.
+
+**O que quebra se desfizer:** voltar a um quadrado branco em qualquer tela
+reabre a divergência visual entre telas e a ilegibilidade das logos largas.
+Voltar a paginar esconde parte do catálogo atrás de um clique. Devolver o
+cadastro manual ao topo recoloca uma ação rara acima da lista. Devolver a
+borda ao chip de pendência faz o usuário clicar num "botão" que não faz
+nada. `ConsoleLabel.onImageError` é o que avisa o `ConsoleHero` que não há
+logo, para não mostrar "restaurar padrão" sem nada para restaurar; se ele
+sair, o hero perde essa informação.
+
+### Detalhe do console diz cada coisa uma vez só — 2026-09-28
+
+**O quê:** no detalhe do console, (1) o banner de prontidão ficou só com a
+frase + a trilha de peças (saiu o selo `readiness.badge`), e o card de cada
+emulador perdeu o selo "não instalado" — o que falta vira a ação ("Instalar"
+ou o trilho manual); o selo de instalado fica, porque diz quem instalou.
+(2) As ressalvas do parecer — `precision: "parcial"` e os limiares do catálogo
+ainda não medidos (D2) — viraram uma linha de rodapé dentro de
+`ConsoleVerdictCard` (`VerdictCaveat`, em `components/ui.tsx`), com selo âmbar
+"parcial" ou neutro "estimativa", no lugar da caixa âmbar de `PartialNotice`
+dentro do card e do `Callout` "estimativa" abaixo dele. `THRESHOLDS_CALIBRATED`
+passou da tela para o lado do card. (3) O caminho da pasta de jogos é truncado
+pelo começo (`…/roms/ps2`, `PathTail` em `components/ui.tsx`: `dir="rtl"` +
+`<bdi dir="ltr">` + `text-left`), com o caminho inteiro no `title` — vale
+também para o caminho do arquivo no detalhe do jogo.
+
+**Por quê:** a revisão de design (PS2 numa máquina sem PCSX2 e sem GPU
+identificada) contou "falta o emulador" três vezes e "não temos certeza" em
+três camadas empilhadas — a repetição diluía o que o parecer diz de fato
+(patamar, preset, gargalo). Dizer menos vezes, nunca deixar de dizer: as duas
+ressalvas continuam por extenso e "parcial" continua em âmbar (princípio 4). O
+aviso de limiares dentro do card também corrige uma lacuna: o detalhe do jogo
+mostrava o mesmo parecer sem aviso nenhum. No caminho, o que distingue uma
+pasta da outra é o fim; o `truncate` comum mostrava só o prefixo que todas
+compartilham.
+
+**O que quebra se desfizer:** voltar `PartialNotice`/`Callout` para o card
+reempilha as caixas também em "Como vai rodar" do detalhe do jogo; devolver
+`THRESHOLDS_CALIBRATED` à tela tira o aviso de estimativa do detalhe do jogo.
+Tirar o `<bdi>` do `PathTail` faz a barra inicial e a pontuação trocarem de
+lado; tirar o `text-left` encosta caminhos curtos à direita.
+
+### Detalhe do jogo não mostra ano do console como se fosse do jogo — 2026-09-28
+
+**O quê:** o badge de ano ao lado do nome do console, em `GameDetailScreen`,
+foi removido. Nenhum ano aparece no detalhe do jogo enquanto a biblioteca não
+guardar o ano de lançamento do próprio jogo. Na mesma passada da biblioteca:
+um só indicador de "buscando capas" (o botão vira medidor com a contagem), o
+"nunca jogado" sai dos tiles e da lista (tempo só aparece quando > 0), o
+título abaixo da capa abre o detalhe (clique de mouse, sem alvo de foco novo)
+e o destaque "último jogado" usa o `GameCover` (o cartucho) sem capa.
+
+**Por quê:** o valor vinha de `verdict.year`, que é o ano do console no
+catálogo. Solto ao lado do título, lia como ano do jogo: "Okami" aparecia com
+2000 (o PS2), mas o jogo é de 2006. A biblioteca não tem esse dado — o
+scraper do IGDB lê `first_release_date`, mas descarta, e o
+libretro-thumbnails, fonte tentada primeiro, não tem ano. Mostrar um ano que
+não é deste jogo é fingir certeza (princípio 4); omitir é o honesto. Para
+voltar a ter ano: persistir o ano do IGDB numa coluna de `library_games`,
+expor em `LibraryGame` e aceitar que fica ausente para capas do libretro.
+
+**O que quebra se desfizer:** religar `year` no badge volta a mostrar o ano
+do console como se fosse do jogo, em todo jogo lançado depois da estreia do
+console, que é a maioria.
+
+### Idioma só em Configurações; Configurações reordenada; tour em pixel art — 2026-09-28
+
+**O quê:** (1) o seletor de idioma saiu do rodapé da barra lateral e ficou só
+em Configurações, como botões de alternância (o mesmo controle de "Efeitos
+visuais"). (2) Configurações passou a ir do que mais muda o app ao que é raro:
+Idioma e Efeitos visuais lado a lado, Capas (IGDB), Controles, Atualizações,
+Apresentação, Instalação e, por último, Desinstalar. (3) As quatro ilustrações
+do tour de abertura viraram pixel art gerada por código (`lib/pixelArt.ts` +
+`components/TourArt.tsx`), numa grade de 80×50 exibida a no máximo 480px (6px
+inteiros por pixel). (4) No Histórico vazio, só o botão do estado vazio leva à
+biblioteca.
+
+**Por quê:** dois seletores para a mesma escolha faziam a pessoa se perguntar
+se eram configurações diferentes, e o da barra lateral não alcançava ninguém a
+mais: a barra lateral só existe nas fases em que Configurações já está a um
+clique (`SIDEBAR_PHASES`). As capas do IGDB são o ajuste que mais muda a cara
+da biblioteca e estavam no fim da página; ação rara e destrutiva (desinstalar)
+fica longe de quem só veio trocar uma opção. Os SVGs de traço liso do tour
+eram a única arte vetorial num app de identidade pixel (direção retrô de
+2026-09-09), justo na primeira coisa vista depois do scan.
+
+**O que quebra se desfizer:** devolver o seletor à barra lateral recria o
+controle duplicado (e exige recriar a opção `collapsible`, removida).
+Aumentar a largura do tour ou tirar o `ring` da moldura (trocando por
+`border`) deixa a escala da arte fracionária e os pixels cintilam. Mexer em
+`pixelController.ts` achando que o tour depende dele não afeta o tour: são
+módulos separados de propósito (o controle deriva dele as regiões do
+mapeamento).
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do

@@ -226,7 +226,6 @@ function App() {
     game: LibraryGame;
     consoleName: string;
     shortName: string;
-    year?: number;
   } | null>(null);
 
   // M4 (docs/sprint-m-plano.md, decidido pelo Douglas em 2026-08-07): página,
@@ -516,15 +515,12 @@ function App() {
           scrollElementRef={mainRef}
           initialScrollTop={allGamesScrollTop}
           onOpenGame={(game, consoleName, shortName) => {
-            const year =
-              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
-              consoles.find((c) => c.console_id === game.console_id)?.year;
             // M4: guarda a rolagem antes de trocar de fase — é a última
             // chance de ler `mainRef.current.scrollTop` com a grade ainda
             // na tela.
             setAllGamesScrollTop(mainRef.current?.scrollTop ?? 0);
             setGameDetailOrigin("all-games");
-            setSelectedGame({ game, consoleName, shortName, year });
+            setSelectedGame({ game, consoleName, shortName });
             setPhase("game-detail");
           }}
         />
@@ -537,7 +533,6 @@ function App() {
           game={selectedGame!.game}
           consoleName={selectedGame!.consoleName}
           shortName={selectedGame!.shortName}
-          year={selectedGame!.year}
           report={report ?? undefined}
           onBack={() => setPhase(gameDetailOrigin)}
           onOpenConsole={() => abrirConsolePorID(selectedGame!.game.console_id)}
@@ -623,14 +618,11 @@ function App() {
           report={report ?? undefined}
           onBack={() => setPhase(gamesOrigin)}
           onOpenGame={(game, consoleName, shortName) => {
-            const year =
-              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
-              consoles.find((c) => c.console_id === game.console_id)?.year;
             // M5: "Voltar" do detalhe precisa devolver pra cá, não pra
             // "all-games" — diferente de AllGamesScreen, esta tela não tem
             // rolagem própria pra salvar (grade curta, sem paginação).
             setGameDetailOrigin("games");
-            setSelectedGame({ game, consoleName, shortName, year });
+            setSelectedGame({ game, consoleName, shortName });
             setPhase("game-detail");
           }}
         />
@@ -644,11 +636,8 @@ function App() {
           consoleCatalog={consoles}
           onOpenLibrary={() => setPhase("all-games")}
           onOpenGame={(game, consoleName, shortName) => {
-            const year =
-              report?.verdicts.find((v) => v.console_id === game.console_id)?.year ??
-              consoles.find((c) => c.console_id === game.console_id)?.year;
             setGameDetailOrigin("history");
-            setSelectedGame({ game, consoleName, shortName, year });
+            setSelectedGame({ game, consoleName, shortName });
             setPhase("game-detail");
           }}
         />

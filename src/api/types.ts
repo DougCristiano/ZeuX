@@ -214,7 +214,7 @@ export type ConsoleEntry = {
    * console (gerada por cmd/generate-console-images, embutida no binário —
    * ver docs/decisoes.md, "Identidade visual por console"). `false` é o
    * estado normal antes de rodar o gerador, ou quando o IGDB não tem a
-   * plataforma — a interface cai para `ConsoleIcon` (sigla) nesse caso.
+   * plataforma — a interface cai para a sigla (`ConsoleLabel`) nesse caso.
    */
   has_image: boolean;
 };

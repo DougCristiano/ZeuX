@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   CHROME_TINT_DANGER,
+  PathTail,
   ConfirmModal,
   ConsoleVerdictCard,
   ErrorModal,
@@ -107,17 +108,6 @@ export function GameDetailScreen({
   game: LibraryGame;
   consoleName: string;
   shortName: string;
-  /**
-   * Ano do CONSOLE no catálogo (verdict.year) — de propósito NÃO exibido
-   * (2026-09-28). Aparecia num badge solto ao lado do nome do console e lia
-   * como o ano do jogo: "Okami" saía com "2000", o ano do PS2, quando o
-   * jogo é de 2006. A biblioteca não guarda ano de lançamento do jogo (o
-   * scraper do IGDB até lê `first_release_date`, mas descarta; a fonte
-   * libretro-thumbnails nem tem), então o certo é não mostrar ano nenhum
-   * em vez de mostrar um que não é deste jogo (princípio 4). A prop fica
-   * porque `App.tsx` ainda passa o valor; sai quando alguém mexer lá.
-   */
-  year?: number;
   /** Ausente sem consentimento/scan — "Jogar" continua funcionando (sem
    * preset autoconfigurado), só o card de parecer some. */
   report?: Report;
@@ -1039,11 +1029,9 @@ export function GameDetailScreen({
                 </div>
                 {folderError && <InlineError>{folderError}</InlineError>}
                 {rescanState.kind === "error" && <InlineError>{rescanState.message}</InlineError>}
-                {/* `font-mono`: é um caminho de arquivo, e o `title` continua
-                    carregando o valor inteiro quando o `truncate` corta. */}
-                <p className="truncate font-mono text-xs text-muted" title={game.path}>
-                  {game.path}
-                </p>
+                {/* Caminho cortado pelo começo (`PathTail`): o nome do
+                    arquivo, no fim, é o que identifica o jogo. */}
+                <PathTail path={game.path} className="font-mono text-xs text-muted" />
               </div>
             </Card>
           </section>

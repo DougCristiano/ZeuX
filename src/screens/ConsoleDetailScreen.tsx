@@ -26,6 +26,7 @@ import {
   ConsoleVerdictCard,
   InlineError,
   InlineWarning,
+  PathTail,
   ProgressBar,
   ScreenContainer,
   SectionHeading,
@@ -47,26 +48,6 @@ import { dict } from "./ConsoleDetailScreen.i18n";
 // era uma segunda caixa abaixo do card, e o detalhe do jogo — que também
 // mostra o parecer — não tinha aviso nenhum.
 
-/**
- * Caminho de pasta truncado pelo COMEÇO (`…/roms/ps2`), com o caminho inteiro
- * no `title`. O que distingue uma pasta da outra é o fim do caminho; cortar
- * no fim, como o `truncate` comum faz, deixava à mostra só o prefixo que
- * todas as pastas compartilham (`/home/usuario/…`) — achado da revisão de
- * design de 2026-09-28.
- *
- * `dir="rtl"` joga a reticência para a esquerda (o transbordo sai pelo fim
- * da linha, que em RTL é a esquerda); o `<bdi dir="ltr">` impede o algoritmo
- * bidirecional de mover a barra inicial ou pontuação para o outro lado; e
- * `text-left` mantém um caminho curto, que cabe inteiro, alinhado com o resto
- * do card em vez de encostado à direita.
- */
-function PathTail({ path }: { path: string }) {
-  return (
-    <span dir="rtl" title={path} className="min-w-0 truncate text-left text-muted">
-      <bdi dir="ltr">{path}</bdi>
-    </span>
-  );
-}
 
 /**
  * Uma forma de rodar este console. Cada opção é um card: o que é, se está
@@ -464,7 +445,7 @@ function GamesFolderSection({
           <ul className="flex flex-col gap-2">
             {folders.map((folder) => (
               <li key={folder.id} className="flex items-center justify-between gap-2 text-sm">
-                <PathTail path={folder.path} />
+                <PathTail path={folder.path} className="text-muted" />
                 <span className="flex shrink-0 gap-1">
                   {/* "Revarrer", não "Varrer de novo" (achado testando com o
                       Douglas, 2026-09-06): mesma ação que LibraryScreen/
@@ -852,8 +833,8 @@ export function ConsoleDetailScreen({
         logoOverlay={
           /* Troca manual de logo (2026-09-08): mesmo padrão visual de
              FavoriteToggle (botão circular pequeno flutuando sobre a arte) —
-             aqui reposicionado no canto porque a caixa de 64px já é pequena,
-             um botão do mesmo tamanho por cima escondia a logo inteira. */
+             aqui reposicionado no canto porque a etiqueta da logo é pequena,
+             e um botão do mesmo tamanho por cima esconderia a logo inteira. */
           <button
             type="button"
             disabled={imageBusy}

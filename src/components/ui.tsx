@@ -1,6 +1,5 @@
-import { useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
+import { type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
 import { ChevronLeft, Play, Star, TriangleAlert } from "lucide-react";
-import { consoleImageURL } from "../api";
 import type { ConsoleVerdict } from "../api/types";
 import logoZeux from "../assets/logo-zeux.png";
 import logoZeuxMark from "../assets/logo-zeux-mark.png";
@@ -1628,113 +1627,34 @@ const ICON_LABEL_OVERRIDES: Readonly<Record<string, string>> = {
 };
 
 /**
- * Resolve a sigla que os ícones de console mostram — extraído de dentro de
- * `ConsoleIcon` (2026-09-07) para `ConsolesScreen` poder desenhar seu
- * próprio tile clicável (não pode aninhar o `<button>` de `ConsoleIcon`
- * dentro de outro `<button>`, HTML inválido) sem duplicar o mapa de
- * exceções. Mesma regra de sempre: overrides pros 4 casos que colidem de
- * verdade, `slice(0, 4)` pro resto.
+ * Resolve a sigla de um console quando não há logo (`ConsoleLabel`, capa
+ * provisória) — um mapa de exceções só, em vez de cada tela fazer
+ * `slice(0, 4)` à mão. Overrides pros casos que colidem de verdade,
+ * `slice(0, 4)` pro resto.
  */
 export function consoleIconLabel(consoleId: string, label: string): string {
   return (ICON_LABEL_OVERRIDES[consoleId] ?? label.slice(0, 4)).toUpperCase();
 }
 
 /**
- * `ConsoleIcon` (2026-09-07: passou a tentar a logo real primeiro, achado do
- * Douglas — "os consoles deveriam ter o mesmo ícone aqui do que tem na aba
- * Consoles"). Antes só desenhava a sigla, mesmo para os 30 de 33 consoles
- * que já têm logo oficial embutida (`cmd/generate-console-images`,
- * `ConsolesScreen` já usa) — as duas telas mostravam identidades diferentes
- * para o mesmo console. Sem `has_image` aqui (esse campo só vem de
- * `GET /consoles`, que nem toda tela que usa `ConsoleIcon` busca): tenta a
- * imagem direto e cai pra sigla no `onError` — mesmo efeito prático que
- * `ConsolesScreen` obtém checando `has_image` antes, só que sem precisar de
- * uma segunda chamada de API só pra isso. Onde a imagem falha, é 1 request
- * 404 por ícone, não um estado quebrado visível.
- *
- * Fundo branco atrás da logo, não `--fill` (2026-09-07, achado do Douglas:
- * "a visibilidade do console está difícil... muita cor escura, talvez um
- * fundo branco seja o ideal"). A maioria das logos que o IGDB devolve (a da
- * Nintendo incluída) foi desenhada pra selo/embalagem em fundo claro — sobre
- * o `--fill` quase preto do tema, a arte escura da própria logo se perdia
- * dentro do próprio ícone. Só entra quando a imagem carrega: a sigla
- * (`imageFailed`) continua sobre `--fill`, porque essa foi desenhada com a
- * cor de acento em mente para fundo escuro, e um branco atrás dela
- * desligaria o contraste que já funciona.
+ * Caminho de arquivo truncado pelo COMEÇO (`…/roms/ps2`), com o caminho
+ * inteiro no `title` (2026-09-28). O que distingue uma pasta da outra é o
+ * fim; o `truncate` comum mostrava só o prefixo que todas compartilham.
+ * `dir="rtl"` põe as reticências à esquerda; o `<bdi dir="ltr">` impede que a
+ * barra inicial e a pontuação troquem de lado; `text-left` mantém caminho
+ * curto encostado à esquerda.
  */
-export function ConsoleIcon({ label, consoleId, onClick }: { label: string; consoleId: string; onClick: () => void }) {
-  const accent = consoleAccentColor(consoleId);
-  const [imageFailed, setImageFailed] = useState(false);
+export function PathTail({ path, className = "" }: { path: string; className?: string }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      style={{ borderColor: `${accent}66`, color: accent, backgroundColor: imageFailed ? undefined : "#fff" }}
-      // M7 (docs/sprint-m-plano.md): 8px violava o piso de 11px da fonte
-      // pixel (src/index.css) — mesma regra do badge de GameCover.
-      //
-      // `w-12` (não `w-9`, achado ao testar com o Douglas, 2026-09-06):
-      // medido ao vivo com Playwright, `label.slice(0, 4)` em Press Start 2P
-      // 11px renderiza ~41px de largura — a caixa de 36px que existia antes
-      // ficava 5px curta, e um `w-10` (40px) intermediário ainda cortava a
-      // primeira/última letra. O G5 (docs/roadmap.md) só travou colisão de
-      // SIGLA IGUAL entre dois consoles diferentes (script comparando
-      // strings), nunca mediu se o texto cabia na própria caixa —
-      // "arcade"/"atari2600"/"dreamcast" (e qualquer outro console cujo
-      // `short_name` não caiba em 3 letras e não tenha entrada em
-      // `ICON_LABEL_OVERRIDES`) vazava sobre o ícone vizinho, sem colidir em
-      // sigla nenhuma. `overflow-hidden` fica como rede de segurança: um
-      // label futuro ainda maior corta em vez de vazar.
-      //
-      // `h-16 w-16` (era `h-12 w-12`): achado do Douglas testando a logo
-      // nova, 2026-09-07 — "os ícones pequenos, queria mais destaque". A
-      // sigla de texto continua no mesmo `text-[11px]` (ela só precisava
-      // caber, não precisa crescer); é a caixa ao redor — e a logo dentro
-      // dela — que ganham presença.
-      className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none transition-colors hover:brightness-125 ${FOCUS_RING}`}
-    >
-      {imageFailed ? (
-        consoleIconLabel(consoleId, label)
-      ) : (
-        <img
-          src={consoleImageURL(consoleId)}
-          alt=""
-          // Decorativo: `title` do botão já carrega o nome do console.
-          aria-hidden="true"
-          className="h-14 w-14 object-contain p-0.5"
-          onError={() => setImageFailed(true)}
-        />
-      )}
-    </button>
-  );
-}
-
-/**
- * Indicador "···" quando a lista de consoles de um emulador não cabe no
- * tamanho fixo do card (2026-08-04) — vários emuladores (ex.: RetroArch)
- * atendem 20+ consoles; sem isso, cada card teria uma altura diferente.
- * Não é clicável de propósito: só sinaliza "tem mais", o filtro de console
- * já cobre "quero saber quais são".
- */
-export function ConsoleMoreBadge({ count }: { count: number }) {
-  return (
-    // `h-12 w-12` acompanha o `ConsoleIcon` acima (2026-09-06, ver comentário
-    // lá) — os dois convivem na mesma fileira, tamanhos diferentes
-    // desalinhariam a grade.
-    <span
-      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-line-strong text-sm text-muted"
-      title={`mais ${count} console(s)`}
-      aria-hidden="true"
-    >
-      ···
+    <span dir="rtl" title={path} className={`block min-w-0 truncate text-left ${className}`}>
+      <bdi dir="ltr">{path}</bdi>
     </span>
   );
 }
 
 /**
  * Modal de descrição do console (2026-08-04, a pedido do Douglas), aberto ao
- * clicar num `ConsoleIcon`. `verdict` vem ausente quando esta tela foi
+ * clicar numa logo de console na tela de Emuladores. `verdict` vem ausente quando esta tela foi
  * alcançada sem `Report` carregado ainda (Emuladores é alcançável a partir de
  * DeclinedScreen, antes do consentimento/scan) — mostra só o nome que já se
  * conhece nesse caso, nunca finge um parecer que não existe.
