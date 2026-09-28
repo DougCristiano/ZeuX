@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { WindowFrame } from "./components/WindowFrame";
 import { LanguageProvider } from "./i18n/i18n";
 import "./index.css";
 // Efeito colateral de import: marca `data-visual-effects` no `<html>` antes
@@ -12,7 +13,9 @@ import "./hooks/useVisualEffects";
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <LanguageProvider>
-      <App />
+      <WindowFrame>
+        <App />
+      </WindowFrame>
     </LanguageProvider>
   </React.StrictMode>,
 );

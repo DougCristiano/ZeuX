@@ -1298,6 +1298,58 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### Barra de título própria, em pixel — 2026-09-28
+
+Pergunta do Douglas: "por que o header, onde maximizo/fecho/minimizo, não está
+estilizado também?". Era a barra do sistema operacional, fora do alcance de
+qualquer CSS. Agora o ZeuX desenha a dele (`WindowFrame.tsx`, montada em
+`main.tsx` em volta do `<App />`): marca "ZEUX" em fonte pixel, e três botões
+com ícones de grade 6×6 desenhados a 12px (cada "pixel" = 2px inteiros).
+
+**Por plataforma, de propósito:**
+- **Windows e Linux:** janela sem moldura (`decorations: false`, em
+  `tauri.windows.conf.json` e `tauri.linux.conf.json`) e botões nossos.
+- **macOS:** `titleBarStyle: "Overlay"` (`tauri.macos.conf.json`). Os botões
+  coloridos do sistema ficam; a barra só reserva o espaço deles. Botões
+  desenhados por nós ali perderiam tela cheia e o menu da janela.
+- **Linux:** uma janela GTK sem moldura não tem bordas de redimensionar, então
+  o `WindowFrame` desenha 8 faixas invisíveis que chamam
+  `startResizeDragging`. No Windows não: o sistema resolve a borda sozinho, e
+  as faixas cobririam a ponta da barra de rolagem.
+
+**A barra só liga depois de `isDecorated()` responder `false`.** Se a
+configuração por plataforma não pegar, o app fica com a barra nativa em vez de
+duas — ou de nenhuma.
+
+**Pegadinhas que custaram decisão:**
+- Os arquivos por plataforma são mesclados por JSON Merge Patch (RFC 7396),
+  que **substitui arrays inteiros**: cada um repete o objeto completo de
+  `app.windows[0]`. O tamanho da janela (1280×800, mínimo 960×600) agora mora
+  em quatro arquivos e precisa mudar nos quatro.
+- A barra ocupa 32px da janela, então `h-screen` (100vh) passaria da tela. O
+  contêiner de conteúdo tem altura definida e rola por dentro, e as telas que
+  eram `h-screen`/`min-h-screen` (shell, `Sidebar`, splash, recusa) viraram
+  `h-full`/`min-h-full`. **Tela nova não use `h-screen`.**
+- Os botões são `tabIndex={-1}` (chrome de mouse, como os do sistema), e o
+  `FOCUSABLE_SELECTOR` da navegação por controle passou a respeitar isso — sem
+  o ajuste, o D-pad pararia neles.
+- Permissões novas em `capabilities/default.json`: arrastar, alternar
+  maximizar (`toggle` e `internal-toggle`, esta usada pelo duplo clique),
+  minimizar, fechar, redimensionar, `is-decorated` e `is-maximized`. Todas
+  conferidas contra a referência de permissões do crate `tauri`.
+- Detecção de macOS/Linux por `navigator.userAgent`, e não
+  `@tauri-apps/plugin-os`: é a única informação que falta e não vale uma
+  dependência (nem um plugin do lado Rust).
+
+**Verificado:** o desenho, a altura, a rolagem e as chamadas de janela (com a
+API do Tauri simulada num navegador). **Não verificado neste ambiente:** o
+arrastar, o duplo clique, os botões e o redimensionar na janela real — dependem
+de ver a release rodando no Windows (e depois no Linux e no macOS).
+
+**O que quebra se desfizer:** apagar os três `tauri.*.conf.json` devolve a barra
+do sistema (a barra nossa some sozinha, por causa do `isDecorated`). Apagar só
+as permissões deixa a janela sem botão que funcione.
+
 ### Primeiros passos, dicas de primeira visita e estados vazios que ensinam — 2026-09-28
 
 Pergunta do Douglas: "falta explicação maior de como o ZeuX funciona? um vídeo

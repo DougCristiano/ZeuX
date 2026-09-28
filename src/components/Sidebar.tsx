@@ -98,7 +98,7 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
   return (
     // `w-16` aqui é o que participa do `flex` de App.tsx — nunca muda. `group`
     // e `relative` existem só para ancorar e disparar o painel absoluto abaixo.
-    <aside className="group relative h-screen w-16 shrink-0">
+    <aside className="group relative h-full w-16 shrink-0">
       <div
         // N17 (docs/roadmap.md, Sprint N): `w-60` media o rótulo em Press
         // Start 2P (pixel font, larga e pesada para 14 caracteres — motivo

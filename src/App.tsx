@@ -723,7 +723,7 @@ function App() {
       // baixa (a versão de 14% do onboarding competiria com grade densa de
       // jogos/consoles). Fixo no shell, não por tela: sobrevive à troca de
       // fase sem precisar repetir em cada uma das nove telas pós-onboarding.
-      <div className="relative flex h-screen overflow-hidden">
+      <div className="relative flex h-full overflow-hidden">
         <AmbientGlow opacity={9} />
         {/* 2026-09-10 (achado do critico-design): a grade de pixels
             (`.zeux-pixel-grid`, index.css) existia em só 3 componentes

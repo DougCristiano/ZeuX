@@ -18,7 +18,7 @@ const DPAD: [number, Direction][] = [
 type Direction = "up" | "down" | "left" | "right";
 
 const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]):not([tabindex="-1"]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Atributo que marca "o controle está AQUI" — o realce visual é escrito em

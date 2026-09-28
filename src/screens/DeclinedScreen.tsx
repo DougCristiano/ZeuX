@@ -40,7 +40,7 @@ export function DeclinedScreen({
     // N3/N8 (docs/roadmap.md, Sprint N): max-w-3xl é o mesmo teto de leitura
     // do resto do app (era max-w-md); glow de identidade (N8) — mesmo motivo
     // do comentário em AmbientGlow (src/components/ui.tsx).
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-6">
+    <main className="relative flex min-h-full items-center justify-center overflow-hidden bg-paper px-6">
       <AmbientGlow />
       {/* Linhas de CRT bem apagadas (~8%) — mesmo material do `SplashScreen`/
           `GameHero`; o texto por cima é `--ink`/`--muted` sobre `--paper`, com

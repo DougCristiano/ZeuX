@@ -104,7 +104,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <div
-      className="relative flex h-screen flex-col items-center justify-center overflow-hidden bg-paper"
+      className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-paper"
       style={
         leaving && !reduced
           ? { animation: `zeux-boot-out ${EXIT_MS}ms ease-in forwards` }
