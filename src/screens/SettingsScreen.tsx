@@ -281,308 +281,326 @@ export function SettingsScreen({
       {toastMessage && <Toast message={toastMessage} />}
       <ScreenHeader title={t("title")} />
 
-      <Card filled className="mb-6">
-        <SectionHeading className="mb-2">{t("languageLabel")}</SectionHeading>
-        <LanguageSelector />
-      </Card>
+      {/* Ordem (2026-09-28): do que muda a cara do app ao que quase ninguém
+          abre. Idioma e efeitos visuais primeiro, lado a lado (são curtos, e
+          empilhados empurravam o resto meia tela para baixo); logo depois as
+          capas do IGDB, que é o ajuste que mais muda a biblioteca e ficava no
+          fim da página. Pasta de instalação e desinstalar vão por último: ação
+          rara, e a destrutiva longe do caminho de quem só veio trocar uma
+          opção. `gap` no contêiner em vez de `mb-6` em cada card — mudar a
+          ordem não deixa mais um card sem margem ou com margem sobrando. */}
+      <div className="flex flex-col gap-6">
+        {/* `lg:`, não `xl:`: a 1280px padrão a área útil já perdeu a
+            sidebar e a barra de rolagem (CLAUDE.md, layout responsivo). */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card filled>
+            <SectionHeading className="mb-2">{t("languageLabel")}</SectionHeading>
+            <p className="mb-4 text-sm text-muted">{t("languageDescription")}</p>
+            <LanguageSelector />
+          </Card>
 
-      <Card filled className="mb-6">
-        <SectionHeading className="mb-2">{t("visualEffectsHeading")}</SectionHeading>
-        <p className="mb-4 text-sm text-muted">{t("visualEffectsDescription")}</p>
-        {/* Chip de filtro, não `Button`: é alternância de estado, e o chip
-            é o único controle do app que mostra "ligado" (acende em roxo).
-            Antes eram duas variantes de botão diferentes, e não dava para
-            dizer qual das duas opções estava valendo. */}
-        <div role="radiogroup" aria-label={t("visualEffectsHeading")} className="flex w-fit gap-2">
-          {(["full", "reduced"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={visualEffects === mode}
-              onClick={() => setVisualEffects(mode)}
-              className={`${FILTER_CHIP_BASE} ${visualEffects === mode ? FILTER_CHIP_ON : FILTER_CHIP_OFF} ${FOCUS_RING}`}
-            >
-              {t(mode === "full" ? "visualEffectsFull" : "visualEffectsReduced")}
-            </button>
-          ))}
+          <Card filled>
+            <SectionHeading className="mb-2">{t("visualEffectsHeading")}</SectionHeading>
+            <p className="mb-4 text-sm text-muted">{t("visualEffectsDescription")}</p>
+            {/* Chip de filtro, não `Button`: é alternância de estado, e o chip
+                é o único controle do app que mostra "ligado" (acende em roxo).
+                Antes eram duas variantes de botão diferentes, e não dava para
+                dizer qual das duas opções estava valendo. */}
+            <div role="radiogroup" aria-label={t("visualEffectsHeading")} className="flex w-fit gap-2">
+              {(["full", "reduced"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={visualEffects === mode}
+                  onClick={() => setVisualEffects(mode)}
+                  className={`${FILTER_CHIP_BASE} ${visualEffects === mode ? FILTER_CHIP_ON : FILTER_CHIP_OFF} ${FOCUS_RING}`}
+                >
+                  {t(mode === "full" ? "visualEffectsFull" : "visualEffectsReduced")}
+                </button>
+              ))}
+            </div>
+          </Card>
         </div>
-      </Card>
 
-      <Card filled className="mb-6">
-        <SectionHeading className="mb-2">{t("tourHeading")}</SectionHeading>
-        <p className="mb-4 text-sm text-muted">{t("tourDescription")}</p>
-        <Button variant="chrome" className="w-fit" onClick={onReplayTour}>
-          {t("replayTour")}
-        </Button>
-      </Card>
-
-      <Card filled className="mb-6">
-        <SectionHeading className="mb-2">{t("updatesHeading")}</SectionHeading>
-        <p className="mb-1 text-sm text-muted">{t("updatesDescription")}</p>
-        {appVersion && <p className="mb-4 text-sm text-muted">{t("currentVersion", { version: appVersion })}</p>}
-
-        {updateState.kind === "available" && (
-          <div className="mb-3 rounded-lg border border-accent bg-fill p-3">
-            <p className="font-semibold text-ink">{t("updateAvailable", { version: updateState.version })}</p>
-            {updateState.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted">{updateState.notes}</p>}
-          </div>
-        )}
-        {updateState.kind === "installing" && (
-          <p className="mb-3 text-sm text-muted">
-            {updateState.progress === null
-              ? t("downloadingUpdate")
-              : t("downloadingUpdateProgress", { progress: updateState.progress })}
+        <Card filled>
+          <SectionHeading className="mb-2">{t("igdbHeading")}</SectionHeading>
+          <p className="mb-4 text-sm text-muted">
+            {t("igdbDescription")}
           </p>
-        )}
-        {updateState.kind === "upToDate" && <p className="mb-3 text-sm text-ink">{t("upToDate")}</p>}
-        {updateState.kind === "error" && <InlineError className="mb-3">{updateState.message}</InlineError>}
 
-        <div className="flex flex-wrap gap-3">
-          <Button variant="chrome" disabled={updateState.kind === "checking" || updateState.kind === "installing"} onClick={checkForUpdates}>
-            {updateState.kind === "checking" ? t("checkingUpdates") : t("checkUpdates")}
-          </Button>
-          {updateState.kind === "available" && (
-            <Button variant="primary" onClick={installUpdate}>
-              {t("installUpdate")}
-            </Button>
+          {state.kind === "loading" && <p className="text-sm text-muted">{t("readingAccountStatus")}</p>}
+
+          {state.kind === "error" && (
+            <div>
+              <InlineError className="mb-2">{state.message}</InlineError>
+              <Button variant="chrome" onClick={loadStatus}>
+                {t("tryAgain")}
+              </Button>
+            </div>
           )}
-        </div>
-      </Card>
 
-      <Card filled className="mb-6">
-        <SectionHeading className="mb-2">{t("controllersHeading")}</SectionHeading>
-        <p className="mb-4 text-sm text-muted">{t("controllersDescription")}</p>
+          {state.kind === "loaded" && state.personal && (
+            <div>
+              <p className="mb-3 text-sm text-ink">{t("accountConnected")}</p>
+              {formError && <InlineError className="mb-3">{formError}</InlineError>}
+              {confirmingDisconnect ? (
+                // N13 (docs/roadmap.md, Sprint N): irreversível (apaga a
+                // credencial pessoal salva) — era painel inline, virou modal.
+                <ConfirmModal
+                  title={t("disconnectConfirmTitle")}
+                  message={t("disconnectConfirmMessage")}
+                  onClose={() => setConfirmingDisconnect(false)}
+                  actions={
+                    <>
+                      <Button variant="chrome" disabled={saving} onClick={() => setConfirmingDisconnect(false)}>
+                        {t("cancel")}
+                      </Button>
+                      <Button variant="danger" disabled={saving} onClick={handleDisconnect}>
+                        {t("disconnect")}
+                      </Button>
+                    </>
+                  }
+                />
+              ) : (
+                // Vermelho já em repouso (mesmo padrão de "Remover" em
+                // Emuladores/Biblioteca): desconectar apaga a credencial pessoal.
+                // A cor não é o único sinal — o rótulo diz "Desconectar" e o
+                // `ConfirmModal` confirma —, então não viola 1.4.1.
+                <Button
+                  type="button"
+                  variant="chrome"
+                  className={CHROME_TINT_DANGER}
+                  onClick={() => setConfirmingDisconnect(true)}
+                >
+                  {t("disconnect")}
+                </Button>
+              )}
+            </div>
+          )}
 
-        <div className="mb-4 flex flex-wrap gap-3">
-          <Button variant="primary" className="w-fit" onClick={onOpenConfigureController}>
-            {t("configureControllerButton")}
-          </Button>
-          <Button variant="chrome" className="w-fit" onClick={onOpenControllerTest}>
-            {t("testControllerButton")}
-          </Button>
-        </div>
+          {state.kind === "loaded" && !state.personal && (
+            <div className="flex flex-col gap-3">
+              {/* Achado real, 2026-08-17: pequenos grupos de testadores não têm
+                  conta própria do IGDB ainda quando começam a usar o ZeuX — em
+                  vez de deixar a busca de capa travada até alguém configurar
+                  algo, o ZeuX já busca sozinho com uma credencial de teste
+                  embutida (internal/igdb/credentials.go, defaultCredentials).
+                  O formulário abaixo continua disponível pra quem quiser
+                  conectar a própria conta e sair da cota compartilhada.
 
-        {emulators === null && <p className="text-sm text-muted">{t("loadingEmulatorsForControllers")}</p>}
+                  Achado real, 2026-09-08: essa credencial de teste só existe
+                  em builds oficiais do release (injetada via ldflags a partir
+                  de GitHub Secrets) — um build local sem essas variáveis de
+                  ambiente chega aqui com `configured: false`, e dizer
+                  "já funciona sem configurar nada" seria falso nesse caso
+                  (busca de capa que dependa do IGDB fica sem fonte nenhuma até
+                  conectar uma conta própria abaixo; libretro-thumbnails
+                  continua funcionando do mesmo jeito, sem depender disto). */}
+              <p className="text-sm text-ink">
+                {state.configured ? t("usingTestCredential") : t("noTestCredential")}
+              </p>
+              {formError && <InlineError>{formError}</InlineError>}
+              {/* `max-w-xl` (teto): subindo para o topo da página, o card
+                  ganhou a largura inteira, e um campo de ID de 1000px lia
+                  como área de texto, não como um código curto. */}
+              <label className="flex max-w-xl flex-col gap-1 text-sm text-ink">
+                {t("clientIdLabel")}
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  autoComplete="off"
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex max-w-xl flex-col gap-1 text-sm text-ink">
+                {t("clientSecretLabel")}
+                <input
+                  type="password"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  autoComplete="off"
+                  className={inputClass}
+                />
+              </label>
+              <Button
+                variant="primary"
+                disabled={saving || !clientId || !clientSecret}
+                onClick={handleConnect}
+                className="w-fit"
+              >
+                {saving ? t("connecting") : t("connect")}
+              </Button>
+            </div>
+          )}
+        </Card>
 
-        {emulators !== null &&
-          (() => {
-            const checkable = emulators.filter((e) => e.installed && e.controller_check);
-            if (checkable.length > 0) {
+        <Card filled>
+          <SectionHeading className="mb-2">{t("controllersHeading")}</SectionHeading>
+          <p className="mb-4 text-sm text-muted">{t("controllersDescription")}</p>
+
+          <div className="mb-4 flex flex-wrap gap-3">
+            <Button variant="primary" className="w-fit" onClick={onOpenConfigureController}>
+              {t("configureControllerButton")}
+            </Button>
+            <Button variant="chrome" className="w-fit" onClick={onOpenControllerTest}>
+              {t("testControllerButton")}
+            </Button>
+          </div>
+
+          {emulators === null && <p className="text-sm text-muted">{t("loadingEmulatorsForControllers")}</p>}
+
+          {emulators !== null &&
+            (() => {
+              const checkable = emulators.filter((e) => e.installed && e.controller_check);
+              if (checkable.length > 0) {
+                return (
+                  <div className="mb-6">
+                    {/* Redesenho arcade/CRT (2026-09-09): subtítulo de bloco no mesmo
+                vocabulário de kicker monoespaçado do resto do app, no lugar do
+                `text-primary` (roxo reservado a ação). */}
+            <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("guidedSetupHeading")}</h3>
+                    <GamepadStatusLine />
+                    <div className="mt-3 flex flex-col gap-3">
+                      {checkable.map((emulator) => (
+                        <GuidedControllerSetupStep key={emulator.adapter_id} emulator={emulator} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+          {emulators !== null &&
+            (() => {
+              const bindable = emulators.filter((e) => e.installed && e.bindable);
+              if (bindable.length === 0) {
+                return <EmptyState variant="inline" title={t("noBindableEmulators")} />;
+              }
               return (
-                <div className="mb-6">
-                  {/* Redesenho arcade/CRT (2026-09-09): subtítulo de bloco no mesmo
-              vocabulário de kicker monoespaçado do resto do app, no lugar do
-              `text-primary` (roxo reservado a ação). */}
-          <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("guidedSetupHeading")}</h3>
-                  <GamepadStatusLine />
-                  <div className="mt-3 flex flex-col gap-3">
-                    {checkable.map((emulator) => (
-                      <GuidedControllerSetupStep key={emulator.adapter_id} emulator={emulator} />
+                <div>
+                  <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("manualMappingHeading")}</h3>
+                  <div className="flex flex-col gap-3">
+                    {bindable.map((emulator) => (
+                      <div key={emulator.adapter_id}>
+                        <Button
+                          variant="chrome"
+                          className="w-fit"
+                          onClick={() =>
+                            setExpandedAdapterId((id) => (id === emulator.adapter_id ? null : emulator.adapter_id))
+                          }
+                        >
+                          {emulator.name} · {expandedAdapterId === emulator.adapter_id ? t("hideManualMapping") : t("manualMappingButton")}
+                        </Button>
+                        {expandedAdapterId === emulator.adapter_id && (
+                          <div className="mt-3">
+                            <EmulatorBindingsPanel adapterId={emulator.adapter_id} adapterName={emulator.name} />
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
               );
-            }
-            return null;
-          })()}
+            })()}
+        </Card>
 
-        {emulators !== null &&
-          (() => {
-            const bindable = emulators.filter((e) => e.installed && e.bindable);
-            if (bindable.length === 0) {
-              return <EmptyState variant="inline" title={t("noBindableEmulators")} />;
-            }
-            return (
-              <div>
-                <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("manualMappingHeading")}</h3>
-                <div className="flex flex-col gap-3">
-                  {bindable.map((emulator) => (
-                    <div key={emulator.adapter_id}>
-                      <Button
-                        variant="chrome"
-                        className="w-fit"
-                        onClick={() =>
-                          setExpandedAdapterId((id) => (id === emulator.adapter_id ? null : emulator.adapter_id))
-                        }
-                      >
-                        {emulator.name} · {expandedAdapterId === emulator.adapter_id ? t("hideManualMapping") : t("manualMappingButton")}
-                      </Button>
-                      {expandedAdapterId === emulator.adapter_id && (
-                        <div className="mt-3">
-                          <EmulatorBindingsPanel adapterId={emulator.adapter_id} adapterName={emulator.name} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-      </Card>
+        <Card filled>
+          <SectionHeading className="mb-2">{t("updatesHeading")}</SectionHeading>
+          <p className="mb-1 text-sm text-muted">{t("updatesDescription")}</p>
+          {appVersion && <p className="mb-4 text-sm text-muted">{t("currentVersion", { version: appVersion })}</p>}
 
-      <Card filled className="mb-6">
-        <SectionHeading className="mb-2">{t("installationHeading")}</SectionHeading>
-        <p className="mb-4 text-sm text-muted">
-          {t("installationDescription")}
-        </p>
-
-        {systemInfo.kind === "loading" && <p className="text-sm text-muted">{t("locatingFolder")}</p>}
-        {systemInfo.kind === "error" && <InlineError>{systemInfo.message}</InlineError>}
-
-        {systemInfo.kind === "loaded" && (
-          <div className="flex flex-col gap-3">
-            <p className="break-all rounded-lg border border-line bg-fill px-3 py-2 font-mono text-xs text-ink">
-              {systemInfo.info.app_data_dir}
+          {updateState.kind === "available" && (
+            <div className="mb-3 rounded-lg border border-accent bg-fill p-3">
+              <p className="font-semibold text-ink">{t("updateAvailable", { version: updateState.version })}</p>
+              {updateState.notes && <p className="mt-2 whitespace-pre-wrap text-sm text-muted">{updateState.notes}</p>}
+            </div>
+          )}
+          {updateState.kind === "installing" && (
+            <p className="mb-3 text-sm text-muted">
+              {updateState.progress === null
+                ? t("downloadingUpdate")
+                : t("downloadingUpdateProgress", { progress: updateState.progress })}
             </p>
-            {pathError && <InlineError>{pathError}</InlineError>}
-            {/* `chrome` (2026-09-07): abrir pasta é chrome de arquivo em
-                toda tela do app — ver a variante em components/ui.tsx. */}
-            <Button variant="chrome" onClick={openInstallFolder} className="w-fit">
-              {t("openInstallFolder")}
+          )}
+          {updateState.kind === "upToDate" && <p className="mb-3 text-sm text-ink">{t("upToDate")}</p>}
+          {updateState.kind === "error" && <InlineError className="mb-3">{updateState.message}</InlineError>}
+
+          <div className="flex flex-wrap gap-3">
+            <Button variant="chrome" disabled={updateState.kind === "checking" || updateState.kind === "installing"} onClick={checkForUpdates}>
+              {updateState.kind === "checking" ? t("checkingUpdates") : t("checkUpdates")}
             </Button>
-          </div>
-        )}
-      </Card>
-
-      <Card filled className="mb-6">
-        <SectionHeading className="mb-2">{t("uninstallHeading")}</SectionHeading>
-
-        {systemInfo.kind === "loaded" && systemInfo.info.os === "windows" && (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted">
-              {t("uninstallWindowsDescription")}
-            </p>
-            {uninstallError && <InlineError>{uninstallError}</InlineError>}
-            <Button variant="chrome" onClick={openWindowsUninstall} className="w-fit">
-              {t("openWindowsUninstall")}
-            </Button>
-          </div>
-        )}
-
-        {systemInfo.kind === "loaded" && systemInfo.info.os !== "windows" && (
-          <p className="text-sm text-muted">
-            {systemInfo.info.os === "darwin"
-              ? t("uninstallMacDescription")
-              : t("uninstallLinuxDescription")}{" "}
-            {t("uninstallSuffix")}
-          </p>
-        )}
-
-        {systemInfo.kind !== "loaded" && (
-          <p className="text-sm text-muted">{t("waitingForInstall")}</p>
-        )}
-      </Card>
-
-      <Card filled>
-        <SectionHeading className="mb-2">{t("igdbHeading")}</SectionHeading>
-        <p className="mb-4 text-sm text-muted">
-          {t("igdbDescription")}
-        </p>
-
-        {state.kind === "loading" && <p className="text-sm text-muted">{t("readingAccountStatus")}</p>}
-
-        {state.kind === "error" && (
-          <div>
-            <InlineError className="mb-2">{state.message}</InlineError>
-            <Button variant="chrome" onClick={loadStatus}>
-              {t("tryAgain")}
-            </Button>
-          </div>
-        )}
-
-        {state.kind === "loaded" && state.personal && (
-          <div>
-            <p className="mb-3 text-sm text-ink">{t("accountConnected")}</p>
-            {formError && <InlineError className="mb-3">{formError}</InlineError>}
-            {confirmingDisconnect ? (
-              // N13 (docs/roadmap.md, Sprint N): irreversível (apaga a
-              // credencial pessoal salva) — era painel inline, virou modal.
-              <ConfirmModal
-                title={t("disconnectConfirmTitle")}
-                message={t("disconnectConfirmMessage")}
-                onClose={() => setConfirmingDisconnect(false)}
-                actions={
-                  <>
-                    <Button variant="chrome" disabled={saving} onClick={() => setConfirmingDisconnect(false)}>
-                      {t("cancel")}
-                    </Button>
-                    <Button variant="danger" disabled={saving} onClick={handleDisconnect}>
-                      {t("disconnect")}
-                    </Button>
-                  </>
-                }
-              />
-            ) : (
-              // Vermelho já em repouso (mesmo padrão de "Remover" em
-              // Emuladores/Biblioteca): desconectar apaga a credencial pessoal.
-              // A cor não é o único sinal — o rótulo diz "Desconectar" e o
-              // `ConfirmModal` confirma —, então não viola 1.4.1.
-              <Button
-                type="button"
-                variant="chrome"
-                className={CHROME_TINT_DANGER}
-                onClick={() => setConfirmingDisconnect(true)}
-              >
-                {t("disconnect")}
+            {updateState.kind === "available" && (
+              <Button variant="primary" onClick={installUpdate}>
+                {t("installUpdate")}
               </Button>
             )}
           </div>
-        )}
+        </Card>
 
-        {state.kind === "loaded" && !state.personal && (
-          <div className="flex flex-col gap-3">
-            {/* Achado real, 2026-08-17: pequenos grupos de testadores não têm
-                conta própria do IGDB ainda quando começam a usar o ZeuX — em
-                vez de deixar a busca de capa travada até alguém configurar
-                algo, o ZeuX já busca sozinho com uma credencial de teste
-                embutida (internal/igdb/credentials.go, defaultCredentials).
-                O formulário abaixo continua disponível pra quem quiser
-                conectar a própria conta e sair da cota compartilhada.
+        <Card filled>
+          <SectionHeading className="mb-2">{t("tourHeading")}</SectionHeading>
+          <p className="mb-4 text-sm text-muted">{t("tourDescription")}</p>
+          <Button variant="chrome" className="w-fit" onClick={onReplayTour}>
+            {t("replayTour")}
+          </Button>
+        </Card>
 
-                Achado real, 2026-09-08: essa credencial de teste só existe
-                em builds oficiais do release (injetada via ldflags a partir
-                de GitHub Secrets) — um build local sem essas variáveis de
-                ambiente chega aqui com `configured: false`, e dizer
-                "já funciona sem configurar nada" seria falso nesse caso
-                (busca de capa que dependa do IGDB fica sem fonte nenhuma até
-                conectar uma conta própria abaixo; libretro-thumbnails
-                continua funcionando do mesmo jeito, sem depender disto). */}
-            <p className="text-sm text-ink">
-              {state.configured ? t("usingTestCredential") : t("noTestCredential")}
+        <Card filled>
+          <SectionHeading className="mb-2">{t("installationHeading")}</SectionHeading>
+          <p className="mb-4 text-sm text-muted">
+            {t("installationDescription")}
+          </p>
+
+          {systemInfo.kind === "loading" && <p className="text-sm text-muted">{t("locatingFolder")}</p>}
+          {systemInfo.kind === "error" && <InlineError>{systemInfo.message}</InlineError>}
+
+          {systemInfo.kind === "loaded" && (
+            <div className="flex flex-col gap-3">
+              <p className="break-all rounded-lg border border-line bg-fill px-3 py-2 font-mono text-xs text-ink">
+                {systemInfo.info.app_data_dir}
+              </p>
+              {pathError && <InlineError>{pathError}</InlineError>}
+              {/* `chrome` (2026-09-07): abrir pasta é chrome de arquivo em
+                  toda tela do app — ver a variante em components/ui.tsx. */}
+              <Button variant="chrome" onClick={openInstallFolder} className="w-fit">
+                {t("openInstallFolder")}
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        <Card filled>
+          <SectionHeading className="mb-2">{t("uninstallHeading")}</SectionHeading>
+
+          {systemInfo.kind === "loaded" && systemInfo.info.os === "windows" && (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-muted">
+                {t("uninstallWindowsDescription")}
+              </p>
+              {uninstallError && <InlineError>{uninstallError}</InlineError>}
+              <Button variant="chrome" onClick={openWindowsUninstall} className="w-fit">
+                {t("openWindowsUninstall")}
+              </Button>
+            </div>
+          )}
+
+          {systemInfo.kind === "loaded" && systemInfo.info.os !== "windows" && (
+            <p className="text-sm text-muted">
+              {systemInfo.info.os === "darwin"
+                ? t("uninstallMacDescription")
+                : t("uninstallLinuxDescription")}{" "}
+              {t("uninstallSuffix")}
             </p>
-            {formError && <InlineError>{formError}</InlineError>}
-            <label className="flex flex-col gap-1 text-sm text-ink">
-              {t("clientIdLabel")}
-              <input
-                type="text"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                autoComplete="off"
-                className={inputClass}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-ink">
-              {t("clientSecretLabel")}
-              <input
-                type="password"
-                value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-                autoComplete="off"
-                className={inputClass}
-              />
-            </label>
-            <Button
-              variant="primary"
-              disabled={saving || !clientId || !clientSecret}
-              onClick={handleConnect}
-              className="w-fit"
-            >
-              {saving ? t("connecting") : t("connect")}
-            </Button>
-          </div>
-        )}
-      </Card>
+          )}
+
+          {systemInfo.kind !== "loaded" && (
+            <p className="text-sm text-muted">{t("waitingForInstall")}</p>
+          )}
+        </Card>
+      </div>
     </ScreenContainer>
   );
 }

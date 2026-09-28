@@ -120,10 +120,18 @@ export function HistoryScreen({
       <ScreenHeader
         title={t("title")}
         subtitle={t("subtitle")}
+        // Só com histórico na tela (2026-09-28): no estado vazio o
+        // `EmptyState` já traz o CTA para a biblioteca, e os dois botões
+        // levavam ao mesmo lugar com rótulos diferentes ("Ver todos os
+        // jogos" e "Ver biblioteca") — parecia haver dois destinos. Também
+        // fora do carregamento, para não aparecer e sumir se o resultado
+        // vier vazio.
         actions={
-          <Button variant="chrome" onClick={onOpenLibrary}>
-            {t("seeAllGames")}
-          </Button>
+          !loading && !nothingYet ? (
+            <Button variant="chrome" onClick={onOpenLibrary}>
+              {t("seeAllGames")}
+            </Button>
+          ) : undefined
         }
       />
 
