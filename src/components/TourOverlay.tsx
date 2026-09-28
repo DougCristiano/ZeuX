@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AmbientGlow, Button, FOCUS_RING } from "./ui";
+import { AmbientGlow, Button } from "./ui";
+import { TourArt, type TourArtKind } from "./TourArt";
 import { useT } from "../i18n/i18n";
 import { dict } from "./TourOverlay.i18n";
 
@@ -18,10 +19,11 @@ import { dict } from "./TourOverlay.i18n";
  * apresentação" em qualquer execução; **não** reaparece por biblioteca vazia
  * (quem esvaziou a biblioteca já conhece o app).
  *
- * As ilustrações são arte esquemática no vocabulário visual do app (janela
- * de emulador, medidor, pasta, nós da rede), **sem texto embutido** — a
- * legenda vem do i18n. Print real envelhece a cada redesenho (o visual mudou
- * duas vezes em três dias) e precisaria de um jogo de imagens por idioma.
+ * As ilustrações são pixel art gerada por código (`TourArt.tsx`, desde
+ * 2026-09-28 — antes eram SVG de traço liso, que destoava do resto do app),
+ * **sem texto embutido** — a legenda vem do i18n. Print real envelhece a cada
+ * redesenho (o visual mudou duas vezes em três dias) e precisaria de um jogo
+ * de imagens por idioma.
  */
 
 const STORAGE_KEY = "zeux.tour-seen";
@@ -45,9 +47,7 @@ export function markTourSeen() {
   }
 }
 
-type StepArt = "autoconfig" | "verdict" | "library" | "social";
-
-const STEPS: { art: StepArt; kicker: keyof typeof dict; title: keyof typeof dict; body: keyof typeof dict }[] = [
+const STEPS: { art: TourArtKind; kicker: keyof typeof dict; title: keyof typeof dict; body: keyof typeof dict }[] = [
   { art: "autoconfig", kicker: "s1Kicker", title: "s1Title", body: "s1Body" },
   { art: "verdict", kicker: "s2Kicker", title: "s2Title", body: "s2Body" },
   { art: "library", kicker: "s3Kicker", title: "s3Title", body: "s3Body" },
@@ -93,52 +93,67 @@ export function TourOverlay({ onClose }: { onClose: () => void }) {
       <h2 className="sr-only">{t("srHeading")}</h2>
 
       {/* Saída sempre visível, em toda tela. `autoFocus` não vai aqui — o
-          botão "Próximo" abaixo é o alvo do botão A do controle. */}
-      <button
-        type="button"
-        onClick={finish}
-        className={`absolute top-6 right-6 rounded-lg px-3 py-1.5 text-xs tracking-wide text-muted uppercase transition-colors hover:text-ink ${FOCUS_RING}`}
-      >
+          botão "Próximo" abaixo é o alvo do botão A do controle. `quiet`: é o
+          terciário do app (só texto), com a mesma voz mono dos outros dois
+          botões do tour — antes era um `<button>` avulso em sans. */}
+      <Button type="button" variant="quiet" size="sm" onClick={finish} className="absolute top-6 right-6">
         {t("skip")}
-      </button>
+      </Button>
 
-      <div className="relative flex w-full max-w-md flex-col items-center gap-5">
+      {/* `max-w-[480px]`: teto, não largura — é a medida em que a grade de
+          80×50 da arte cai em 6px inteiros por célula (ver TourArt.tsx). */}
+      <div className="relative flex w-full max-w-[480px] flex-col items-center gap-5">
         {/* Moldura de tubo: a ilustração troca a cada passo; a coreografia de
             fade usa o keyframe autoral já existente (`zeux-boot-letter`), que
-            o bloco global de `prefers-reduced-motion` do index.css zera. */}
+            o bloco global de `prefers-reduced-motion` do index.css zera.
+            Contorno por `ring` (sombra), não `border`: a borda comeria 2px da
+            largura e a escala da arte deixaria de ser inteira. Canto reto,
+            como os botões e chips — pixel art em moldura arredondada lia como
+            imagem colada. */}
         <div
           key={step}
-          className="relative w-full overflow-hidden rounded-lg border border-line-strong bg-fill"
+          className="relative w-full overflow-hidden rounded-sm bg-fill ring-1 ring-line-strong"
           style={{ animation: "zeux-boot-letter 320ms cubic-bezier(0.16, 1, 0.3, 1) both" }}
         >
-          <StepArtwork art={current.art} />
-          <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-50" />
+          <TourArt art={current.art} />
+          <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
         </div>
 
-        <div key={`text-${step}`} className="flex flex-col items-center gap-2 text-center">
+        <div key={`text-${step}`} className="flex flex-col items-center gap-3 text-center">
           <p className="font-mono text-xs tracking-[0.2em] text-accent-secondary uppercase">{t(current.kicker)}</p>
-          <p className="text-xl font-semibold text-ink">{t(current.title)}</p>
+          {/* Título na fonte pixel, como o `<h1>` de toda tela do app
+              (`ScreenHeader`). 16px, não os 22px de lá: aqui a frase é longa
+              e quebraria em três linhas; a 16px a Press Start 2P ainda lê
+              bem, e `leading-relaxed` dá a folga que a altura-x dela pede. */}
+          <p className="font-pixel text-base leading-relaxed tracking-[0.02em] text-balance text-ink">{t(current.title)}</p>
           <p className="max-w-sm text-sm text-muted">{t(current.body)}</p>
         </div>
 
         {/* Marcadores de passo — decorativos; a contagem real vai no
-            `aria-label` do grupo para o leitor de tela. */}
+            `aria-label` do grupo para o leitor de tela. Quadrados, não
+            bolinhas: um pixel de 8px, o mesmo marcador do `SectionHeading`. */}
         <div className="flex items-center gap-2" role="group" aria-label={t("stepLabel", { current: step + 1, total: STEPS.length })}>
           {STEPS.map((_, i) => (
             <span
               key={i}
               aria-hidden="true"
-              className="h-1.5 w-1.5 rounded-full transition-colors"
+              className="size-2 transition-colors"
               style={{ background: i === step ? "var(--accent)" : "var(--line-strong)" }}
             />
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          {step > 0 && (
-            <Button type="button" variant="chrome" onClick={back}>
+        {/* "Próximo" fixo no centro, "Voltar" à esquerda dele: com os dois
+            num `flex` centralizado, o "Próximo" pulava de posição debaixo do
+            cursor quando o "Voltar" aparecia no passo 2 — quem avança
+            clicando sem olhar clicava no vazio. */}
+        <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
+          {step > 0 ? (
+            <Button type="button" variant="chrome" onClick={back} className="justify-self-end">
               {t("back")}
             </Button>
+          ) : (
+            <span />
           )}
           <Button type="button" variant="primary" autoFocus onClick={next} {...{ "data-gamepad-start": "" }}>
             {isLast ? t("done") : t("next")}
@@ -146,120 +161,5 @@ export function TourOverlay({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * Ilustração esquemática por passo. Sem texto — todo rótulo é do i18n. Traços
- * finos, canto reto, paleta de tokens: o mesmo chassi/CRT do resto do app.
- * `viewBox` fixo, largura fluida.
- */
-function StepArtwork({ art }: { art: StepArt }) {
-  const common = {
-    viewBox: "0 0 240 150",
-    className: "block h-auto w-full",
-    role: "img" as const,
-    "aria-hidden": true,
-  };
-  const line = "var(--line-strong)";
-  const ink = "var(--muted)";
-  const accent = "var(--accent)";
-  const cyan = "var(--accent-secondary)";
-
-  if (art === "autoconfig") {
-    return (
-      <svg {...common}>
-        {/* Chip que "lê o hardware" alimentando a janela do emulador */}
-        <rect x="18" y="58" width="30" height="30" rx="2" fill="none" stroke={cyan} strokeWidth="1.5" />
-        <path d="M24 58v-6M36 58v-6M24 88v6M36 88v6M18 66h-6M18 78h-6M48 66h6M48 78h6" stroke={cyan} strokeWidth="1.5" />
-        <path d="M56 73h26m0 0-6-5m6 5-6 5" stroke={accent} strokeWidth="1.5" fill="none" />
-        {/* Janela do emulador com barra de título e três "sliders" preenchidos */}
-        <rect x="92" y="30" width="128" height="90" rx="3" fill="none" stroke={line} strokeWidth="1.5" />
-        <path d="M92 44h128" stroke={line} strokeWidth="1.5" />
-        <circle cx="100" cy="37" r="2" fill={ink} />
-        <circle cx="108" cy="37" r="2" fill={ink} />
-        <circle cx="116" cy="37" r="2" fill={ink} />
-        <path d="M104 60h96M104 78h96M104 96h96" stroke={line} strokeWidth="4" strokeLinecap="round" />
-        <path d="M104 60h60M104 78h34M104 96h78" stroke={accent} strokeWidth="4" strokeLinecap="round" />
-        <circle cx="164" cy="60" r="4" fill="var(--paper)" stroke={accent} strokeWidth="1.5" />
-        <circle cx="138" cy="78" r="4" fill="var(--paper)" stroke={accent} strokeWidth="1.5" />
-        <circle cx="182" cy="96" r="4" fill="var(--paper)" stroke={accent} strokeWidth="1.5" />
-      </svg>
-    );
-  }
-
-  if (art === "verdict") {
-    return (
-      <svg {...common}>
-        {/* Medidor segmentado; um segmento marcado por uma chave que aponta
-            para o "componente que barra" (chip abaixo) */}
-        <rect x="30" y="52" width="180" height="20" rx="2" fill="none" stroke={line} strokeWidth="1.5" />
-        <rect x="32" y="54" width="52" height="16" fill={accent} opacity="0.9" />
-        <rect x="86" y="54" width="52" height="16" fill={accent} opacity="0.5" />
-        <path d="M84 54v16M138 54v16" stroke="var(--paper)" strokeWidth="1.5" />
-        {/* Chave sob o segundo segmento */}
-        <path d="M86 80v5h52v-5M112 85v8" stroke={cyan} strokeWidth="1.5" fill="none" />
-        {/* Chip = o componente nomeado */}
-        <rect x="96" y="100" width="32" height="24" rx="2" fill="none" stroke={cyan} strokeWidth="1.5" />
-        <path d="M104 100v-5M120 100v-5M96 108h-5M96 116h-5M128 108h5M128 116h5" stroke={cyan} strokeWidth="1.5" />
-        {/* Ponteiro de escala, sem números */}
-        <path d="M30 44v-6M120 44v-6M210 44v-6" stroke={ink} strokeWidth="1.5" />
-      </svg>
-    );
-  }
-
-  if (art === "library") {
-    return (
-      <svg {...common}>
-        {/* Pasta no disco → grade de capas. A pasta não se move: a seta é só
-            de leitura. */}
-        <path
-          d="M20 50h26l8 10h44v58H20z"
-          fill="none"
-          stroke={line}
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        {/* "Discos" dentro da pasta */}
-        <circle cx="45" cy="88" r="10" fill="none" stroke={ink} strokeWidth="1.5" />
-        <circle cx="45" cy="88" r="2.5" fill={ink} />
-        <circle cx="70" cy="94" r="10" fill="none" stroke={ink} strokeWidth="1.5" />
-        <circle cx="70" cy="94" r="2.5" fill={ink} />
-        <path d="M104 84h22m0 0-6-5m6 5-6 5" stroke={cyan} strokeWidth="1.5" fill="none" />
-        {/* Grade de capas */}
-        <rect x="138" y="40" width="24" height="32" rx="2" fill="none" stroke={accent} strokeWidth="1.5" />
-        <rect x="170" y="40" width="24" height="32" rx="2" fill="none" stroke={line} strokeWidth="1.5" />
-        <rect x="202" y="40" width="24" height="32" rx="2" fill="none" stroke={line} strokeWidth="1.5" />
-        <rect x="138" y="82" width="24" height="32" rx="2" fill="none" stroke={line} strokeWidth="1.5" />
-        <rect x="170" y="82" width="24" height="32" rx="2" fill="none" stroke={accent} strokeWidth="1.5" />
-        <rect x="202" y="82" width="24" height="32" rx="2" fill="none" stroke={line} strokeWidth="1.5" />
-      </svg>
-    );
-  }
-
-  // social
-  return (
-    <svg {...common}>
-      {/* Três nós ligados; ícones de save / controle / textura viajam pelos
-          links. Um cartucho com traço: o jogo não circula. */}
-      <path d="M60 40 120 75 60 110M180 40 120 75 180 110" stroke={line} strokeWidth="1.5" fill="none" />
-      <circle cx="52" cy="35" r="10" fill="none" stroke={cyan} strokeWidth="1.5" />
-      <circle cx="52" cy="115" r="10" fill="none" stroke={cyan} strokeWidth="1.5" />
-      <circle cx="188" cy="35" r="10" fill="none" stroke={cyan} strokeWidth="1.5" />
-      <circle cx="120" cy="75" r="12" fill="none" stroke={accent} strokeWidth="1.5" />
-      {/* save (disquete) */}
-      <rect x="84" y="49" width="12" height="12" rx="1" fill="none" stroke={accent} strokeWidth="1.5" />
-      <path d="M87 49v4h6v-4" stroke={accent} strokeWidth="1.5" />
-      {/* controle */}
-      <rect x="84" y="89" width="14" height="9" rx="4.5" fill="none" stroke={accent} strokeWidth="1.5" />
-      {/* textura (swatch) */}
-      <rect x="146" y="49" width="12" height="12" fill="none" stroke={accent} strokeWidth="1.5" />
-      <path d="M146 55h12M152 49v12" stroke={accent} strokeWidth="1" />
-      {/* cartucho com traço = a ROM não circula */}
-      <rect x="150" y="90" width="20" height="24" rx="2" fill="none" stroke={ink} strokeWidth="1.5" />
-      <path d="M155 90v-4h10v4" stroke={ink} strokeWidth="1.5" />
-      <circle cx="160" cy="102" r="15" fill="none" stroke="var(--danger)" strokeWidth="2" />
-      <path d="M150 92 170 112" stroke="var(--danger)" strokeWidth="2" />
-    </svg>
   );
 }

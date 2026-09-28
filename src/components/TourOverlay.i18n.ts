@@ -3,7 +3,7 @@ import type { Dict } from "../i18n/i18n";
 // Tour de primeira execução (O1, docs/pendencias.md). Quatro telas de
 // apresentação, uma por pilar do produto (docs/visao-do-produto.md), exibidas
 // depois do scan e antes da primeira tela do app. Toda legenda vem daqui —
-// as ilustrações são arte esquemática sem texto embutido, de propósito
+// as ilustrações (pixel art, TourArt.tsx) não têm texto embutido, de propósito
 // (print real envelhece a cada redesenho e dobraria por idioma).
 export const dict = {
   // Lido só por leitor de tela: anuncia o que é a sobreposição.

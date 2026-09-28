@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Cpu, Gamepad2, History, LayoutGrid, Settings } from "lucide-react";
 import { useT } from "../i18n/i18n";
-import { LanguageSelector } from "./LanguageSelector";
 import { FOCUS_RING, ZeuXMark } from "./ui";
 import { dict } from "./Sidebar.i18n";
 
@@ -189,10 +188,13 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
             );
           })}
         </nav>
-
-        <div className="mt-auto w-full px-2">
-          <LanguageSelector className="justify-center" collapsible />
-        </div>
+        {/* Sem seletor de idioma aqui desde 2026-09-28: ele existia também
+            em Configurações, e dois controles para a mesma escolha faziam a
+            pessoa se perguntar se eram coisas diferentes. Ficou só em
+            Configurações, onde se procura. Não havia ganho de alcance em
+            manter este: a sidebar só existe nas mesmas fases em que
+            Configurações já está a um clique (`SIDEBAR_PHASES` em App.tsx) —
+            nem o consentimento nem a tela de recusa a mostram. */}
       </div>
     </aside>
   );

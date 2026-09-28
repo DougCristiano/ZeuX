@@ -5,6 +5,12 @@ export const dict = {
 
   // Language section
   languageLabel: { "pt-BR": "Idioma", en: "Language" },
+  // 2026-09-28: o card de idioma ficou lado a lado com o de efeitos visuais;
+  // sem uma frase, os chips dos dois cards ficavam em alturas diferentes.
+  languageDescription: {
+    "pt-BR": "Vale para todas as telas do ZeuX e muda na hora.",
+    en: "Applies to every ZeuX screen and changes right away.",
+  },
 
   // Visual effects section (B6, docs/pendencias.md) — intensidade de
   // scanline/glow, não paleta de cor (por isso "Efeitos visuais", não "Tema").
