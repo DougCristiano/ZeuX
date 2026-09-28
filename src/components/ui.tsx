@@ -1494,6 +1494,7 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
   // sem a cor de identidade que M10 introduziu — 33+ cards visualmente
   // idênticos, cinza, diferindo só pelo texto.
   const accent = consoleAccentColor(verdict.console_id);
+  const partial = verdict.precision === "parcial";
 
   return (
     // `filled` como todo card do app — era o último `<Card>` sem a prop, e
@@ -1528,12 +1529,6 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
           contradiria o que o ZeuX vai realmente aplicar. */}
       {verdict.display_note && <p className="text-xs text-muted">{verdict.display_note}</p>}
 
-      {verdict.precision === "parcial" && (
-        <PartialNotice>
-          {t("partialPrecisionMessage")}
-        </PartialNotice>
-      )}
-
       {verdict.bottlenecks && verdict.bottlenecks.length > 0 && (
         <Callout label={t("bottleneckLabel")}>
           <ul className="list-disc space-y-1 pl-4">
@@ -1543,7 +1538,54 @@ export function ConsoleVerdictCard({ verdict }: { verdict: ConsoleVerdict }) {
           </ul>
         </Callout>
       )}
+
+      <VerdictCaveat partial={partial} />
     </Card>
+  );
+}
+
+// D2 — calibrar os limiares do catálogo — segue aberto: os campos `requires`
+// de consoles.json são estimativas escritas a partir de conhecimento geral,
+// nunca medidas em hardware real. Mora junto do card (2026-09-28), e não da
+// tela que o usa, porque vale para TODO parecer em toda máquina: quando era
+// constante de `ConsoleDetailScreen`, o detalhe do jogo ("Como vai rodar")
+// mostrava o mesmo card sem aviso nenhum. Vira `true` quando o D2 fechar.
+const THRESHOLDS_CALIBRATED = false;
+
+/**
+ * A ressalva do parecer, numa linha de rodapé do próprio card.
+ *
+ * Junta duas incertezas diferentes — `precision: "parcial"` (algo DESTA
+ * máquina não pôde ser lido, princípio 4 do CLAUDE.md) e os limiares ainda
+ * não calibrados (o catálogo inteiro, em qualquer máquina) — que até
+ * 2026-09-28 eram duas caixas grandes empilhadas: a âmbar de `PartialNotice`
+ * dentro do card e um `Callout` "estimativa" abaixo dele. Com o selo de
+ * patamar no topo, eram três camadas de "não temos certeza" disputando a
+ * atenção com o que o parecer de fato diz (patamar, preset, gargalo).
+ *
+ * Dizer menos vezes, nunca deixar de dizer: as duas ressalvas continuam
+ * escritas por extenso, e "parcial" continua com o selo âmbar — o mesmo tom
+ * que o app reserva para dado não verificável —, só que em tamanho de
+ * legenda. Sem "parcial", o selo é neutro, porque aí a ressalva não é sobre
+ * esta máquina.
+ */
+function VerdictCaveat({ partial }: { partial: boolean }) {
+  const t = useT(dict);
+  if (!partial && THRESHOLDS_CALIBRATED) return null;
+
+  const message = partial
+    ? THRESHOLDS_CALIBRATED
+      ? t("partialPrecisionMessage")
+      : t("partialAndUncalibratedMessage")
+    : t("thresholdsNotCalibrated");
+
+  return (
+    <p className="flex items-start gap-2 border-t border-line pt-2 text-xs text-muted">
+      <span className="shrink-0">
+        <Badge variant={partial ? "warn" : "default"}>{partial ? t("partialLabel") : t("estimateLabel")}</Badge>
+      </span>
+      <span className="pt-0.5">{message}</span>
+    </p>
   );
 }
 
