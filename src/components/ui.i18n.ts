@@ -73,6 +73,21 @@ export const dict = {
     "pt-BR": "Não foi possível confirmar todos os requisitos deste console — este parecer é uma estimativa.",
     en: "Could not confirm all requirements for this console — this verdict is an estimate.",
   },
+  // As duas ressalvas do parecer numa frase só (ver `VerdictCaveat`): a
+  // primeira metade é sobre esta máquina, a segunda sobre o catálogo.
+  partialAndUncalibratedMessage: {
+    "pt-BR":
+      "Nem todos os requisitos puderam ser confirmados nesta máquina, e os do catálogo ainda não foram medidos em hardware real — este parecer é uma estimativa.",
+    en: "Not every requirement could be confirmed on this machine, and the catalog ones have not yet been measured on real hardware — this verdict is an estimate.",
+  },
+  // Migrado de ConsoleDetailScreen.i18n.ts (2026-09-28) junto com o aviso,
+  // que passou a morar no próprio card do parecer.
+  thresholdsNotCalibrated: {
+    "pt-BR": "Os requisitos do catálogo ainda não foram medidos em hardware real — este patamar é uma estimativa.",
+    en: "The catalog requirements have not yet been measured on real hardware — this tier is an estimate.",
+  },
+  partialLabel: { "pt-BR": "parcial", en: "partial" },
+  estimateLabel: { "pt-BR": "estimativa", en: "estimate" },
   levelOtimo: {
     "pt-BR": "ótimo",
     en: "excellent",

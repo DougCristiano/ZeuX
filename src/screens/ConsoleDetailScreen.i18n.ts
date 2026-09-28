@@ -39,10 +39,6 @@ export const dict = {
     "pt-BR": "já estava na máquina",
     en: "already on machine",
   },
-  notInstalledBadge: {
-    "pt-BR": "não instalado",
-    en: "not installed",
-  },
   coreForConsole: {
     "pt-BR": "Core deste console:",
     en: "Core for this console:",
@@ -304,15 +300,6 @@ export const dict = {
   savesHeading: {
     "pt-BR": "Saves",
     en: "Saves",
-  },
-  // Migrado de VerdictScreen.i18n.ts (2026-09-07): a grade de parecer por
-  // console saiu da tela de Especificações — este disclaimer (D2,
-  // docs/roadmap.md) segue o parecer para onde ele passou a viver de
-  // verdade, aqui no detalhe de cada console.
-  estimateLabel: { "pt-BR": "estimativa", en: "estimate" },
-  thresholdsNotCalibrated: {
-    "pt-BR": "Os patamares abaixo são uma estimativa: os requisitos do catálogo ainda não foram medidos em hardware real.",
-    en: "The thresholds below are an estimate: the catalog requirements have not yet been measured on real hardware.",
   },
   couldNotPointFolder: {
     "pt-BR": "Não foi possível apontar esta pasta.",

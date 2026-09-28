@@ -41,14 +41,32 @@ import { buildReadinessIndex, evaluateConsoleReadiness } from "../lib/consoleRea
 import { useT } from "../i18n/i18n";
 import { dict } from "./ConsoleDetailScreen.i18n";
 
-// D2 (docs/roadmap.md) — calibrar os limiares do catálogo — segue aberto: os
-// campos `requires` de consoles.json são estimativas escritas a partir de
-// conhecimento geral, nunca medidas em hardware real. Migrado de
-// VerdictScreen.tsx (2026-09-07) junto com o próprio parecer, que deixou de
-// ter uma grade dedicada — este é hoje o único lugar do produto que mostra
-// `ConsoleVerdictCard`, então é aqui que o aviso precisa estar. Vira `true`
-// quando o D2 fechar.
-const THRESHOLDS_CALIBRATED = false;
+// O aviso de "limiares ainda não medidos" (D2) que VerdictScreen.tsx aponta
+// para cá saiu desta tela em 2026-09-28: virou parte da própria ressalva de
+// `ConsoleVerdictCard` (components/ui.tsx, `THRESHOLDS_CALIBRATED`). Aqui ele
+// era uma segunda caixa abaixo do card, e o detalhe do jogo — que também
+// mostra o parecer — não tinha aviso nenhum.
+
+/**
+ * Caminho de pasta truncado pelo COMEÇO (`…/roms/ps2`), com o caminho inteiro
+ * no `title`. O que distingue uma pasta da outra é o fim do caminho; cortar
+ * no fim, como o `truncate` comum faz, deixava à mostra só o prefixo que
+ * todas as pastas compartilham (`/home/usuario/…`) — achado da revisão de
+ * design de 2026-09-28.
+ *
+ * `dir="rtl"` joga a reticência para a esquerda (o transbordo sai pelo fim
+ * da linha, que em RTL é a esquerda); o `<bdi dir="ltr">` impede o algoritmo
+ * bidirecional de mover a barra inicial ou pontuação para o outro lado; e
+ * `text-left` mantém um caminho curto, que cabe inteiro, alinhado com o resto
+ * do card em vez de encostado à direita.
+ */
+function PathTail({ path }: { path: string }) {
+  return (
+    <span dir="rtl" title={path} className="min-w-0 truncate text-left text-muted">
+      <bdi dir="ltr">{path}</bdi>
+    </span>
+  );
+}
 
 /**
  * Uma forma de rodar este console. Cada opção é um card: o que é, se está
@@ -126,13 +144,18 @@ function EmulatorOptionCard({
               console de emulador único seria ruído. */}
           {isChosen && <p className="text-xs text-accent">{t("isChosenEmulator")}</p>}
         </div>
-        <span className="shrink-0 whitespace-nowrap">
-          {installed ? (
+        {/* Só o selo de instalado (2026-09-28, revisão de design): o "não
+            instalado" repetia, pela terceira vez na tela, o que o banner de
+            prontidão já diz no topo ("PCSX2 atende este console, mas não está
+            instalado" + a trilha "Emulador · falta"). Aqui o que falta vira a
+            AÇÃO — o botão "Instalar" ou o trilho de instalação manual, que só
+            existem quando não está instalado. O selo de instalado fica porque
+            carrega um dado que não está em outro lugar: quem instalou. */}
+        {installed && (
+          <span className="shrink-0 whitespace-nowrap">
             <Badge variant="solid">{entry?.installation?.managed ? t("installedByZeuxBadge") : t("alreadyInstalledBadge")}</Badge>
-          ) : (
-            <Badge>{t("notInstalledBadge")}</Badge>
-          )}
-        </span>
+          </span>
+        )}
       </div>
 
       {/* O core é a peça que falta com mais frequência: o RetroArch pode
@@ -441,9 +464,7 @@ function GamesFolderSection({
           <ul className="flex flex-col gap-2">
             {folders.map((folder) => (
               <li key={folder.id} className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate text-muted" title={folder.path}>
-                  {folder.path}
-                </span>
+                <PathTail path={folder.path} />
                 <span className="flex shrink-0 gap-1">
                   {/* "Revarrer", não "Varrer de novo" (achado testando com o
                       Douglas, 2026-09-06): mesma ação que LibraryScreen/
@@ -877,12 +898,13 @@ export function ConsoleDetailScreen({
           borderLeftWidth: 3,
         }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-base text-ink">{readiness.detail}</p>
-          <span className="shrink-0 whitespace-nowrap">
-            <Badge variant={readiness.step === "pronto" ? "solid" : "default"}>{readiness.badge}</Badge>
-          </span>
-        </div>
+        {/* Frase + trilha, sem o selo `readiness.badge` que ficava à direita
+            (2026-09-28, revisão de design): "instalar emulador" era a mesma
+            peça que a frase já nomeia e o chip "Emulador · falta" já marca —
+            três jeitos de dizer a mesma coisa num card só. A frase diz o que
+            fazer agora; a trilha diz onde isso fica na sequência. O selo
+            continua útil na LISTA de consoles, onde não há frase nem trilha. */}
+        <p className="text-base text-ink">{readiness.detail}</p>
 
         <ul className="flex flex-wrap gap-1.5">
           {trail.map((piece) => (
@@ -1000,9 +1022,6 @@ export function ConsoleDetailScreen({
             <section className="flex flex-col gap-3">
               <SectionHeading>{t("onThisMachine")}</SectionHeading>
               <ConsoleVerdictCard verdict={verdict} />
-              {!THRESHOLDS_CALIBRATED && (
-                <Callout label={t("estimateLabel")}>{t("thresholdsNotCalibrated")}</Callout>
-              )}
             </section>
           )}
         </aside>
