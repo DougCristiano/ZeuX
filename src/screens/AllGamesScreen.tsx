@@ -895,34 +895,24 @@ export function AllGamesScreen({
                 (sem credencial nenhuma) e só recorre ao IGDB se essa fonte
                 não achar, então esconder o botão sem conta escondia também a
                 fonte livre. */}
-            <div className="flex flex-col items-stretch gap-1">
-              {/* M15 (docs/sprint-m-plano.md, 2026-08-07): o progresso saiu
-                  do rótulo do botão (`Buscando capas… 7/30` crescia e
-                  encolhia a cada jogo, empurrando o botão vizinho) e foi
-                  pra `ProgressBar`, abaixo — mesmo componente que a
-                  instalação inline já usa. Rótulo do botão agora é fixo. */}
-              {/* `chrome`, não `secondary` (2026-09-07): buscar capa é
-                  ação sobre o acervo, não sobre o jogo em foco — e ficava
-                  a poucos pixels da régua de filtros já redesenhada, com
-                  outro canto, outro tamanho de texto e outra caixa. Ver o
-                  comentário da variante em components/ui.tsx. */}
-              <Button variant="chrome" disabled={scrapeJob !== null} onClick={startScrapeCovers}>
-                {scrapeJob ? t("fetchingCovers") : t("fetchCoversButton")}
+            {/* `chrome`, não `secondary` (2026-09-07): buscar capa é ação
+                sobre o acervo, não sobre o jogo em foco — e ficava a poucos
+                pixels da régua de filtros já redesenhada, com outro canto,
+                outro tamanho de texto e outra caixa. Ver o comentário da
+                variante em components/ui.tsx.
+                2026-09-28 (revisão de design): durante a busca o botão SAI e
+                o mesmo lugar vira o medidor. Antes ficavam três coisas
+                empilhadas dizendo a mesma coisa — botão desabilitado
+                "Buscando capas…", barra e "buscando capas… 5/9" embaixo —,
+                e a pilha ainda empurrava a altura do cabeçalho enquanto
+                durava. Um indicador só, na caixa que o botão ocupava. */}
+            {scrapeJob ? (
+              <ScrapeProgress processed={scrapeJob.processed} total={scrapeJob.total} />
+            ) : (
+              <Button variant="chrome" onClick={startScrapeCovers}>
+                {t("fetchCoversButton")}
               </Button>
-              {scrapeJob && (
-                <>
-                  <ProgressBar percent={scrapeJob.total > 0 ? Math.round((scrapeJob.processed / scrapeJob.total) * 100) : null} />
-                  {/* A11y 4.1.3: contador que muda sozinho — anunciado por
-                      aria-live. O texto ("buscando capas… 12/48") diz o que
-                      está acontecendo: um lote automático (adotado por
-                      `adoptRunningScrapeJob`) roda sem nenhum clique do
-                      usuário, e um número solto não explicava a si mesmo. */}
-                  <p className="text-center text-xs text-muted" aria-live="polite">
-                    {t("scrapingCoversProgress", { processed: scrapeJob.processed, total: scrapeJob.total })}
-                  </p>
-                </>
-              )}
-            </div>
+            )}
 
             {/* Navegação de topo (Emuladores/Parecer) mudou para a sidebar
                 (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui
@@ -1215,5 +1205,70 @@ export function AllGamesScreen({
         </>
       )}
     </ScreenContainer>
+  );
+}
+
+/**
+ * Medidor da busca de capas (2026-09-28, revisão de design). Ocupa a mesma
+ * caixa do botão "Buscar capas" — mesma altura, borda e tipografia da
+ * variante `chrome` — e se enche por dentro como uma barra de carga de
+ * cartucho, em blocos. Um indicador só: o rótulo carrega o contador e o
+ * preenchimento carrega a proporção; nada embaixo, nada duplicado.
+ *
+ * `min-w` + `tabular-nums`: o rótulo muda a cada jogo processado e, sem
+ * isso, a caixa encolhia/crescia e arrastava "Pastas de jogos" ao lado (o
+ * mesmo problema que tirou o contador do rótulo do botão no M15).
+ *
+ * `total === 0` é o instante entre o POST e o primeiro poll: o servidor ainda
+ * não contou os jogos. Mostra "Buscando capas…" sem número e sem proporção —
+ * nunca um "0/0" nem uma barra cheia fingindo progresso (princípio 4).
+ */
+function ScrapeProgress({ processed, total }: { processed: number; total: number }) {
+  const t = useT(dict);
+  const known = total > 0;
+  const percent = known ? Math.min(100, Math.round((processed / total) * 100)) : null;
+  const label = known ? t("scrapingCoversProgress", { processed, total }) : t("fetchingCovers");
+  const spoken = known ? t("scrapingCoversProgressLabel", { processed, total }) : t("fetchingCovers");
+  return (
+    <>
+      <div
+        role="progressbar"
+        aria-label={spoken}
+        aria-valuenow={percent ?? undefined}
+        aria-valuemin={known ? 0 : undefined}
+        aria-valuemax={known ? 100 : undefined}
+        className="relative inline-flex h-9 min-w-[13rem] items-center justify-center overflow-hidden rounded-sm border-[1.5px] border-accent/70 px-3.5 font-mono text-xs font-medium tracking-wider whitespace-nowrap text-ink uppercase tabular-nums"
+      >
+        {/* Preenchimento em duas camadas: um tom liso atrás do rótulo (listra
+            atrás de texto cortava as letras — conferido no print) e, na
+            base, uma fita de blocos de 6px com vão de 2px, a grade de pixels
+            da marca. Sem proporção conhecida, pulsa em vez de mentir um
+            tamanho (o bloco global de `prefers-reduced-motion` em
+            src/index.css troca o pulso por opacidade fixa). */}
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-0 transition-[width] duration-300 ${percent === null ? "w-full animate-pulse opacity-50" : ""}`}
+          style={{
+            width: percent === null ? undefined : `${percent}%`,
+            background: "color-mix(in srgb, var(--accent) 22%, transparent)",
+          }}
+        >
+          <span
+            className="absolute inset-x-0 bottom-0 h-1"
+            style={{ backgroundImage: "repeating-linear-gradient(to right, var(--accent) 0 6px, transparent 6px 8px)" }}
+          />
+        </span>
+        <span aria-hidden="true" className="relative">
+          {label}
+        </span>
+      </div>
+      {/* A11y 4.1.3: o lote automático (`adoptRunningScrapeJob`) roda sem
+          clique nenhum — quem usa leitor de tela precisa ouvir que algo
+          começou e como anda. Irmão do medidor, não filho: os filhos de um
+          `progressbar` são apresentacionais e não seriam anunciados. */}
+      <span className="sr-only" aria-live="polite">
+        {spoken}
+      </span>
+    </>
   );
 }

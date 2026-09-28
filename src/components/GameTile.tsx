@@ -169,12 +169,29 @@ export function GameTile({
       </div>
       {/* Rodapé de altura fixa (`min-h`): 2 linhas de título + 1 de metadado,
           sempre — sem isso um título de 1 linha encurtava o tile e a fileira
-          virtualizada ficava irregular. */}
-      <div className="min-h-[3.75rem] min-w-0">
-        <p className="line-clamp-2 text-sm leading-tight font-semibold text-ink" title={game.title}>
+          virtualizada ficava irregular. O `min-h` segura a altura mesmo
+          quando a linha de metadado some (jogo nunca jogado, abaixo).
+
+          Clicável com o mouse (2026-09-28, revisão de design): mirar no nome
+          do jogo e não acontecer nada lia como defeito — a capa abria o
+          detalhe, o título logo embaixo não. Só `onClick`, sem `tabIndex`
+          nem `role`: quem navega por Tab/D-pad já tem o wrapper
+          `role="button"` acima como alvo único (M1); um segundo alvo aqui
+          faria o cursor do controle parar duas vezes no mesmo jogo. */}
+      <div className="group/title min-h-[3.75rem] min-w-0 cursor-pointer" onClick={onOpenDetail}>
+        <p
+          className="line-clamp-2 text-sm leading-tight font-semibold text-ink decoration-accent underline-offset-2 group-hover/title:underline"
+          title={game.title}
+        >
           {game.title}
         </p>
-        <p className="mt-1 font-mono text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
+        {/* "nunca jogado" embaixo de cada tile era ruído (2026-09-28): numa
+            biblioteca nova, a frase se repetia em todos os jogos e não
+            distinguia nenhum. O tempo só aparece quando existe; a ausência
+            dele já diz a mesma coisa. */}
+        {game.playtime_seconds > 0 && (
+          <p className="mt-1 font-mono text-xs text-muted">{formatPlaytime(game.playtime_seconds)}</p>
+        )}
       </div>
     </div>
   );

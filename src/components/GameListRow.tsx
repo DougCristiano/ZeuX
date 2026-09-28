@@ -97,8 +97,12 @@ export function GameListRow({
         {lastPlayed ?? "—"}
       </span>
 
+      {/* Célula vazia quando nunca foi jogado (2026-09-28, mesma regra do
+          `GameTile`): "nunca jogado" repetido linha após linha numa
+          biblioteca nova não distinguia jogo nenhum. O `<span>` continua lá
+          mesmo vazio — é ele que ocupa a trilha de 84px do grid. */}
       <span className="pointer-events-none truncate font-mono text-xs tabular-nums text-muted">
-        {formatPlaytime(game.playtime_seconds)}
+        {game.playtime_seconds > 0 ? formatPlaytime(game.playtime_seconds) : null}
       </span>
 
       <div className="relative z-10 flex shrink-0 items-center gap-2">

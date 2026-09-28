@@ -100,7 +100,6 @@ export function GameDetailScreen({
   game,
   consoleName,
   shortName,
-  year,
   report,
   onBack,
   onOpenConsole,
@@ -108,7 +107,16 @@ export function GameDetailScreen({
   game: LibraryGame;
   consoleName: string;
   shortName: string;
-  /** Ano do console no catálogo — dado real (verdict.year), não inventado. */
+  /**
+   * Ano do CONSOLE no catálogo (verdict.year) — de propósito NÃO exibido
+   * (2026-09-28). Aparecia num badge solto ao lado do nome do console e lia
+   * como o ano do jogo: "Okami" saía com "2000", o ano do PS2, quando o
+   * jogo é de 2006. A biblioteca não guarda ano de lançamento do jogo (o
+   * scraper do IGDB até lê `first_release_date`, mas descarta; a fonte
+   * libretro-thumbnails nem tem), então o certo é não mostrar ano nenhum
+   * em vez de mostrar um que não é deste jogo (princípio 4). A prop fica
+   * porque `App.tsx` ainda passa o valor; sai quando alguém mexer lá.
+   */
   year?: number;
   /** Ausente sem consentimento/scan — "Jogar" continua funcionando (sem
    * preset autoconfigurado), só o card de parecer some. */
@@ -576,7 +584,6 @@ export function GameDetailScreen({
           )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <Badge accentColor={accent}>{consoleName}</Badge>
-            {year !== undefined && <Badge>{year}</Badge>}
             {game.missing && <Badge>{t("missingFile")}</Badge>}
           </div>
         </div>

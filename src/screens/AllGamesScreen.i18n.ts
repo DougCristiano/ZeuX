@@ -94,9 +94,17 @@ export const dict = {
   },
   // 2026-09-09: contador de progresso da busca de capas. Diz o que está
   // acontecendo porque um lote automático roda sem clique nenhum do usuário.
+  // 2026-09-28: sem reticências — agora é o rótulo do próprio medidor (que
+  // já está enchendo), não uma legenda solta embaixo de um botão.
   scrapingCoversProgress: {
-    "pt-BR": "buscando capas… {{processed}}/{{total}}",
-    en: "fetching covers… {{processed}}/{{total}}",
+    "pt-BR": "Buscando capas {{processed}}/{{total}}",
+    en: "Fetching covers {{processed}}/{{total}}",
+  },
+  // Nome acessível do medidor: "5/9" lido em voz alta vira "cinco barra
+  // nove", que não diz o que é cada número.
+  scrapingCoversProgressLabel: {
+    "pt-BR": "Buscando capas: {{processed}} de {{total}} jogos",
+    en: "Fetching covers: {{processed}} of {{total}} games",
   },
   // 2026-09-07 (achado do Douglas: "GERENCIAR PASTAS não tem uma boa
   // nomenclatura"): o botão levava pra tela "Pastas de jogos" (renomeada em
