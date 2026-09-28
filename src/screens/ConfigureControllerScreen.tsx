@@ -1,69 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import controllerPhoto from "../assets/controller-reference.png";
 import { api, ApiError } from "../api";
 import type { EmulatorEntry } from "../api/types";
+import { PixelController } from "../components/PixelController";
 import { Button, Callout, Card, ScreenContainer, ScreenHeader } from "../components/ui";
-import { CONTROLLER_SPOTS } from "../lib/controllerRegions";
 import { CONTROLLER_BINDING_TARGETS } from "../lib/controllerBindingTargets";
 import { useGamepad } from "../hooks/useGamepad";
 import { resumeGamepadNavigation, suspendGamepadNavigation } from "../hooks/gamepadNavigationSuspend";
 import { useT } from "../i18n/i18n";
 import { dict } from "./ConfigureControllerScreen.i18n";
 
-/** Mesma cor de "aqui o sistema informa" que `ControllerTestScreen` usa —
- *  `--accent-secondary`, fixada no redesenho de 2026-09-07. */
-const ON_COLOR = "var(--accent-secondary)";
-
 /**
- * Peças que não são redondas na foto — cópia consciente da lista de
- * `ControllerTestScreen`: um realce circular em cima do braço do direcional ou
- * da pílula de select vaza para fora da peça e encosta na vizinha.
+ * Intensidade de cada botão no controle desenhado durante a sequência: o alvo
+ * aceso por inteiro (com halo — é o que a pessoa vê pelo canto do olho
+ * enquanto olha para o controle físico), os já capturados fracos e sem halo —
+ * dizem "já passei por aqui" sem disputar atenção com o botão pedido agora.
  */
-const BOXY_SPOTS = new Set([
-  "dpadUp",
-  "dpadDown",
-  "dpadLeft",
-  "dpadRight",
-  "shoulderLeft",
-  "shoulderRight",
-  "triggerLeft",
-  "triggerRight",
-  "select",
-  "start",
-]);
-
-/**
- * Marcador sobre a foto. Bem mais simples que o `Spot` da tela de teste, de
- * propósito: aqui não existe intensidade analógica nem eixo — um spot só pode
- * estar em um de três estados, e nenhum deles muda 60 vezes por segundo.
- */
-function Spot({ id, state }: { id: string; state: "target" | "captured" }) {
-  const spot = CONTROLLER_SPOTS[id];
-  if (!spot) return null;
-  const isTarget = state === "target";
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        position: "absolute",
-        left: `${spot.x}%`,
-        top: `${spot.y}%`,
-        width: `${spot.w}%`,
-        height: `${spot.h}%`,
-        transform: "translate(-50%, -50%)",
-        borderRadius: BOXY_SPOTS.has(id) ? "22%" : "50%",
-        background: ON_COLOR,
-        // O halo só existe no alvo: é o que a pessoa vê pelo canto do olho
-        // enquanto olha para o controle, não para a tela. Os já capturados
-        // ficam opacos e sem halo — dizem "já passei por aqui" sem disputar
-        // atenção com o botão que está sendo pedido agora.
-        boxShadow: isTarget ? `0 0 14px 4px ${ON_COLOR}` : "none",
-        opacity: isTarget ? 0.7 : 0.18,
-        transition: "opacity 120ms linear",
-      }}
-    />
-  );
-}
+const TARGET_INTENSITY = 1;
+const CAPTURED_INTENSITY = 0.1;
 
 /** Uma nota do resumo final: de qual emulador veio e o que ele disse. */
 interface AdapterNote {
@@ -329,22 +282,17 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
       )}
 
       <Card filled>
-        <div className="relative mx-auto w-full max-w-xl">
-          <img
-            src={controllerPhoto}
-            alt=""
-            aria-hidden="true"
-            className="block w-full select-none"
-            draggable={false}
+        <div className="mx-auto w-full max-w-xl">
+          <PixelController
+            lit={
+              phase === "running"
+                ? {
+                    ...Object.fromEntries([...capturedSpots].map((spotId) => [spotId, CAPTURED_INTENSITY])),
+                    [target.spotId]: TARGET_INTENSITY,
+                  }
+                : {}
+            }
           />
-          {phase === "running" && (
-            <>
-              {[...capturedSpots].map((spotId) => (
-                <Spot key={spotId} id={spotId} state="captured" />
-              ))}
-              <Spot id={target.spotId} state="target" />
-            </>
-          )}
         </div>
       </Card>
     </ScreenContainer>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import controllerPhoto from "../assets/controller-reference.png";
+import { PixelController } from "../components/PixelController";
 import { Button, Callout, Card, ScreenContainer, ScreenHeader } from "../components/ui";
-import { CONTROLLER_SPOTS } from "../lib/controllerRegions";
 import { useGamepad } from "../hooks/useGamepad";
 import { resumeGamepadNavigation, suspendGamepadNavigation } from "../hooks/gamepadNavigationSuspend";
 import { useT } from "../i18n/i18n";
@@ -69,142 +68,45 @@ function axis(snapshot: GamepadSnapshot, index: number): number {
 }
 
 /**
- * A foto é clara (controle branco) sobre o tema escuro do app, então o realce
- * é uma mancha ciano com halo — `--accent-secondary`, a cor que o redesenho de
- * 2026-09-07 fixou como "aqui o sistema informa" (docs/decisoes.md). Cor por
- * `style` e não por classe Tailwind: a opacidade muda a cada quadro
- * (`requestAnimationFrame`), e montar string de classe 60x por segundo é
- * desperdício — mesma razão que o SVG anterior já registrava aqui.
- */
-const ON_COLOR = "var(--accent-secondary)";
-
-/**
- * Peças que não são redondas na foto: braços do direcional, ombros, gatilhos e
- * as pílulas de select/start. Um realce circular em cima delas vaza para fora
- * da peça e encosta na vizinha.
- */
-const BOXY_SPOTS = new Set([
-  "dpadUp",
-  "dpadDown",
-  "dpadLeft",
-  "dpadRight",
-  "shoulderLeft",
-  "shoulderRight",
-  "triggerLeft",
-  "triggerRight",
-  "select",
-  "start",
-]);
-
-function Spot({
-  id,
-  intensity,
-  offsetX = 0,
-  offsetY = 0,
-}: {
-  id: string;
-  /** 0 = solto, 1 = totalmente apertado. Analógico (L2/R2) usa o meio-termo. */
-  intensity: number;
-  /** Deslocamento em % do próprio marcador — só os analógicos usam, para o
-   *  realce acompanhar o eixo em vez de só acender no clique. */
-  offsetX?: number;
-  offsetY?: number;
-}) {
-  const spot = CONTROLLER_SPOTS[id];
-  const on = intensity > 0.02;
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        position: "absolute",
-        left: `${spot.x}%`,
-        top: `${spot.y}%`,
-        width: `${spot.w}%`,
-        height: `${spot.h}%`,
-        transform: `translate(calc(-50% + ${offsetX}%), calc(-50% + ${offsetY}%))`,
-        borderRadius: BOXY_SPOTS.has(id) ? "22%" : "50%",
-        background: ON_COLOR,
-        // O halo é o que faz o realce ser visto no canto do olho enquanto a
-        // pessoa está olhando para o controle, não para a tela.
-        boxShadow: on ? `0 0 14px 4px ${ON_COLOR}` : "none",
-        opacity: on ? 0.25 + 0.5 * intensity : 0,
-        transition: "opacity 60ms linear",
-      }}
-    />
-  );
-}
-
-/**
- * Foto de um controle real com uma camada de marcadores por cima — um por
- * botão, posicionado em % da imagem (nunca px: a foto encolhe com a janela).
- *
- * **Isto substituiu, em 2026-09-08, um SVG desenhado do zero e deliberadamente
- * sem marca** ("sem A/B/X/Y, sem ✕/○/□/△"). Duas rodadas de desenho à mão não
- * chegaram a uma geometria que parecesse um controle de verdade, e o Douglas
- * decidiu — perguntado e confirmado antes, ciente do risco de marca de
- * terceiro — usar a foto como está, logo e letras A/B/X/Y inclusas. Mesmo
- * precedente da imagem real de console em `ConsolesScreen`. O porquê completo,
- * o risco aceito e a saída caso precise ser desfeito estão em docs/decisoes.md,
- * "Foto de controle real no lugar do SVG desenhado à mão (2026-09-08)".
- *
- * A geometria mora em `lib/controllerRegions.ts`, compartilhada com o painel
- * de mapeamento — as duas telas leem a mesma foto e não podem divergir sobre
- * onde cada botão está.
+ * O controle em pixel art (`PixelController`, desde 2026-09-28) com cada
+ * botão acendendo no ritmo da Gamepad API. Até ali era uma foto de controle
+ * real com manchas sobrepostas (docs/decisoes.md, "Controle em pixel art no
+ * lugar da foto").
  */
 function ControllerDiagram({ snapshot }: { snapshot: GamepadSnapshot }) {
   const lx = axis(snapshot, 0);
   const ly = axis(snapshot, 1);
   const rx = axis(snapshot, 2);
   const ry = axis(snapshot, 3);
-  // 35% do próprio marcador: percurso visível sem que o realce saia da
-  // depressão do analógico na foto.
-  const travel = 35;
 
   const digital = (index: number) => (pressed(snapshot, index) ? 1 : 0);
 
   return (
-    <div className="relative mx-auto w-full max-w-xl">
-      <img
-        src={controllerPhoto}
-        alt=""
-        aria-hidden="true"
-        className="block w-full select-none"
-        draggable={false}
-      />
-
-      <Spot id="triggerLeft" intensity={analogValue(snapshot, BTN.triggerLeft)} />
-      <Spot id="triggerRight" intensity={analogValue(snapshot, BTN.triggerRight)} />
-      <Spot id="shoulderLeft" intensity={digital(BTN.shoulderLeft)} />
-      <Spot id="shoulderRight" intensity={digital(BTN.shoulderRight)} />
-
-      <Spot id="dpadUp" intensity={digital(BTN.dpadUp)} />
-      <Spot id="dpadDown" intensity={digital(BTN.dpadDown)} />
-      <Spot id="dpadLeft" intensity={digital(BTN.dpadLeft)} />
-      <Spot id="dpadRight" intensity={digital(BTN.dpadRight)} />
-
-      <Spot id="faceTop" intensity={digital(BTN.faceTop)} />
-      <Spot id="faceLeft" intensity={digital(BTN.faceLeft)} />
-      <Spot id="faceRight" intensity={digital(BTN.faceRight)} />
-      <Spot id="faceBottom" intensity={digital(BTN.faceBottom)} />
-
-      <Spot id="select" intensity={digital(BTN.select)} />
-      <Spot id="start" intensity={digital(BTN.start)} />
-      <Spot id="home" intensity={digital(BTN.home)} />
-
-      {/* Analógico acende com o eixo, não só com o clique: mover o stick sem
-          apertar é o caso mais comum de "meu controle está com drift?", que é
-          metade do motivo desta tela existir. O clique (L3/R3) soma por cima. */}
-      <Spot
-        id="leftStick"
-        intensity={Math.max(digital(BTN.stickLeftClick), Math.min(1, Math.hypot(lx, ly)))}
-        offsetX={lx * travel}
-        offsetY={ly * travel}
-      />
-      <Spot
-        id="rightStick"
-        intensity={Math.max(digital(BTN.stickRightClick), Math.min(1, Math.hypot(rx, ry)))}
-        offsetX={rx * travel}
-        offsetY={ry * travel}
+    <div className="mx-auto w-full max-w-xl">
+      <PixelController
+        lit={{
+          triggerLeft: analogValue(snapshot, BTN.triggerLeft),
+          triggerRight: analogValue(snapshot, BTN.triggerRight),
+          shoulderLeft: digital(BTN.shoulderLeft),
+          shoulderRight: digital(BTN.shoulderRight),
+          dpadUp: digital(BTN.dpadUp),
+          dpadDown: digital(BTN.dpadDown),
+          dpadLeft: digital(BTN.dpadLeft),
+          dpadRight: digital(BTN.dpadRight),
+          faceTop: digital(BTN.faceTop),
+          faceLeft: digital(BTN.faceLeft),
+          faceRight: digital(BTN.faceRight),
+          faceBottom: digital(BTN.faceBottom),
+          select: digital(BTN.select),
+          start: digital(BTN.start),
+          home: digital(BTN.home),
+          // Analógico acende com o eixo, não só com o clique: mover o stick
+          // sem apertar é o caso mais comum de "meu controle está com drift?",
+          // que é metade do motivo desta tela existir. O clique (L3/R3) soma.
+          leftStick: Math.max(digital(BTN.stickLeftClick), Math.min(1, Math.hypot(lx, ly))),
+          rightStick: Math.max(digital(BTN.stickRightClick), Math.min(1, Math.hypot(rx, ry))),
+        }}
+        sticks={{ leftStick: { x: lx, y: ly }, rightStick: { x: rx, y: ry } }}
       />
     </div>
   );

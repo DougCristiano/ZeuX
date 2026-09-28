@@ -45,15 +45,12 @@ export const dict = {
     "pt-BR": "Botões de face",
     en: "Face buttons",
   },
-  // A foto é de um controle de marca real, com logo e A/B/X/Y visíveis —
-  // decisão explícita do Douglas em 2026-09-08, que substituiu o desenho
-  // neutro anterior (docs/decisoes.md, "Foto de controle real no lugar do SVG
-  // desenhado à mão"). Este texto existe porque a foto mostra UM controle e a
-  // tela lê QUALQUER um: sem a ressalva, quem usa um controle de outro
-  // formato acha que a tela está lendo errado.
+  // O desenho mostra UM formato de controle (genérico, pixel art, desde
+  // 2026-09-28) e a tela lê QUALQUER um: sem a ressalva, quem usa um
+  // controle de outro formato acha que a tela está lendo errado.
   photoNote: {
-    "pt-BR": "A foto é só referência de posição: o realce segue o índice padrão da Gamepad API, o mesmo em qualquer controle no mapeamento \"standard\", mesmo que o seu tenha outro formato ou outros rótulos nos botões.",
-    en: "The photo is a position reference only: the highlight follows the standard Gamepad API index, the same on any controller in \"standard\" mapping, even if yours has a different shape or different button labels.",
+    "pt-BR": "O desenho é só referência de posição: o realce segue o índice padrão da Gamepad API, o mesmo em qualquer controle no mapeamento \"standard\", mesmo que o seu tenha outro formato ou outros rótulos nos botões.",
+    en: "The drawing is a position reference only: the highlight follows the standard Gamepad API index, the same on any controller in \"standard\" mapping, even if yours has a different shape or different button labels.",
   },
   // Achado real, 2026-09-08 (relato do Douglas): num controle Xbox real,
   // esta tela acendia o botão errado. Causa: o navegador só garante que os

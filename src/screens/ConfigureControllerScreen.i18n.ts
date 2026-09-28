@@ -47,7 +47,7 @@ export const dict = {
     en: "Could not write {{action}}: {{error}}",
   },
 
-  // Rótulos das 16 posições físicas. Nomeiam o botão pelo lugar na foto e,
+  // Rótulos das 16 posições físicas. Nomeiam o botão pelo lugar no desenho e,
   // entre parênteses, pelo nome que a pessoa vê estampado no controle — os
   // dois vocabulários (PlayStation e Xbox) aparecem porque o ZeuX não sabe
   // qual controle está na mão de quem lê.

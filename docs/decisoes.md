@@ -532,6 +532,39 @@ realmente veio do evento de apertar o botão, nunca assume posição fixa — po
 isso continua sendo o caminho confiável para mapear um controle cujo
 `mapping` não é "standard", enquanto a tela de teste é só diagnóstico visual.
 
+### Controle em pixel art no lugar da foto (2026-09-28)
+
+**Revertida a entrada acima**, a pedido do Douglas, depois da revisão de
+design tela por tela: a foto 3D de um controle de marca era o elemento que
+mais destoava da direção retrô/pixelada (2026-09-09). A foto pixelizada foi
+testada antes (24 e 64 cores) e descartada — perdia a cor das letras ou
+ganhava faixas de cor no corpo branco.
+
+O que é diferente das duas rodadas de SVG de 2026-09-07, que falharam: elas
+tentavam um controle realista. Este é pixel art de 16 bits, gerado por
+código em `src/lib/pixelController.ts` — formas simples (retângulo
+arredondado, elipse) rasterizadas numa grade de 128×80, com contorno, brilho
+e sombra calculados pela vizinhança na própria máscara. A simplicidade é o
+estilo, não uma aproximação; mexer numa forma não exige redesenhar pixel.
+Protótipo aprovado pelo Douglas antes da troca.
+
+- Genérico: formato de DualShock (os 17 botões do mapeamento "standard",
+  analógicos e gatilhos inclusos), sem logo, sem letra, sem ✕/○/□/△. Face
+  nas cores do Super Famicom; home no roxo do ZeuX. Some o risco de marca de
+  terceiro que a foto trazia.
+- `CONTROLLER_SPOTS` passou a ser derivado da geometria (caixa de cada
+  peça), não medido à mão — a tabela de coordenadas sobre a foto não existe
+  mais.
+- O botão acende de verdade (`PixelController`: a própria peça repintada em
+  ciano, com opacidade pela intensidade — o gatilho analógico acende pela
+  metade), em vez de uma mancha sobreposta. A capa do analógico se desloca
+  com o eixo, em pixels inteiros.
+- `src/assets/controller-reference.png` saiu do repositório.
+
+**O que quebra se desfizer:** voltar à foto traz de volta a marca de
+terceiro e as coordenadas medidas à mão, e a tela de controle volta a ser a
+única do app fora da linguagem pixel.
+
 ### Recusar consentimento não pode ser uma versão mais pobre do app (2026-09-08)
 
 Achado real, relato do Douglas: "quem não dá consentimento não consegue

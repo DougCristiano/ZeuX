@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
-import controllerPhoto from "../assets/controller-reference.png";
 import type { InputBinding } from "../api/types";
 import type { ControllerAssignment, ControllerProfile } from "../api/types";
 import { CONTROLLER_SPOTS, regionForAction, type ControllerRegion } from "../lib/controllerRegions";
 import { translateKeyForAdapter } from "../lib/keyMapping";
+import { PixelController } from "./PixelController";
 import { Button, Callout, InlineError, Toast, ZSelect } from "./ui";
 import { SelectItem } from "./ui/select";
 import { useToast } from "../hooks/useToast";
@@ -13,12 +13,12 @@ import { useT } from "../i18n/i18n";
 import { dict } from "./EmulatorBindingsPanel.i18n";
 
 /**
- * As duas colunas que ladeiam a foto, de cima para baixo na ordem em que a
- * região aparece no controle de verdade. É isto que torna o layout espacial:
- * o card de "L2" fica acima do card de "L1", que fica acima do analógico
- * esquerdo, do mesmo jeito que as peças se empilham na foto. Referência que o
- * Douglas trouxe: o painel de configuração de controle do PCSX2 — foto no
- * centro, grupos ao redor, sem seta ligando um ao outro.
+ * As duas colunas que ladeiam o desenho do controle, de cima para baixo na
+ * ordem em que a região aparece no controle de verdade. É isto que torna o
+ * layout espacial: o card de "L2" fica acima do card de "L1", que fica acima
+ * do analógico esquerdo, do mesmo jeito que as peças se empilham no desenho.
+ * Referência que o Douglas trouxe: o painel de configuração de controle do
+ * PCSX2 — controle no centro, grupos ao redor, sem seta ligando um ao outro.
  */
 const LEFT_COLUMN: ControllerRegion[] = ["triggerLeft", "shoulderLeft", "leftStick", "dpad"];
 const RIGHT_COLUMN: ControllerRegion[] = ["triggerRight", "shoulderRight", "face", "rightStick"];
@@ -335,7 +335,7 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
   }
 
   // A ação em foco é a que está esperando um aperto — durante a sequência é a
-  // da vez. É ela que acende a região correspondente na foto.
+  // da vez. É ela que acende a região correspondente no desenho.
   const acaoEmFoco = listeningButtonFor ?? listeningKeyFor;
   const regiaoEmFoco = acaoEmFoco ? regionForAction(acaoEmFoco) : null;
 
@@ -522,10 +522,11 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
         </div>
       )}
 
-      {/* Layout espacial (2026-09-08): a foto do controle no centro e os cards
-          de mapeamento agrupados por região ao redor dela, em vez da lista
+      {/* Layout espacial (2026-09-08): o controle no centro (foto até
+          2026-09-28, desenho em pixel art desde então) e os cards de
+          mapeamento agrupados por região ao redor dele, em vez da lista
           vertical única de antes. Com 16 ações, a lista não dizia NADA sobre
-          qual peça do controle cada nome ("L3", "Cross", "l2") é — a foto diz.
+          qual peça do controle cada nome ("L3", "Cross", "l2") é — o desenho diz.
 
           **Container query (`@container`/`@4xl:`), não breakpoint de janela.**
           O CLAUDE.md avisa que `lg:`/`xl:` medem a janela inteira; aqui isso
@@ -536,43 +537,36 @@ export function EmulatorBindingsPanel({ adapterId, adapterName }: { adapterId: s
           dentro do card estreito e os cards se espremeriam um no outro — que
           é exatamente o defeito que esta rodada precisava não repetir. A
           consulta é sobre a largura DO PAINEL: abaixo de 56rem ele volta para
-          uma coluna só, com a foto por cima da lista.
+          uma coluna só, com o controle por cima da lista.
 
           56rem (`@4xl`) e não 48rem: com 48rem cada coluna lateral fica com
           ~190px, e "Direcional digital para cima" + dois botões não cabem sem
           o card virar uma torre de quebras de linha. */}
       <div className="@container">
         <div className="grid grid-cols-1 gap-x-5 gap-y-5 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)_minmax(0,1fr)] @4xl:items-start">
-          {/* A foto vem primeiro no DOM para que, na coluna única, ela apareça
-              acima dos grupos; `order` só reposiciona ela para o meio quando
-              as três colunas existem. */}
+          {/* O controle vem primeiro no DOM para que, na coluna única, ele
+              apareça acima dos grupos; `order` só o reposiciona para o meio
+              quando as três colunas existem. */}
           <div className="order-1 flex flex-col gap-4 @4xl:order-2">
-            {/* Escondida em painel estreito (`@md`): a mesma foto que ajuda em
-                24rem vira uma miniatura ilegível dentro de um card de grade. */}
-            <div className="relative mx-auto hidden w-full max-w-sm @md:block">
-              <img src={controllerPhoto} alt="" aria-hidden="true" className="block w-full select-none" draggable={false} />
+            {/* Escondido em painel estreito (`@md`): o mesmo desenho que ajuda
+                em 24rem vira uma miniatura ilegível dentro de um card de grade. */}
+            <div className="mx-auto hidden w-full max-w-sm @md:block">
               {/* Realce da região da ação em foco — é o que liga o card à peça
                   física sem precisar desenhar uma seta. Durante a sequência,
-                  aponta para onde apertar em seguida. */}
-              {regiaoEmFoco &&
-                Object.entries(CONTROLLER_SPOTS)
-                  .filter(([, spot]) => spot.region === regiaoEmFoco)
-                  .map(([id, spot]) => (
-                    <div
-                      key={id}
-                      aria-hidden="true"
-                      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
-                      style={{
-                        left: `${spot.x}%`,
-                        top: `${spot.y}%`,
-                        width: `${spot.w}%`,
-                        height: `${spot.h}%`,
-                        background: "var(--accent)",
-                        opacity: 0.55,
-                        boxShadow: "0 0 14px 4px var(--accent)",
-                      }}
-                    />
-                  ))}
+                  aponta para onde apertar em seguida. Roxo (`accent`), não
+                  ciano: aqui é "aqui você age", não "o sistema informa". */}
+              <PixelController
+                tone="accent"
+                lit={
+                  regiaoEmFoco
+                    ? Object.fromEntries(
+                        Object.entries(CONTROLLER_SPOTS)
+                          .filter(([, spot]) => spot.region === regiaoEmFoco)
+                          .map(([id]) => [id, 1]),
+                      )
+                    : {}
+                }
+              />
             </div>
             {renderGroup("center")}
           </div>

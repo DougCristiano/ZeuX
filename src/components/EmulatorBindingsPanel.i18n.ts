@@ -69,8 +69,8 @@ export const dict = {
   groupCenter: { "pt-BR": "Centro", en: "Center" },
   groupOther: { "pt-BR": "Outras ações", en: "Other actions" },
   groupOtherHint: {
-    "pt-BR": "Ações que não têm uma peça correspondente na foto — atalhos do emulador, ou nomes que o Zeux não reconheceu. Continuam mapeáveis do mesmo jeito.",
-    en: "Actions with no matching part on the photo — emulator hotkeys, or names Zeux did not recognise. They map exactly the same way.",
+    "pt-BR": "Ações que não têm uma peça correspondente no desenho do controle — atalhos do emulador, ou nomes que o ZeuX não reconheceu. Continuam mapeáveis do mesmo jeito.",
+    en: "Actions with no matching part on the controller drawing — emulator hotkeys, or names ZeuX did not recognise. They map exactly the same way.",
   },
   bindingSaved: { "pt-BR": "Mapeamento salvo.", en: "Binding saved." },
   gamepadMapped: { "pt-BR": "Controle mapeado.", en: "Gamepad mapped." },

@@ -51,7 +51,7 @@ export interface ControllerBindingTarget {
    *  (`target_faceBottom` etc.) na tela de configuração. */
   id: string;
   /** Chave em `CONTROLLER_SPOTS` (lib/controllerRegions.ts). Os cliques de
-   *  analógico não têm spot próprio: a foto só tem a região do analógico
+   *  analógico não têm spot próprio: o desenho só tem a região do analógico
    *  inteiro, e destacá-la é o suficiente para dizer "aperte aqui". */
   spotId: string;
   /** Nome da ação por adapter. Um adapter ausente aqui simplesmente não

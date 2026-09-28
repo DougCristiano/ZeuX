@@ -1,22 +1,23 @@
+import { partSpot } from "./pixelController";
+
 /**
- * Geometria da foto de controle (`src/assets/controller-reference.png`) e o
- * palpite de qual região do controle uma ação de mapeamento pertence.
+ * Geometria do controle desenhado (`lib/pixelController.ts`) vista como
+ * regiões, e o palpite de qual região uma ação de mapeamento pertence.
  *
- * Existe como módulo próprio porque duas telas leem a MESMA foto e precisam
- * concordar sobre onde cada botão está: `ControllerTestScreen` acende o botão
- * apertado em cima da imagem, e `EmulatorBindingsPanel` agrupa os cards de
- * mapeamento ao redor dela. Duas tabelas de coordenadas separadas divergiriam
- * no primeiro ajuste fino.
+ * Existe como módulo próprio porque três telas desenham o MESMO controle e
+ * precisam concordar sobre onde cada botão está: `ControllerTestScreen` e
+ * `ConfigureControllerScreen` acendem botões nele, e `EmulatorBindingsPanel`
+ * agrupa os cards de mapeamento ao redor dele.
  *
- * Sobre a decisão de usar uma foto de controle de marca real (com a logo e os
- * botões A/B/X/Y visíveis), ver docs/decisoes.md, "Foto de controle real no
- * lugar do SVG desenhado à mão (2026-09-08)".
+ * Até 2026-09-28 as coordenadas eram medidas à mão sobre uma foto de controle
+ * real (docs/decisoes.md, "Foto de controle real…" e "Controle em pixel art…").
  */
 
 /**
  * Agrupamento espacial — é isso que o painel de mapeamento usa para decidir de
- * que lado da foto o card de uma ação vai. Mais grosso que o botão individual
- * de propósito: "de que lado, e a que altura" é tudo que o layout precisa.
+ * que lado do controle o card de uma ação vai. Mais grosso que o botão
+ * individual de propósito: "de que lado, e a que altura" é tudo que o layout
+ * precisa.
  */
 export type ControllerRegion =
   | "dpad"
@@ -32,45 +33,38 @@ export type ControllerRegion =
 export interface ControllerSpot {
   /** Região a que este ponto pertence (o painel agrupa por ela). */
   region: ControllerRegion;
-  /** Centro e tamanho em PORCENTAGEM da foto, nunca em px: a imagem encolhe
-   *  junto com a janela (ver CLAUDE.md, "Layout responsivo"), e coordenada
-   *  fixa descolaria do botão no primeiro redimensionamento. */
+  /** Centro e tamanho em PORCENTAGEM do desenho, nunca em px: o controle
+   *  encolhe junto com a janela (ver CLAUDE.md, "Layout responsivo"). */
   x: number;
   y: number;
   w: number;
   h: number;
 }
 
-/**
- * Medido à mão sobre a foto já recortada (760×521), com uma grade de 5%
- * sobreposta — ver o relatório da sessão de 2026-09-08. A foto é uma
- * perspectiva de três quartos, não uma vista frontal: por isso os pares
- * espelhados (L2/R2, ombros, analógicos) NÃO têm coordenadas simétricas, e
- * "consertar" isso para ficar simétrico desalinha o realce do botão real.
- */
-export const CONTROLLER_SPOTS: Record<string, ControllerSpot> = {
-  triggerLeft: { region: "triggerLeft", x: 17, y: 9, w: 14, h: 13 },
-  triggerRight: { region: "triggerRight", x: 82.5, y: 11.5, w: 14, h: 14 },
-  shoulderLeft: { region: "shoulderLeft", x: 17.5, y: 18.5, w: 21, h: 9 },
-  shoulderRight: { region: "shoulderRight", x: 79.5, y: 22.5, w: 23, h: 10 },
-
-  home: { region: "center", x: 45.5, y: 35.5, w: 10, h: 12 },
-  select: { region: "center", x: 36, y: 53, w: 6.5, h: 7 },
-  start: { region: "center", x: 53.5, y: 55.7, w: 6, h: 7 },
-
-  leftStick: { region: "leftStick", x: 14.5, y: 51, w: 17, h: 22 },
-  rightStick: { region: "rightStick", x: 60, y: 79, w: 16, h: 21 },
-
-  dpadUp: { region: "dpad", x: 31, y: 66.5, w: 7, h: 8 },
-  dpadDown: { region: "dpad", x: 31, y: 80, w: 7, h: 8 },
-  dpadLeft: { region: "dpad", x: 25.5, y: 72.5, w: 8, h: 7 },
-  dpadRight: { region: "dpad", x: 37, y: 73.5, w: 8, h: 7 },
-
-  faceTop: { region: "face", x: 78, y: 47.7, w: 9.5, h: 12 },
-  faceLeft: { region: "face", x: 68.2, y: 57.8, w: 9.5, h: 11 },
-  faceRight: { region: "face", x: 85.8, y: 58.3, w: 9.5, h: 11 },
-  faceBottom: { region: "face", x: 76, y: 68.3, w: 9.5, h: 11 },
+const SPOT_REGIONS: Record<string, ControllerRegion> = {
+  triggerLeft: "triggerLeft",
+  triggerRight: "triggerRight",
+  shoulderLeft: "shoulderLeft",
+  shoulderRight: "shoulderRight",
+  home: "center",
+  select: "center",
+  start: "center",
+  leftStick: "leftStick",
+  rightStick: "rightStick",
+  dpadUp: "dpad",
+  dpadDown: "dpad",
+  dpadLeft: "dpad",
+  dpadRight: "dpad",
+  faceTop: "face",
+  faceLeft: "face",
+  faceRight: "face",
+  faceBottom: "face",
 };
+
+/** Derivado da geometria desenhada — nunca mais medido à mão. */
+export const CONTROLLER_SPOTS: Record<string, ControllerSpot> = Object.fromEntries(
+  Object.entries(SPOT_REGIONS).map(([id, region]) => [id, { region, ...partSpot(id) }]),
+);
 
 /** Tira acento e caixa: o nome da ação vem do adapter, e cada um escreve do
  *  seu jeito ("L2", "l2", "Botão L2 (gatilho)"). */
