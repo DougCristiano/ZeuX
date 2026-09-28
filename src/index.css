@@ -513,6 +513,38 @@ textarea {
   * {
     @apply border-border outline-ring/50;
   }
+
+  /*
+   * Mãozinha em tudo que é clicável (relato do Douglas, 2026-09-28: "o mouse
+   * não está mudando quando passa em cima de coisas clicáveis"). O preflight
+   * do Tailwind 4 deixou de pôr `cursor: pointer` em `<button>` — segue o
+   * padrão do navegador, que é a seta —, e o app só tinha `cursor-pointer`
+   * escrito à mão em quatro lugares. Numa regra só, aqui, qualquer botão
+   * novo já nasce certo em vez de depender de alguém lembrar da classe.
+   *
+   * Fica em `@layer base` de propósito: um `cursor-default` explícito (itens
+   * de menu do Radix, que seguem a convenção de menu nativo) é utility e
+   * continua vencendo.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="radio"],
+  [role="switch"],
+  [role="checkbox"],
+  a[href],
+  summary,
+  select:not(:disabled),
+  label:has(> input:not(:disabled)) {
+    cursor: pointer;
+  }
+
+  /* Desabilitado mostra que não responde, em vez de parecer texto comum. */
+  button:disabled,
+  [aria-disabled="true"],
+  select:disabled {
+    cursor: not-allowed;
+  }
 }
 
 /*
