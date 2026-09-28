@@ -1,5 +1,6 @@
 import { useT } from "../i18n/i18n";
 import { Button, AmbientGlow } from "../components/ui";
+import { LanguageSelector } from "../components/LanguageSelector";
 import { dict } from "./DeclinedScreen.i18n";
 
 /**
@@ -46,7 +47,13 @@ export function DeclinedScreen({
           folga de contraste de sobra. */}
       <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-[0.08]" />
       <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
-        <p className="font-mono text-xs tracking-wider text-accent-secondary uppercase">{t("kicker")}</p>
+        {/* Mesmo seletor da tela de consentimento: esta tela também vem antes
+            da barra lateral (e de Configurações), então sem ele quem recusou
+            ficaria preso no idioma em que estava. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-mono text-xs tracking-wider text-accent-secondary uppercase">{t("kicker")}</p>
+          <LanguageSelector />
+        </div>
         {/* Voz pixel, como todo título de tela do app (direção retrô do
             CLAUDE.md): só o título. O corpo — o texto da política e a
             explicação — continua em Inter, que é a fonte de leitura; texto

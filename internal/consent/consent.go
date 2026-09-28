@@ -27,6 +27,28 @@ const PolicyText = "O ZeuX vai ler as características do seu computador (modelo
 	"Esses dados são usados apenas para gerar essas sugestões e como base de comparação " +
 	"entre jogadores. Nada além disso é coletado, e nenhum arquivo pessoal é acessado."
 
+// PolicyTextEN é o mesmo texto em inglês (2026-09-28): o seletor de idioma
+// aparece desde a primeira tela, e quem escolhe inglês não pode ler a
+// interface em inglês e justamente o texto legal em português. É a MESMA
+// política — mesma versão, mesmo escopo; mudar o que qualquer um dos dois diz
+// exige subir PolicyVersion, como sempre. Mora aqui, ao lado do português,
+// pelo mesmo motivo de PolicyText: o texto exibido é sempre o que o servidor
+// registra, nunca um escrito no front (princípio 1 do CLAUDE.md).
+const PolicyTextEN = "ZeuX will read your computer's characteristics (processor model, " +
+	"cores, clock speed, video card and memory) to suggest which consoles it can run. " +
+	"This data is used only to generate those suggestions and as a basis for comparison " +
+	"between players. Nothing else is collected, and no personal files are accessed."
+
+// PolicyTextFor devolve o texto da política no idioma pedido ("en" ou
+// "pt-BR"). Qualquer outro valor — inclusive vazio — cai no português, o
+// idioma de origem da política.
+func PolicyTextFor(lang string) string {
+	if lang == "en" {
+		return PolicyTextEN
+	}
+	return PolicyText
+}
+
 // Record é o registro persistido do consentimento.
 type Record struct {
 	Granted       bool      `json:"granted"`

@@ -11,7 +11,7 @@ import { useGamepad } from "./hooks/useGamepad";
 import { useGamepadNavigation } from "./hooks/useGamepadNavigation";
 import { useSessionWatcher } from "./hooks/useSessionWatcher";
 import { useToast } from "./hooks/useToast";
-import { useT } from "./i18n/i18n";
+import { useLocale, useT } from "./i18n/i18n";
 import type { ConsoleEntry, LibraryGame } from "./api/types";
 import { dict } from "./App.i18n";
 import {
@@ -93,6 +93,7 @@ function App() {
   const { connected: gamepadNavConnected } = useGamepadNavigation();
 
   const t = useT(dict);
+  const { locale } = useLocale();
 
   // Toast de conectado/desconectado (pedido do Douglas, 2026-09-07,
   // referência: o toggle da Steam quando um controle é plugado). `useGamepad`
@@ -290,7 +291,7 @@ function App() {
 
     async function tryLoad() {
       try {
-        const status = await api.getConsent();
+        const status = await api.getConsent(locale);
         if (cancelled) return;
         setPolicy({ text: status.policy_text, version: status.policy_version });
         if (status.granted) {
@@ -317,6 +318,28 @@ function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  // O seletor de idioma aparece já na tela de consentimento (2026-09-28): ao
+  // trocar a língua ali, o texto da política precisa vir de novo do servidor
+  // no idioma escolhido — é o servidor quem guarda os dois textos, e a tela
+  // nunca mostra um que ele não registrou (princípio 1). Só na fase de
+  // consentimento: em qualquer outra o texto não está na tela.
+  useEffect(() => {
+    if (phase !== "consent") return;
+    let cancelled = false;
+    api
+      .getConsent(locale)
+      .then((status) => {
+        if (!cancelled) setPolicy({ text: status.policy_text, version: status.policy_version });
+      })
+      .catch(() => {
+        // Falhou trocar o idioma do texto: fica o texto que já estava na
+        // tela, que é o registrado pelo servidor — nunca um vazio.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, locale]);
 
   async function runScan() {
     setPhase("scanning");

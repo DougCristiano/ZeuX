@@ -1,5 +1,6 @@
 import { useT } from "../i18n/i18n";
 import { Button, Card, AmbientGlow, ZeuXMark } from "../components/ui";
+import { LanguageSelector } from "../components/LanguageSelector";
 import { dict } from "./ConsentScreen.i18n";
 
 type ConsentScreenProps = {
@@ -50,7 +51,15 @@ export function ConsentScreen({ policyText, policyVersion, onAccept, onDecline, 
           desenhado para o shell rolável com sidebar, não para uma tela
           centralizada na viewport inteira, sem sidebar. */}
       <div className="relative z-10 flex w-full max-w-3xl flex-col gap-4">
-        <ZeuXMark size={48} />
+        {/* Idioma desde a primeira tela (2026-09-28, pedido do Douglas):
+            quem prefere inglês precisa poder trocar ANTES de ler o texto
+            legal, não depois de aceitá-lo. Trocar aqui também troca o texto
+            da política — ele vem de novo do servidor no idioma escolhido
+            (App.tsx). */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ZeuXMark size={48} />
+          <LanguageSelector />
+        </div>
         {/* Kicker-etiqueta em monoespaçada, mesmo vocabulário de "rótulo de
             chassi" dos chips e do `SectionHeading` — ciano porque é o sistema
             informando o que precisa antes de o usuário decidir. */}

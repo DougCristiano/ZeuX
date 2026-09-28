@@ -1277,6 +1277,27 @@ de capa deixa sem ano e sem resumo todo jogo cuja capa o libretro achou.
 Tirar o `metadata_status` faz o lote reconsultar para sempre os jogos que o
 IGDB não tem.
 
+### Seletor de idioma desde o consentimento; política em dois idiomas — 2026-09-28
+
+O seletor de idioma aparece na tela de consentimento e na de recusa, não só
+em Configurações. O texto da política vem do servidor no idioma pedido
+(`GET /consent?lang=en`); sem o parâmetro, ou com qualquer outro valor, vem
+em português.
+
+**Por quê:** a primeira tela do app é justamente a que pede uma decisão
+sobre dados — quem não lê português precisava aceitar sem entender, ou
+aceitar para só depois achar o seletor. O texto continua saindo do servidor
+(princípio 1): a interface nunca traduz a política por conta própria.
+
+As duas versões são o mesmo texto e compartilham `PolicyVersion`. Mudar o
+escopo de uso exige mudar as duas juntas e subir a versão — uma tradução
+que diga mais ou menos que a outra seria um consentimento diferente
+registrado sob a mesma versão.
+
+**O que quebra se desfizer:** tirar o `?lang=` faz a tela em inglês exibir
+a política em português; traduzir no front faz a interface mostrar um texto
+que o servidor não registrou.
+
 ### PCSX2 no Windows: BIOS e configurações apontavam para pasta errada — 2026-09-11
 
 `BiosDir` (`internal/emulator/bios_dir.go`) só resolvia a pasta de BIOS do

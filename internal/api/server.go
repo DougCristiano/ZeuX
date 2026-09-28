@@ -2496,7 +2496,7 @@ func (s *Server) handleGetConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, toConsentResponse(record))
+	writeJSON(w, http.StatusOK, toConsentResponse(record, r.URL.Query().Get("lang")))
 }
 
 func (s *Server) handlePostConsent(w http.ResponseWriter, r *http.Request) {
@@ -2536,7 +2536,7 @@ func (s *Server) handlePostConsent(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 	}
 
-	writeJSON(w, http.StatusOK, toConsentResponse(record))
+	writeJSON(w, http.StatusOK, toConsentResponse(record, r.URL.Query().Get("lang")))
 }
 
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
@@ -2616,11 +2616,13 @@ func (s *Server) withLogging(next http.Handler) http.Handler {
 	})
 }
 
-func toConsentResponse(record consent.Record) consentResponse {
+// lang ("en" ou "pt-BR", de `?lang=`) só escolhe o idioma do texto exibido —
+// a política, a versão e o que o consentimento autoriza são os mesmos.
+func toConsentResponse(record consent.Record, lang string) consentResponse {
 	response := consentResponse{
 		Granted:       record.IsValid(),
 		PolicyVersion: consent.PolicyVersion,
-		PolicyText:    consent.PolicyText,
+		PolicyText:    consent.PolicyTextFor(lang),
 	}
 
 	if record.IsValid() {

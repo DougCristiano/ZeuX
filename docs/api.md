@@ -50,7 +50,7 @@ JSON (isso desatualiza rápido e o compilador já garante que bate).
 
 | Rota | Propósito |
 |---|---|
-| `GET /consent` | Estado do consentimento + `policy_text`/`policy_version` — a interface **nunca** deve exibir um texto de política diferente do que esta rota devolve. |
+| `GET /consent` | Estado do consentimento + `policy_text`/`policy_version` — a interface **nunca** deve exibir um texto de política diferente do que esta rota devolve. `?lang=en` devolve o `policy_text` em inglês (2026-09-28); sem `lang` ou com outro valor, português. É a mesma política e a mesma versão — só o idioma do texto muda. |
 | `POST /consent` | `{"granted": true\|false}`. Concede ou revoga. Revogar também zera o último scan em memória. |
 | `POST /hardware/scan` | Roda a detecção de verdade (CPU/RAM sempre; GPU tolerante a falha). Exige consentimento válido — checado **no servidor**, não confia na UI. Sem consentimento: `403 consent_required`. |
 | `GET /hardware` | Devolve o último scan guardado em memória (não persiste em disco — é `Server.lastScan`, protegido por mutex). |

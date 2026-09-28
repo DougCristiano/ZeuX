@@ -9,8 +9,10 @@ import { FILTER_CHIP_BASE, FILTER_CHIP_OFF, FILTER_CHIP_ON, FOCUS_RING } from ".
  * hoje; `LOCALES` é a lista única de verdade, então um terceiro idioma
  * futuro aparece aqui sem tocar este componente.
  *
- * Mora só em Configurações desde 2026-09-28 — a cópia no rodapé da sidebar
- * (e a variante `collapsible` que existia só para ela) saiu; o motivo está no
+ * Onde aparece (2026-09-28): em Configurações e nas duas telas que vêm antes
+ * da barra lateral — consentimento e recusa —, para quem prefere inglês
+ * trocar antes de ler o texto legal. A cópia no rodapé da sidebar (e a
+ * variante `collapsible` que existia só para ela) saiu; o motivo está no
  * comentário do fim de Sidebar.tsx.
  */
 export function LanguageSelector({ className = "" }: { className?: string }) {

@@ -169,7 +169,12 @@ export const api = {
 
   // Timeout curto: na fase connecting a UI tenta dezenas de vezes; cada
   // tentativa não pode ficar 30 s presa se a porta aceitar TCP sem HTTP.
-  getConsent: () => request<ConsentStatus>("/consent", { signal: AbortSignal.timeout(2_000) }),
+  // `lang` escolhe só o idioma do `policy_text` (a política e a versão são as
+  // mesmas) — o texto continua vindo do servidor, nunca escrito no front.
+  getConsent: (lang?: string) =>
+    request<ConsentStatus>(lang ? `/consent?lang=${encodeURIComponent(lang)}` : "/consent", {
+      signal: AbortSignal.timeout(2_000),
+    }),
   setConsent: (granted: boolean) => postJSON<ConsentStatus>("/consent", { granted }),
 
   scanHardware: () => request<HardwareInfo>("/hardware/scan", { method: "POST" }),

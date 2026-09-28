@@ -226,6 +226,28 @@ func TestScanWithoutConsentIsForbidden(t *testing.T) {
 	}
 }
 
+// Trava o idioma do texto de consentimento (2026-09-28): `?lang=en` devolve
+// o texto em inglês com a MESMA versão da política (é tradução, não outra
+// política), e qualquer outro valor cai no português — o texto exibido
+// continua sempre vindo do servidor (princípio 1).
+func TestConsentPolicyTextFollowsLang(t *testing.T) {
+	handler := newTestServer(t, fakeProbe{info: beefyHardware()}).Routes()
+
+	en := decodeBody(t, doJSON(t, handler, http.MethodGet, "/api/v1/consent?lang=en", nil))
+	pt := decodeBody(t, doJSON(t, handler, http.MethodGet, "/api/v1/consent", nil))
+	other := decodeBody(t, doJSON(t, handler, http.MethodGet, "/api/v1/consent?lang=fr", nil))
+
+	if en["policy_text"] != consent.PolicyTextEN {
+		t.Fatalf("?lang=en devolveu %q", en["policy_text"])
+	}
+	if pt["policy_text"] != consent.PolicyText || other["policy_text"] != consent.PolicyText {
+		t.Fatalf("sem lang ou com lang desconhecido deveria cair no português: %q / %q", pt["policy_text"], other["policy_text"])
+	}
+	if en["policy_version"] != pt["policy_version"] {
+		t.Fatalf("tradução não pode mudar a versão da política: %v != %v", en["policy_version"], pt["policy_version"])
+	}
+}
+
 // Trava o caminho feliz: consentir, escanear, e ler o resultado de volta.
 func TestConsentThenScanThenReadHardware(t *testing.T) {
 	server := newTestServer(t, fakeProbe{info: beefyHardware()})
