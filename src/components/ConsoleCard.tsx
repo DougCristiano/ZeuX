@@ -150,11 +150,21 @@ export function ConsoleCard({
           ) : hasFolder && ready ? (
             <span className="font-mono text-[11px] text-muted tabular-nums">{labels.noGames}</span>
           ) : (
-            // Chip de pendência visível já na grade (pedido do item 1/6): a
-            // faixa de hover traz a frase inteira, mas o selo curto fica
-            // sempre à vista no card.
-            <span className="rounded-sm border border-line px-1.5 py-0.5 font-mono text-[10px] tracking-wide text-muted uppercase">
-              {readiness.badge}
+            // Pendência visível já na grade (pedido do item 1/6): a faixa de
+            // hover traz a frase inteira, mas o selo curto fica sempre à
+            // vista no card.
+            //
+            // Status, não controle (2026-09-28): era um chip com borda, e
+            // caixa com borda + texto em caixa alta é exatamente o desenho
+            // de botão do app — lia como "clique aqui para instalar", mas
+            // não fazia nada (o clique é o card inteiro). Agora é um pixel
+            // quadrado + texto, sem caixa: o mesmo vocabulário do ponto
+            // ciano de "pronto" no canto, só que âmbar e esmaecido — aviso
+            // de "falta uma peça", não alarme (numa grade com vários
+            // consoles pendentes, âmbar pleno viraria um painel de erro).
+            <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-[10px] tracking-wide text-amber/80 uppercase">
+              <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 bg-amber/80" />
+              <span className="truncate">{readiness.badge}</span>
             </span>
           )}
         </div>

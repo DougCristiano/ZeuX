@@ -30,6 +30,7 @@ export function ConsoleLabel({
   imageVersion,
   size = "md",
   className = "",
+  onImageError,
 }: {
   consoleId: string;
   shortName: string;
@@ -40,6 +41,13 @@ export function ConsoleLabel({
   /** `sm` = miniatura de lista (32–64px), `md` = card, `lg` = cabeçalho. */
   size?: "sm" | "md" | "lg";
   className?: string;
+  /**
+   * Avisa quem chama que a logo não carregou e a etiqueta caiu na sigla.
+   * Existe para o `ConsoleHero`, cujo "restaurar padrão" só faz sentido com
+   * logo no ar — o estado de falha mora aqui dentro, e sem o aviso o hero
+   * não teria como saber.
+   */
+  onImageError?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = hasImage && !imageFailed;
@@ -65,7 +73,10 @@ export function ConsoleLabel({
           src={consoleImageURL(consoleId, imageVersion || undefined)}
           alt=""
           className="h-full min-h-0 w-full min-w-0 object-contain mix-blend-multiply"
-          onError={() => setImageFailed(true)}
+          onError={() => {
+            setImageFailed(true);
+            onImageError?.();
+          }}
         />
       ) : (
         <span

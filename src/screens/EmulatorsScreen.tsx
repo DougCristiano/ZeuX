@@ -21,9 +21,7 @@ import {
   CHROME_TINT_DANGER,
   CHROME_TINT_INFO,
   ConfirmModal,
-  ConsoleIcon,
   ConsoleInfoModal,
-  ConsoleMoreBadge,
   CardSkeleton,
   EmptyState,
   ErrorModal,
@@ -34,7 +32,6 @@ import {
   InlineError,
   InlineWarning,
   inputClass,
-  Pagination,
   ProgressBar,
   ScreenAtmosphere,
   ScreenContainer,
@@ -43,6 +40,7 @@ import {
   ZSelect,
 } from "../components/ui";
 import { SelectItem } from "../components/ui/select";
+import { ConsoleLabel } from "../components/ConsoleLabel";
 import { ManualEmulatorForm } from "../components/ManualEmulatorForm";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
@@ -53,11 +51,14 @@ import { consoleAccentColor } from "../lib/consoleColor";
 import { percentOf } from "../lib/format";
 import { parentDir } from "../lib/paths";
 
-const PAGE_SIZE = 6;
-// Quantos ícones de console cabem no card sem esticar a altura entre
+// Quantos cards de esqueleto mostrar enquanto a lista carrega — o bastante
+// para preencher duas fileiras da grade na janela padrão, sem prometer uma
+// contagem que o catálogo ainda não disse.
+const SKELETON_COUNT = 6;
+// Quantas etiquetas de console cabem no card sem esticar a altura entre
 // emuladores de 1 console (ex.: xemu) e emuladores de 20+ (RetroArch) —
-// acima disso, o resto vira "···" (ConsoleMoreBadge).
-const MAX_CONSOLE_ICONS = 6;
+// acima disso, o resto vira "+N".
+const MAX_CONSOLE_ICONS = 5;
 
 // O `Select` do shadcn/Radix recusa `value=""` num `SelectItem` (string
 // vazia é reservada para "nada selecionado") — este sentinela representa
@@ -387,9 +388,19 @@ function EmulatorCardHeader({ entry }: { entry: EmulatorEntry }) {
 /**
  * Ícones de console em vez da lista de texto (2026-08-04, a pedido do
  * Douglas): cada um abre ConsoleInfoModal com a descrição do console.
- * Tamanho fixo do card — a partir de MAX_CONSOLE_ICONS o resto vira "···"
- * (ConsoleMoreBadge), nunca clicável, pra não estourar altura entre um
- * emulador de console único e o RetroArch (20+).
+ * Tamanho fixo do card — a partir de MAX_CONSOLE_ICONS o resto vira "+N",
+ * nunca clicável, pra não estourar altura entre um emulador de console único
+ * e o RetroArch (20+).
+ *
+ * Etiqueta de cartucho (`ConsoleLabel`) desde 2026-09-28, no lugar do
+ * quadrado branco de 64px (`ConsoleIcon`): o quadrado encolhia as logos
+ * largas — PS2 e PSP viravam um risco ilegível no meio do branco — e era um
+ * segundo desenho de logo de console, diferente do card da grade. A etiqueta
+ * é mais larga que alta (96×56) pelo mesmo motivo que a do cabeçalho: a
+ * maioria das logos é horizontal. 64×44 foi a primeira medida e ainda
+ * deixava o "PlayStation 2" sob a logo do PS2 ilegível; o card tem folga
+ * (a maioria dos emuladores atende um console só), então a etiqueta cresce
+ * e o RetroArch mostra uma a menos antes do "+N" para caber em duas fileiras.
  */
 function EmulatorCardConsoles({
   entry,
@@ -402,16 +413,41 @@ function EmulatorCardConsoles({
 }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {entry.consoles.slice(0, MAX_CONSOLE_ICONS).map((consoleId) => (
-        <ConsoleIcon
-          key={consoleId}
-          consoleId={consoleId}
-          label={verdictById.get(consoleId)?.short_name ?? consoleId}
-          onClick={() => onSelectConsole(consoleId)}
-        />
-      ))}
+      {entry.consoles.slice(0, MAX_CONSOLE_ICONS).map((consoleId) => {
+        const verdict = verdictById.get(consoleId);
+        return (
+          // O botão é o alvo de clique e o dono do nome acessível; a
+          // etiqueta dentro é `aria-hidden` (só desenho). O realce de hover
+          // vem de fora, pela borda na cor de acento do botão — dentro da
+          // etiqueta, qualquer mudança de cor brigaria com a logo.
+          <button
+            key={consoleId}
+            type="button"
+            onClick={() => onSelectConsole(consoleId)}
+            title={verdict?.name ?? consoleId}
+            aria-label={verdict?.name ?? consoleId}
+            className={`rounded-sm p-0.5 outline-1 outline-transparent transition-[outline-color] hover:outline-accent-secondary ${FOCUS_RING}`}
+          >
+            <ConsoleLabel
+              consoleId={consoleId}
+              shortName={verdict?.short_name ?? consoleId}
+              size="sm"
+              className="h-14 w-24"
+            />
+          </button>
+        );
+      })}
       {entry.consoles.length > MAX_CONSOLE_ICONS && (
-        <ConsoleMoreBadge count={entry.consoles.length - MAX_CONSOLE_ICONS} />
+        // Não é clicável de propósito: só sinaliza "tem mais"; o filtro de
+        // console já responde "quero saber quais são". Mesma caixa das
+        // etiquetas (com o respiro do botão) para não desalinhar a fileira.
+        <span
+          aria-hidden="true"
+          title={`mais ${entry.consoles.length - MAX_CONSOLE_ICONS} console(s)`}
+          className="m-0.5 flex h-14 w-24 items-center justify-center rounded-sm border border-dashed border-line-strong font-mono text-xs text-muted tabular-nums"
+        >
+          +{entry.consoles.length - MAX_CONSOLE_ICONS}
+        </span>
       )}
     </div>
   );
@@ -952,7 +988,14 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   const [consoleFilter, setConsoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [modalConsoleId, setModalConsoleId] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const manualEntryRef = useRef<HTMLDivElement>(null);
+
+  // O formulário mora no pé da tela (ver o bloco lá embaixo), mas "Editar"
+  // é clicado no card de um emulador personalizado, lá em cima: sem rolar até
+  // ele, o clique pareceria não fazer nada.
+  useEffect(() => {
+    if (formMode !== "closed") manualEntryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [formMode]);
 
   const verdictById = useMemo(() => new Map(report?.verdicts.map((v) => [v.console_id, v]) ?? []), [report]);
   const customById = useMemo(() => new Map(customs.map((c) => [c.id, c])), [customs]);
@@ -1008,10 +1051,16 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
   }, [emulators, verdictById]);
 
   // Catálogo pequeno e fixo (uma dúzia e tanto de adapters embutidos) — já
-  // vem inteiro em GET /emulators, sem paginação no servidor. Filtro e
-  // paginação (2026-08-04) são client-side de propósito: diferente da
-  // Biblioteca (que cresce sem limite pelo uso real), este catálogo nunca
-  // fica grande o bastante pra justificar ida ao servidor a cada página.
+  // vem inteiro em GET /emulators, sem paginação no servidor. O filtro é
+  // client-side de propósito: diferente da Biblioteca (que cresce sem limite
+  // pelo uso real), este catálogo nunca fica grande o bastante pra justificar
+  // ida ao servidor.
+  //
+  // Sem paginação na tela também, desde 2026-09-28. Eram 3 páginas de 6 para
+  // 14 emuladores: a pergunta "o que já está instalado?" exigia virar página,
+  // e a última página tinha 2 cards soltos. 14 cards cabem numa rolagem, a
+  // grade já é responsiva, e os filtros acima continuam sendo o jeito de
+  // estreitar a lista.
   const filtered = (emulators ?? []).filter((e) => {
     if (consoleFilter && !e.consoles.includes(consoleFilter)) return false;
     if (statusFilter === "installed" && !e.installed) return false;
@@ -1023,23 +1072,6 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
       e.consoles.some((c) => c.toLowerCase().includes(term) || (verdictById.get(c)?.name ?? "").toLowerCase().includes(term))
     );
   });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  function handleSearch(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
-
-  function handleConsoleFilter(value: string) {
-    setConsoleFilter(value);
-    setPage(1);
-  }
-
-  function handleStatusFilter(value: StatusFilter) {
-    setStatusFilter(value);
-    setPage(1);
-  }
 
   // Contagens do resumo e dos chips: sempre sobre a lista INTEIRA, nunca sobre
   // o resultado filtrado — um chip que muda de número conforme o próprio chip
@@ -1075,50 +1107,8 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
         </p>
       )}
 
-      {/* B2b (docs/pendencias.md): a porta de cadastro manual sai do rodapé e
-          vira uma afordância visível sem rolar. O backend já aceita emulador
-          de console fora do catálogo (internal/emulator/custom.go) — só
-          faltava dizer isso em algum lugar. O mesmo bloco hospeda o formulário
-          (novo ou em edição, vindo do card de um custom). */}
-      <div className="mb-5 rounded-lg border border-dashed border-line-strong bg-panel p-4">
-        {formMode === "closed" ? (
-          <>
-            <p className="font-mono text-xs tracking-[0.2em] text-accent-secondary uppercase">
-              {t("manualEntryKicker")}
-            </p>
-            <p className="mt-1 text-sm font-semibold text-ink">{t("manualEntryTitle")}</p>
-            <p className="mt-1 max-w-2xl text-sm text-muted">{t("manualEntryBody")}</p>
-            <Button
-              type="button"
-              variant="chrome"
-              className="mt-3 w-fit"
-              {...{ "data-gamepad-start": "" }}
-              onClick={() => setFormMode("new")}
-            >
-              {t("addEmulatorManuallyButton")}
-            </Button>
-          </>
-        ) : (
-          <>
-            <SectionHeading className="mb-2">{t("addEmulatorSectionTitle")}</SectionHeading>
-            <ManualEmulatorForm
-              existing={formMode === "new" ? undefined : formMode}
-              existingIds={customs
-                .map((c) => c.id)
-                .filter((id) => formMode === "new" || id !== (formMode as CustomDefinition).id)}
-              placeholders={placeholders}
-              onSaved={() => {
-                setFormMode("closed");
-                setReloadKey((k) => k + 1);
-              }}
-              onCancel={() => setFormMode("closed")}
-            />
-          </>
-        )}
-      </div>
-
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {emulators && emulators.length > PAGE_SIZE && (
+        {emulators && emulators.length > 0 && (
           <>
             <label htmlFor="emulators-search" className="sr-only">
               {t("searchEmulatorLabel")}
@@ -1129,7 +1119,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
               name="emulators-search"
               autoComplete="off"
               value={search}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder={t("searchEmulatorPlaceholder")}
               className={`${inputClass} max-w-xs`}
             />
@@ -1140,7 +1130,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           <ZSelect
             ariaLabel={t("filterByConsoleLabel")}
             value={consoleFilter || ALL_CONSOLES}
-            onValueChange={(v) => handleConsoleFilter(v === ALL_CONSOLES ? "" : v)}
+            onValueChange={(v) => setConsoleFilter(v === ALL_CONSOLES ? "" : v)}
             className="max-w-xs"
           >
             <SelectItem value={ALL_CONSOLES}>{t("allConsoles")}</SelectItem>
@@ -1164,7 +1154,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
               <button
                 key={item.id || "all"}
                 type="button"
-                onClick={() => handleStatusFilter(item.id)}
+                onClick={() => setStatusFilter(item.id)}
                 aria-pressed={statusFilter === item.id}
                 className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${
                   statusFilter === item.id ? FILTER_CHIP_ON : FILTER_CHIP_OFF
@@ -1198,7 +1188,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
         <div role="status" aria-live="polite">
           <span className="sr-only">{t("loadingEmulators")}</span>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
-            {Array.from({ length: PAGE_SIZE }, (_, i) => (
+            {Array.from({ length: SKELETON_COUNT }, (_, i) => (
               <CardSkeleton key={i} className="h-40" />
             ))}
           </div>
@@ -1215,51 +1205,101 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
         />
       )}
 
-      {pageItems.length > 0 && (
-        <>
-          {/* O4 (docs/roadmap.md, Sprint O): a causa raiz do estouro em
-              1024-1279px era o grid interno do EmulatorBindingsPanel, já
-              corrigido lá para flex-wrap — um card de ~290px (3 colunas em
-              1024px) agora só quebra o mapeamento em mais linhas, sem gerar
-              rolagem horizontal. Por isso o breakpoint continua em `lg`, sem
-              usar `xl` (proibido pelo K3). O5: `2xl`/`min-[2400px]` acompanham
-              o teto do container acima — sem eles, o card ficaria cada vez
-              mais largo (e mais vazio) conforme a janela cresce, em vez de
-              ganhar mais uma coluna.
+      {/* O4 (docs/roadmap.md, Sprint O): a causa raiz do estouro em
+          1024-1279px era o grid interno do EmulatorBindingsPanel, já
+          corrigido lá para flex-wrap — um card de ~290px (3 colunas em
+          1024px) agora só quebra o mapeamento em mais linhas, sem gerar
+          rolagem horizontal. Por isso o breakpoint continua em `lg`, sem
+          usar `xl` (proibido pelo K3). O5: `2xl`/`min-[2400px]` acompanham
+          o teto do container acima — sem eles, o card ficaria cada vez
+          mais largo (e mais vazio) conforme a janela cresce, em vez de
+          ganhar mais uma coluna.
 
-              `items-start` (achado testando com o Douglas, 2026-09-06): sem
-              isso, o Grid CSS estica cada card pra altura da fileira mais
-              alta (comportamento padrão do `align-items: stretch`) — o
-              RetroArch (configurações + mapeamento + "ver cores") define uma
-              fileira alta, e DuckStation/PCSX2 (só um botão "Instalar")
-              esticavam junto, com a borda acompanhando mas o conteúdo colado
-              no topo — metade do card vazia por dentro. Com `items-start`,
-              cada card fica só do tamanho do próprio conteúdo.
+          `items-start` (achado testando com o Douglas, 2026-09-06): sem
+          isso, o Grid CSS estica cada card pra altura da fileira mais
+          alta (comportamento padrão do `align-items: stretch`) — o
+          RetroArch (configurações + mapeamento + "ver cores") define uma
+          fileira alta, e DuckStation/PCSX2 (só um botão "Instalar")
+          esticavam junto, com a borda acompanhando mas o conteúdo colado
+          no topo — metade do card vazia por dentro. Com `items-start`,
+          cada card fica só do tamanho do próprio conteúdo.
 
-              Voltou ao `stretch` padrão em 2026-09-26 (pedido do Douglas:
-              alinhamento em todas as telas): com `items-start`, numa mesma
-              fileira cada card terminava numa altura e cada "Instalar" ficava
-              num lugar. O problema de 09-06 era o conteúdo colado no topo com
-              a metade de baixo vazia; agora a barra de ação tem `mt-auto`
-              (`EmulatorCard`) e desce para a base, então o card esticado fica
-              com identidade em cima, ação embaixo, e o respiro entre os dois. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
-            {pageItems.map((entry) => (
-              <EmulatorCard
-                key={entry.adapter_id}
-                entry={entry}
-                source={sources[entry.adapter_id]}
-                customDef={customById.get(entry.adapter_id)}
-                verdictById={verdictById}
-                onSelectConsole={setModalConsoleId}
-                onChanged={() => setReloadKey((k) => k + 1)}
-                onEditCustom={setFormMode}
-              />
-            ))}
-          </div>
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
-        </>
+          Voltou ao `stretch` padrão em 2026-09-26 (pedido do Douglas:
+          alinhamento em todas as telas): com `items-start`, numa mesma
+          fileira cada card terminava numa altura e cada "Instalar" ficava
+          num lugar. O problema de 09-06 era o conteúdo colado no topo com
+          a metade de baixo vazia; agora a barra de ação tem `mt-auto`
+          (`EmulatorCard`) e desce para a base, então o card esticado fica
+          com identidade em cima, ação embaixo, e o respiro entre os dois. */}
+      {filtered.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
+          {filtered.map((entry) => (
+            <EmulatorCard
+              key={entry.adapter_id}
+              entry={entry}
+              source={sources[entry.adapter_id]}
+              customDef={customById.get(entry.adapter_id)}
+              verdictById={verdictById}
+              onSelectConsole={setModalConsoleId}
+              onChanged={() => setReloadKey((k) => k + 1)}
+              onEditCustom={setFormMode}
+            />
+          ))}
+        </div>
       )}
+
+      {/* Porta de cadastro manual. O backend aceita emulador de console fora
+          do catálogo (internal/emulator/custom.go), e o B2b
+          (docs/pendencias.md) a tinha levado para o TOPO, num painel
+          tracejado de destaque, para que alguém soubesse que ela existe.
+          Voltou para depois da grade em 2026-09-28: é ação rara, e no topo
+          ela era a primeira coisa da tela — empurrando para baixo a lista que
+          todo mundo veio ver e competindo com o "Instalar" dos cards. Aqui
+          embaixo continua achável (quem não achou seu emulador na lista
+          chega exatamente aqui ao terminar de rolar), só sem pedir atenção:
+          filete tracejado em vez de painel, texto cinza, botão compacto.
+          Sem `data-gamepad-start` pelo mesmo motivo — o pouso do controle é
+          o topo da lista, não a ação rara.
+
+          O mesmo bloco hospeda o formulário (novo ou em edição, vindo do
+          card de um custom); aberto, ele volta a ser painel, porque aí é o
+          que a pessoa está fazendo. */}
+      <div ref={manualEntryRef} className={`scroll-mt-4 ${filtered.length > 0 || emulators === null ? "mt-8" : ""}`}>
+        {formMode === "closed" ? (
+          <div className="border-t border-dashed border-line pt-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="font-mono text-xs tracking-[0.2em] text-muted uppercase">{t("manualEntryKicker")}</p>
+              <Button
+                type="button"
+                variant="chrome"
+                className={`w-fit ${CARD_CHROME}`}
+                onClick={() => setFormMode("new")}
+              >
+                {t("addEmulatorManuallyButton")}
+              </Button>
+            </div>
+            <p className="mt-2 max-w-2xl text-xs text-muted">
+              {t("manualEntryTitle")} {t("manualEntryBody")}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-line-strong bg-panel p-4">
+            <SectionHeading className="mb-2">{t("addEmulatorSectionTitle")}</SectionHeading>
+            <ManualEmulatorForm
+              existing={formMode === "new" ? undefined : formMode}
+              existingIds={customs
+                .map((c) => c.id)
+                .filter((id) => formMode === "new" || id !== (formMode as CustomDefinition).id)}
+              placeholders={placeholders}
+              onSaved={() => {
+                setFormMode("closed");
+                setReloadKey((k) => k + 1);
+              }}
+              onCancel={() => setFormMode("closed")}
+            />
+          </div>
+        )}
+      </div>
 
       {modalConsoleId && (
         <ConsoleInfoModal

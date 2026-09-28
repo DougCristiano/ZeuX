@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { consoleImageURL } from "../api";
-import { consoleAccentColor, consoleTextColor } from "../lib/consoleColor";
-import { consoleIconLabel } from "./ui";
+import { consoleAccentColor } from "../lib/consoleColor";
+import { ConsoleLabel } from "./ConsoleLabel";
 
 /**
  * Cabeçalho das duas telas que pertencem a UM console: `ConsoleDetailScreen`
@@ -13,11 +13,11 @@ import { consoleIconLabel } from "./ui";
  * contagem de jogos). Extraído em 2026-09-11: o que varia entre as telas entra
  * por prop, o desenho é um só.
  *
- * Por que o fundo branco atrás da logo: as imagens do IGDB foram desenhadas
- * para selo em fundo claro (mesma razão já registrada em `ConsolesScreen`).
- * Nos 3 consoles sem imagem cadastrada, o `onError` do `<img>` derruba para a
- * sigla em `font-pixel` — por `consoleIconLabel`, nunca `slice(0, 4)` à mão,
- * que ignoraria o mapa de exceções.
+ * A logo é a etiqueta de cartucho (`ConsoleLabel`) desde 2026-09-28 — a caixa
+ * branca de 64px era um segundo desenho de logo de console, diferente do card
+ * da grade de onde o usuário acabou de clicar. Mesma etiqueta nos dois lugares
+ * = o olho reconhece o console na passagem de uma tela para a outra. O creme,
+ * a faixa na cor do console e a queda para a sigla sem logo são dela.
  *
  * O título vem em `font-pixel` (voz de marca da direção retrô, CLAUDE.md) um
  * degrau ABAIXO do `ScreenHeader` de listagem: aqui ele divide espaço com a
@@ -50,7 +50,7 @@ export function ConsoleHero({
   hasImage?: boolean;
   /** Linha de dados sob o título: ano/sigla, ou sigla + contagem de jogos. */
   meta: ReactNode;
-  /** Flutua no canto da caixa de 64px — hoje, o botão de trocar a logo. */
+  /** Flutua no canto da etiqueta da logo — hoje, o botão de trocar a logo. */
   logoOverlay?: ReactNode;
   /**
    * Conteúdo extra abaixo da linha de metadados (ex.: "restaurar padrão").
@@ -65,13 +65,11 @@ export function ConsoleHero({
   // A logo oficial não existe para os 3 consoles sem imagem cadastrada no
   // IGDB. A checagem é o próprio `onError` do <img>, e não um `has_image` do
   // catálogo: as duas telas nem sempre têm esse campo à mão, e a queda para a
-  // sigla acontece um quadro depois — imperceptível.
+  // sigla acontece um quadro depois — imperceptível. Duas imagens podem
+  // acusar a falha (a da etiqueta e a arte de fundo); qualquer uma basta para
+  // `belowTitle` saber que não há logo no ar.
   const [imageFailed, setImageFailed] = useState(false);
   const accent = consoleAccentColor(consoleId);
-  // A sigla é TEXTO sobre `--fill` quando não há logo: variante clara da mesma
-  // matiz (≥4.5:1, WCAG 1.4.3 — ver `consoleTextColor`). A borda e o gradiente
-  // seguem com o `accent` puro, que é decoração.
-  const labelColor = consoleTextColor(consoleId);
   const showImage = hasImage && !imageFailed;
   const src = consoleImageURL(consoleId, imageVersion || undefined);
 
@@ -105,21 +103,19 @@ export function ConsoleHero({
       />
       <div className="relative flex items-center gap-4">
         <div className="relative shrink-0">
-          <span
-            aria-hidden="true"
-            style={{
-              borderColor: `${accent}66`,
-              color: labelColor,
-              backgroundColor: showImage ? "#fff" : undefined,
-            }}
-            className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border bg-fill font-pixel text-[11px] leading-none"
-          >
-            {showImage ? (
-              <img src={src} alt="" className="h-14 w-14 object-contain p-0.5" onError={() => setImageFailed(true)} />
-            ) : (
-              consoleIconLabel(consoleId, shortName)
-            )}
-          </span>
+          {/* Retangular (7:4), não quadrada como a caixa antiga: a maioria das
+              logos é larga (PS2, Mega Drive, GBA chega a quase 9:1), e num
+              quadrado de 64px elas viravam uma faixa fina no meio. A altura
+              acompanha as duas linhas de título + metadados ao lado. */}
+          <ConsoleLabel
+            consoleId={consoleId}
+            shortName={shortName}
+            hasImage={hasImage}
+            imageVersion={imageVersion}
+            size="lg"
+            className="h-16 w-28"
+            onImageError={() => setImageFailed(true)}
+          />
           {/* Só aparece quando há logo de verdade para trocar/restaurar — a
               tela que passa o overlay decide isso, aqui só reservamos o
               canto. */}

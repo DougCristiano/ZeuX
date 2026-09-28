@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ChevronRight, Folder, FolderPlus, RefreshCw, Trash2 } from "lucide-react";
-import { api, ApiError, consoleImageURL } from "../api";
+import { api, ApiError } from "../api";
 import { consoleAccentColor } from "../lib/consoleColor";
 import type { BulkMatchedFolder, ConsoleEntry, LibraryFolder, LibraryGame, Report } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
@@ -11,7 +11,6 @@ import {
   Card,
   CardSkeleton,
   ConfirmModal,
-  consoleIconLabel,
   ConsoleInfoModal,
   EmptyState,
   ErrorModal,
@@ -22,6 +21,7 @@ import {
   SectionHeading,
   ZSelect,
 } from "../components/ui";
+import { ConsoleLabel } from "../components/ConsoleLabel";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { SelectItem } from "../components/ui/select";
 import { useT } from "../i18n/i18n";
@@ -128,7 +128,7 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
  * Era um `Card filled dense` com quatro molduras aninhadas (caixa de 64px do
  * ConsoleIcon, bloco separado por `border-t`, botões com borda + sombra
  * interna). Agora o console é a ÚNICA superfície: uma linha densa no formato
- * de `GameListRow` — [logo 40px] nome · N jogos … [caminho mono] [ações no
+ * de `GameListRow` — [etiqueta da logo] nome · N jogos … [caminho mono] [ações no
  * hover]. `grid-cols-1` sempre, mesmo em janela larga: tabela de gerência não
  * quer 2 colunas. Pastas extras do mesmo console viram sub-linhas separadas
  * só por `border-t border-line`, sem caixa nenhuma.
@@ -165,9 +165,6 @@ function ConfiguredConsoleRow({
   const [confirmingRemove, setConfirmingRemove] = useState<number | null>(null);
   const confirmingFolder = folders.find((f) => f.id === confirmingRemove);
   const accent = consoleAccentColor(consoleInfo.console_id);
-  // A logo oficial não existe para os 3 consoles sem imagem cadastrada no
-  // IGDB — cai para a sigla em pixel font, um quadro depois.
-  const [logoFailed, setLogoFailed] = useState(false);
 
   return (
     <div
@@ -209,24 +206,18 @@ function ConfiguredConsoleRow({
           onClick={onSelectConsole}
           className={`flex min-w-0 flex-1 items-center gap-3 rounded-sm text-left transition-colors hover:bg-fill ${FOCUS_RING}`}
         >
-          <span
-            aria-hidden="true"
-            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-sm border bg-white"
-            style={{ borderColor: `${accent}66` }}
-          >
-            {logoFailed ? (
-              <span className="font-pixel text-[9px] leading-none text-ink">
-                {consoleIconLabel(consoleInfo.console_id, consoleInfo.short_name)}
-              </span>
-            ) : (
-              <img
-                src={consoleImageURL(consoleInfo.console_id)}
-                alt=""
-                className="h-8 w-8 object-contain"
-                onError={() => setLogoFailed(true)}
-              />
-            )}
-          </span>
+          {/* Etiqueta de cartucho (`ConsoleLabel`, o desenho único de logo de
+              console desde 2026-09-28) no lugar do quadrado branco de 40px.
+              Mais larga que alta porque a maioria das logos é horizontal; a
+              altura continua a da linha densa (nome + contagem). Sem
+              `has_image` aqui (`ConsoleInfo` não o carrega): a etiqueta cai
+              na sigla pelo `onError` da imagem, um quadro depois. */}
+          <ConsoleLabel
+            consoleId={consoleInfo.console_id}
+            shortName={consoleInfo.short_name}
+            size="sm"
+            className="h-10 w-16 shrink-0"
+          />
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold text-ink">{consoleInfo.name}</span>
             {/* Ciano quando a contagem chega ("aqui o sistema informa", regra
