@@ -1,9 +1,9 @@
-import { useState, type CSSProperties } from "react";
-import { consoleImageURL } from "../api";
+import type { CSSProperties } from "react";
 import type { ConsoleEntry } from "../api/types";
-import { consoleAccentColor, consoleTextColor } from "../lib/consoleColor";
+import { consoleAccentColor } from "../lib/consoleColor";
 import type { ConsoleReadiness } from "../lib/consoleReadiness";
-import { consoleIconLabel, FOCUS_RING } from "./ui";
+import { ConsoleLabel } from "./ConsoleLabel";
+import { FOCUS_RING } from "./ui";
 
 /**
  * O card de um console na grade (2026-09-09, direção retrô/pixelada do
@@ -69,20 +69,10 @@ export function ConsoleCard({
   labels: ConsoleCardLabels;
   onOpen: () => void;
 }) {
+  // O `accent` vai na borda, no glow e no gradiente do compartimento — só
+  // decoração; a logo (ou a sigla, sem logo) fica com `ConsoleLabel`.
   const accent = consoleAccentColor(entry.console_id);
-  // A sigla é TEXTO: usa a variante clara da mesma matiz (`consoleTextColor`,
-  // ≥4.5:1 sobre `--fill` — WCAG 1.4.3). O `accent` puro continua na borda, no
-  // glow e no gradiente do compartimento, onde é decoração e não precisa ser
-  // lido.
-  const labelColor = consoleTextColor(entry.console_id);
   const ready = readiness.step === "pronto";
-
-  // Mesma checagem de `ConsoleHero`/`LibraryScreen`: `has_image` diz o que o
-  // catálogo sabe, `onError` cobre o resto (imagem cadastrada mas que falhou
-  // ao carregar). Nunca um `slice(0, 4)` à mão — `consoleIconLabel` já
-  // conhece o mapa de exceções de sigla.
-  const [imageFailed, setImageFailed] = useState(false);
-  const showImage = entry.has_image && !imageFailed;
 
   // A contagem toma o lugar do chip de pendência só quando há pasta E o
   // console está pronto: com uma peça ainda faltando, o que o usuário precisa
@@ -127,29 +117,14 @@ export function ConsoleCard({
         <div aria-hidden="true" className="zeux-pixel-grid pointer-events-none absolute inset-0" />
         <div aria-hidden="true" className="zeux-scanlines pointer-events-none absolute inset-0 opacity-40" />
 
-        {showImage ? (
-          // Etiqueta de cartucho — ver doc comment do arquivo. `absolute`,
-          // não em fluxo: o compartimento é `flex items-center
-          // justify-center` para o fallback de sigla. `object-contain` é o
-          // ponto da mudança: as logos vão de 1:1 a quase 9:1 (GBA), e
-          // qualquer `cover` corta alguma. `mix-blend-multiply` porque
-          // algumas logos (Fliperama, Mega Drive, SNES) vêm com fundo branco
-          // chapado: multiplicado, o branco vira o creme da etiqueta em vez
-          // de um retângulo branco dentro dela; preto e cor mudam quase nada.
-          <div className="absolute inset-x-3.5 top-2.5 bottom-2.5 flex overflow-hidden rounded-sm bg-cart-label px-2.5 pt-3.5 pb-2 shadow-[0_2px_0_rgb(0_0_0/0.35)]">
-            <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5" style={{ background: accent }} />
-            <img
-              src={consoleImageURL(entry.console_id)}
-              alt=""
-              className="h-full min-h-0 w-full min-w-0 object-contain mix-blend-multiply"
-              onError={() => setImageFailed(true)}
-            />
-          </div>
-        ) : (
-          <span aria-hidden="true" className="relative font-pixel text-sm leading-none" style={{ color: labelColor }}>
-            {consoleIconLabel(entry.console_id, entry.short_name)}
-          </span>
-        )}
+        {/* Etiqueta de cartucho (`ConsoleLabel`, o desenho único de logo de
+            console no app) sobre o "casco" com o gradiente na cor do console. */}
+        <ConsoleLabel
+          consoleId={entry.console_id}
+          shortName={entry.short_name}
+          hasImage={entry.has_image}
+          className="absolute inset-x-3.5 top-2.5 bottom-2.5"
+        />
 
         {ready && (
           <span
