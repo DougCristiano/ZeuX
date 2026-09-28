@@ -162,7 +162,7 @@ export function GameHero({
           onClick={onOpenDetail}
           tabIndex={-1}
           aria-hidden="true"
-          className="w-28 shrink-0 cursor-pointer rounded-lg transition-transform duration-150 hover:scale-[1.03] sm:w-36"
+          className="w-28 shrink-0 cursor-hand rounded-lg transition-transform duration-150 hover:scale-[1.03] sm:w-36"
         >
           <GameCover label={shortName} title={game.title} consoleId={game.console_id} coverUrl={cover} />
         </button>

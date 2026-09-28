@@ -36,6 +36,7 @@
  * trazê-la, removida aqui de propósito.
  */
 @import "tw-animate-css";
+@import "./cursors.css";
 @import "shadcn/tailwind.css";
 
 /*
@@ -506,6 +507,12 @@ textarea {
   --radius-xl: calc(var(--radius) * 1.4);
 }
 
+/* `cursor-hand`: a mão em pixel para o que é clicável mas não é <button>/<a>
+   (um <div onClick>). Substitui `cursor-pointer`, que traria a mão nativa. */
+@utility cursor-hand {
+  cursor: var(--cursor-hand), pointer;
+}
+
 /* Default de borda/anel de foco que os componentes do shadcn assumem
    (`border-border`, `outline-ring/50`) — não duplica o `body{}` abaixo, que
    já cobre fundo/texto/fonte com os tokens ZeuX diretamente. */
@@ -536,7 +543,26 @@ textarea {
   summary,
   select:not(:disabled),
   label:has(> input:not(:disabled)) {
-    cursor: pointer;
+    cursor: var(--cursor-hand), pointer;
+  }
+
+  /*
+   * Cursor do mouse em pixel art (src/cursors.css, gerado por
+   * scripts/generate-cursors.mjs). A seta vai no `html` e é herdada; a mão
+   * entra acima, nos clicáveis. Campo de texto continua com o cursor de
+   * digitação do sistema — `text` explícito, porque a seta herdada também
+   * cobriria os campos. A regra de `cursor: not-allowed` abaixo segue nativa,
+   * e `cursor-default` explícito nos menus deixou de existir: herdam a seta.
+   * Texto solto também mostra a seta (e não o I-beam), como qualquer app
+   * desktop — só o campo editável pede o cursor de texto.
+   */
+  html {
+    cursor: var(--cursor-arrow), default;
+  }
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"]),
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
   }
 
   /* Desabilitado mostra que não responde, em vez de parecer texto comum. */

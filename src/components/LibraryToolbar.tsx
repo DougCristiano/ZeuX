@@ -420,7 +420,7 @@ function MoreFilters({
               key={key}
               checked={toggle.on}
               onCheckedChange={() => toggle.onToggle()}
-              className="flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 font-mono text-xs tracking-wider text-ink uppercase outline-none select-none data-highlighted:bg-accent/15"
+              className="flex items-center gap-2 rounded-sm px-2 py-1.5 font-mono text-xs tracking-wider text-ink uppercase outline-none select-none data-highlighted:bg-accent/15"
             >
               {icon}
               <span className="flex-1">{itemLabel}</span>

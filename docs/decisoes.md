@@ -1298,6 +1298,54 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### Menu de botão direito nos jogos, cursor em pixel e fim do menu nativo — 2026-09-28
+
+Pedido do Douglas: o cursor estilizado, e botão direito num jogo (por exemplo
+um ausente que ele quer tirar da lista) para ver detalhes "entre outros".
+
+**Menu do jogo** (`GameContextMenu`, Radix `ContextMenu`): Ver detalhes ·
+Jogar · Favoritar/Tirar dos favoritos · Mostrar na pasta · Remover da
+biblioteca (ou Trazer de volta, se o jogo está oculto). Vale na grade, na
+lista e no destaque "Continue jogando" de "Todos os jogos", e na grade e na
+lista da tela de um console. `Jogar` e `Mostrar na pasta` ficam desabilitados
+em jogo ausente. **"Remover" continua sendo esconder** (`POST .../exclude`, o
+mesmo da tela de detalhe): o arquivo no disco nunca é tocado (princípio 6), a
+confirmação diz isso, e o jogo volta pelo filtro "Ocultos". O contêiner do
+menu é `display: contents`, para não virar caixa na grade nem na lista.
+
+**Correção no servidor que o menu expôs.** O filtro "Ocultos"
+(`?excluded=true`) exigia `missing = 0`, e o "Ausentes" exige `excluded = 0`:
+um jogo **ausente e oculto** não aparecia em filtro nenhum, e a promessa de
+"trazer de volta pelo Ocultos" era falsa justamente para o caso de remover um
+ausente. Agora "Ocultos" lista os ocultos ausentes também
+(`ListAllGames`, com teste). Isso já era verdade pela tela de detalhe; o menu
+só tornou o caminho comum.
+
+**Menu nativo do sistema desligado** fora de campo de texto e de texto
+selecionado, só na versão empacotada (`WindowFrame`): o botão direito abria o
+menu do WebView ("Voltar", "Recarregar"), que não é do app. No `dev` ele
+continua, para o "Inspecionar".
+
+**Cursor em pixel** (`src/cursors.css`, gerado por
+`scripts/generate-cursors.mjs`; não edite o CSS à mão): seta creme e mão roxa,
+com contorno escuro para aparecerem sobre capas claras. PNG em data URI, e não
+SVG, porque WebView2, WebKitGTK e WKWebView tratam tamanho e antialias de
+cursor SVG de jeitos diferentes, e pixel art só é pixel art com célula em
+pixels inteiros (2×2). A seta vai no `html` e é herdada; a mão entra em
+botões, links, abas e afins pela regra de base, e a classe `cursor-hand`
+substitui `cursor-pointer` em `<div onClick>`. Campos de texto mantêm o cursor
+de digitação do sistema, e `not-allowed` segue nativo. Efeito colateral aceito:
+texto solto mostra a seta, e não o I-beam, como em qualquer app desktop.
+
+**Não verificado:** o cursor na janela real (o Playwright não desenha
+o cursor; conferi o desenho ampliado e o `cursor` calculado nos elementos), e
+como cada WebView escala o PNG em telas com zoom do sistema.
+
+**O que quebra se desfizer:** apagar `cursors.css` (ou o `@import`) deixa o
+`var(--cursor-*)` inválido e cai no cursor nativo (`default`/`pointer`), sem
+quebrar nada; reverter o filtro de "Ocultos" volta a esconder o jogo ausente
+removido de todo filtro.
+
 ### Barra de título própria, em pixel — 2026-09-28
 
 Pergunta do Douglas: "por que o header, onde maximizo/fecho/minimizo, não está

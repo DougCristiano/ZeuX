@@ -102,7 +102,7 @@ export function GameTile({
           role="button"
           tabIndex={0}
           {...(gamepadStart ? { "data-gamepad-start": "" } : {})}
-          className={`group block w-full cursor-pointer rounded-lg text-left ${FOCUS_RING}`}
+          className={`group block w-full cursor-hand rounded-lg text-left ${FOCUS_RING}`}
           title={game.title}
           // A11y 4.1.2: quando bloqueado, o motivo (`launchability.title`)
           // entra no nome acessível — senão o leitor de tela anuncia só "Ver
@@ -178,7 +178,7 @@ export function GameTile({
           nem `role`: quem navega por Tab/D-pad já tem o wrapper
           `role="button"` acima como alvo único (M1); um segundo alvo aqui
           faria o cursor do controle parar duas vezes no mesmo jogo. */}
-      <div className="group/title min-h-[3.75rem] min-w-0 cursor-pointer" onClick={onOpenDetail}>
+      <div className="group/title min-h-[3.75rem] min-w-0 cursor-hand" onClick={onOpenDetail}>
         <p
           className="line-clamp-2 text-sm leading-tight font-semibold text-ink decoration-accent underline-offset-2 group-hover/title:underline"
           title={game.title}

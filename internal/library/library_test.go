@@ -543,3 +543,47 @@ func TestListAllGamesHidesExcludedAndScanKeepsItHidden(t *testing.T) {
 		t.Fatalf("ListAllGames após revelar = %+v (err %v), esperava os 2 de volta", revealed, err)
 	}
 }
+
+// Um jogo removido da biblioteca depois de ter o arquivo sumido tem que
+// aparecer no filtro "Ocultos": é o único caminho de volta que a interface
+// promete ao remover, e antes ele exigia `missing = 0`, deixando o jogo fora
+// de todo filtro. O "Ausentes" continua sem ele (esconder tira da vista).
+func TestListAllGamesExcludedOnlyIncludesMissingHiddenGames(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	folder, err := s.AddFolder(ctx, "gba", "/jogos/gba")
+	if err != nil {
+		t.Fatalf("AddFolder: %v", err)
+	}
+	gone := NewGame{ConsoleID: "gba", Path: "/jogos/gba/sumiu.gba", Title: "Sumiu"}
+	kept := NewGame{ConsoleID: "gba", Path: "/jogos/gba/fica.gba", Title: "Fica"}
+	if err := s.SyncFolder(ctx, folder.ID, []NewGame{gone, kept}); err != nil {
+		t.Fatalf("SyncFolder: %v", err)
+	}
+	// Revarredura sem o arquivo: o jogo vira ausente.
+	if err := s.SyncFolder(ctx, folder.ID, []NewGame{kept}); err != nil {
+		t.Fatalf("SyncFolder (sem o arquivo): %v", err)
+	}
+
+	missing, err := s.ListAllGames(ctx, "", false, true, false)
+	if err != nil || len(missing) != 1 {
+		t.Fatalf("ListAllGames(missingOnly) = %+v / %v, esperava o jogo ausente", missing, err)
+	}
+	if err := s.SetExcluded(ctx, missing[0].ID, true); err != nil {
+		t.Fatalf("SetExcluded: %v", err)
+	}
+
+	hidden, err := s.ListAllGames(ctx, "", false, false, true)
+	if err != nil {
+		t.Fatalf("ListAllGames(excludedOnly): %v", err)
+	}
+	if len(hidden) != 1 || hidden[0].Title != "Sumiu" || !hidden[0].Missing || !hidden[0].Excluded {
+		t.Fatalf("ListAllGames(excludedOnly) = %+v, esperava o jogo ausente e oculto", hidden)
+	}
+
+	stillMissing, err := s.ListAllGames(ctx, "", false, true, false)
+	if err != nil || len(stillMissing) != 0 {
+		t.Fatalf("ListAllGames(missingOnly) depois de ocultar = %+v / %v, esperava vazio", stillMissing, err)
+	}
+}

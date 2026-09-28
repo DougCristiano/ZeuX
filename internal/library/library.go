@@ -434,7 +434,8 @@ func (s *Store) SyncFolder(ctx context.Context, folderID int64, found []NewGame)
 // excludedOnly (2026-09-09) segue a mesma lógica de missingOnly para os jogos
 // que o usuário escondeu à mão ("Remover da biblioteca" em GameDetailScreen):
 // por padrão ficam FORA da lista, e a tela só os traz — e só eles — quando
-// liga o filtro "mostrar ocultos", o caminho de volta para desfazer.
+// liga o filtro "mostrar ocultos", o caminho de volta para desfazer. Esse
+// filtro traz os ocultos ausentes também (ver o `switch` abaixo).
 func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly bool, missingOnly bool, excludedOnly bool) ([]Game, error) {
 	conditions := make([]string, 0, 4)
 	args := make([]any, 0, 4)
@@ -450,9 +451,15 @@ func (s *Store) ListAllGames(ctx context.Context, query string, favoriteOnly boo
 	if favoriteOnly {
 		conditions = append(conditions, `favorite = 1`)
 	}
-	if missingOnly {
+	// "Ocultos" não filtra por ausência: um jogo removido da biblioteca com o
+	// arquivo já sumido (o caso típico de "quero deletar este ausente") ficaria
+	// fora de todo filtro — o "Ausentes" exige `excluded = 0` e o "Ocultos"
+	// exigia `missing = 0` — e o "trazer de volta" prometido ao remover nunca
+	// o encontraria.
+	switch {
+	case missingOnly:
 		conditions = append(conditions, `missing = 1`)
-	} else {
+	case !excludedOnly:
 		conditions = append(conditions, `missing = 0`)
 	}
 	if excludedOnly {

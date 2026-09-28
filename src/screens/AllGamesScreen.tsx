@@ -34,6 +34,7 @@ import { useToast } from "../hooks/useToast";
 import { useT } from "../i18n/i18n";
 import { dict } from "./AllGamesScreen.i18n";
 import { FirstStepsChecklist } from "../components/FirstStepsChecklist";
+import { GameContextMenu } from "../components/GameContextMenu";
 import { GameHero } from "../components/GameHero";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
@@ -393,6 +394,14 @@ export function AllGamesScreen({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Depois de remover/trazer de volta pelo menu de botão direito: o jogo
+  // some (ou volta) da lista atual, e o destaque "Continue jogando" pode ter
+  // sido o removido — as duas listas são rebuscadas.
+  function refreshAfterMenuAction() {
+    loadGames();
+    loadRecentGames();
+  }
 
   // Toggle otimista (G4): atualiza a lista na hora, sem esperar a resposta
   // nem recarregar a página inteira. Se a chamada falhar, desfaz.
@@ -967,6 +976,14 @@ export function AllGamesScreen({
             const featuredVerdict = verdictFor(featured.console_id);
             const featuredConsoleName = nameFor(featured.console_id);
             return (
+              <GameContextMenu
+                game={featured}
+                onOpenDetail={() => onOpenGame(featured, featuredConsoleName, shortNameFor(featured.console_id))}
+                onPlay={playHandlerFor(featured)}
+                onToggleFavorite={() => toggleFavorite(featured)}
+                onChanged={refreshAfterMenuAction}
+                onNotify={showToast}
+              >
               <GameHero
                 game={featured}
                 shortName={shortNameFor(featured.console_id)}
@@ -989,6 +1006,7 @@ export function AllGamesScreen({
                   install.state.kind === "installing" && install.state.pendingGamePath === featured.path
                 }
               />
+              </GameContextMenu>
             );
           })()}
         </div>
@@ -1144,6 +1162,14 @@ export function AllGamesScreen({
                   : undefined;
                 return (
                   <div key={virtualRow.key} data-index={virtualRow.index} ref={rowVirtualizer.measureElement} style={rowStyle}>
+                    <GameContextMenu
+                      game={game}
+                      onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                      onPlay={playHandlerFor(game)}
+                      onToggleFavorite={() => toggleFavorite(game)}
+                      onChanged={refreshAfterMenuAction}
+                      onNotify={showToast}
+                    >
                     <GameListRow
                       game={game}
                       consoleShortName={shortNameFor(game.console_id)}
@@ -1163,6 +1189,7 @@ export function AllGamesScreen({
                         verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict)) : undefined
                       }
                     />
+                    </GameContextMenu>
                   </div>
                 );
               }
@@ -1188,8 +1215,16 @@ export function AllGamesScreen({
                       ? evaluateGameLaunchability(game, verdict, adapterEntryFor(verdict))
                       : undefined;
                     return (
-                      <GameTile
+                      <GameContextMenu
                         key={game.id}
+                        game={game}
+                        onOpenDetail={() => onOpenGame(game, consoleName, shortNameFor(game.console_id))}
+                        onPlay={playHandlerFor(game)}
+                        onToggleFavorite={() => toggleFavorite(game)}
+                        onChanged={refreshAfterMenuAction}
+                        onNotify={showToast}
+                      >
+                      <GameTile
                         game={game}
                         shortName={shortNameFor(game.console_id)}
                         gamepadStart={!heroShown && virtualRow.index === 0 && i === 0}
@@ -1207,6 +1242,7 @@ export function AllGamesScreen({
                         verdict?.adapter_id ? () => install.handlePlay(game, verdict, adapterEntryFor(verdict)) : undefined
                       }
                       />
+                      </GameContextMenu>
                     );
                   })}
                 </div>

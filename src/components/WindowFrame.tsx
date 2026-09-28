@@ -79,8 +79,30 @@ function useWindowChrome(): { mode: Mode; maximized: boolean } {
   return { mode, maximized };
 }
 
+/**
+ * O botão direito fora dos menus do ZeuX abria o menu nativo do WebView
+ * ("Voltar", "Recarregar"...), que não é um menu do app e tira o efeito dos
+ * menus de verdade (`GameContextMenu`). Só na versão empacotada — no
+ * desenvolvimento o menu nativo traz o "Inspecionar" —, e nunca sobre campo de
+ * texto nem sobre texto selecionado, onde copiar/colar continua fazendo falta.
+ */
+function useSuppressNativeContextMenu() {
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    const block = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) return;
+      if (window.getSelection()?.toString()) return;
+      event.preventDefault();
+    };
+    document.addEventListener("contextmenu", block);
+    return () => document.removeEventListener("contextmenu", block);
+  }, []);
+}
+
 export function WindowFrame({ children }: { children: ReactNode }) {
   const { mode, maximized } = useWindowChrome();
+  useSuppressNativeContextMenu();
 
   return (
     <div className="flex h-screen flex-col">

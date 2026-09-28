@@ -3,6 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { api, ApiError, isDownloadingCore } from "../api";
 import type { EmulatorEntry, InstallJob, LibraryGame, Report, Session } from "../api/types";
 import { rescanAllFoldersIfStale } from "../lib/autoRescan";
+import { GameContextMenu } from "../components/GameContextMenu";
 import {
   BackButton,
   Button,
@@ -718,6 +719,14 @@ export function GamesScreen({
                 {/* Q5: `onInstall` passa por `handlePlay`, a mesma cadeia de
                     decisão do ▶ — ramifica por motivo e nunca dispara uma
                     instalação que o servidor recusa para fonte manual. */}
+                <GameContextMenu
+                  game={game}
+                  onOpenDetail={() => onOpenGame(game, consoleName, shortName)}
+                  onPlay={canPlay ? () => install.handlePlay(game, verdict, adapterEntry) : undefined}
+                  onToggleFavorite={() => toggleFavorite(game)}
+                  onChanged={() => void loadGames()}
+                  onNotify={showToast}
+                >
                 {viewMode === "lista" ? (
                   <GameListRow
                     game={game}
@@ -746,6 +755,7 @@ export function GamesScreen({
                     }
                   />
                 )}
+                </GameContextMenu>
 
                 {/* Os blocos abaixo (progresso, aviso, erro) foram desenhados
                     para a largura de um tile. No modo lista eles ganham o

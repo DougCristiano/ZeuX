@@ -1,0 +1,9 @@
+/*
+ * GERADO por scripts/generate-cursors.mjs — não edite à mão; mude a grade no
+ * script e rode-o de novo. Cursor do mouse em pixel art (PNG em data URI, ver
+ * o porquê no cabeçalho do script). Usado por src/index.css.
+ */
+:root {
+  --cursor-arrow: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAgCAYAAAAWl4iLAAAAcElEQVR4nNXUsQ1AIQhFUWsbR3D/bf4Ilm6h8ZckRMUHIgmdntsRYsptbECPOgwPqMO1fP/CAmYwLGAOHweuweLAdXg74AZeDriDpwE3MD2z7Nk1h4+PkxlMP4oD6jD30C/MPpAG1ODVeQ+mARi4C3fU+FcWS7ADZwAAAABJRU5ErkJggg==") 0 0;
+  --cursor-hand: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAgCAYAAAABtRhCAAAAeElEQVR4nGNgIAC4+OX/I2NC6ikGdLMQZsHGkv8omGYWj1o4aiHVLaR6dhl0FhJyyOCxEJdCci0k6IABsxCXQnSDycVwiwfcQkJBN/QsJJRIho+FtLZ4+FpIdFFHNwupbfHwtZDkepHuFpJrMcVNjgGzkFQ8aCwEAGb1PojnVk09AAAAAElFTkSuQmCC") 8 0;
+}

@@ -269,7 +269,7 @@ export function HistoryScreen({
                       key={game.id}
                       role="button"
                       tabIndex={0}
-                      className={`group flex w-[150px] shrink-0 cursor-pointer flex-col gap-2 rounded-lg text-left ${FOCUS_RING}`}
+                      className={`group flex w-[150px] shrink-0 cursor-hand flex-col gap-2 rounded-lg text-left ${FOCUS_RING}`}
                       aria-label={t("playedOn", { console: consoleName, date: lastPlayed ?? "—" })}
                       onClick={() => onOpenGame(game, consoleName, shortName)}
                       onKeyDown={(e) => {
