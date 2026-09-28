@@ -768,8 +768,23 @@ export function ConsoleDetailScreen({
    */
   type TrailState = "ok" | "pendente" | "desconhecido" | "na";
   const emulatorState: TrailState = readiness.chosen ? "ok" : "pendente";
+  // Sem emulador instalado, o core só é "desconhecido" quando depende de QUAL
+  // emulador o usuário vai instalar (um standalone não tem core, o RetroArch
+  // tem). Quando toda opção pede core, o estado já é sabido — e dizer "o
+  // ZeuX não sabe" ao lado do card que mostra o core como faltando era
+  // contradição na mesma tela (GBA, que só roda pelo RetroArch).
+  const optionCores = entry.emulators.map((option) => option.core);
+  const coreStateWithoutEmulator: TrailState = optionCores.every((core) => !core)
+    ? "na"
+    : !optionCores.every((core) => core)
+      ? "desconhecido"
+      : optionCores.every((core) => coreByName.get(core!)?.installed)
+        ? "ok"
+        : optionCores.every((core) => !coreByName.get(core!)?.installed)
+          ? "pendente"
+          : "desconhecido";
   const coreState: TrailState = !readiness.chosen
-    ? "desconhecido" // depende de qual emulador for instalado
+    ? coreStateWithoutEmulator
     : !readiness.chosen.core
       ? "na"
       : coreByName.get(readiness.chosen.core)?.installed
