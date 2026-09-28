@@ -48,10 +48,16 @@ export function ConsoleLabel({
   const stripe = size === "sm" ? "h-1" : size === "md" ? "h-1.5" : "h-2";
   const padding = size === "sm" ? "px-1 pt-1.5 pb-0.5" : size === "md" ? "px-2.5 pt-3.5 pb-2" : "px-2 pt-3 pb-1.5";
 
+  // `relative` só quando quem chama não posiciona a etiqueta: `relative` e
+  // `absolute` na mesma string são decididos pela ordem no CSS gerado, e o
+  // `relative` vencia — a etiqueta do card saía do `inset` e crescia com a
+  // imagem. Os dois servem de referência para a faixa `absolute` de dentro.
+  const position = /\b(absolute|fixed)\b/.test(className) ? "" : "relative";
+
   return (
     <div
       aria-hidden="true"
-      className={`relative flex overflow-hidden rounded-sm bg-cart-label shadow-[0_2px_0_rgb(0_0_0/0.35)] ${padding} ${className}`}
+      className={`${position} flex overflow-hidden rounded-sm bg-cart-label shadow-[0_2px_0_rgb(0_0_0/0.35)] ${padding} ${className}`}
     >
       <div className={`absolute inset-x-0 top-0 ${stripe}`} style={{ background: accent }} />
       {showImage ? (
