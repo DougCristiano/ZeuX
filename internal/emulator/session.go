@@ -139,6 +139,21 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 	// nada nem tocar o sistema de arquivos").
 	options := input.Options
 	configUnapplied, persisted := l.applyPreset(ctx, adapter, install, options)
+
+	// Jogador 1 sem bind nenhum (nem teclado) é o estado que o seed antigo do
+	// ZeuX deixava no PCSX2 e no DuckStation — o jogo abriria sem responder a
+	// nada. Consertar aqui não passa por cima de escolha do usuário
+	// (NeedsControllerPreset só diz sim quando não há escolha nenhuma), e
+	// falhar em gravar não impede o jogo de abrir.
+	if NeedsControllerPreset(adapter.ID(), install) {
+		if err := ApplyControllerPreset(adapter.ID(), install); err != nil {
+			l.logger.Warn("não foi possível gravar o mapeamento padrão de controle",
+				"emulador", adapter.Name(), "erro", err)
+		} else {
+			l.logger.Info("mapeamento padrão de controle gravado (jogador 1 estava vazio)",
+				"emulador", adapter.Name())
+		}
+	}
 	if persisted {
 		// O arquivo de configuração passou a carregar estas duas opções, então
 		// pedi-las de novo na linha de comando só produziria uma segunda

@@ -382,6 +382,10 @@ export const api = {
   // (hoje só RPCS3). Responde quando o emulador abre.
   installFirmware: (adapterId: string, path: string) =>
     postJSON<{ started: boolean }>(`/emulators/${encodeURIComponent(adapterId)}/firmware`, { path }),
+  // Grava o mapeamento padrão de controle do ZeuX no jogador 1 (só emulador
+  // com `controller_support: "preset"`).
+  applyControllerPreset: (adapterId: string) =>
+    postJSON<{ applied: boolean }>(`/emulators/${encodeURIComponent(adapterId)}/controller-preset`, {}),
   getScrapeJob: (id: string) => request<ScrapeJob>(`/scrape-jobs/${encodeURIComponent(id)}`),
   // Só ano/resumo/gêneros/desenvolvedora de um jogo, sem tocar na capa
   // (2026-09-29). Devolve um job acompanhado por getScrapeJob.

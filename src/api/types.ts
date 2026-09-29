@@ -239,6 +239,16 @@ export type EmulatorEntry = {
   firmware_installed?: boolean;
   /** O ZeuX sabe entregar o arquivo de firmware ao instalador do emulador. */
   firmware_installable?: boolean;
+  /**
+   * (2026-09-29) O que falta para o controle funcionar neste emulador:
+   * `"auto"` — reconhece sozinho; `"preset"` — o ZeuX sabe gravar um
+   * mapeamento padrão (POST .../controller-preset); `"manual"` — só dentro do
+   * próprio emulador. Ausente em emulador personalizado ou não instalado.
+   */
+  controller_support?: "auto" | "preset" | "manual";
+  /** Só com `controller_support: "preset"`: o jogador 1 já tem controle
+   * mapeado. Ausente quando o arquivo não pôde ser lido. */
+  controller_preset_applied?: boolean;
   /** H1/H2, docs/roadmap.md — diz se GET/POST/DELETE .../config existe de
    * verdade para este emulador (hoje só PCSX2 e RetroArch). */
   configurable: boolean;

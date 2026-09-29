@@ -220,7 +220,9 @@ type KeyBindableAdapter interface {
 // sozinho — PCSX2 e RetroArch resolvem isso cada um do seu jeito
 // (SDL_GameController posicional e autoconfig por vendor/product,
 // respectivamente), e os dois já são robustos o bastante para qualquer
-// marca de controle sem o ZeuX precisar traduzir nada.
+// marca de controle sem o ZeuX precisar traduzir nada. (Desde 2026-09-29 o
+// ZeuX também grava um mapeamento padrão no PCSX2 — ver
+// controller_preset.go; esta interface continua só lendo.)
 type NativeControllerAdapter interface {
 	ControllerConfigured(install Installation) (bool, error)
 }

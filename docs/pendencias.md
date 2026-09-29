@@ -809,6 +809,46 @@ rodada:
 
 **Depende de:** nada · **Bloqueia:** nada
 
+## Pré-configuração por emulador — o que ainda dá para tirar das mãos do usuário
+
+**Origem:** levantamento de 2026-09-29 (pedido do Douglas: "para o usuário
+mexer o mínimo possível em cada emulador"), lendo o código-fonte de cada um.
+O controle já foi feito — ver `decisoes.md`, "Controle pré-configurado por
+emulador". O que sobrou, em ordem de ganho para o usuário:
+
+- [ ] **xemu: arquivos de sistema pela tela do console.** O xemu não abre
+      sem BIOS, MCPX e HD (`[sys.files]` `bootrom_path`, `flashrom_path`,
+      `eeprom_path`, `hdd_path` em `xemu.toml`, lido em
+      `config_spec.yml`). Um seletor de arquivo por item, como o firmware do
+      PS3, gravaria esses caminhos — o usuário hoje precisa achar o menu
+      certo dentro do xemu. O ZeuX só grava o caminho que o usuário escolheu;
+      nunca sugere de onde tirar os arquivos (princípio 6).
+- [ ] **Seeds que gravam no lugar errado (inofensivos, mas inúteis).**
+      `seedXemu` escreve chaves em `[general]` que o xemu não lê;
+      `seedRPCS3` cria `config.yml` na pasta da instalação, mas no Windows o
+      RPCS3 lê `config/` e no Linux `~/.config/rpcs3` (achado junto do
+      firmware do PS3); o caminho do `Dolphin.ini` de `seedDolphin` nunca foi
+      conferido contra o binário. Corrigir ou apagar cada um, com o mesmo
+      método de snapshot que resolveu o PCSX2 em 2026-09-11.
+- [ ] **Dolphin no Windows: controle XInput por posição.** O dispositivo
+      `XInput/0/Gamepad` não carrega nome de produto, então um
+      `GCPadNew.ini` padrão serviria para qualquer controle Xbox — falta ler
+      os nomes exatos de cada entrada no código do Dolphin e conferir com um
+      controle real antes de virar "padrão do ZeuX".
+- [ ] **melonDS e Azahar:** o formato de bind de controle não foi lido.
+      Hoje aparecem como "configure no emulador" por falta de verificação,
+      não por impossibilidade.
+- [ ] **RMG:** tem tipo de dispositivo "Automatic", mas o perfil ausente
+      deixa o jogador desligado (`PluggedIn = false`). Dá para investigar se
+      um perfil mínimo com "Automatic" basta.
+- [ ] **DuckStation instalado pelo próprio usuário:** fica como "configure no
+      emulador" porque a pasta de dados dele varia entre versões e sistemas.
+      Só vale mexer se aparecer pedido real.
+
+**Depende de:** nada · **Bloqueia:** nada
+
+---
+
 ## Manifesto de cores do RetroArch: decisão de escopo em aberto
 
 Não é uma feature faltando — é uma escolha de arquitetura ainda não tomada.

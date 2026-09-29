@@ -15,8 +15,11 @@ import (
 // travar a entrada do usuário — o diferencial de "plug and play" do ZeuX.
 //
 // Isto NÃO é fingir que configuramos o emulador: só a chave que suprime o
-// assistente é gravada. Vídeo, controle e BIOS continuam por conta do próprio
-// emulador, preenchidos com os defaults dele no primeiro uso real.
+// assistente é gravada. Vídeo e BIOS continuam por conta do próprio
+// emulador, preenchidos com os defaults dele no primeiro uso real. A exceção
+// é o controle do PCSX2 e do DuckStation (2026-09-29): com o arquivo semeado
+// eles deixam de aplicar os padrões de controle deles, então o seed leva o
+// [Pad1] junto — ver emulator.ControllerPresetSeed.
 //
 // Mapeados (D8):
 // - DuckStation (modo portátil + settings.ini)
@@ -104,7 +107,13 @@ func seedDuckStationPortable(installDir string) error {
 		return nil
 	}
 
-	const seed = "[Main]\nSetupWizardIncomplete = false\nNoDesktopFile = true\n"
+	// O [Pad1] vai junto (2026-09-29): com o settings.ini já existindo, o
+	// DuckStation não aplica os padrões dele e o jogador 1 ficava sem bind
+	// nenhum — nem teclado. Ver ControllerPresetSeed.
+	seed := "[Main]\nSetupWizardIncomplete = false\nNoDesktopFile = true\n"
+	if pad, ok := emulator.ControllerPresetSeed("duckstation"); ok {
+		seed += "\n" + pad
+	}
 	if err := os.WriteFile(settingsPath, []byte(seed), 0o644); err != nil {
 		return fmt.Errorf("criando settings.ini: %w", err)
 	}
@@ -211,7 +220,14 @@ func seedPCSX2() error {
 		return fmt.Errorf("criando a pasta de configuração do PCSX2: %w", err)
 	}
 
-	const seed = "[UI]\nSettingsVersion = 1\nSetupWizardIncomplete = false\n"
+	// O [Pad1] vai junto (2026-09-29): com "SettingsVersion" presente o
+	// PCSX2 considera o arquivo válido e não aplica o mapeamento padrão dele
+	// — sem esta seção o jogador 1 ficava sem bind nenhum, nem teclado. Ver
+	// ControllerPresetSeed.
+	seed := "[UI]\nSettingsVersion = 1\nSetupWizardIncomplete = false\n"
+	if pad, ok := emulator.ControllerPresetSeed("pcsx2"); ok {
+		seed += "\n" + pad
+	}
 	if err := os.WriteFile(iniPath, []byte(seed), 0o644); err != nil {
 		return fmt.Errorf("criando %s: %w", iniPath, err)
 	}

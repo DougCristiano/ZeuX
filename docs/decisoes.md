@@ -1298,6 +1298,77 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### Controle pré-configurado por emulador: "sozinho", "padrão do ZeuX" ou "dentro do emulador" — 2026-09-29
+
+Pedido do Douglas depois de um usuário instalar o RPCS3: a configuração de
+controle só aparecia para RetroArch e PCSX2, e ele queria "ver tudo que
+podemos pré-configurar em cada emulador, para o usuário mexer o mínimo
+possível". A resposta foi lida no código-fonte de cada emulador
+(raw.githubusercontent.com), não em documentação nem em palpite, e virou um
+campo por emulador em `GET /emulators` (`controller_support`,
+`internal/emulator/controller_preset.go`):
+
+| Emulador | Resposta | Por quê (no código dele) |
+|---|---|---|
+| RetroArch | sozinho | autoconfig por vendor/product |
+| PPSSPP | sozinho | `RestoreDefault` já mapeia XInput e controle genérico |
+| Flycast | sozinho | `DefaultInputMapping` monta o mapa a partir do `SDL_GameController` |
+| xemu | sozinho | `input.auto_bind` ligado por padrão |
+| Vita3K | sozinho | abre os controles SDL que encontrar |
+| Xenia | sozinho | `hid = "any"` (XInput no Windows) |
+| PCSX2 | padrão do ZeuX | bind posicional `SDL-0/FaceSouth` (confirmado com controle real em 2026-09-08) |
+| DuckStation | padrão do ZeuX, só instalado pelo ZeuX | mesmo formato posicional; só o `settings.ini` portátil tem lugar conhecido |
+| RPCS3 | padrão do ZeuX só no Windows | handler XInput nomeia o aparelho por posição (`XInput Pad #1`); no SDL o nome inclui o produto |
+| Dolphin, RMG, Cemu | dentro do emulador | o bind carrega o nome/GUID do aparelho — não há texto genérico |
+| melonDS, Azahar | dentro do emulador | formato não lido ainda (ver pendências) |
+
+**O padrão do ZeuX liga controle E teclado.** PCSX2 e DuckStation guardam
+vários binds por ação repetindo a chave no INI (`AddToStringList` /
+`GetStringList` nos dois; o leitor do DuckStation agrupa as repetições).
+Cada ação recebe o botão do primeiro controle e a tecla que o próprio
+emulador usaria por padrão — as tabelas vêm de `MapController` +
+`GetKeyboardGenericBindingMapping` de cada um, e **não são iguais**: o
+DuckStation escreve `Keyboard/UpArrow` e `Keyboard/Enter`, o PCSX2
+`Keyboard/Up` e `Keyboard/Return`; os botões de face do DuckStation são
+`A/B/X/Y` mesmo com controle de PlayStation (a tabela que ele lê do arquivo
+é sempre a posicional do Xbox). Copiar a tabela de um para o outro deixaria
+metade do teclado mudo. O formato do DuckStation **não** foi conferido com
+controle físico — é leitura de código.
+
+**Achado que motivou consertar ao abrir o jogo:** o seed antigo do ZeuX
+(`seedPCSX2` com `SettingsVersion = 1`; `seedDuckStationPortable` criando o
+`settings.ini`) fazia os dois emuladores acharem um arquivo válido e **não**
+aplicarem os padrões deles — o jogador 1 ficava sem bind nenhum, nem
+teclado. Instalação nova agora já nasce com o `[Pad1]`
+(`emulator.ControllerPresetSeed`, sem passar por backup, para o "restaurar"
+não voltar a um arquivo sem controle). Para quem já instalou,
+`Launcher.Launch` grava o padrão antes de abrir o jogo quando
+`NeedsControllerPreset` diz que o jogador 1 não tem bind **nenhum** — o
+único estado em que não existe escolha do usuário a preservar.
+
+**RPCS3 só a pedido, e só em arquivo vazio.** O `pad_thread` carrega o
+`Default.yml`, aplica os padrões do handler escolhido (`init_config`) e
+carrega o arquivo de novo por cima — então gravar só `Handler: XInput` e
+`Device: XInput Pad #1` já dá o mapeamento XInput completo. Mas é um
+handler por jogador: ligar o controle desliga o teclado do jogador 1, e por
+isso a tela confirma antes. Um `Default.yml` que já existe não é editado
+(YAML aninhado, com o mapeamento do handler anterior em `Config:` — trocar
+só o `Handler` misturaria nomes de tecla com o XInput).
+
+**Interface:** "Configurar controle" e Configurações listam todo emulador
+instalado com o que falta nele ("reconhece sozinho", "falta mapear" com o
+botão "Aplicar mapeamento padrão", "configure no emulador" com o botão para
+abri-lo). Substituiu o passo guiado de 2026-09-08, que só existia para PCSX2
+e RetroArch. A sequência botão a botão continua, agora como "Layout
+personalizado", e deixa de fora quem é "preset": o índice cru da Gamepad API
+só o RetroArch grava, e no PCSX2 ela produzia 16 ressalvas.
+
+**O que quebra se desfizer:** tirar o `[Pad1]` do seed volta o PCSX2 e o
+DuckStation instalados pelo ZeuX a abrir sem controle nem teclado; trocar a
+tabela de um emulador pela do outro deixa teclas mudas; editar um
+`Default.yml` existente do RPCS3 pode deixar o jogador 1 sem entrada
+nenhuma.
+
 ### Firmware do PS3 instalado pelo próprio RPCS3, a partir da tela do console — 2026-09-29
 
 Relato do Douglas: um usuário instalou o RPCS3 e não havia botão para levar

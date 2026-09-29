@@ -9,22 +9,13 @@ import { useT } from "../i18n/i18n";
 import { dict } from "./SettingsScreen.i18n";
 import { FirstVisitTip } from "../components/FirstVisitTip";
 import { resetHints } from "../lib/hints";
-import { Badge, Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, FILTER_CHIP_BASE, FILTER_CHIP_OFF, FILTER_CHIP_ON, FOCUS_RING, InlineError, inputClass, ScreenAtmosphere, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
+import { Button, Card, CHROME_TINT_DANGER, ConfirmModal, EmptyState, FILTER_CHIP_BASE, FILTER_CHIP_OFF, FILTER_CHIP_ON, FOCUS_RING, InlineError, inputClass, ScreenAtmosphere, ScreenContainer, ScreenHeader, SectionHeading, Toast } from "../components/ui";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { EmulatorControllerList } from "../components/EmulatorControllerList";
 import { useToast } from "../hooks/useToast";
 import { useGamepad } from "../hooks/useGamepad";
 import { useVisualEffects } from "../hooks/useVisualEffects";
-
-// Instruções fixas por adapter (2026-09-08) — passos reais confirmados
-// mapeando um controle físico de verdade dentro de cada emulador. Não vem
-// do backend: é texto de UI, não protocolo, e cada app tem seu próprio
-// menu — um mapa aqui é mais simples que inventar uma abstração de "passo"
-// genérica para dois casos.
-const GUIDED_SETUP_INSTRUCTION_KEYS: Record<string, keyof typeof dict> = {
-  pcsx2: "guidedSetupInstructionsPcsx2",
-  retroarch: "guidedSetupInstructionsRetroarch",
-};
 
 // `configured` de GET /igdb/credentials nem sempre é `true` (achado real,
 // 2026-09-08): a credencial de teste embutida só existe em builds oficiais
@@ -114,12 +105,14 @@ export function SettingsScreen({
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
   const [expandedAdapterId, setExpandedAdapterId] = useState<string | null>(null);
 
-  useEffect(() => {
+  function reloadEmulators() {
     api
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
       .catch(() => setEmulators([]));
-  }, []);
+  }
+
+  useEffect(reloadEmulators, []);
 
   useEffect(() => {
     api
@@ -463,27 +456,18 @@ export function SettingsScreen({
 
           {emulators === null && <p className="text-sm text-muted">{t("loadingEmulatorsForControllers")}</p>}
 
-          {emulators !== null &&
-            (() => {
-              const checkable = emulators.filter((e) => e.installed && e.controller_check);
-              if (checkable.length > 0) {
-                return (
-                  <div className="mb-6">
-                    {/* Redesenho arcade/CRT (2026-09-09): subtítulo de bloco no mesmo
-                vocabulário de kicker monoespaçado do resto do app, no lugar do
-                `text-primary` (roxo reservado a ação). */}
-            <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("guidedSetupHeading")}</h3>
-                    <GamepadStatusLine />
-                    <div className="mt-3 flex flex-col gap-3">
-                      {checkable.map((emulator) => (
-                        <GuidedControllerSetupStep key={emulator.adapter_id} emulator={emulator} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
+          {/* Um emulador por linha, com o que falta para o controle funcionar
+              nele (2026-09-29). Substituiu o "passo guiado" que só existia para
+              PCSX2 e RetroArch — os outros emuladores sumiam desta tela. */}
+          {emulators !== null && (
+            <div className="mb-6">
+              <h3 className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">{t("guidedSetupHeading")}</h3>
+              <GamepadStatusLine />
+              <div className="mt-3">
+                <EmulatorControllerList emulators={emulators} onChanged={reloadEmulators} />
+              </div>
+            </div>
+          )}
 
           {emulators !== null &&
             (() => {
@@ -636,69 +620,5 @@ function GamepadStatusLine() {
     <p className="text-sm text-muted">
       {gamepad.connected ? t("guidedSetupDetectedController", { name: gamepad.name ?? "" }) : t("guidedSetupNoController")}
     </p>
-  );
-}
-
-type VerifyState = { kind: "idle" } | { kind: "checking" } | { kind: "done"; configured: boolean } | { kind: "error"; message: string };
-
-/**
- * Um passo do fluxo guiado "Configurar controle" (2026-09-08): abre o
- * emulador real, mostra a instrução fixa daquele app, e confirma lendo o
- * arquivo dele via GET .../controller-status — o ZeuX nunca escreve o bind
- * de botão físico sozinho, cada emulador resolve isso do jeito nativo dele.
- */
-function GuidedControllerSetupStep({ emulator }: { emulator: EmulatorEntry }) {
-  const t = useT(dict);
-  const [opening, setOpening] = useState(false);
-  const [openError, setOpenError] = useState<string | null>(null);
-  const [verify, setVerify] = useState<VerifyState>({ kind: "idle" });
-
-  const instructionKey = GUIDED_SETUP_INSTRUCTION_KEYS[emulator.adapter_id];
-
-  async function openEmulator() {
-    setOpening(true);
-    setOpenError(null);
-    try {
-      await api.openEmulator(emulator.adapter_id);
-    } catch (err) {
-      setOpenError(
-        err instanceof ApiError ? err.message : t("guidedSetupOpenError", { emulator: emulator.name }),
-      );
-    } finally {
-      setOpening(false);
-    }
-  }
-
-  async function verifyStatus() {
-    setVerify({ kind: "checking" });
-    try {
-      const { configured } = await api.getControllerStatus(emulator.adapter_id);
-      setVerify({ kind: "done", configured });
-    } catch (err) {
-      setVerify({ kind: "error", message: err instanceof ApiError ? err.message : t("guidedSetupCheckError") });
-    }
-  }
-
-  return (
-    <Card filled dense>
-      <p className="mb-2 font-semibold text-ink">{emulator.name}</p>
-      {instructionKey && <p className="mb-3 text-sm text-muted">{t(instructionKey)}</p>}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="chrome" disabled={opening} onClick={openEmulator}>
-          {opening ? t("guidedSetupOpening") : t("guidedSetupOpenButton", { emulator: emulator.name })}
-        </Button>
-        <Button variant="chrome" disabled={verify.kind === "checking"} onClick={verifyStatus}>
-          {verify.kind === "checking" ? t("guidedSetupVerifying") : t("guidedSetupVerifyButton")}
-        </Button>
-        {verify.kind === "done" &&
-          (verify.configured ? (
-            <Badge variant="solid">{t("guidedSetupConfigured")}</Badge>
-          ) : (
-            <Badge variant="warn">{t("guidedSetupNotConfiguredYet")}</Badge>
-          ))}
-      </div>
-      {openError && <InlineError>{openError}</InlineError>}
-      {verify.kind === "error" && <InlineError>{verify.message}</InlineError>}
-    </Card>
   );
 }

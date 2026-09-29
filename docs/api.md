@@ -93,6 +93,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `GET/POST /emulators/{id}/bindings` | Mapeamento de tecla/botão por emulador. `400 not_bindable` para adapter sem suporte. |
 | `GET /controllers` | Lista os perfis de controle conhecidos (ex. `xbox`, `dualshock`) — não é lista de hardware conectado fisicamente. |
 | `GET/POST /emulators/{id}/controller-profile` | Perfil de controle aplicado a um emulador. `POST` com `profile_id` desconhecido: `400 unknown_controller_profile`. |
+| `POST /emulators/{id}/controller-preset` | (2026-09-29) Grava o mapeamento padrão de controle do ZeuX no jogador 1 do emulador — só para quem `GET /emulators` marca com `controller_support: "preset"` (PCSX2; DuckStation instalado pelo ZeuX; RPCS3 no Windows). PCSX2 e DuckStation recebem controle (`SDL-0/...`) **e** teclado em cada ação, com backup do arquivo antes da primeira escrita; o RPCS3 recebe `Handler: XInput` no `Default.yml` e só quando o arquivo ainda não existe. Responde `200 {"applied": true}`. Emulador desconhecido, não instalado, sem preset ou com configuração que o ZeuX não edita: `400 controller_preset_failed`. `GET /emulators` traz `controller_support` (`auto`/`preset`/`manual`, ausente em emulador personalizado) e, para `preset`, `controller_preset_applied`. |
 | `GET /emulators/{id}/controller-status` | `{"configured": bool}` — diz se este emulador já tem, agora, algum mapeamento de controle físico salvo no seu próprio mecanismo nativo (PCSX2: bind `SDL-` no Pad1; RetroArch: algum `.cfg` em `autoconfig/`). Não escreve nada; usado pela tela guiada "Configurar controle" para confirmar que o passo dentro do próprio emulador funcionou. Adapter sem suporte: `400 controller_check_unsupported`. |
 
 ## 6. Instalação: acompanhamento de job
@@ -155,6 +156,7 @@ formato próprio do ZeuX) — o ZeuX lê/edita a config nativa.
 | `save_data_read_failed` | 500 | `GET /emulators/{id}/save-data` não conseguiu ler o diretório de save (permissão, I/O). |
 | `not_save_data_configurable`, `save_data_write_failed` | 400/500 | `POST /emulators/{id}/save-data`: adapter sem essa capacidade, ou escrita/criação de pasta falhou. |
 | `not_configurable`, `not_bindable`, `controller_check_unsupported` | 400 | Emulador sem suporte a config/bindings/checagem de controle pelo ZeuX. |
+| `controller_preset_failed`, `firmware_install_failed` | 400 | Mapeamento padrão de controle ou instalação de firmware recusados — a mensagem diz o que fazer dentro do emulador. |
 | `config_restore_failed`, `config_read_failed`, `config_write_failed` | 400/500 | Config de emulador (leitura, escrita, restauração de backup). |
 | `unknown_controller_profile` | 400 | `profile_id` não reconhecido. |
 | `install_refused`, `core_install_refused`, `uninstall_failed`, `cancel_failed` | 400 | Fluxo de instalação/desinstalação de emulador ou core. |

@@ -87,35 +87,13 @@ export const dict = {
     en: "No installed emulator accepts controller mapping yet (today: PCSX2 and RetroArch). Navigating ZeuX doesn't depend on it.",
   },
 
-  // Configurar controle — fluxo guiado (2026-09-08): um passo por emulador,
-  // que abre o app real e confirma lendo o arquivo dele depois. O ZeuX
-  // nunca escreve o bind de botão físico sozinho — cada emulador resolve
-  // isso do seu jeito nativo (PCSX2: SDL posicional; RetroArch: autoconfig
-  // por vendor/product).
-  guidedSetupHeading: { "pt-BR": "Configurar controle", en: "Set up controller" },
+  // Controle em cada emulador (2026-09-29): a lista de EmulatorControllerList
+  // substituiu o passo guiado de 2026-09-08, que só cobria PCSX2 e RetroArch.
+  guidedSetupHeading: { "pt-BR": "Em cada emulador", en: "In each emulator" },
   guidedSetupDetectedController: { "pt-BR": "Controle detectado: {{name}}", en: "Detected controller: {{name}}" },
   guidedSetupNoController: {
     "pt-BR": "Nenhum controle detectado ainda — conecte um e aperte qualquer botão.",
     en: "No controller detected yet — connect one and press any button.",
-  },
-  guidedSetupOpenButton: { "pt-BR": "Abrir {{emulator}}", en: "Open {{emulator}}" },
-  guidedSetupOpening: { "pt-BR": "Abrindo…", en: "Opening…" },
-  guidedSetupOpenError: { "pt-BR": "Não foi possível abrir o {{emulator}}.", en: "Could not open {{emulator}}." },
-  guidedSetupVerifyButton: { "pt-BR": "Concluído, verificar", en: "Done, verify" },
-  guidedSetupVerifying: { "pt-BR": "Verificando…", en: "Verifying…" },
-  guidedSetupCheckError: { "pt-BR": "Não foi possível verificar agora.", en: "Could not check right now." },
-  guidedSetupConfigured: { "pt-BR": "Configurado", en: "Configured" },
-  guidedSetupNotConfiguredYet: {
-    "pt-BR": "Ainda não detectamos — siga os passos acima e verifique de novo.",
-    en: "Not detected yet — follow the steps above and check again.",
-  },
-  guidedSetupInstructionsPcsx2: {
-    "pt-BR": "Configurações → Controladores → Pad1: aperte cada botão do vocabulário do PCSX2 (Up, Cross, Triangle...) com o seu controle físico, sem criar um perfil de entrada separado.",
-    en: "Settings → Controllers → Pad1: press each PCSX2 action (Up, Cross, Triangle...) with your physical controller, without creating a separate input profile.",
-  },
-  guidedSetupInstructionsRetroarch: {
-    "pt-BR": "Configurações → Entrada → Porta 1 → Configurar: aperte cada botão pedido com o seu controle físico e, ao final, escolha \"Salvar perfil de controle\".",
-    en: "Settings → Input → Port 1 Controls → Configure: press each requested button with your physical controller, and at the end choose \"Save Controller Profile\".",
   },
 
   // Mapeamento manual (avançado) — o painel de teclado/botão por ação que

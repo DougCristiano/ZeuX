@@ -146,3 +146,60 @@ func (f *iniFile) bytes() []byte {
 	}
 	return buf.Bytes()
 }
+
+// getAll devolve todos os valores de section/key, na ordem do arquivo.
+// Existe porque PCSX2 e DuckStation guardam mais de um bind para a mesma ação
+// repetindo a chave (é assim que "controle E teclado" convivem no Pad1 —
+// AddToStringList/GetStringList no código dos dois), e `get` só enxerga a
+// primeira linha.
+func (f *iniFile) getAll(section, key string) []string {
+	var values []string
+	for _, line := range f.lines {
+		if line.section == section && line.key == key {
+			idx := strings.Index(line.raw, "=")
+			values = append(values, strings.TrimSpace(line.raw[idx+1:]))
+		}
+	}
+	return values
+}
+
+// setAll troca todos os valores de section/key por values, uma linha por
+// valor, no lugar da primeira ocorrência (ou onde `set` poria uma chave
+// nova). As linhas ficam juntas de propósito: o leitor do DuckStation agrupa
+// chaves repetidas, e mantê-las lado a lado é também o que os próprios
+// emuladores gravam. values vazio só apaga a chave.
+func (f *iniFile) setAll(section, key string, values []string) {
+	first := -1
+	kept := f.lines[:0:0]
+	for _, line := range f.lines {
+		if line.section == section && line.key == key {
+			if first == -1 {
+				first = len(kept)
+			}
+			continue
+		}
+		kept = append(kept, line)
+	}
+	f.lines = kept
+
+	if len(values) == 0 {
+		return
+	}
+
+	if first == -1 {
+		f.set(section, key, values[0])
+		for i, line := range f.lines {
+			if line.section == section && line.key == key {
+				first = i + 1
+				break
+			}
+		}
+		values = values[1:]
+	}
+
+	extra := make([]iniLine, 0, len(values))
+	for _, v := range values {
+		extra = append(extra, iniLine{raw: fmt.Sprintf("%s = %s", key, v), section: section, key: key})
+	}
+	f.lines = append(f.lines[:first], append(extra, f.lines[first:]...)...)
+}

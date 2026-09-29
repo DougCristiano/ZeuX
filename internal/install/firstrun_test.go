@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -29,8 +30,16 @@ func TestSeedDuckStationPortableWritesWizardSkip(t *testing.T) {
 	}
 
 	want := "[Main]\nSetupWizardIncomplete = false\nNoDesktopFile = true\n"
-	if string(got) != want {
-		t.Errorf("settings.ini = %q, want %q", got, want)
+	if !strings.HasPrefix(string(got), want) {
+		t.Errorf("settings.ini = %q, want prefixo %q", got, want)
+	}
+	// O jogador 1 nasce com controle E teclado: sem [Pad1] o DuckStation,
+	// que não aplica os padrões dele quando o arquivo já existe, abria sem
+	// bind nenhum.
+	for _, line := range []string{"Cross = SDL-0/A\n", "Cross = Keyboard/K\n"} {
+		if !strings.Contains(string(got), line) {
+			t.Errorf("settings.ini sem %q:\n%s", line, got)
+		}
 	}
 }
 
@@ -195,8 +204,15 @@ func TestSeedPCSX2WritesWizardSkip(t *testing.T) {
 	}
 
 	want := "[UI]\nSettingsVersion = 1\nSetupWizardIncomplete = false\n"
-	if string(got) != want {
-		t.Errorf("PCSX2.ini = %q, want %q", got, want)
+	if !strings.HasPrefix(string(got), want) {
+		t.Errorf("PCSX2.ini = %q, want prefixo %q", got, want)
+	}
+	// Mesma regra do DuckStation: com SettingsVersion presente o PCSX2 não
+	// aplica os padrões dele, então o [Pad1] precisa nascer aqui.
+	for _, line := range []string{"Cross = SDL-0/FaceSouth\n", "Cross = Keyboard/K\n"} {
+		if !strings.Contains(string(got), line) {
+			t.Errorf("PCSX2.ini sem %q:\n%s", line, got)
+		}
 	}
 }
 

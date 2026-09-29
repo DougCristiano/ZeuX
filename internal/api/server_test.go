@@ -642,3 +642,18 @@ func TestPostConsentWithInvalidBodyReturns400(t *testing.T) {
 		t.Fatalf("code = %q, esperado invalid_body", code)
 	}
 }
+
+// Trava que o mapeamento padrão de controle é erro do usuário (400, com
+// code estável), não 500, quando o emulador não existe ou não está
+// instalado — mesma convenção de handleOpenEmulator.
+func TestControllerPresetUnknownEmulatorReturns400(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/api/v1/emulators/nao-existe/controller-preset", nil)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, esperado 400", rec.Code)
+	}
+	if code := errorCode(decodeBody(t, rec)); code != "controller_preset_failed" {
+		t.Fatalf("code = %q, esperado controller_preset_failed", code)
+	}
+}

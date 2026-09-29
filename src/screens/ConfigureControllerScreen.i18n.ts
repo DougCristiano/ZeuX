@@ -30,10 +30,16 @@ export const dict = {
   },
   testAllButtons: { "pt-BR": "Testar todos os botões", en: "Test every button" },
   emulatorsHeading: { "pt-BR": "Nos emuladores", en: "In the emulators" },
+  emulatorsStatusIntro: {
+    "pt-BR":
+      "O que cada emulador instalado precisa para o controle funcionar. Quase sempre é nada, ou um clique.",
+    en: "What each installed emulator needs for the controller to work. Usually nothing, or one click.",
+  },
+  customHeading: { "pt-BR": "Layout personalizado", en: "Custom layout" },
   emulatorsIntro: {
     "pt-BR":
-      "Opcional. Aperte cada botão do controle uma vez e o ZeuX aplica o mesmo mapeamento em todos os emuladores instalados que aceitam isso.",
-    en: "Optional. Press each controller button once and ZeuX applies the same mapping to every installed emulator that accepts it.",
+      "Opcional, para quem quer os botões em outro lugar. Aperte cada botão do controle uma vez e o ZeuX grava o mesmo layout nos emuladores que aceitam isso (hoje, o RetroArch).",
+    en: "Optional, for anyone who wants buttons somewhere else. Press each controller button once and ZeuX writes the same layout to the emulators that accept it (today, RetroArch).",
   },
   back: { "pt-BR": "Voltar", en: "Back" },
   noController: {
@@ -62,9 +68,10 @@ export const dict = {
   },
   noBindableEmulators: {
     "pt-BR":
-      "Nenhum emulador instalado aceita mapeamento pelo ZeuX ainda (hoje: PCSX2 e RetroArch). Isso não afeta o ZeuX — quando instalar um deles, volte aqui para levar o mapeamento.",
-    en: "No installed emulator accepts mapping through ZeuX yet (today: PCSX2 and RetroArch). That doesn't affect ZeuX — once you install one, come back here to carry the mapping over.",
+      "Nenhum emulador instalado aceita layout personalizado pelo ZeuX ainda (hoje: RetroArch). Isso não afeta o mapeamento padrão acima.",
+    en: "No installed emulator accepts a custom layout through ZeuX yet (today: RetroArch). This doesn't affect the default mapping above.",
   },
+
   perAdapterNotesHeading: { "pt-BR": "Ressalvas por emulador", en: "Per-emulator notes" },
   // Nota registrada quando a própria chamada da API falha. Fica ao lado das
   // ressalvas do backend porque, para quem lê, as duas respondem a mesma

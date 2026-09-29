@@ -144,6 +144,7 @@ func (s *Server) Routes() http.Handler {
 	// Launcher.LaunchStandalone, internal/emulator/session.go.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/open", s.handleOpenEmulator)
 	mux.HandleFunc("POST /api/v1/emulators/{id}/firmware", s.handleInstallFirmware)
+	mux.HandleFunc("POST /api/v1/emulators/{id}/controller-preset", s.handleApplyControllerPreset)
 	mux.HandleFunc("POST /api/v1/system/vcredist/install", s.handleInstallVCRedist)
 	// Trilho guiado de instalação manual (2026-09-09): cria (se ainda não
 	// existir) a pasta onde o findBinary procura este emulador e devolve o
@@ -635,6 +636,18 @@ func (s *Server) handleInstallFirmware(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"started": true})
+}
+
+// handleApplyControllerPreset grava o mapeamento padrão de controle do ZeuX
+// no jogador 1 do emulador (emulator.ApplyControllerPreset). 400 quando o
+// emulador não é "preset" ou já tem configuração que o ZeuX não edita — em
+// ambos os casos a mensagem diz o que fazer dentro do emulador.
+func (s *Server) handleApplyControllerPreset(w http.ResponseWriter, r *http.Request) {
+	if err := s.launcher.ApplyControllerPreset(r.Context(), r.PathValue("id")); err != nil {
+		s.writeError(w, http.StatusBadRequest, "controller_preset_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"applied": true})
 }
 
 // handleOpenEmulator abre o executável do emulador sozinho — sem jogo, sem

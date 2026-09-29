@@ -171,6 +171,16 @@ type Status struct {
 	// ao instalador deste emulador (POST /emulators/{id}/firmware).
 	FirmwareInstallable bool `json:"firmware_installable,omitempty"`
 
+	// ControllerSupport diz o que falta para o controle funcionar neste
+	// emulador — "auto", "preset" ou "manual" (controller_preset.go). Ausente
+	// em emulador personalizado: o ZeuX não sabe o que ele é.
+	ControllerSupport ControllerSupport `json:"controller_support,omitempty"`
+
+	// ControllerPresetApplied só existe quando ControllerSupport é "preset" e
+	// o arquivo do emulador pôde ser lido: true quando o jogador 1 já tem um
+	// controle físico mapeado (pelo ZeuX ou pelo usuário).
+	ControllerPresetApplied *bool `json:"controller_preset_applied,omitempty"`
+
 	// Configurable/Bindable (H1/H3/H4, docs/roadmap.md) dizem se este
 	// adapter satisfaz ConfigurableAdapter/KeyBindableAdapter — a interface
 	// usa isso para mostrar ou esconder os botões de configurar/mapear sem
@@ -247,6 +257,15 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 				status.FirmwareInstalled = &installed
 			}
 			status.FirmwareInstallable = FirmwareInstallable(adapter.ID())
+
+			if support, ok := ControllerSupportFor(adapter.ID(), install); ok {
+				status.ControllerSupport = support
+				if support == ControllerSupportPreset {
+					if applied, known := ControllerPresetApplied(adapter.ID(), install); known {
+						status.ControllerPresetApplied = &applied
+					}
+				}
+			}
 
 			if dir, ok := BiosDir(adapter.ID(), install); ok {
 				status.BiosDir = dir

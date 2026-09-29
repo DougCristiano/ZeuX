@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { EmulatorEntry } from "../api/types";
+import { EmulatorControllerList } from "../components/EmulatorControllerList";
 import { PixelController } from "../components/PixelController";
 import { Button, Callout, Card, FILTER_CHIP_BASE, FILTER_CHIP_OFF, FILTER_CHIP_ON, FOCUS_RING, ScreenContainer, ScreenHeader, SectionHeading } from "../components/ui";
 import { getConfirmButton, setConfirmButton, type ConfirmButton } from "../lib/gamepadPrefs";
@@ -28,6 +29,17 @@ interface AdapterNote {
 type Phase = "idle" | "running" | "done";
 
 /**
+ * Quem recebe a sequência botão a botão. Um emulador "preset" fica de fora
+ * (2026-09-29): o botão capturado aqui é o índice cru da Gamepad API, formato
+ * que só o RetroArch grava — no PCSX2 cada botão virava uma ressalva "configure
+ * dentro do PCSX2", 16 vezes, enquanto o mapeamento padrão da lista acima já
+ * resolve o controle dele num clique.
+ */
+function sequenceTargets(emulators: EmulatorEntry[]) {
+  return emulators.filter((e) => e.installed && e.bindable && e.controller_support !== "preset");
+}
+
+/**
  * Configuração unificada de controle: a pessoa aperta cada posição física uma
  * vez e o ZeuX escreve o bind equivalente em TODOS os emuladores instalados
  * que aceitam mapeamento, de uma vez.
@@ -45,6 +57,8 @@ type Phase = "idle" | "running" | "done";
  * próprio PCSX2 (`WriteBindings` nunca escreve bind de botão físico — formato
  * nunca validado contra o binário real, comportamento deliberado do backend).
  * Tratar o PCSX2 como caso especial aqui esconderia isso da pessoa.
+ * (Desde 2026-09-29 o PCSX2 nem entra na sequência: o mapeamento padrão da
+ * lista de emuladores resolve o controle dele — ver `sequenceTargets`.)
  *
  * Os painéis por emulador (`EmulatorBindingsPanel`) continuam em Configurações
  * para quem quiser ajustar um emulador específico depois — este fluxo é o
@@ -68,6 +82,9 @@ export function ConfigureControllerScreen({ onBack, onOpenTest }: { onBack: () =
   // ainda), e mostrar "nenhum emulador aceita" seria afirmar algo que o
   // ZeuX não verificou.
   const [checkedAdapters, setCheckedAdapters] = useState(false);
+  /** Todos os emuladores, para a lista "o que falta em cada um" — que cobre
+   *  quem não aceita a sequência botão a botão (2026-09-29). */
+  const [allEmulators, setAllEmulators] = useState<EmulatorEntry[] | null>(null);
 
   const total = CONTROLLER_BINDING_TARGETS.length;
   const target = CONTROLLER_BINDING_TARGETS[index];
@@ -81,22 +98,28 @@ export function ConfigureControllerScreen({ onBack, onOpenTest }: { onBack: () =
   // A seção dos emuladores diz de cara se há algum para receber o mapeamento
   // (2026-09-29): antes a pessoa só descobria depois de clicar em Iniciar, e a
   // tela inteira parecia dizer que o controle não tinha o que configurar.
-  useEffect(() => {
+  function loadEmulators() {
     api
       .getEmulators()
       .then(({ emulators }) => {
-        setAdapters(emulators.filter((e) => e.installed && e.bindable));
+        setAllEmulators(emulators);
+        // Durante a sequência a lista fica congelada (ver `adapters`).
+        if (phase !== "running") setAdapters(sequenceTargets(emulators));
         setCheckedAdapters(true);
       })
       .catch(() => {});
-  }, []);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(loadEmulators, []);
 
   async function start() {
     setStartError(null);
     setStarting(true);
     try {
       const { emulators } = await api.getEmulators();
-      const bindable = emulators.filter((e) => e.installed && e.bindable);
+      setAllEmulators(emulators);
+      const bindable = sequenceTargets(emulators);
       setAdapters(bindable);
       setCheckedAdapters(true);
       // Sem ninguém para receber o mapeamento, entrar na sequência pediria 16
@@ -279,7 +302,19 @@ export function ConfigureControllerScreen({ onBack, onOpenTest }: { onBack: () =
         </Card>
       </section>
 
-      <SectionHeading className="mb-2">{t("emulatorsHeading")}</SectionHeading>
+      <section className="mb-8 flex flex-col gap-3">
+        <SectionHeading>{t("emulatorsHeading")}</SectionHeading>
+        <p className="max-w-prose text-sm text-muted">{t("emulatorsStatusIntro")}</p>
+        <Card filled>
+          {allEmulators === null ? (
+            <p className="text-sm text-muted">{t("loadingEmulators")}</p>
+          ) : (
+            <EmulatorControllerList emulators={allEmulators} onChanged={loadEmulators} />
+          )}
+        </Card>
+      </section>
+
+      <SectionHeading className="mb-2">{t("customHeading")}</SectionHeading>
       <p className="mb-4 max-w-prose text-sm text-muted">{t("emulatorsIntro")}</p>
 
       {startError && (

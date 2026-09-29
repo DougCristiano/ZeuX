@@ -250,11 +250,16 @@ func (pcsx2ConfigurableAdapter) ReadBindings(install Installation) ([]InputBindi
 	bindings := make([]InputBinding, 0, len(pcsx2PadActions))
 	for _, action := range pcsx2PadActions {
 		binding := InputBinding{Action: action}
-		if raw, ok := ini.get("Pad1", action); ok {
+		// Uma ação pode ter mais de um bind (o mapeamento padrão do ZeuX grava
+		// controle E teclado, ver controller_preset.go): o primeiro de cada
+		// tipo vence.
+		for _, raw := range ini.getAll("Pad1", action) {
 			if strings.HasPrefix(raw, "SDL-") {
-				value := raw
-				binding.Button = &value
-			} else {
+				if binding.Button == nil {
+					value := raw
+					binding.Button = &value
+				}
+			} else if binding.Key == nil {
 				key := strings.TrimPrefix(raw, "Keyboard/")
 				binding.Key = &key
 			}
@@ -275,22 +280,9 @@ func pcsx2ControllerConfigured() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("lendo %s: %w", path, err)
-	}
-
-	ini := parseINI(data)
-	for _, action := range pcsx2PadActions {
-		if raw, ok := ini.get("Pad1", action); ok && strings.HasPrefix(raw, "SDL-") {
-			return true, nil
-		}
-	}
-	return false, nil
+	// Todos os binds de cada ação, não só o primeiro: quem mapeou o controle
+	// por cima do teclado dentro do PCSX2 tem a linha "Keyboard/" antes.
+	return iniSectionHasPrefix(path, "Pad1", pcsx2PadActions, "SDL-")
 }
 
 func (pcsx2ConfigurableAdapter) ControllerConfigured(install Installation) (bool, error) {
@@ -329,7 +321,15 @@ func (pcsx2ConfigurableAdapter) WriteBindings(install Installation, bindings []I
 			continue
 		}
 		if b.Key != nil {
-			ini.set("Pad1", b.Action, "Keyboard/"+*b.Key)
+			// Troca só o bind de teclado — um bind de controle na mesma ação
+			// (mapeamento padrão do ZeuX ou feito no PCSX2) continua valendo.
+			values := []string{"Keyboard/" + *b.Key}
+			for _, v := range ini.getAll("Pad1", b.Action) {
+				if !strings.HasPrefix(v, "Keyboard/") {
+					values = append(values, v)
+				}
+			}
+			ini.setAll("Pad1", b.Action, values)
 		}
 		if b.Button != nil {
 			unapplied = append(unapplied, fmt.Sprintf(
