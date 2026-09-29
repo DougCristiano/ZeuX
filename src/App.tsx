@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { api, ApiError, setAppVersionCacheKey, type Report } from "./api";
@@ -258,6 +258,17 @@ function App() {
   // depois que `games` deixa de ser `null`.
   const mainRef = useRef<HTMLElement>(null);
   const [allGamesScrollTop, setAllGamesScrollTop] = useState(0);
+
+  // Tela nova começa do topo (2026-09-29, vídeo do Douglas: rolar a grade e
+  // abrir um jogo mostrava o detalhe já no fim). O `<main>` é o mesmo nó entre
+  // as fases, então a rolagem da grade vazava para a tela seguinte — o
+  // navegador só a zera quando o conteúdo novo é curto demais para ela.
+  // "Todos os jogos" fica de fora: restaura a própria posição quando os jogos
+  // chegam (ver acima). `useLayoutEffect` para zerar antes da pintura, sem um
+  // quadro da tela nova rolada.
+  useLayoutEffect(() => {
+    if (phase !== "all-games") mainRef.current?.scrollTo({ top: 0 });
+  }, [phase]);
 
   // 1. Antes de tudo, o achado do B5: a porta pode estar ocupada por algo que
   // não é o zeuxd. Consultado sob demanda (não por evento) — ver

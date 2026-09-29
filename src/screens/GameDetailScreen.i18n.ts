@@ -182,6 +182,35 @@ export const dict = {
   },
   // Seção de informações do IGDB (2026-09-28).
   aboutGame: { "pt-BR": "Sobre o jogo", en: "About the game" },
+  // Por que não há resumo (2026-09-29) — um motivo por estado da busca.
+  aboutNeedsAccount: {
+    "pt-BR":
+      "Ano, resumo e gêneros vêm do IGDB, e esta instalação não tem conta do IGDB configurada. Dá para conectar a sua em Configurações.",
+    en: "Year, summary and genres come from IGDB, and this install has no IGDB account set up. You can connect yours in Settings.",
+  },
+  aboutNotFetched: {
+    "pt-BR": "As informações deste jogo ainda não foram buscadas no IGDB.",
+    en: "This game's info hasn't been fetched from IGDB yet.",
+  },
+  aboutNotFound: {
+    "pt-BR":
+      "O IGDB não achou um jogo chamado \"{{title}}\". Se o nome oficial for outro, use Editar título acima e busque de novo.",
+    en: "IGDB didn't find a game called \"{{title}}\". If the official name is different, use Edit title above and search again.",
+  },
+  aboutError: {
+    "pt-BR": "A última busca no IGDB falhou — pode ter sido a conexão. Tente de novo.",
+    en: "The last IGDB search failed — it may have been the connection. Try again.",
+  },
+  aboutNothingInIgdb: {
+    "pt-BR": "O IGDB tem este jogo, mas sem resumo nem gêneros.",
+    en: "IGDB has this game, but no summary or genres.",
+  },
+  fetchInfo: { "pt-BR": "Buscar informações", en: "Fetch info" },
+  fetchingInfo: { "pt-BR": "Buscando…", en: "Fetching…" },
+  infoError: {
+    "pt-BR": "Não foi possível buscar as informações do jogo.",
+    en: "Could not fetch the game's info.",
+  },
   genresLabel: { "pt-BR": "Gêneros", en: "Genres" },
   summarySource: {
     "pt-BR": "Resumo do IGDB — por enquanto só em inglês.",

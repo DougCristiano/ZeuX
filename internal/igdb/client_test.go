@@ -244,3 +244,22 @@ func TestAuthenticateNaoColocaSegredoNaURL(t *testing.T) {
 		t.Errorf("Content-Type = %q, esperava application/x-www-form-urlencoded", contentType)
 	}
 }
+
+// Trava a normalização do título para a busca: as convenções de nome de ROM
+// que o IGDB não entende (artigo no fim, " - " antes do subtítulo) viram a
+// forma que ele acha; um título comum passa intacto.
+func TestSearchTitleNormalizesROMNaming(t *testing.T) {
+	cases := map[string]string{
+		"Legend of Zelda, The - Ocarina of Time": "The Legend of Zelda: Ocarina of Time",
+		"Legend of Zelda, The":                   "The Legend of Zelda",
+		"Pokemon - Red Version":                  "Pokemon: Red Version",
+		"God of War II":                          "God of War II",
+		"Tales of Phantasia, A":                  "A Tales of Phantasia",
+		"Theme Park":                             "Theme Park",
+	}
+	for in, want := range cases {
+		if got := searchTitle(in); got != want {
+			t.Errorf("searchTitle(%q) = %q, esperado %q", in, got, want)
+		}
+	}
+}

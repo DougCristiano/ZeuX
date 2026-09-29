@@ -164,7 +164,12 @@ export function Sidebar({ active, onNav }: { active: NavID; onNav: (id: NavID) =
                       // ativa). `text-accent-hover` (#b174ff) sobre `bg-fill`
                       // mede ~5.9:1 e mantém a identidade roxa.
                       "border-accent bg-fill text-accent-hover"
-                    : "border-transparent text-muted hover:text-ink"
+                    : // Hover com fundo e fio lateral, não só o texto
+                      // (2026-09-29, relato do Douglas: "achei pouco o
+                      // destaque quando o mouse está por cima"). O fio fica
+                      // em `line-strong`, abaixo do roxo do item ativo, para
+                      // os dois estados nunca se confundirem.
+                      "border-transparent text-muted hover:border-line-strong hover:bg-fill/70 hover:text-ink"
                 }`}
               >
                 {/* Slot de largura fixa igual à sidebar recolhida (`w-16`) —

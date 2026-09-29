@@ -379,6 +379,11 @@ export const api = {
   scrapeCovers: (gameId?: number) =>
     postJSON<ScrapeJob>("/library/games/scrape-covers", gameId ? { game_id: gameId } : {}),
   getScrapeJob: (id: string) => request<ScrapeJob>(`/scrape-jobs/${encodeURIComponent(id)}`),
+  // Só ano/resumo/gêneros/desenvolvedora de um jogo, sem tocar na capa
+  // (2026-09-29). Devolve um job acompanhado por getScrapeJob.
+  fetchGameMetadata: (id: number) => postJSON<ScrapeJob>(`/library/games/${id}/metadata`, {}),
+  // Um jogo só, com `cover_url` — sem tempo de jogo (vem das sessões).
+  getGame: (id: number) => request<LibraryGame>(`/library/games/${id}`),
   // Buscas recentes, da mais nova para a mais antiga. "Todos os jogos" usa
   // isto para descobrir um lote automático (autoScrapeCovers) já em andamento
   // — sem um id de job em mãos, não havia como mostrar o progresso de uma

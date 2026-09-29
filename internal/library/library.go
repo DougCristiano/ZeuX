@@ -99,8 +99,11 @@ type Game struct {
 	Developer   string   `json:"developer,omitempty"`
 
 	// MetadataStatus é o `CoverStatus` das informações: '' nunca tentou,
-	// 'found', 'not_found', 'error'. Fica fora do JSON como CoverStatus.
-	MetadataStatus string `json:"-"`
+	// 'found', 'not_found', 'error'. Vai no JSON (diferente de CoverStatus)
+	// desde 2026-09-29: sem ele, a tela do jogo não tinha como dizer por que
+	// o resumo não aparece — "ainda não buscado", "o IGDB não achou este
+	// título" e "a busca falhou" pedem ações diferentes do usuário.
+	MetadataStatus string `json:"metadata_status,omitempty"`
 }
 
 // Metadata é o que a busca no IGDB grava de um jogo (SetMetadata).
@@ -564,6 +567,11 @@ func (s *Store) UncoveredGames(ctx context.Context) ([]Game, error) {
 // do IGDB (withMetadata), porque sem ela não há de onde tirar esses dados e o
 // lote passaria por jogo nenhum de útil. Sem isso, uma biblioteca com todas as
 // capas já resolvidas (pelo libretro-thumbnails) nunca ganharia ano/resumo.
+// 'error' entra de novo a cada lote (2026-09-29): era final, e uma falha
+// passageira de rede ou da conta do IGDB deixava o jogo sem informações para
+// sempre. 'not_found' continua final — repetir a mesma busca daria o mesmo
+// nada. Quem limita a insistência numa conta quebrada é o próprio lote (ver
+// maxConsecutiveMetadataErrors em internal/igdb/scrape.go).
 func (s *Store) ScrapeCandidates(ctx context.Context, withMetadata bool) ([]Game, error) {
 	if !withMetadata {
 		return s.UncoveredGames(ctx)
@@ -571,7 +579,7 @@ func (s *Store) ScrapeCandidates(ctx context.Context, withMetadata bool) ([]Game
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+gameColumns+`
 		FROM library_games
-		WHERE excluded = 0 AND ((cover_path = '' AND cover_status = '') OR metadata_status = '')
+		WHERE excluded = 0 AND ((cover_path = '' AND cover_status = '') OR metadata_status IN ('', 'error'))
 		ORDER BY id
 	`)
 	if err != nil {

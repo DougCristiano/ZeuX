@@ -217,6 +217,78 @@ export function GameDetailScreen({
     }
   }
 
+  // Informações do IGDB em estado local (2026-09-29), e não lidas direto de
+  // `game`: `game` é o retrato tirado da lista ao abrir a tela, e a busca de
+  // informações (ou a de capa, que também as traz) precisa atualizá-las aqui
+  // sem voltar à lista.
+  const [about, setAbout] = useState(() => aboutOf(game));
+  const [fetchingInfo, setFetchingInfo] = useState(false);
+  const [infoError, setInfoError] = useState<string | null>(null);
+  // `null` enquanto não respondeu — a seção não diz nada sobre a conta até
+  // saber, para não mostrar "sem conta" num piscar a quem tem conta.
+  const [igdbConfigured, setIgdbConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    api
+      .getIGDBCredentials()
+      .then((res) => setIgdbConfigured(res.configured))
+      .catch(() => setIgdbConfigured(null));
+  }, []);
+
+  // Relê este jogo depois de uma busca (capa ou informações). Falha aqui não é
+  // erro de tela: a busca já terminou, só a tela fica com o retrato anterior.
+  function refreshFromServer() {
+    api
+      .getGame(game.id)
+      .then((updated) => {
+        setAbout(aboutOf(updated));
+        setCoverUrl(updated.cover_url);
+      })
+      .catch(() => {});
+  }
+
+  function pollInfoJob(jobId: string) {
+    api
+      .getScrapeJob(jobId)
+      .then((job) => {
+        if (job.phase === "concluido") {
+          setFetchingInfo(false);
+          const result = job.results[0];
+          if (result?.status === "error") setInfoError(result.message ?? t("infoError"));
+          refreshFromServer();
+          return;
+        }
+        if (job.phase === "falhou") {
+          setFetchingInfo(false);
+          setInfoError(job.error ?? t("infoError"));
+          return;
+        }
+        setTimeout(() => pollInfoJob(jobId), 400);
+      })
+      .catch((err) => {
+        setFetchingInfo(false);
+        setInfoError(err instanceof ApiError ? err.message : t("infoError"));
+      });
+  }
+
+  function handleFetchInfo() {
+    setInfoError(null);
+    setFetchingInfo(true);
+    api
+      .fetchGameMetadata(game.id)
+      .then((job) => pollInfoJob(job.id))
+      .catch((err) => {
+        setFetchingInfo(false);
+        setInfoError(err instanceof ApiError ? err.message : t("infoError"));
+      });
+  }
+
+  useEffect(() => {
+    setAbout(aboutOf(game));
+    setInfoError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id]);
+
   useEffect(() => {
     setCoverUrl(game.cover_url);
     setFavorite(game.favorite);
@@ -271,17 +343,11 @@ export function GameDetailScreen({
             setCoverError(result.message ?? t("errorSearchingCover"));
           } else if (result?.status === "not_found") {
             setCoverError(t("errorCoverNotFound"));
-          } else {
-            // Encontrada: recarrega este jogo para pegar o cover_url novo —
-            // a rota de busca não devolve o caminho da capa, só o status.
-            api
-              .getLibraryGames(game.console_id)
-              .then((res) => {
-                const updated = res.games.find((g) => g.id === game.id);
-                if (updated) setCoverUrl(updated.cover_url);
-              })
-              .catch(() => {});
           }
+          // Relê o jogo em qualquer desfecho: a rota de busca não devolve o
+          // caminho da capa, só o status — e a busca de um jogo só também
+          // traz as informações do IGDB, mesmo quando a capa não foi achada.
+          refreshFromServer();
           return;
         }
         if (job.phase === "falhou") {
@@ -380,7 +446,7 @@ export function GameDetailScreen({
 
   const status = statusFor(game.id);
   const verdict = report?.verdicts.find((v) => v.console_id === game.console_id);
-  const hasAbout = Boolean(game.summary || (game.genres && game.genres.length > 0));
+  const hasAbout = Boolean(about.summary || (about.genres && about.genres.length > 0));
   const heroCoverUrl = coverImageURL(coverUrl, coverVersion || undefined);
   const accent = consoleAccentColor(game.console_id);
 
@@ -580,9 +646,9 @@ export function GameDetailScreen({
           {/* Ano e desenvolvedora DO JOGO, vindos do IGDB (2026-09-28). O
               ano do console deixou de aparecer aqui por ser lido como ano do
               jogo; este só aparece quando o IGDB o informou. */}
-          {(game.release_year || game.developer) && (
+          {(about.release_year || about.developer) && (
             <p className="mt-2 font-mono text-sm tracking-wide text-muted">
-              {[game.developer, game.release_year].filter(Boolean).join(" · ")}
+              {[about.developer, about.release_year].filter(Boolean).join(" · ")}
             </p>
           )}
         </div>
@@ -963,39 +1029,50 @@ export function GameDetailScreen({
             consoles da VerdictScreen, um card solto embaixo do hero não
             dizia sozinho o que ele responde. O título fala do jogo, nunca da
             máquina (princípio 2 do CLAUDE.md). */}
-        {(verdict || hasAbout) && (
-          <div className="flex flex-col gap-6 lg:col-span-2">
+        <div className="flex flex-col gap-6 lg:col-span-2">
             {/* "Sobre o jogo" (2026-09-28): gêneros e resumo vindos do IGDB.
-                Some por inteiro quando não há nada — sem conta do IGDB, ou
-                jogo que o IGDB não tem —, nunca uma seção vazia nem texto de
-                palpite. O resumo é em inglês (o IGDB só tem esse idioma,
-                decisão do Douglas): `lang="en"` para o leitor de tela
-                pronunciar certo, e a legenda diz de onde veio e por que está
-                em inglês. */}
-            {hasAbout && (
-              <section>
-                <SectionHeading className="mb-3">{t("aboutGame")}</SectionHeading>
-                <Card filled className="flex flex-col gap-3">
-                  {game.genres && game.genres.length > 0 && (
-                    <ul className="flex flex-wrap gap-1.5" aria-label={t("genresLabel")}>
-                      {game.genres.map((genre) => (
-                        <li key={genre}>
-                          <Badge>{genre}</Badge>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {game.summary && (
-                    <>
-                      <p lang="en" className="max-w-prose text-sm leading-relaxed whitespace-pre-line text-ink">
-                        {game.summary}
-                      </p>
-                      <p className="font-mono text-[11px] tracking-wide text-muted">{t("summarySource")}</p>
-                    </>
-                  )}
-                </Card>
-              </section>
-            )}
+                O resumo é em inglês (o IGDB só tem esse idioma, decisão do
+                Douglas): `lang="en"` para o leitor de tela pronunciar certo, e
+                a legenda diz de onde veio. Desde 2026-09-29 a seção aparece
+                sempre — antes sumia sem nada, e o Douglas não tinha como saber
+                se faltava conta, se o IGDB não achou o título ou se a busca
+                nem tinha rodado. Cada caso diz o que fazer; nunca um palpite
+                no lugar do dado (princípio 4). */}
+            <section>
+              <SectionHeading className="mb-3">{t("aboutGame")}</SectionHeading>
+              <Card filled className="flex flex-col gap-3">
+                {hasAbout ? (
+                  <>
+                    {about.genres && about.genres.length > 0 && (
+                      <ul className="flex flex-wrap gap-1.5" aria-label={t("genresLabel")}>
+                        {about.genres.map((genre) => (
+                          <li key={genre}>
+                            <Badge>{genre}</Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {about.summary && (
+                      <>
+                        <p lang="en" className="max-w-prose text-sm leading-relaxed whitespace-pre-line text-ink">
+                          {about.summary}
+                        </p>
+                        <p className="font-mono text-[11px] tracking-wide text-muted">{t("summarySource")}</p>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <AboutMissing
+                    status={about.metadata_status}
+                    igdbConfigured={igdbConfigured}
+                    title={title}
+                    fetching={fetchingInfo}
+                    onFetch={handleFetchInfo}
+                  />
+                )}
+                {infoError && <InlineError>{infoError}</InlineError>}
+              </Card>
+            </section>
 
             {verdict && (
               <section>
@@ -1004,11 +1081,8 @@ export function GameDetailScreen({
               </section>
             )}
           </div>
-        )}
 
-        {/* Sem parecer nem informações do jogo, a coluna de serviço ocupa a
-            largura toda em vez de deixar duas colunas vazias à esquerda. */}
-        <div className={`flex flex-col gap-6 ${verdict || hasAbout ? "" : "lg:col-span-3"}`}>
+        <div className="flex flex-col gap-6">
           <section>
             <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
             <Card filled>
@@ -1126,5 +1200,55 @@ export function GameDetailScreen({
         </div>
       </div>
     </ScreenContainer>
+  );
+}
+
+/** As informações do IGDB de um jogo, no formato que a tela guarda em estado. */
+function aboutOf(game: LibraryGame) {
+  return {
+    release_year: game.release_year,
+    summary: game.summary,
+    genres: game.genres,
+    developer: game.developer,
+    metadata_status: game.metadata_status,
+  };
+}
+
+/**
+ * O que a seção "Sobre o jogo" diz quando não há resumo nem gêneros — um
+ * motivo por caso, e a ação que resolve cada um. Enquanto não se sabe se há
+ * conta do IGDB (`igdbConfigured === null`), não diz nada.
+ */
+function AboutMissing({
+  status,
+  igdbConfigured,
+  title,
+  fetching,
+  onFetch,
+}: {
+  status: LibraryGame["metadata_status"];
+  igdbConfigured: boolean | null;
+  title: string;
+  fetching: boolean;
+  onFetch: () => void;
+}) {
+  const t = useT(dict);
+  if (igdbConfigured === null) return null;
+  if (!igdbConfigured) return <p className="text-sm text-muted">{t("aboutNeedsAccount")}</p>;
+  if (status === "found") return <p className="text-sm text-muted">{t("aboutNothingInIgdb")}</p>;
+
+  const message =
+    status === "not_found"
+      ? t("aboutNotFound", { title })
+      : status === "error"
+        ? t("aboutError")
+        : t("aboutNotFetched");
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <p className="max-w-prose text-sm text-muted">{message}</p>
+      <Button variant="chrome" size="sm" disabled={fetching} onClick={onFetch}>
+        {fetching ? t("fetchingInfo") : t("fetchInfo")}
+      </Button>
+    </div>
   );
 }

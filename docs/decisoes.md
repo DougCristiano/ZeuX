@@ -1298,6 +1298,61 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### "Sobre o jogo" sempre visível, busca só de informações e retentativa — 2026-09-29
+
+Relato do Douglas, com vídeo, na v0.1.34: o resumo do jogo não aparecia em
+lugar nenhum. A seção "Sobre o jogo" **sumia por inteiro** quando não havia
+resumo nem gêneros, e havia quatro motivos possíveis, indistinguíveis na tela.
+A causa exata na máquina dele não foi confirmada daqui, mas cada motivo agora
+se diz sozinho:
+
+- **Sem conta do IGDB** (build sem a credencial de teste, ou nenhuma conta
+  conectada): a seção diz isso e aponta Configurações.
+- **Nunca buscado:** botão "Buscar informações".
+- **`not_found`:** o IGDB não achou o título. O texto sugere "Editar título"
+  e buscar de novo. Os títulos no padrão das ROMs ("Legend of Zelda, The -
+  Ocarina of Time") agora são ajustados para a busca (`searchTitle`,
+  `internal/igdb/client.go`), então muitos deixam de cair aqui.
+- **`error`:** a busca falhou. Botão para tentar de novo, e a mensagem do erro
+  aparece embaixo.
+
+**Busca só de informações** (`POST /library/games/{id}/metadata`,
+`ScrapeManager.StartMetadata`): "Buscar capa de novo" também traz as
+informações, mas troca a capa, inclusive uma escolhida à mão. Sem conta do
+IGDB, ela recusa com o motivo (`igdb_not_configured`), em vez de terminar como
+"não encontrado".
+
+**`error` deixou de ser final.** Uma falha passageira (rede, conta suspensa
+por um tempo) deixava o jogo sem informações para sempre, porque o lote só
+pegava `metadata_status = ''`. Agora pega `'error'` também. Para uma conta
+quebrada não virar uma chamada ao Twitch/IGDB por jogo a cada biblioteca
+aberta (o lote automático roda a cada pasta revarrida), o lote para de buscar
+informações depois de `maxConsecutiveMetadataErrors` (3) falhas seguidas.
+
+`metadata_status` passou a ir no JSON (antes `json:"-"`), e existe
+`GET /library/games/{id}` para a tela reler o jogo depois de uma busca.
+
+**O que quebra se desfizer:** voltar a esconder a seção devolve o "por que não
+aparece?" sem resposta; tirar o teto de 3 falhas faz uma conta suspensa gerar
+N pedidos inúteis a cada abertura da biblioteca.
+
+### Tela nova começa do topo — 2026-09-29
+
+O `<main>` do shell é o mesmo nó entre as telas, então a rolagem da grade vazava
+para a tela seguinte: rolar a biblioteca e abrir um jogo mostrava o detalhe já
+no fim (vídeo do Douglas). `App.tsx` zera a rolagem a cada troca de fase
+(`useLayoutEffect`, antes da pintura), menos ao voltar para "Todos os jogos",
+que restaura a própria posição quando os jogos chegam.
+
+### Ajuda de nomes de subpasta recolhível no "Caminho mais rápido" — 2026-09-29
+
+O botão "Ver nomes de pasta aceitos" era grande e ficava sozinho no fim do
+cabeçalho de "Pastas de jogos" (relato do Douglas), e abria um modal. Virou
+"Como nomear as subpastas", recolhível dentro do cartão da pasta de todos os
+jogos, que é o único lugar onde esses nomes importam. A lista mostra o nome
+completo e só as formas curtas que o servidor trata como diferentes (mesma
+normalização de `normalizeConsoleMatch`), em grade `auto-fill`.
+
 ### Menu de botão direito nos jogos, cursor em pixel e fim do menu nativo — 2026-09-28
 
 Pedido do Douglas: o cursor estilizado, e botão direito num jogo (por exemplo

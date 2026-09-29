@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -264,6 +265,23 @@ type gameResult struct {
 	InvolvedCompanies []involvedCompany `json:"involved_companies"`
 }
 
+// articleSuffix casa o artigo que a nomenclatura No-Intro/Redump (a das ROMs
+// e do libretro-thumbnails) move para o fim do nome: "Legend of Zelda, The".
+var articleSuffix = regexp.MustCompile(`^(.+?), (The|A|An)\b(.*)$`)
+
+// searchTitle ajusta o título do arquivo para a busca do IGDB (2026-09-29):
+// "Legend of Zelda, The - Ocarina of Time" não acha nada lá, "The Legend of
+// Zelda: Ocarina of Time" acha. Desfaz as duas convenções de nome de ROM que
+// o IGDB não segue — o artigo no fim e o " - " no lugar dos dois-pontos do
+// subtítulo — e nada mais: o título que o usuário vê continua o do arquivo.
+func searchTitle(title string) string {
+	t := strings.TrimSpace(title)
+	if m := articleSuffix.FindStringSubmatch(t); m != nil {
+		t = m[2] + " " + m[1] + m[3]
+	}
+	return strings.Replace(t, " - ", ": ", 1)
+}
+
 // SearchGame procura um jogo pelo título. Nenhum resultado não é erro — é
 // uma busca que não achou nada, e a chamadora decide o que fazer (marcar
 // como "não encontrado", nunca inventar uma capa parecida).
@@ -275,7 +293,7 @@ func (c *Client) SearchGame(ctx context.Context, title string) (Match, bool, err
 		return Match{}, false, err
 	}
 
-	body := fmt.Sprintf("search %q; fields name,cover.image_id,first_release_date,summary,genres.name,involved_companies.developer,involved_companies.company.name; limit 1;", title)
+	body := fmt.Sprintf("search %q; fields name,cover.image_id,first_release_date,summary,genres.name,involved_companies.developer,involved_companies.company.name; limit 1;", searchTitle(title))
 
 	reqURL := igdbAPIBase + "/games"
 	if err := checkHost(reqURL); err != nil {

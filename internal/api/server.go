@@ -211,6 +211,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/igdb/credentials", s.handleSetIGDBCredentials)
 	mux.HandleFunc("DELETE /api/v1/igdb/credentials", s.handleClearIGDBCredentials)
 	mux.HandleFunc("POST /api/v1/library/games/scrape-covers", s.handleScrapeCovers)
+	mux.HandleFunc("GET /api/v1/library/games/{id}", s.handleGetGame)
+	mux.HandleFunc("POST /api/v1/library/games/{id}/metadata", s.handleFetchGameMetadata)
 	mux.HandleFunc("GET /api/v1/scrape-jobs", s.handleScrapeJobs)
 	mux.HandleFunc("GET /api/v1/scrape-jobs/{id}", s.handleScrapeJob)
 	mux.HandleFunc("POST /api/v1/library/games/{id}/cover", s.handleSetGameCover)
@@ -2251,6 +2253,57 @@ func (s *Server) handleScrapeCovers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeJSON(w, http.StatusAccepted, job)
+}
+
+// handleGetGame devolve um jogo só (2026-09-29). Existe para a tela do jogo
+// reler as informações e a capa depois de buscá-las (handleFetchGameMetadata,
+// handleScrapeCovers com game_id): a listagem inteira seria o caminho mais caro
+// para uma linha. Sem tempo de jogo de propósito — ele vem das sessões, e um
+// `playtime_seconds: 0` aqui seria lido como "nunca jogado".
+func (s *Server) handleGetGame(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id", "O identificador do jogo deve ser numérico.")
+		return
+	}
+	game, ok, err := s.library.GameByID(r.Context(), id)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "library_read_failed", err.Error())
+		return
+	}
+	if !ok {
+		s.writeError(w, http.StatusNotFound, "not_found", fmt.Sprintf("Nenhum jogo com o id %d.", id))
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		library.Game
+		CoverURL string `json:"cover_url,omitempty"`
+	}{game, coverURLFor(game.CoverPath)})
+}
+
+// handleFetchGameMetadata busca só ano, resumo, gêneros e desenvolvedora de
+// um jogo no IGDB, sem tocar na capa — ver igdb.StartMetadata. Devolve o job,
+// que a tela acompanha por GET /scrape-jobs/{id} como qualquer outra busca.
+func (s *Server) handleFetchGameMetadata(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_id", "O identificador do jogo deve ser numérico.")
+		return
+	}
+	job, err := s.igdbJobs.StartMetadata(r.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, igdb.ErrScrapeInProgress):
+			s.writeError(w, http.StatusConflict, "scrape_in_progress", err.Error())
+		case errors.Is(err, igdb.ErrMetadataNeedsAccount):
+			s.writeError(w, http.StatusBadRequest, "igdb_not_configured",
+				"As informações do jogo vêm do IGDB, e esta instalação não tem conta do IGDB configurada. Conecte a sua em Configurações.")
+		default:
+			s.writeError(w, http.StatusBadRequest, "scrape_refused", err.Error())
+		}
+		return
+	}
 	writeJSON(w, http.StatusAccepted, job)
 }
 

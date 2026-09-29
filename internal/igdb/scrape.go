@@ -18,6 +18,19 @@ import (
 // andamento. Só uma por vez, mesma simplicidade de internal/install.Manager.
 var ErrScrapeInProgress = errors.New("já existe uma busca de capas em andamento")
 
+// ErrMetadataNeedsAccount recusa a busca só de informações sem conta do IGDB:
+// ano, resumo e gêneros não existem em nenhuma fonte livre, e um job que
+// terminasse "não encontrado" esconderia o motivo real.
+var ErrMetadataNeedsAccount = errors.New("as informações do jogo vêm do IGDB, e esta instalação não tem conta do IGDB configurada — conecte a sua em Configurações")
+
+// maxConsecutiveMetadataErrors é quantas buscas de informações seguidas
+// podem falhar num lote antes de ele parar de tentar as restantes. Com a conta
+// suspensa ou sem rede, cada jogo falharia do mesmo jeito — e como o lote
+// automático roda a cada pasta revarrida (e 'error' volta a ser candidato,
+// ver library.ScrapeCandidates), sem esse teto seriam N pedidos inúteis ao
+// Twitch/IGDB toda vez que o usuário abre a biblioteca.
+const maxConsecutiveMetadataErrors = 3
+
 // Phase é a etapa em que um job de busca de capas está.
 type Phase string
 
@@ -82,6 +95,19 @@ func NewScrapeManager(libraryStore *library.Store, credentials *CredentialsStore
 // gameIDs com um elemento é a busca por um jogo só (G2: reconsultar sem
 // apagar o cache inteiro).
 func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error) {
+	return m.start(ctx, gameIDs, false)
+}
+
+// StartMetadata busca só as informações (ano, resumo, gêneros, desenvolvedora)
+// de um jogo, sem tocar na capa (2026-09-29). O "Buscar capa de novo" da tela
+// do jogo também traz as informações, mas substitui a capa — inclusive uma
+// escolhida à mão —, então não serve para quem só quer o resumo, por exemplo
+// depois de corrigir o título para o IGDB achar o jogo.
+func (m *ScrapeManager) StartMetadata(ctx context.Context, gameID int64) (*Job, error) {
+	return m.start(ctx, []int64{gameID}, true)
+}
+
+func (m *ScrapeManager) start(ctx context.Context, gameIDs []int64, metadataOnly bool) (*Job, error) {
 	// Sem credencial não é mais motivo para recusar o disparo inteiro
 	// (achado de 2026-09-08, relato do Douglas: capa de PS2 sumiu de buscar
 	// mesmo depois da cobertura de libretro-thumbnails ter crescido pra 32
@@ -93,6 +119,9 @@ func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error
 	creds, configured, err := m.credentials.Load()
 	if err != nil {
 		return nil, fmt.Errorf("lendo a credencial do IGDB: %w", err)
+	}
+	if metadataOnly && !configured {
+		return nil, ErrMetadataNeedsAccount
 	}
 
 	// Lote (gameIDs vazio) e busca de um jogo só divergem em quem pode
@@ -131,7 +160,7 @@ func (m *ScrapeManager) Start(ctx context.Context, gameIDs []int64) (*Job, error
 	// Contexto próprio do job, não da requisição HTTP — o lote precisa
 	// sobreviver ao fim da resposta 202 que o disparou (mesmo raciocínio de
 	// internal/install.Manager.run).
-	go m.run(job, creds, configured, games, batch)
+	go m.run(job, creds, configured, games, batch, metadataOnly)
 
 	return m.snapshot(job.ID), nil
 }
@@ -158,7 +187,7 @@ func (m *ScrapeManager) resolveGames(ctx context.Context, gameIDs []int64, confi
 	return games, nil
 }
 
-func (m *ScrapeManager) run(job *Job, creds Credentials, configured bool, games []library.Game, batch bool) {
+func (m *ScrapeManager) run(job *Job, creds Credentials, configured bool, games []library.Game, batch, metadataOnly bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 
@@ -190,8 +219,18 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, configured bool, games 
 		return
 	}
 
+	metadataErrors := 0
 	for _, game := range games {
-		result := m.processGame(ctx, client, configured, root, game, batch)
+		// Depois de maxConsecutiveMetadataErrors falhas seguidas, o resto do
+		// lote segue só com a capa — as informações ficam para o próximo lote.
+		withMetadata := configured && metadataErrors < maxConsecutiveMetadataErrors
+		result, metaStatus := m.processGame(ctx, client, configured, withMetadata, root, game, batch, metadataOnly)
+		switch metaStatus {
+		case "error":
+			metadataErrors++
+		case "found", "not_found":
+			metadataErrors = 0
+		}
 
 		m.mu.Lock()
 		job.Results = append(job.Results, result)
@@ -230,7 +269,12 @@ func (m *ScrapeManager) run(job *Job, creds Credentials, configured bool, games 
 //     substituir a capa atual, manual ou automática — precisa continuar
 //     sobrescrevendo sem condição, senão o botão pararia de funcionar
 //     depois de uma troca manual.
-func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configured bool, root string, game library.Game, batch bool) GameResult {
+//
+// withMetadata diz se a etapa das informações pode rodar neste jogo (conta
+// configurada e o lote ainda sem falhas demais seguidas); metadataOnly pula a
+// etapa da capa. O segundo retorno é o estado gravado das informações ("" se
+// a etapa não rodou), para o lote contar as falhas seguidas.
+func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configured, withMetadata bool, root string, game library.Game, batch, metadataOnly bool) (GameResult, string) {
 	result := GameResult{GameID: game.ID, Title: game.Title}
 
 	// Capa e informações são duas etapas independentes desde 2026-09-28: a
@@ -238,21 +282,21 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configu
 	// gêneros e desenvolvedora só existem no IGDB. Antes o IGDB só era
 	// consultado quando o libretro não achava a capa — e a maior parte da
 	// biblioteca nunca ganhava essas informações.
-	coverNeeded, metaNeeded := true, configured
+	coverNeeded, metaNeeded := !metadataOnly, withMetadata
 	if batch {
 		fresh, ok, err := m.library.GameByID(ctx, game.ID)
 		if err != nil {
 			result.Status = "error"
 			result.Message = err.Error()
-			return result
+			return result, ""
 		}
 		if !ok {
 			result.Status = "error"
 			result.Message = "jogo removido da biblioteca durante a busca"
-			return result
+			return result, ""
 		}
 		coverNeeded = fresh.CoverPath == "" && fresh.CoverStatus == ""
-		metaNeeded = configured && fresh.MetadataStatus == ""
+		metaNeeded = withMetadata && (fresh.MetadataStatus == "" || fresh.MetadataStatus == "error")
 		if !coverNeeded {
 			// O resultado reportado ao job é sempre o da capa (é o que a
 			// barra de progresso da tela conta); a busca de informações, se
@@ -282,11 +326,20 @@ func (m *ScrapeManager) processGame(ctx context.Context, client *Client, configu
 	if coverNeeded {
 		result = m.resolveCover(ctx, client, configured, root, game, batch, search, &match, &found, &searchErr)
 	}
+	metaStatus := ""
 	if metaNeeded {
 		search()
-		m.saveMetadata(ctx, game.ID, match, found, searchErr)
+		metaStatus = m.saveMetadata(ctx, game.ID, match, found, searchErr)
+		if metadataOnly {
+			// Sem etapa de capa, o resultado do job é o das informações — é
+			// o que a tela do jogo lê para dizer se achou.
+			result.Status = metaStatus
+			if searchErr != nil {
+				result.Message = searchErr.Error()
+			}
+		}
 	}
-	return result
+	return result, metaStatus
 }
 
 // resolveCover é a etapa da capa de processGame: libretro-thumbnails
@@ -370,13 +423,16 @@ func (m *ScrapeManager) markCoverStatus(ctx context.Context, gameID int64, statu
 
 // saveMetadata é a etapa das informações de processGame. Falha aqui nunca
 // muda o resultado da capa — é um dado a mais, não o motivo do job.
-func (m *ScrapeManager) saveMetadata(ctx context.Context, gameID int64, match Match, found bool, searchErr error) {
+func (m *ScrapeManager) saveMetadata(ctx context.Context, gameID int64, match Match, found bool, searchErr error) string {
 	var err error
+	status := "found"
 	switch {
 	case searchErr != nil:
-		err = m.library.SetMetadataStatus(ctx, gameID, "error")
+		status = "error"
+		err = m.library.SetMetadataStatus(ctx, gameID, status)
 	case !found:
-		err = m.library.SetMetadataStatus(ctx, gameID, "not_found")
+		status = "not_found"
+		err = m.library.SetMetadataStatus(ctx, gameID, status)
 	default:
 		err = m.library.SetMetadata(ctx, gameID, library.Metadata{
 			ReleaseYear: match.ReleaseYear,
@@ -388,6 +444,10 @@ func (m *ScrapeManager) saveMetadata(ctx context.Context, gameID int64, match Ma
 	if err != nil {
 		m.logger.Error("gravando as informações do jogo", "jogo", gameID, "erro", err)
 	}
+	if searchErr != nil {
+		m.logger.Warn("busca de informações no IGDB falhou", "jogo", gameID, "erro", searchErr)
+	}
+	return status
 }
 
 // saveResolvedCover grava no banco o caminho (relativo a root) de uma capa

@@ -102,10 +102,6 @@ export const dict = {
     "pt-BR": "Pastas de jogos",
     en: "Game folders",
   },
-  seeFolderNamesAccepted: {
-    "pt-BR": "Ver nomes de pasta aceitos",
-    en: "See accepted folder names",
-  },
   couldNotListFolders: {
     "pt-BR": "Não foi possível listar as pastas",
     en: "Could not list folders",
@@ -128,19 +124,15 @@ export const dict = {
     "pt-BR": "Nenhum console com pasta apontada ainda.",
     en: "No console with a folder assigned yet.",
   },
-  acceptedFolderNames: {
-    "pt-BR": "Nomes de pasta aceitos",
-    en: "Accepted folder names",
+  howToNameSubfolders: {
+    "pt-BR": "Como nomear as subpastas",
+    en: "How to name the subfolders",
   },
   folderNamesGuideText: {
     "pt-BR":
-      'Em "Selecionar pasta para todos os jogos", cada subpasta é reconhecida pelo nome — copie um dos valores abaixo (id, nome completo ou sigla) para nomear a subpasta daquele console. Maiúscula/minúscula, espaço e hífen não importam.',
+      "Cada subpasta é reconhecida pelo nome: vale o nome completo do console ou uma das formas curtas abaixo dele. Maiúscula/minúscula, espaço e hífen não importam.",
     en:
-      'In "Select folder for all games", each subfolder is recognized by name — copy one of the values below (id, full name, or abbreviation) to name the subfolder for that console. Uppercase/lowercase, spaces, and hyphens do not matter.',
-  },
-  close: {
-    "pt-BR": "Fechar",
-    en: "Close",
+      "Each subfolder is recognized by name: the console's full name works, or one of the short forms below it. Uppercase/lowercase, spaces and hyphens don't matter.",
   },
   couldNotScanFolder: {
     "pt-BR": "Não foi possível varrer esta pasta.",

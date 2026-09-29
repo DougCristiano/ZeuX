@@ -586,6 +586,11 @@ export type LibraryGame = {
   summary?: string;
   genres?: string[];
   developer?: string;
+  /** Estado da busca dessas informações (2026-09-29): ausente = nunca
+   * buscada; `not_found` = o IGDB não achou o título; `error` = a busca
+   * falhou (volta a ser tentada no próximo lote). É o que deixa a tela do
+   * jogo dizer por que o resumo não aparece. */
+  metadata_status?: "found" | "not_found" | "error";
 };
 
 // --- Scraper de metadados IGDB (G1, docs/roadmap.md) ---

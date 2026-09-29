@@ -22,12 +22,82 @@ import {
   ZSelect,
 } from "../components/ui";
 import { ConsoleLabel } from "../components/ConsoleLabel";
-import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { SelectItem } from "../components/ui/select";
 import { useT } from "../i18n/i18n";
 import { dict } from "./LibraryScreen.i18n";
 
 type ConsoleInfo = { console_id: string; name: string; short_name: string };
+
+/**
+ * Nomes de subpasta que `POST /library/folders/bulk` reconhece (2026-08-17,
+ * a pedido do Douglas): sem isto, o único jeito de descobrir os nomes aceitos
+ * era tentar e ver o que ficava em "Subpastas não reconhecidas". Espelha
+ * `normalizeConsoleMatch`/`byNormalized` (internal/api/server.go,
+ * handleBulkAddLibraryFolders) sem reimplementar a comparação: mostra os
+ * valores que o servidor aceita — id, nome e sigla — e o usuário copia um.
+ *
+ * **Recolhível dentro do cartão "Caminho mais rápido", não modal nem botão no
+ * cabeçalho** (2026-09-29, relato do Douglas: o botão "Ver nomes de pasta
+ * aceitos" era grande demais e ficava sozinho no fim do cabeçalho). Os nomes
+ * só importam para quem vai usar a pasta de todos os jogos, então moram ali;
+ * e uma lista aberta no lugar deixa copiar um nome sem fechar nada. Grade
+ * `auto-fill`, nunca largura fixa (CLAUDE.md, layout responsivo).
+ */
+// Mesma equivalência que o servidor usa ao casar subpastas
+// (normalizeConsoleMatch, internal/api/server.go): minúsculas, e só letras
+// de a a z e dígitos contam.
+function normalizeFolderName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function FolderNameGuide({ consoles }: { consoles: ConsoleInfo[] }) {
+  const t = useT(dict);
+  const [open, setOpen] = useState(false);
+  const sorted = [...consoles].sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="folder-name-guide"
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1 font-mono text-xs tracking-wider text-muted uppercase hover:text-ink ${FOCUS_RING}`}
+      >
+        <ChevronRight size={12} aria-hidden="true" className={`transition-transform ${open ? "rotate-90" : ""}`} />
+        {t("howToNameSubfolders")}
+      </button>
+      {open && (
+        <div id="folder-name-guide" className="mt-2 flex flex-col gap-2">
+          <p className="text-sm text-muted">{t("folderNamesGuideText")}</p>
+          <ul className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(12rem, 1fr))" }}>
+            {sorted.map((c) => {
+              // O nome completo já é o título do cartão (e também é aceito);
+              // a linha de baixo só traz as formas curtas que dizem algo a
+              // mais. Duas formas que o servidor considera iguais ("PS1" e
+              // "ps1", "Mega Drive" e "megadrive") aparecem uma vez só.
+              const seen = new Set([normalizeFolderName(c.name)]);
+              const short = [c.short_name, c.console_id].filter((n) => {
+                const key = normalizeFolderName(n);
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+              return (
+                <li key={c.console_id} className="rounded-sm border border-line bg-paper/40 px-2 py-1.5">
+                  <p className="select-all text-xs text-ink">{c.name}</p>
+                  {short.length > 0 && (
+                    <p className="select-all font-mono text-xs text-accent-secondary">{short.join(" · ")}</p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * "Selecionar pasta para todos os jogos" (2026-08-05, a pedido do Douglas):
@@ -39,7 +109,7 @@ type ConsoleInfo = { console_id: string; name: string; short_name: string };
  * (docs/sprint-m-plano.md): continua sendo o único assistente — a
  * reorganização não construiu um segundo.
  */
-function BulkFolderPicker({ onDone }: { onDone: () => void }) {
+function BulkFolderPicker({ consoles, onDone }: { consoles: ConsoleInfo[]; onDone: () => void }) {
   const t = useT(dict);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +166,8 @@ function BulkFolderPicker({ onDone }: { onDone: () => void }) {
           {busy ? t("scanning") : t("chooseFolderButton")}
         </Button>
       </div>
+
+      <FolderNameGuide consoles={consoles} />
 
       {error && <InlineError>{error}</InlineError>}
 
@@ -368,56 +440,6 @@ function AddConsoleSection({
   );
 }
 
-/**
- * Nomes de subpasta que `POST /library/folders/bulk` reconhece (2026-08-17,
- * a pedido do Douglas): antes disso só existia o caminho de tentativa e
- * erro (escolher a pasta e, se algo não bateu, `BulkFolderPicker` mostra
- * quem ficou de fora em "Subpastas não reconhecidas") — sem lugar nenhum
- * que dissesse os nomes aceitos ANTES de organizar as pastas. Espelha
- * `normalizeConsoleMatch`/`byNormalized` (internal/api/server.go,
- * handleBulkAddLibraryFolders) sem reimplementar a comparação aqui: mostra
- * os três valores que o servidor aceita — id, nome e sigla — e cabe ao
- * usuário copiar um deles. Maiúscula/minúscula, espaço e hífen não
- * importam pro servidor (ex.: "Mega Drive", "megadrive" e "MEGA-DRIVE"
- * casam igual), então isso não precisa ser explicado campo a campo, só uma
- * vez no topo do modal.
- */
-function FolderNameGuideModal({ consoles, onClose }: { consoles: ConsoleInfo[]; onClose: () => void }) {
-  const t = useT(dict);
-  const sorted = [...consoles].sort((a, b) => a.name.localeCompare(b.name));
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      {/* O1 (docs/roadmap.md, Sprint O): precisa do prefixo "sm:" para vencer o
-          "sm:max-w-sm" da base do DialogContent — sem ele o modal renderiza em
-          384px, cortando a lista de 33 consoles em vez de usar a largura pedida. */}
-      <DialogContent className="max-h-[85vh] sm:max-w-lg overflow-y-auto rounded-lg border border-line bg-fill p-5 ring-0">
-        <DialogTitle className="mb-1 text-lg font-semibold text-ink">{t("acceptedFolderNames")}</DialogTitle>
-        <p className="mb-4 text-sm text-muted">
-          {t("folderNamesGuideText")}
-        </p>
-        <ul className="flex flex-col gap-2">
-          {sorted.map((c) => {
-            // Dedup: em vários consoles o id e a sigla coincidem (ex.: n64,
-            // gba) — mostrar o mesmo valor duas vezes só confundiria.
-            const names = [...new Set([c.name, c.short_name, c.console_id])];
-            return (
-              <li key={c.console_id} className="rounded-lg border border-line bg-fill px-3 py-2">
-                <p className="text-xs text-muted">{c.name}</p>
-                <p className="select-all font-mono text-sm text-ink">{names.join(" · ")}</p>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-4 flex justify-end">
-          <Button variant="primary" autoFocus onClick={onClose}>
-            {t("close")}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /**
  * Tela 04 do wireframe, redesenhada no M9 (docs/sprint-m-plano.md,
@@ -456,7 +478,6 @@ export function LibraryScreen({
   const [folders, setFolders] = useState<LibraryFolder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [showNameGuide, setShowNameGuide] = useState(false);
   // Ausente = ainda não contado para aquele console (GET /library/games
   // por console não devolve total, só a lista — critério do M9 exige a
   // contagem na própria linha, então cada console configurado dispara sua
@@ -583,16 +604,9 @@ export function LibraryScreen({
             </span>
           ) : undefined
         }
-        actions={
-          <Button type="button" variant="chrome" onClick={() => setShowNameGuide(true)}>
-            {t("seeFolderNamesAccepted")}
-          </Button>
-        }
       />
 
-      <BulkFolderPicker onDone={() => setReloadKey((k) => k + 1)} />
-
-      {showNameGuide && <FolderNameGuideModal consoles={allConsoles} onClose={() => setShowNameGuide(false)} />}
+      <BulkFolderPicker consoles={allConsoles} onDone={() => setReloadKey((k) => k + 1)} />
 
       {/* Falha ao listar as pastas é erro de tela inteira (nada renderiza
           sem essa lista) — vira modal, não parágrafo vermelho solto (mesmo

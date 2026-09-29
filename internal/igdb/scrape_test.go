@@ -2,6 +2,8 @@ package igdb
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -551,5 +553,102 @@ func TestScrapeBatchPicksUpCoveredGamesMissingMetadata(t *testing.T) {
 	}
 	if got.ReleaseYear != 1995 {
 		t.Fatalf("release_year = %d, esperado 1995", got.ReleaseYear)
+	}
+}
+
+// Trava a busca só de informações (2026-09-29): ela existe justamente para
+// não trocar a capa — uma capa escolhida à mão tem que continuar intacta — e
+// o resultado do job passa a ser o das informações.
+func TestStartMetadataKeepsCoverAndSavesInfo(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	credsStore := newTestCredentialsStore(t)
+	if err := credsStore.Save(testCredentials()); err != nil {
+		t.Fatalf("Save credenciais: %v", err)
+	}
+	game := seedGame(t, lib, "snes", "Chrono Trigger")
+	if err := lib.SetCover(context.Background(), game.ID, "covers/snes/1/manual.jpg"); err != nil {
+		t.Fatalf("SetCover: %v", err)
+	}
+	igdbWithMetadata(t)
+
+	manager := NewScrapeManager(lib, credsStore, silentLogger())
+	job, err := manager.StartMetadata(context.Background(), game.ID)
+	if err != nil {
+		t.Fatalf("StartMetadata: %v", err)
+	}
+	done := waitJobDone(t, manager, job.ID)
+	if len(done.Results) != 1 || done.Results[0].Status != "found" {
+		t.Fatalf("resultado do job = %+v, esperado um \"found\"", done.Results)
+	}
+
+	got, _, _ := lib.GameByID(context.Background(), game.ID)
+	if got.CoverPath != "covers/snes/1/manual.jpg" {
+		t.Fatalf("a busca só de informações trocou a capa: %q", got.CoverPath)
+	}
+	if got.Summary != "A time-travel RPG." || got.MetadataStatus != "found" {
+		t.Fatalf("informações = %q / %q, esperado o resumo e \"found\"", got.Summary, got.MetadataStatus)
+	}
+}
+
+// Sem conta do IGDB, a busca só de informações recusa com o motivo, em vez de
+// um job que terminaria "não encontrado" escondendo que falta a conta.
+func TestStartMetadataRefusesWithoutAccount(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	game := seedGame(t, lib, "snes", "Chrono Trigger")
+
+	manager := NewScrapeManager(lib, newTestCredentialsStore(t), silentLogger())
+	if _, err := manager.StartMetadata(context.Background(), game.ID); !errors.Is(err, ErrMetadataNeedsAccount) {
+		t.Fatalf("StartMetadata sem conta = %v, esperado ErrMetadataNeedsAccount", err)
+	}
+}
+
+// Trava as duas metades da retentativa: uma busca de informações que falhou
+// ('error') volta a entrar no lote seguinte — antes ficava sem informações
+// para sempre —, mas o lote para de tentar depois de
+// maxConsecutiveMetadataErrors falhas seguidas, para uma conta quebrada não
+// virar uma chamada ao IGDB por jogo a cada biblioteca aberta.
+func TestScrapeBatchRetriesMetadataErrorsButStopsAfterConsecutiveFailures(t *testing.T) {
+	setManagedRootEnv(t)
+	lib := newTestLibrary(t)
+	credsStore := newTestCredentialsStore(t)
+	if err := credsStore.Save(testCredentials()); err != nil {
+		t.Fatalf("Save credenciais: %v", err)
+	}
+	var searches int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth2/token", tokenHandler)
+	mux.HandleFunc("/v4/games", func(w http.ResponseWriter, r *http.Request) {
+		searches++
+		http.Error(w, "fora do ar", http.StatusInternalServerError)
+	})
+	fakeIGDBServer(t, mux)
+	fakeLibretroThumbnailsServer(t, http.NewServeMux())
+
+	var ids []int64
+	for i := 0; i < maxConsecutiveMetadataErrors+3; i++ {
+		game := seedGame(t, lib, "snes", fmt.Sprintf("Jogo %d", i))
+		if err := lib.SetCover(context.Background(), game.ID, fmt.Sprintf("covers/snes/%d/cover.jpg", game.ID)); err != nil {
+			t.Fatalf("SetCover: %v", err)
+		}
+		if err := lib.SetMetadataStatus(context.Background(), game.ID, "error"); err != nil {
+			t.Fatalf("SetMetadataStatus: %v", err)
+		}
+		ids = append(ids, game.ID)
+	}
+
+	manager := NewScrapeManager(lib, credsStore, silentLogger())
+	job, err := manager.Start(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if job.Total != len(ids) {
+		t.Fatalf("Total = %d, esperado %d (os jogos com busca de informações falha voltam ao lote)", job.Total, len(ids))
+	}
+	waitJobDone(t, manager, job.ID)
+
+	if searches != maxConsecutiveMetadataErrors {
+		t.Fatalf("buscas no IGDB = %d, esperado parar em %d falhas seguidas", searches, maxConsecutiveMetadataErrors)
 	}
 }
