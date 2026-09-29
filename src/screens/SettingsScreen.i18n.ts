@@ -75,15 +75,16 @@ export const dict = {
   // Controllers section
   controllersHeading: { "pt-BR": "Controles", en: "Controllers" },
   controllersDescription: {
-    "pt-BR": "Configure seu controle físico uma vez só abaixo — o ZeuX abre cada emulador, diz o passo exato e confirma que funcionou. Sem emuladores instalados que suportem isso, a lista fica vazia.",
-    en: "Set up your physical controller once below — ZeuX opens each emulator, tells you the exact step, and confirms it worked. With no installed emulator that supports this, the list stays empty.",
+    "pt-BR":
+      "O controle já navega o ZeuX sem configurar nada. Em Configurar controle você escolhe qual botão confirma e, se quiser, leva o mesmo mapeamento para os emuladores; em Testar controle confere botão por botão.",
+    en: "Your controller already navigates ZeuX with no setup. In Configure controller you pick which button confirms and, if you want, carry the same mapping to the emulators; in Test controller you check every button.",
   },
   configureControllerButton: { "pt-BR": "Configurar controle", en: "Configure controller" },
   testControllerButton: { "pt-BR": "Testar controle", en: "Test controller" },
   loadingEmulatorsForControllers: { "pt-BR": "Carregando emuladores…", en: "Loading emulators…" },
   noBindableEmulators: {
-    "pt-BR": "Nenhum emulador instalado suporta mapeamento de controle ainda (hoje: PCSX2 e RetroArch).",
-    en: "No installed emulator supports controller mapping yet (currently: PCSX2 and RetroArch).",
+    "pt-BR": "Nenhum emulador instalado aceita mapeamento de controle ainda (hoje: PCSX2 e RetroArch). A navegação no ZeuX não depende disso.",
+    en: "No installed emulator accepts controller mapping yet (today: PCSX2 and RetroArch). Navigating ZeuX doesn't depend on it.",
   },
 
   // Configurar controle — fluxo guiado (2026-09-08): um passo por emulador,

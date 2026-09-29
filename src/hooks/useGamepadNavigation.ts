@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { confirmBackIndices } from "../lib/gamepadPrefs";
 import { isGamepadNavigationSuspended } from "./gamepadNavigationSuspend";
 
 // Zona morta do analógico — abaixo disso, ruído do próprio hardware não
 // deveria mover o foco sozinho.
 const STICK_DEADZONE = 0.5;
 // Índices do Gamepad API (padrão "standard" mapping): D-pad como botões
-// digitais, A e B nas mesmas posições de um controle Xbox/PlayStation.
-const BUTTON_A = 0;
-const BUTTON_B = 1;
+// digitais. Confirmar e voltar vêm de `confirmBackIndices()` — por padrão o
+// botão de baixo confirma (A no Xbox, ✕ no PlayStation), mas quem usa controle
+// Nintendo pode trocar em Configurar controle (lib/gamepadPrefs.ts).
 const DPAD: [number, Direction][] = [
   [12, "up"],
   [13, "down"],
@@ -409,20 +410,21 @@ export function useGamepadNavigation(): { connected: boolean } {
       }
       stickDirectionActive = stickDirection;
 
-      const aPressed = pad.buttons[BUTTON_A]?.pressed ?? false;
-      if (aPressed && !prevButtons[BUTTON_A]) {
+      const { confirm: BUTTON_CONFIRM, back: BUTTON_BACK } = confirmBackIndices();
+      const aPressed = pad.buttons[BUTTON_CONFIRM]?.pressed ?? false;
+      if (aPressed && !prevButtons[BUTTON_CONFIRM]) {
         // O cursor visível manda: Ⓐ tem que acionar exatamente o que a
         // pessoa está VENDO realçado, mesmo que algo tenha roubado o foco
         // do DOM no meio do caminho.
         (currentCursor() ?? (document.activeElement as HTMLElement | null))?.click();
       }
-      prevButtons[BUTTON_A] = aPressed;
+      prevButtons[BUTTON_CONFIRM] = aPressed;
 
-      const bPressed = pad.buttons[BUTTON_B]?.pressed ?? false;
-      if (bPressed && !prevButtons[BUTTON_B]) {
+      const bPressed = pad.buttons[BUTTON_BACK]?.pressed ?? false;
+      if (bPressed && !prevButtons[BUTTON_BACK]) {
         pressBack();
       }
-      prevButtons[BUTTON_B] = bPressed;
+      prevButtons[BUTTON_BACK] = bPressed;
     }
 
     frame = requestAnimationFrame(poll);

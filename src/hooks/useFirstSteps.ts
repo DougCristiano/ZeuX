@@ -27,11 +27,14 @@ export function useFirstSteps({
   consoles,
   emulators,
   recentlyPlayed,
+  refreshKey = 0,
 }: {
   consoles: ConsoleEntry[] | undefined;
   emulators: EmulatorEntry[] | null;
   /** `null` enquanto a lista de jogos recentes ainda não respondeu. */
   recentlyPlayed: boolean | null;
+  /** Muda quando a tela sabe que pastas/cores podem ter mudado — relê tudo. */
+  refreshKey?: number;
 }): { progress: FirstStepsProgress | null; dismiss: () => void } {
   const [folders, setFolders] = useState<LibraryFolder[] | null>(null);
   const [cores, setCores] = useState<RetroArchCoreStatus[] | null>(null);
@@ -57,7 +60,7 @@ export function useFirstSteps({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   const progress = useMemo(() => {
     if (dismissed || !consoles || !emulators || !folders || !cores || playedBefore === null || recentlyPlayed === null) {
@@ -79,4 +82,32 @@ export function useFirstSteps({
       setDismissed(true);
     },
   };
+}
+
+/**
+ * A mesma lista, para as telas aonde os passos levam — Pastas de jogos (passo
+ * 1) e o detalhe do console (passo 2). Lá não há catálogo nem emuladores
+ * carregados para reaproveitar, então este busca os dois. "Já jogou?" vem só
+ * do histórico: essas telas não abrem jogo.
+ */
+export function useStandaloneFirstSteps(refreshKey: number) {
+  const [consoles, setConsoles] = useState<ConsoleEntry[] | undefined>(undefined);
+  const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .getConsoles()
+      .then((res) => alive && setConsoles(res.consoles))
+      .catch(() => {});
+    api
+      .getEmulators()
+      .then((res) => alive && setEmulators(res.emulators))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [refreshKey]);
+
+  return useFirstSteps({ consoles, emulators, recentlyPlayed: false, refreshKey });
 }

@@ -256,6 +256,9 @@ function App() {
   // zera `scrollTop` de volta sozinho, e nada dispara de novo depois que os
   // jogos chegam. `AllGamesScreen` recebe `initialScrollTop` e só aplica
   // depois que `games` deixa de ser `null`.
+  // De onde se abriu o teste de controle — o "Voltar" dele volta para lá, e
+  // não sempre para Configurações.
+  const [controllerTestOrigin, setControllerTestOrigin] = useState<"settings" | "configure-controller">("settings");
   const mainRef = useRef<HTMLElement>(null);
   const [allGamesScrollTop, setAllGamesScrollTop] = useState(0);
 
@@ -603,6 +606,7 @@ function App() {
           consoleId={selectedConsole!.id}
           report={report ?? undefined}
           onBack={() => setPhase("consoles")}
+          onContinueFirstSteps={() => setPhase("all-games")}
           // 2026-09-08: "Ver jogos" não depende mais de parecer carregado —
           // `GamesScreen` já lança sem preset autoconfigurado quando
           // `report` está ausente (ver `internal/api/server.go`, `toInput`).
@@ -633,6 +637,7 @@ function App() {
           consoleCatalog={consoles}
           report={report ?? undefined}
           onBack={() => setPhase("all-games")}
+          onContinueFirstSteps={() => setPhase("all-games")}
           onOpenGames={(id, name, shortName) => {
             setSelectedConsole({ id, name, shortName });
             setGamesOrigin("library");
@@ -681,7 +686,10 @@ function App() {
     case "settings":
       screen = (
         <SettingsScreen
-          onOpenControllerTest={() => setPhase("controller-test")}
+          onOpenControllerTest={() => {
+            setControllerTestOrigin("settings");
+            setPhase("controller-test");
+          }}
           onOpenConfigureController={() => setPhase("configure-controller")}
           onReplayTour={() => setTourVisible(true)}
         />
@@ -689,11 +697,19 @@ function App() {
       break;
 
     case "controller-test":
-      screen = <ControllerTestScreen onBack={() => setPhase("settings")} />;
+      screen = <ControllerTestScreen onBack={() => setPhase(controllerTestOrigin)} />;
       break;
 
     case "configure-controller":
-      screen = <ConfigureControllerScreen onBack={() => setPhase("settings")} />;
+      screen = (
+        <ConfigureControllerScreen
+          onBack={() => setPhase("settings")}
+          onOpenTest={() => {
+            setControllerTestOrigin("configure-controller");
+            setPhase("controller-test");
+          }}
+        />
+      );
       break;
   }
 

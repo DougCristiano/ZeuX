@@ -32,7 +32,9 @@ import {
   SectionHeading,
 } from "../components/ui";
 import { EmulatorBindingsPanel } from "../components/EmulatorBindingsPanel";
+import { FirstStepsBanner } from "../components/FirstStepsBanner";
 import { FirstVisitTip } from "../components/FirstVisitTip";
+import { useStandaloneFirstSteps } from "../hooks/useFirstSteps";
 import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { SaveDataPanel } from "../components/SaveDataPanel";
@@ -603,12 +605,15 @@ export function ConsoleDetailScreen({
   report,
   onBack,
   onOpenGames,
+  onContinueFirstSteps,
 }: {
   consoleId: string;
   report?: Report;
   onBack: () => void;
   /** Ausente sem parecer carregado — `GamesScreen` exige o preset. */
   onOpenGames?: () => void;
+  /** Volta para a lista de primeiros passos (em "Todos os jogos"). */
+  onContinueFirstSteps: () => void;
 }) {
   const t = useT(dict);
   const [entry, setEntry] = useState<ConsoleEntry | null>(null);
@@ -685,7 +690,13 @@ export function ConsoleDetailScreen({
     }
   }
 
+  // Sobe a cada `reload` (emulador instalado, core baixado, pasta apontada):
+  // a faixa dos primeiros passos relê o estado junto com a tela.
+  const [reloadCount, setReloadCount] = useState(0);
+  const firstSteps = useStandaloneFirstSteps(reloadCount);
+
   const reload = useCallback(() => {
+    setReloadCount((n) => n + 1);
     api
       .getConsoles()
       .then((res) => {
@@ -825,6 +836,13 @@ export function ConsoleDetailScreen({
   return (
     <ScreenContainer variant="listing">
       <BackButton label={t("backConsoles")} onClick={onBack} />
+
+      {/* Só no console que o passo 2 nomeia — em outro console, "resolva o
+          que falta aqui" apontaria para o lugar errado. */}
+      {firstSteps.progress &&
+        firstSteps.progress.steps.find((s) => s.id === "emulator")?.console?.console_id === consoleId && (
+          <FirstStepsBanner progress={firstSteps.progress} step="emulator" onContinue={onContinueFirstSteps} />
+        )}
 
       {/* Achado do critico-design (2026-09-06): a cor de identidade por
           console — o ativo de marca mais distintivo do projeto

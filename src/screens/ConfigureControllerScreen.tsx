@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import type { EmulatorEntry } from "../api/types";
 import { PixelController } from "../components/PixelController";
-import { Button, Callout, Card, ScreenContainer, ScreenHeader } from "../components/ui";
+import { Button, Callout, Card, FILTER_CHIP_BASE, FILTER_CHIP_OFF, FILTER_CHIP_ON, FOCUS_RING, ScreenContainer, ScreenHeader, SectionHeading } from "../components/ui";
+import { getConfirmButton, setConfirmButton, type ConfirmButton } from "../lib/gamepadPrefs";
 import { CONTROLLER_BINDING_TARGETS } from "../lib/controllerBindingTargets";
 import { useGamepad } from "../hooks/useGamepad";
 import { resumeGamepadNavigation, suspendGamepadNavigation } from "../hooks/gamepadNavigationSuspend";
@@ -49,9 +50,10 @@ type Phase = "idle" | "running" | "done";
  * para quem quiser ajustar um emulador específico depois — este fluxo é o
  * caminho principal, não o único.
  */
-export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
+export function ConfigureControllerScreen({ onBack, onOpenTest }: { onBack: () => void; onOpenTest: () => void }) {
   const t = useT(dict);
   const gamepad = useGamepad();
+  const [confirmButton, setConfirmButtonState] = useState<ConfirmButton>(getConfirmButton);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [starting, setStarting] = useState(false);
@@ -75,6 +77,19 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
   // controle ficaria suspensa no resto do app — o pior estado possível,
   // porque o sintoma aparece longe daqui.
   useEffect(() => resumeGamepadNavigation, []);
+
+  // A seção dos emuladores diz de cara se há algum para receber o mapeamento
+  // (2026-09-29): antes a pessoa só descobria depois de clicar em Iniciar, e a
+  // tela inteira parecia dizer que o controle não tinha o que configurar.
+  useEffect(() => {
+    api
+      .getEmulators()
+      .then(({ emulators }) => {
+        setAdapters(emulators.filter((e) => e.installed && e.bindable));
+        setCheckedAdapters(true);
+      })
+      .catch(() => {});
+  }, []);
 
   async function start() {
     setStartError(null);
@@ -209,6 +224,11 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
   // "nenhum emulador aceita" seria afirmar algo que o ZeuX não verificou.
   const semBindable = phase === "idle" && !starting && startError === null && checkedAdapters && adapters.length === 0;
 
+  function chooseConfirm(value: ConfirmButton) {
+    setConfirmButton(value);
+    setConfirmButtonState(value);
+  }
+
   return (
     <ScreenContainer>
       <ScreenHeader back={{ label: t("back"), onClick: onBack }} title={t("title")} subtitle={t("subtitle")} />
@@ -220,6 +240,47 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
           {t("noController")}
         </Callout>
       )}
+
+      {/* "No ZeuX" vem primeiro (2026-09-29, teste com usuário novo): quem
+          chega aqui quer saber se o controle funciona no app antes de pensar
+          em emulador. O controle já navega o ZeuX sem configurar nada; a única
+          escolha real é qual botão confirma. */}
+      <section className="mb-8 flex flex-col gap-3">
+        <SectionHeading>{t("zeuxHeading")}</SectionHeading>
+        <Card filled className="flex flex-col gap-4">
+          <p className="max-w-prose text-sm text-ink">
+            {t("zeuxWorksAlready", {
+              confirm: confirmButton === "bottom" ? t("buttonBottomShort") : t("buttonRightShort"),
+              back: confirmButton === "bottom" ? t("buttonRightShort") : t("buttonBottomShort"),
+            })}
+          </p>
+          <div>
+            <p id="confirm-button-label" className="mb-2 font-mono text-xs tracking-wider text-muted uppercase">
+              {t("confirmButtonLabel")}
+            </p>
+            <div role="radiogroup" aria-labelledby="confirm-button-label" className="flex flex-wrap gap-2">
+              {(["bottom", "right"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={confirmButton === value}
+                  onClick={() => chooseConfirm(value)}
+                  className={`${FILTER_CHIP_BASE} ${FOCUS_RING} ${confirmButton === value ? FILTER_CHIP_ON : FILTER_CHIP_OFF}`}
+                >
+                  {value === "bottom" ? t("confirmBottom") : t("confirmRight")}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Button variant="chrome" className="w-fit" onClick={onOpenTest}>
+            {t("testAllButtons")}
+          </Button>
+        </Card>
+      </section>
+
+      <SectionHeading className="mb-2">{t("emulatorsHeading")}</SectionHeading>
+      <p className="mb-4 max-w-prose text-sm text-muted">{t("emulatorsIntro")}</p>
 
       {startError && (
         <Callout label={t("errorLabel")} tone="amber" className="mb-4">
@@ -248,7 +309,11 @@ export function ConfigureControllerScreen({ onBack }: { onBack: () => void }) {
           </>
         ) : (
           <>
-            <Button variant="primary" onClick={() => void start()} disabled={!gamepad.connected || starting}>
+            <Button
+              variant="primary"
+              onClick={() => void start()}
+              disabled={!gamepad.connected || starting || (checkedAdapters && adapters.length === 0)}
+            >
               {phase === "done" ? t("restartButton") : t("startButton")}
             </Button>
             {starting && <p className="text-sm text-muted">{t("loadingEmulators")}</p>}

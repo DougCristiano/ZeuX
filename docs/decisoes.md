@@ -1298,6 +1298,43 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### Primeiros passos acompanham o usuário fora da biblioteca — 2026-09-29
+
+Teste com um usuário novo: ele apontou a pasta pela lista de primeiros passos,
+ficou na tela de Pastas de jogos e não entendeu que havia mais passos — só viu
+o 2 e o 3 porque clicou em Voltar por acaso. A lista mora em "Todos os jogos",
+e as ações dela levam a outras telas.
+
+`FirstStepsBanner` aparece nas telas aonde os passos levam: Pastas de jogos
+(passo 1) e o detalhe do console que o passo 2 nomeia (em outro console, "resolva
+o que falta aqui" apontaria o lugar errado). Enquanto o passo está pendente,
+diz o que fazer ali. Assim que ele é concluído, **sem sair da tela**, vira
+"Feito: … Próximo passo: …" com o botão "Continuar primeiros passos", que volta
+para a lista. Para isso `useFirstSteps` ganhou `refreshKey` (as telas o sobem a
+cada pasta apontada ou emulador/core instalado) e `useStandaloneFirstSteps`,
+que busca catálogo e emuladores onde a tela não os tem.
+
+Voltar sozinho para a biblioteca ao apontar a pasta foi descartado: quem aponta
+uma pasta costuma apontar outra em seguida, e ser tirado da tela no meio disso
+seria pior que o problema.
+
+### Controle: seção "No ZeuX" e escolha do botão de confirmar — 2026-09-29
+
+Mesmo teste: o usuário queria "configurar o controle para o ZeuX", e a única
+tela de configuração era a dos emuladores, que sem nenhum instalado dizia que
+não havia o que configurar — embora o controle já navegasse o app sem nada.
+
+Configurar controle agora abre com **No ZeuX**: diz que o controle já funciona,
+quais botões fazem o quê, e deixa escolher o **botão de confirmar** — o de baixo
+(padrão: A no Xbox, ✕ no PlayStation) ou o da direita (A no Nintendo, ○ no
+PlayStation japonês), que é o costume de quem vem de controle Nintendo. A
+escolha mora em `lib/gamepadPrefs.ts` (`localStorage`, preferência da máquina)
+e `useGamepadNavigation` a lê a cada quadro. Remapear botão por botão não entrou:
+a navegação só usa direcional, confirmar e voltar. **Nos emuladores** vem depois,
+marcada como opcional, e diz de cara (sem precisar clicar em Iniciar) quando não
+há emulador que aceite mapeamento — e que isso não afeta o ZeuX. "Testar todos
+os botões" leva ao teste e o Voltar dele retorna para onde se veio.
+
 ### "Sobre o jogo" sempre visível, busca só de informações e retentativa — 2026-09-29
 
 Relato do Douglas, com vídeo, na v0.1.34: o resumo do jogo não aparecia em

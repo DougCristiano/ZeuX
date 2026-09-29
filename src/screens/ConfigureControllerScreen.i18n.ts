@@ -6,13 +6,39 @@ export const dict = {
     en: "Configure controller",
   },
   subtitle: {
-    "pt-BR": "Aperte cada botão do controle uma vez — o ZeuX aplica o mesmo mapeamento em todos os emuladores instalados.",
-    en: "Press each controller button once — ZeuX applies the same mapping to every installed emulator.",
+    "pt-BR": "Deixe o controle do seu jeito no ZeuX e leve o mesmo mapeamento para os emuladores.",
+    en: "Set the controller up your way in ZeuX and carry the same mapping to the emulators.",
+  },
+  // Seção "No ZeuX" (2026-09-29): o controle navega o próprio app sem
+  // configurar nada; a escolha é qual botão confirma (lib/gamepadPrefs.ts).
+  zeuxHeading: { "pt-BR": "No ZeuX", en: "In ZeuX" },
+  zeuxWorksAlready: {
+    "pt-BR":
+      "Seu controle já navega o ZeuX, sem instalar nem configurar nada: o direcional ou o analógico movem o cursor, {{confirm}} seleciona e {{back}} volta.",
+    en: "Your controller already navigates ZeuX, nothing to install or set up: the D-pad or stick moves the cursor, {{confirm}} selects and {{back}} goes back.",
+  },
+  buttonBottomShort: { "pt-BR": "o botão de baixo", en: "the bottom button" },
+  buttonRightShort: { "pt-BR": "o botão da direita", en: "the right button" },
+  confirmButtonLabel: { "pt-BR": "Botão de confirmar", en: "Confirm button" },
+  confirmBottom: {
+    "pt-BR": "De baixo — A no Xbox, ✕ no PlayStation",
+    en: "Bottom — A on Xbox, ✕ on PlayStation",
+  },
+  confirmRight: {
+    "pt-BR": "Da direita — A no Nintendo, ○ no PlayStation japonês",
+    en: "Right — A on Nintendo, ○ on Japanese PlayStation",
+  },
+  testAllButtons: { "pt-BR": "Testar todos os botões", en: "Test every button" },
+  emulatorsHeading: { "pt-BR": "Nos emuladores", en: "In the emulators" },
+  emulatorsIntro: {
+    "pt-BR":
+      "Opcional. Aperte cada botão do controle uma vez e o ZeuX aplica o mesmo mapeamento em todos os emuladores instalados que aceitam isso.",
+    en: "Optional. Press each controller button once and ZeuX applies the same mapping to every installed emulator that accepts it.",
   },
   back: { "pt-BR": "Voltar", en: "Back" },
   noController: {
-    "pt-BR": "Nenhum controle conectado. Plugue um e clique em Iniciar.",
-    en: "No controller connected. Plug one in and click Start.",
+    "pt-BR": "Nenhum controle conectado. Plugue um — o ZeuX o reconhece na hora, sem instalar nada.",
+    en: "No controller connected. Plug one in — ZeuX picks it up right away, nothing to install.",
   },
   connectedAs: { "pt-BR": "Controle: {{name}}", en: "Controller: {{name}}" },
   startButton: { "pt-BR": "Iniciar configuração", en: "Start setup" },
@@ -35,8 +61,9 @@ export const dict = {
     en: "ZeuX applied the mapping to {{count}} emulator(s).",
   },
   noBindableEmulators: {
-    "pt-BR": "Nenhum emulador instalado aceita mapeamento de controle pelo ZeuX ainda.",
-    en: "No installed emulator accepts controller mapping through ZeuX yet.",
+    "pt-BR":
+      "Nenhum emulador instalado aceita mapeamento pelo ZeuX ainda (hoje: PCSX2 e RetroArch). Isso não afeta o ZeuX — quando instalar um deles, volte aqui para levar o mapeamento.",
+    en: "No installed emulator accepts mapping through ZeuX yet (today: PCSX2 and RetroArch). That doesn't affect ZeuX — once you install one, come back here to carry the mapping over.",
   },
   perAdapterNotesHeading: { "pt-BR": "Ressalvas por emulador", en: "Per-emulator notes" },
   // Nota registrada quando a própria chamada da API falha. Fica ao lado das

@@ -22,6 +22,8 @@ import {
   ZSelect,
 } from "../components/ui";
 import { ConsoleLabel } from "../components/ConsoleLabel";
+import { FirstStepsBanner } from "../components/FirstStepsBanner";
+import { useStandaloneFirstSteps } from "../hooks/useFirstSteps";
 import { SelectItem } from "../components/ui/select";
 import { useT } from "../i18n/i18n";
 import { dict } from "./LibraryScreen.i18n";
@@ -463,6 +465,7 @@ export function LibraryScreen({
   report,
   onBack,
   onOpenGames,
+  onContinueFirstSteps,
 }: {
   /** `GET /consoles` — nome/sigla por console, independente de scan. É a
    * fonte de nomes desta tela; `report` só entra para o badge de
@@ -473,11 +476,16 @@ export function LibraryScreen({
   report?: Report;
   onBack: () => void;
   onOpenGames: (consoleId: string, name: string, shortName: string) => void;
+  /** Volta para a lista de primeiros passos (em "Todos os jogos"). */
+  onContinueFirstSteps: () => void;
 }) {
   const t = useT(dict);
   const [folders, setFolders] = useState<LibraryFolder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Relido a cada pasta apontada (reloadKey): é o que faz a faixa virar
+  // "Feito" sem a pessoa sair da tela.
+  const firstSteps = useStandaloneFirstSteps(reloadKey);
   // Ausente = ainda não contado para aquele console (GET /library/games
   // por console não devolve total, só a lista — critério do M9 exige a
   // contagem na própria linha, então cada console configurado dispara sua
@@ -605,6 +613,10 @@ export function LibraryScreen({
           ) : undefined
         }
       />
+
+      {firstSteps.progress && (
+        <FirstStepsBanner progress={firstSteps.progress} step="folder" onContinue={onContinueFirstSteps} />
+      )}
 
       <BulkFolderPicker consoles={allConsoles} onDone={() => setReloadKey((k) => k + 1)} />
 
