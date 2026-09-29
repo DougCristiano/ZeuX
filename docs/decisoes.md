@@ -1298,6 +1298,43 @@ registrado sob a mesma versão.
 a política em português; traduzir no front faz a interface mostrar um texto
 que o servidor não registrou.
 
+### Firmware do PS3 instalado pelo próprio RPCS3, a partir da tela do console — 2026-09-29
+
+Relato do Douglas: um usuário instalou o RPCS3 e não havia botão para levar
+ao firmware. Não havia porque o RPCS3 não lê firmware de pasta nenhuma (ver
+`BiosDir`): o `PS3UPDAT.PUP` passa pelo instalador dele, que decifra e extrai
+para `dev_flash`. Agora a seção "BIOS / firmware" do PS3 vira **"Firmware do
+console"**: diz se está instalado e tem "Instalar firmware…", que pede o
+arquivo que o usuário já tem e o entrega a `rpcs3 --installfw <arquivo>`. O
+RPCS3 abre com a barra de progresso dele; o cartão relê o estado quando a
+janela do ZeuX volta ao foco.
+
+- **Instalado?** A mesma prova que o RPCS3 usa antes de bootar um jogo:
+  `dev_flash/sys/external/liblv2.sprx` na pasta de configuração dele
+  (`rpcs3/Emu/System.cpp`, `firmware_missing`). A pasta espelha
+  `fs::get_config_dir` (`Utilities/File.cpp`): `portable/` ao lado do exe,
+  senão a do exe (ou `RPCS3_CONFIG_DIR`) no Windows, `$XDG_CONFIG_HOME/rpcs3`
+  ou `~/.config/rpcs3` no Linux, `~/Library/Application Support/rpcs3` no
+  macOS. Um `vfs.yml` que tire o `dev_flash` do padrão vira "não sei"
+  (`firmware_installed` ausente), nunca "faltando".
+- **A opção `--installfw`** está no código do RPCS3 (`rpcs3/rpcs3.cpp`,
+  `arg_installfw`: "Forces the emulator to install this firmware file.") e
+  chama o mesmo `main_window::InstallPup` do menu Arquivo → Install Firmware.
+  **Nada disso foi executado contra o binário real** — foi lido do
+  código-fonte em 2026-09-29. Testado com um executável falso que registra os
+  argumentos.
+- Firmware faltando entra na prontidão ("BIOS · falta", frase nomeando o
+  firmware) e na checagem antes de jogar (mesmo motivo `bios_empty`, com o
+  badge "firmware ausente").
+- O ZeuX nunca diz de onde tirar o firmware (princípio 6): só o nome que o
+  arquivo costuma ter, e só aceita `.PUP`.
+
+**Achado de passagem, não corrigido aqui:** `seedRPCS3` (`internal/install/
+firstrun.go`) grava `config.yml` na pasta de instalação, mas no Windows o
+RPCS3 lê a configuração de `config/` dentro dela (`fs::get_config_dir(true)`)
+e no Linux de `~/.config/rpcs3`. Como o arquivo gravado é vazio, o efeito é
+nenhum — nem bom nem ruim; fica registrado para a pré-configuração do RPCS3.
+
 ### Primeiros passos acompanham o usuário fora da biblioteca — 2026-09-29
 
 Teste com um usuário novo: ele apontou a pasta pela lista de primeiros passos,

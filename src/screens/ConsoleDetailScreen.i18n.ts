@@ -233,6 +233,37 @@ export const dict = {
     en:
       "The folder depends on the emulator. Install one above and it will appear here if ZeuX knows where that emulator reads the file.",
   },
+  // Firmware instalado pelo próprio emulador (RPCS3, 2026-09-29). Nunca diz
+  // de onde tirar o arquivo (princípio 6) — só como ele costuma se chamar.
+  firmwareTitle: { "pt-BR": "Firmware do console", en: "Console firmware" },
+  firmwareInstalled: { "pt-BR": "instalado", en: "installed" },
+  firmwareMissing: { "pt-BR": "faltando", en: "missing" },
+  firmwareHelp: {
+    "pt-BR":
+      "O {{emulatorName}} precisa do firmware do console instalado, e ele não fica numa pasta: o arquivo (normalmente PS3UPDAT.PUP) passa pelo instalador do próprio emulador. Escolha o arquivo que você já tem e o ZeuX abre o {{emulatorName}} para instalar.",
+    en: "{{emulatorName}} needs the console firmware installed, and it doesn't live in a folder: the file (usually PS3UPDAT.PUP) goes through the emulator's own installer. Pick the file you already have and ZeuX opens {{emulatorName}} to install it.",
+  },
+  firmwareInstalledHelp: {
+    "pt-BR": "O firmware já está instalado no {{emulatorName}}. Só reinstale se quiser trocar de versão.",
+    en: "The firmware is already installed in {{emulatorName}}. Only reinstall to change versions.",
+  },
+  firmwareUnknown: {
+    "pt-BR": "O ZeuX não conseguiu verificar se o firmware já está instalado — a configuração de pastas do {{emulatorName}} foi personalizada.",
+    en: "ZeuX couldn't check whether the firmware is installed — {{emulatorName}}'s folder setup was customized.",
+  },
+  firmwareInstall: { "pt-BR": "Instalar firmware…", en: "Install firmware…" },
+  firmwareReinstall: { "pt-BR": "Reinstalar firmware…", en: "Reinstall firmware…" },
+  firmwareRecheck: { "pt-BR": "Verificar de novo", en: "Check again" },
+  firmwareFileFilter: { "pt-BR": "Firmware (PUP)", en: "Firmware (PUP)" },
+  firmwareStartedLabel: { "pt-BR": "Instalando", en: "Installing" },
+  firmwareStarted: {
+    "pt-BR": "O {{emulatorName}} abriu e está instalando o firmware. Quando terminar, feche a janela dele e volte aqui — o ZeuX confere sozinho.",
+    en: "{{emulatorName}} opened and is installing the firmware. When it's done, close its window and come back — ZeuX checks on its own.",
+  },
+  firmwareInstallError: {
+    "pt-BR": "Não foi possível abrir o emulador para instalar o firmware.",
+    en: "Could not open the emulator to install the firmware.",
+  },
   openBiosFolder: {
     "pt-BR": "Abrir pasta do BIOS",
     en: "Open BIOS folder",

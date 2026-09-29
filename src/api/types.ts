@@ -234,6 +234,11 @@ export type EmulatorEntry = {
   bios_dir?: string;
   /** Só significativo quando `bios_dir` está presente. */
   bios_dir_empty?: boolean;
+  /** (2026-09-29) Firmware que não é "arquivo numa pasta" (RPCS3): se já
+   * está instalado no emulador. Ausente quando o ZeuX não sabe dizer. */
+  firmware_installed?: boolean;
+  /** O ZeuX sabe entregar o arquivo de firmware ao instalador do emulador. */
+  firmware_installable?: boolean;
   /** H1/H2, docs/roadmap.md — diz se GET/POST/DELETE .../config existe de
    * verdade para este emulador (hoje só PCSX2 e RetroArch). */
   configurable: boolean;

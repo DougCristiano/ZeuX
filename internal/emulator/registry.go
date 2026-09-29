@@ -162,6 +162,15 @@ type Status struct {
 	// depois de clicar.
 	BiosDirEmpty bool `json:"bios_dir_empty,omitempty"`
 
+	// FirmwareInstalled existe para o firmware que não é "arquivo numa
+	// pasta" (RPCS3, 2026-09-29 — ver firmware.go). Ausente quando o ZeuX não
+	// sabe dizer; nunca `false` por palpite.
+	FirmwareInstalled *bool `json:"firmware_installed,omitempty"`
+
+	// FirmwareInstallable diz se o ZeuX sabe entregar o arquivo de firmware
+	// ao instalador deste emulador (POST /emulators/{id}/firmware).
+	FirmwareInstallable bool `json:"firmware_installable,omitempty"`
+
 	// Configurable/Bindable (H1/H3/H4, docs/roadmap.md) dizem se este
 	// adapter satisfaz ConfigurableAdapter/KeyBindableAdapter — a interface
 	// usa isso para mostrar ou esconder os botões de configurar/mapear sem
@@ -233,6 +242,11 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 		if install, ok := adapter.Locate(ctx); ok {
 			status.Installed = true
 			status.Installation = &install
+
+			if installed, known := FirmwareInstalled(adapter.ID(), install); known {
+				status.FirmwareInstalled = &installed
+			}
+			status.FirmwareInstallable = FirmwareInstallable(adapter.ID())
 
 			if dir, ok := BiosDir(adapter.ID(), install); ok {
 				status.BiosDir = dir

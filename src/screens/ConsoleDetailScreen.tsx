@@ -515,6 +515,81 @@ function GamesFolderSection({
 }
 
 /**
+ * Firmware que passa pelo instalador do próprio emulador (RPCS3, 2026-09-29 —
+ * relato do Douglas: um usuário instalou o RPCS3 e não achou onde pôr o
+ * firmware do PS3). Não há pasta para abrir: o arquivo escolhido pelo usuário
+ * vai para o instalador do emulador (`POST /emulators/{id}/firmware`), que
+ * abre com a barra de progresso dele.
+ *
+ * Nunca diz de onde tirar o arquivo (princípio 6) — só o nome que ele costuma
+ * ter, para a pessoa reconhecer o que já tem.
+ *
+ * O estado é relido quando a janela volta ao foco: a instalação termina na
+ * janela do emulador, sem aviso para o ZeuX, e a pessoa volta para cá depois.
+ */
+function FirmwareCard({ entry, onChanged }: { entry: EmulatorEntry; onChanged: () => void }) {
+  const t = useT(dict);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    if (!started) return;
+    window.addEventListener("focus", onChanged);
+    return () => window.removeEventListener("focus", onChanged);
+  }, [started, onChanged]);
+
+  async function pickAndInstall() {
+    setError(null);
+    const picked = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: t("firmwareFileFilter"), extensions: ["PUP", "pup"] }],
+    });
+    if (typeof picked !== "string") return;
+    setBusy(true);
+    try {
+      await api.installFirmware(entry.adapter_id, picked);
+      setStarted(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : t("firmwareInstallError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const installed = entry.firmware_installed;
+  return (
+    <Card filled className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-semibold text-ink">{t("firmwareTitle")}</p>
+        {installed !== undefined && (
+          <Badge variant={installed ? "solid" : undefined}>{installed ? t("firmwareInstalled") : t("firmwareMissing")}</Badge>
+        )}
+      </div>
+      <p className="max-w-prose text-sm text-muted">
+        {installed ? t("firmwareInstalledHelp", { emulatorName: entry.name }) : t("firmwareHelp", { emulatorName: entry.name })}
+      </p>
+      {installed === undefined && <p className="text-sm text-muted">{t("firmwareUnknown", { emulatorName: entry.name })}</p>}
+      {started && !installed && (
+        <Callout label={t("firmwareStartedLabel")}>{t("firmwareStarted", { emulatorName: entry.name })}</Callout>
+      )}
+      {error && <InlineError>{error}</InlineError>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant={installed ? "chrome" : "primary"} disabled={busy} onClick={() => void pickAndInstall()}>
+          {installed ? t("firmwareReinstall") : t("firmwareInstall")}
+        </Button>
+        {started && (
+          <Button type="button" variant="chrome" onClick={onChanged}>
+            {t("firmwareRecheck")}
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/**
  * O BIOS/firmware do console, quando o ZeuX sabe onde o emulador escolhido lê
  * o arquivo.
  *
@@ -531,9 +606,21 @@ function GamesFolderSection({
  *
  * O ZeuX também nunca sugere onde obter o arquivo. Ver o princípio 6.
  */
-function BiosSection({ entry, requiresExternalFile }: { entry?: EmulatorEntry; requiresExternalFile: boolean }) {
+function BiosSection({
+  entry,
+  requiresExternalFile,
+  onChanged,
+}: {
+  entry?: EmulatorEntry;
+  requiresExternalFile: boolean;
+  onChanged: () => void;
+}) {
   const t = useT(dict);
   const [error, setError] = useState<string | null>(null);
+
+  if (entry?.installed && entry.firmware_installable) {
+    return <FirmwareCard entry={entry} onChanged={onChanged} />;
+  }
 
   if (!entry?.bios_dir) {
     if (!requiresExternalFile) return null;
@@ -804,7 +891,11 @@ export function ConsoleDetailScreen({
         : "pendente";
   const biosState: TrailState = !requiresExternalFile
     ? "na"
-    : !chosenEntry?.bios_dir
+    : chosenEntry?.firmware_installed !== undefined
+      ? chosenEntry.firmware_installed
+        ? "ok"
+        : "pendente"
+      : !chosenEntry?.bios_dir
       ? "desconhecido"
       : chosenEntry.bios_dir_empty
         ? "pendente"
@@ -987,7 +1078,7 @@ export function ConsoleDetailScreen({
               ))
             )}
 
-            <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} />
+            <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} onChanged={reload} />
           </section>
 
           {/* Saves (docs/pendencias.md, "Ver saves dentro do ZeuX — MVP de

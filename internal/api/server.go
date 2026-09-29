@@ -143,6 +143,7 @@ func (s *Server) Routes() http.Handler {
 	// não é lançamento de jogo, por isso não é /games/launch. Ver
 	// Launcher.LaunchStandalone, internal/emulator/session.go.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/open", s.handleOpenEmulator)
+	mux.HandleFunc("POST /api/v1/emulators/{id}/firmware", s.handleInstallFirmware)
 	mux.HandleFunc("POST /api/v1/system/vcredist/install", s.handleInstallVCRedist)
 	// Trilho guiado de instalação manual (2026-09-09): cria (se ainda não
 	// existir) a pasta onde o findBinary procura este emulador e devolve o
@@ -615,6 +616,25 @@ func (s *Server) handleUninstall(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"removed": r.PathValue("id")})
+}
+
+// handleInstallFirmware entrega o arquivo de firmware escolhido pelo usuário ao
+// instalador do próprio emulador (hoje só o RPCS3 — ver
+// emulator.InstallFirmware). Responde assim que o emulador abre; a instalação
+// continua na janela dele. Falha é 400 pelo mesmo motivo de handleOpenEmulator.
+func (s *Server) handleInstallFirmware(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Path) == "" {
+		s.writeError(w, http.StatusBadRequest, "invalid_body", `O corpo da requisição deve ser um JSON no formato {"path": "caminho do arquivo de firmware"}.`)
+		return
+	}
+	if err := s.launcher.InstallFirmware(r.Context(), r.PathValue("id"), body.Path); err != nil {
+		s.writeError(w, http.StatusBadRequest, "firmware_install_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"started": true})
 }
 
 // handleOpenEmulator abre o executável do emulador sozinho — sem jogo, sem

@@ -120,6 +120,18 @@ export function evaluateConsoleReadiness(console: ConsoleEntry, index: Readiness
     };
   }
 
+  // Firmware instalado pelo próprio emulador (RPCS3 — ver firmware.go no
+  // daemon): só `false` é falta; ausente é "o ZeuX não sabe", pela mesma
+  // regra do BIOS acima.
+  if (emulador?.firmware_installed === false) {
+    return {
+      step: "sem-bios",
+      badge: "firmware ausente",
+      detail: `O firmware do ${console.short_name} ainda não está instalado no ${chosen.name}. Sem ele, os jogos deste console não abrem.`,
+      chosen,
+    };
+  }
+
   if (!index.consolesComPasta.has(console.console_id)) {
     return {
       step: "sem-pasta",

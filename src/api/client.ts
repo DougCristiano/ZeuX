@@ -378,6 +378,10 @@ export const api = {
   // (ou reconsulta, G2) um jogo só.
   scrapeCovers: (gameId?: number) =>
     postJSON<ScrapeJob>("/library/games/scrape-covers", gameId ? { game_id: gameId } : {}),
+  // Entrega o firmware escolhido pelo usuário ao instalador do emulador
+  // (hoje só RPCS3). Responde quando o emulador abre.
+  installFirmware: (adapterId: string, path: string) =>
+    postJSON<{ started: boolean }>(`/emulators/${encodeURIComponent(adapterId)}/firmware`, { path }),
   getScrapeJob: (id: string) => request<ScrapeJob>(`/scrape-jobs/${encodeURIComponent(id)}`),
   // Só ano/resumo/gêneros/desenvolvedora de um jogo, sem tocar na capa
   // (2026-09-29). Devolve um job acompanhado por getScrapeJob.

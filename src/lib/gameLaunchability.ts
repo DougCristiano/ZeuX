@@ -124,5 +124,18 @@ export function evaluateGameLaunchability(
     };
   }
 
+  // Firmware que passa pelo instalador do emulador (RPCS3, 2026-09-29).
+  // Mesmo motivo "bios_empty" de propósito: para quem clica em jogar a
+  // consequência é a mesma — sem o arquivo, o jogo não abre — e a tela já
+  // sabe pedir confirmação nesse caso. Só `false` conta: ausente é "não sei".
+  if (adapterEntry?.firmware_installed === false) {
+    return {
+      launchable: false,
+      reason: "bios_empty",
+      badge: "firmware ausente",
+      title: `O firmware ainda não está instalado no ${adapterEntry.name}. Sem ele, o jogo não abre — instale pela tela do console.`,
+    };
+  }
+
   return { launchable: true };
 }
