@@ -2188,3 +2188,43 @@ vem ligado por padrão, então separar "continuar" de "do início" exige um
 `--appendconfig` por lançamento), demais emuladores, e o "Continuar" na
 faixa "Continue jogando" da biblioteca.
 
+---
+
+## DuckStation completo: primeira execução, opções, saves e atualização (2026-10-05)
+
+Levantamento do Douglas com o DuckStation 0.1-12070 rodando no Windows
+(fatos observados) + leitura do código-fonte oficial (onde dito).
+
+- **Bug corrigido:** com o assistente pulado e um `settings.ini` já
+  existente, o seed não fazia nada e o jogador 1 ficava sem botões e sem
+  `[Hotkeys]`. Agora `emulator.MergeDuckStationDefaults` **mescla**: na
+  instalação (`seedDuckStationPortable`) e antes de cada lançamento com o
+  DuckStation fechado (`Launcher.Launch`), o que conserta instalações antigas
+  sem reinstalar. Nunca reescreve o arquivo: o DuckStation às vezes grava só
+  as diferenças, às vezes tudo, e "restaurar padrões" reordena as seções.
+- **Políticas por chave:** `[AutoUpdater] CheckAtStartup = false` é
+  **forçado** (o auto-update do DuckStation trocou o .exe durante o teste);
+  assistente, `[InputSources]` e `[Hotkeys]` só entram se ausentes; `[Pad1]`
+  só se o jogador 1 não tiver bind nenhum (`AnalogController`, teclado + SDL
+  no mesmo botão — chave repetida, formato confirmado em
+  `INISettingsInterface::GetStringList`); `[MemoryCards] Card1Type =
+  PerGameFileTitle` só em instalação nova.
+- **Cartão pelo nome da ROM (decisão do Douglas):** com `PerGameTitle` (o
+  padrão) o DuckStation nomeia o cartão pelo título do banco interno dele
+  (`GameDatabase::GetSaveTitle`, código-fonte), que o ZeuX não tem. Com
+  `PerGameFileTitle` o nome é o arquivo da ROM sem extensão, sanitizado
+  (`Path::SanitizeFileName`) + `_<slot>.mcd`. Instalações existentes não são
+  trocadas (os cartões "sumiriam"); lá o ZeuX tenta o nome da ROM e o título
+  limpo e marca o resultado como aproximado.
+- **Opções na tela do console PS1:** `GET/PUT /emulators/duckstation/settings`
+  — catálogo fechado (seção, chave, tipo, padrão), listas só com valores
+  observados ou lidos no código; 409 com o DuckStation aberto.
+- **Saves de um jogo:** `GET /library/games/{id}/saves` — cartões pelo nome da
+  ROM; states `<SERIAL>_<slot>.sav` pelo serial tirado do estado de retomada
+  que o ZeuX liga ao jogo pela sessão (sem sessão encerrada pelo ZeuX, o
+  serial é desconhecido).
+- **Atualização:** `settings.ini`, `portable.txt`, `memcards`, `savestates`,
+  `bios`, `gamesettings`, `inputprofiles` e `playtime.dat` vêm sempre da
+  instalação anterior, mesmo que o pacote novo traga item de mesmo nome
+  (`portableUserPaths`, só DuckStation).
+

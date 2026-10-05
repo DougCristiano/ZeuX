@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/doufl/zeux/internal/emulator"
 )
@@ -22,20 +23,20 @@ import (
 // [Pad1] junto — ver emulator.ControllerPresetSeed.
 //
 // Mapeados (D8):
-// - DuckStation (modo portátil + settings.ini)
-// - PCSX2 (inis/PCSX2.ini no diretório de dados do usuário, não na pasta
-//   gerenciada — ver seedPCSX2)
-// - Dolphin (Dolphin.ini)
-// - PPSSPP (ppsspp.ini)
-// - Flycast (emu.cfg)
-// - RPCS3 (config.yml vazio)
-// - melonDS (melonDS.ini vazio)
-// - Azahar (qt-config.ini vazio)
-// - xemu (xemu.toml mínimo)
-// - Vita3K (config.yml + estrutura)
-// - Xenia (xenia.config.toml)
-// - Cemu (settings.xml + estrutura)
-// - RMG (config.ini mínimo)
+//   - DuckStation (modo portátil + settings.ini)
+//   - PCSX2 (inis/PCSX2.ini no diretório de dados do usuário, não na pasta
+//     gerenciada — ver seedPCSX2)
+//   - Dolphin (Dolphin.ini)
+//   - PPSSPP (ppsspp.ini)
+//   - Flycast (emu.cfg)
+//   - RPCS3 (config.yml vazio)
+//   - melonDS (melonDS.ini vazio)
+//   - Azahar (qt-config.ini vazio)
+//   - xemu (xemu.toml mínimo)
+//   - Vita3K (config.yml + estrutura)
+//   - Xenia (xenia.config.toml)
+//   - Cemu (settings.xml + estrutura)
+//   - RMG (config.ini mínimo)
 func seedFirstRun(installDir, adapterID string) error {
 	switch adapterID {
 	case "duckstation":
@@ -99,25 +100,39 @@ func seedDuckStationPortable(installDir string) error {
 		}
 	}
 
+	// Mescla, não "cria se não existir" (2026-10-05): a versão anterior
+	// pulava o seed quando o settings.ini já existia — numa atualização, ou
+	// num arquivo que o próprio DuckStation tinha criado —, e o jogador 1
+	// ficava sem botões e sem atalhos, com o auto-update do DuckStation
+	// ligado. A mesclagem só acrescenta o que falta (e força o auto-update
+	// desligado); ver emulator.MergeDuckStationDefaults.
 	settingsPath := filepath.Join(installDir, "settings.ini")
-	if _, err := os.Stat(settingsPath); err == nil {
-		// Já existe: veio de uma atualização (preservado por
-		// preservePortableUserData) ou foi editado pelo usuário. Não
-		// sobrescrevemos configuração que não é nossa.
+	data, err := os.ReadFile(settingsPath)
+	fresh := os.IsNotExist(err)
+	if err != nil && !fresh {
+		return fmt.Errorf("lendo settings.ini: %w", err)
+	}
+	merged := emulator.MergeDuckStationDefaults(data, fresh)
+	if !fresh && string(merged) == string(data) {
 		return nil
 	}
-
-	// O [Pad1] vai junto (2026-09-29): com o settings.ini já existindo, o
-	// DuckStation não aplica os padrões dele e o jogador 1 ficava sem bind
-	// nenhum — nem teclado. Ver ControllerPresetSeed.
-	seed := "[Main]\nSetupWizardIncomplete = false\nNoDesktopFile = true\n"
-	if pad, ok := emulator.ControllerPresetSeed("duckstation"); ok {
-		seed += "\n" + pad
-	}
-	if err := os.WriteFile(settingsPath, []byte(seed), 0o644); err != nil {
-		return fmt.Errorf("criando settings.ini: %w", err)
+	if err := os.WriteFile(settingsPath, merged, 0o644); err != nil {
+		return fmt.Errorf("gravando settings.ini: %w", err)
 	}
 	return nil
+}
+
+// portableUserPaths são os arquivos e pastas (primeiro nível da instalação,
+// em minúsculas) que pertencem ao usuário e vêm SEMPRE da instalação
+// anterior numa atualização, mesmo que o pacote novo traga um item com o
+// mesmo nome — config, cartões, states, BIOS, ajustes por jogo, perfis de
+// controle e tempo de jogo. Lista do DuckStation observada no Windows
+// (2026-10-05); outros emuladores seguem a regra antiga até terem a sua.
+var portableUserPaths = map[string]map[string]bool{
+	"duckstation": {
+		"settings.ini": true, "portable.txt": true, "memcards": true, "savestates": true,
+		"bios": true, "gamesettings": true, "inputprofiles": true, "playtime.dat": true,
+	},
 }
 
 // preservePortableUserData copia da instalação anterior para a nova qualquer
@@ -130,10 +145,11 @@ func seedDuckStationPortable(installDir string) error {
 // junto com o binário velho. Só roda quando a instalação anterior tem
 // portable.txt — emuladores sem modo portátil não guardam nada de usuário no
 // diretório gerenciado, então não há o que preservar.
-func preservePortableUserData(oldDir, newDir string) error {
+func preservePortableUserData(oldDir, newDir, adapterID string) error {
 	if _, err := os.Stat(filepath.Join(oldDir, "portable.txt")); err != nil {
 		return nil
 	}
+	protected := portableUserPaths[adapterID]
 
 	return filepath.WalkDir(oldDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -157,9 +173,10 @@ func preservePortableUserData(oldDir, newDir string) error {
 			return nil
 		}
 
-		if _, err := os.Stat(target); err == nil {
+		if _, err := os.Stat(target); err == nil && !protected[strings.ToLower(strings.Split(filepath.ToSlash(rel), "/")[0])] {
 			// O pacote novo já traz este arquivo (ex.: um binário
-			// atualizado) — ele tem prioridade sobre o antigo.
+			// atualizado) — ele tem prioridade sobre o antigo. Exceto o que
+			// é do usuário (portableUserPaths): esse vem sempre do antigo.
 			return nil
 		}
 

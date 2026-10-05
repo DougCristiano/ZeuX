@@ -153,6 +153,14 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 			return Session{}, err
 		}
 	}
+	// Conserta a instalação do DuckStation feita antes de 2026-10-05 (sem
+	// botões, sem atalhos, auto-update ligado) sem exigir reinstalar. Só com
+	// ele fechado: o DuckStation regrava o settings.ini ao sair.
+	if adapter.ID() == "duckstation" && !l.AdapterRunning(ctx, "duckstation") {
+		if err := EnsureDuckStationDefaults(install); err != nil {
+			l.logger.Warn("não foi possível completar a configuração do DuckStation", "erro", err)
+		}
+	}
 	if adapter.ID() == "pcsx2" {
 		if err := ensurePCSX2SaveStateOnShutdown(); err != nil {
 			l.logger.Warn("não foi possível ligar o estado de retomada do PCSX2", "erro", err)
@@ -296,6 +304,23 @@ func (l *Launcher) LaunchStandalone(ctx context.Context, adapterID string) error
 	}()
 
 	return nil
+}
+
+// AdapterRunning diz se há uma sessão aberta deste emulador agora. Escrever
+// na config de um emulador aberto é inútil: ele regrava a própria config ao
+// fechar, por cima. Erro ao ler as sessões conta como "aberto" — na dúvida,
+// não escrever.
+func (l *Launcher) AdapterRunning(ctx context.Context, adapterID string) bool {
+	sessions, err := l.Sessions(ctx)
+	if err != nil {
+		return true
+	}
+	for _, s := range sessions {
+		if s.AdapterID == adapterID && s.IsRunning {
+			return true
+		}
+	}
+	return false
 }
 
 // supervise espera o emulador terminar e fecha a sessão no repositório.

@@ -152,6 +152,9 @@ func (s *Server) Routes() http.Handler {
 	// a pasta de destino" falha quando ela ainda não existe — que é
 	// justamente o caso de quem nunca instalou o emulador.
 	mux.HandleFunc("POST /api/v1/emulators/{id}/managed-dir", s.handleEnsureManagedDir)
+	mux.HandleFunc("GET /api/v1/emulators/duckstation/settings", s.handleDuckStationSettings)
+	mux.HandleFunc("PUT /api/v1/emulators/duckstation/settings", s.handleSetDuckStationSettings)
+	mux.HandleFunc("GET /api/v1/library/games/{id}/saves", s.handleGameSaves)
 	mux.HandleFunc("GET /api/v1/emulators/{id}/save-data", s.handleSaveData)
 	mux.HandleFunc("POST /api/v1/emulators/{id}/save-data", s.handleSetSaveData)
 	// H1/H2 (docs/roadmap.md): configuração persistida do emulador — só

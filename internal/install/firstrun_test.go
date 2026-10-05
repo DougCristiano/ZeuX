@@ -43,13 +43,16 @@ func TestSeedDuckStationPortableWritesWizardSkip(t *testing.T) {
 	}
 }
 
-// Trava a regra: um settings.ini pré-existente (de uma atualização
-// preservada, ou editado pelo usuário) nunca é sobrescrito.
-func TestSeedDuckStationPortableDoesNotOverwriteExistingSettings(t *testing.T) {
+// Trava a regra de 2026-10-05: um settings.ini pré-existente (atualização
+// preservada, ou criado pelo próprio DuckStation) é MESCLADO, nunca
+// sobrescrito — o que a pessoa já tinha fica, o que falta (atalhos, botões,
+// auto-update desligado) entra. Antes o seed pulava o arquivo inteiro e o
+// jogador 1 ficava sem botões.
+func TestSeedDuckStationPortableMergesExistingSettings(t *testing.T) {
 	dir := t.TempDir()
 	settingsPath := filepath.Join(dir, "settings.ini")
 
-	custom := "[Main]\nSetupWizardIncomplete = false\n[Display]\nFullscreen = true\n"
+	custom := "[Main]\nSetupWizardIncomplete = false\n[Display]\nFullscreen = true\n[MemoryCards]\nCard1Type = Shared\n"
 	if err := os.WriteFile(settingsPath, []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -62,8 +65,13 @@ func TestSeedDuckStationPortableDoesNotOverwriteExistingSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != custom {
-		t.Errorf("settings.ini existente foi alterado: got %q, want %q", got, custom)
+	for _, want := range []string{"Fullscreen = true", "Card1Type = Shared", "CheckAtStartup = false", "OpenPauseMenu = Keyboard/Escape", "Cross = Keyboard/K"} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("faltou %q no settings.ini mesclado:\n%s", want, got)
+		}
+	}
+	if strings.Contains(string(got), "PerGameFileTitle") {
+		t.Errorf("tipo de cartão de quem já jogava foi trocado:\n%s", got)
 	}
 }
 
@@ -117,7 +125,7 @@ func TestPreservePortableUserDataCarriesForwardSavesAndSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := preservePortableUserData(oldDir, newDir); err != nil {
+	if err := preservePortableUserData(oldDir, newDir, "duckstation"); err != nil {
 		t.Fatalf("preservePortableUserData: %v", err)
 	}
 
@@ -157,7 +165,7 @@ func TestPreservePortableUserDataSkipsNonPortableInstalls(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := preservePortableUserData(oldDir, newDir); err != nil {
+	if err := preservePortableUserData(oldDir, newDir, "duckstation"); err != nil {
 		t.Fatalf("preservePortableUserData: %v", err)
 	}
 
@@ -537,5 +545,42 @@ func TestSeedRMGWritesConfigFile(t *testing.T) {
 	want := "[General]\n"
 	if string(got) != want {
 		t.Errorf("config.ini = %q, want %q", got, want)
+	}
+}
+
+// Trava a lista protegida da atualização do DuckStation: config, cartões e
+// states vêm SEMPRE da instalação anterior, mesmo que o pacote novo traga um
+// arquivo de mesmo nome; o binário novo continua vencendo o velho.
+func TestPreservePortableUserDataProtectsDuckStationUserFiles(t *testing.T) {
+	oldDir, newDir := t.TempDir(), t.TempDir()
+	write := func(dir, rel, content string) {
+		p := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(oldDir, "portable.txt", "")
+	write(oldDir, "settings.ini", "do usuario")
+	write(oldDir, "memcards/Jogo_1.mcd", "cartao do usuario")
+	write(oldDir, "duckstation-qt-x64-ReleaseLTCG.exe", "binario velho")
+	write(newDir, "settings.ini", "padrao do pacote")
+	write(newDir, "memcards/Jogo_1.mcd", "cartao vazio do pacote")
+	write(newDir, "duckstation-qt-x64-ReleaseLTCG.exe", "binario novo")
+
+	if err := preservePortableUserData(oldDir, newDir, "duckstation"); err != nil {
+		t.Fatal(err)
+	}
+	for rel, want := range map[string]string{
+		"settings.ini":                       "do usuario",
+		"memcards/Jogo_1.mcd":                "cartao do usuario",
+		"duckstation-qt-x64-ReleaseLTCG.exe": "binario novo",
+	} {
+		got, _ := os.ReadFile(filepath.Join(newDir, filepath.FromSlash(rel)))
+		if string(got) != want {
+			t.Errorf("%s = %q, esperado %q", rel, got, want)
+		}
 	}
 }

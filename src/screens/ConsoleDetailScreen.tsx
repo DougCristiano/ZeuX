@@ -38,6 +38,7 @@ import { useStandaloneFirstSteps } from "../hooks/useFirstSteps";
 import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { SaveDataPanel } from "../components/SaveDataPanel";
+import { DuckStationSettingsPanel } from "../components/DuckStationSettingsPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { percentOf } from "../lib/format";
@@ -1092,6 +1093,16 @@ export function ConsoleDetailScreen({
 
             <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} onChanged={reload} />
           </section>
+
+          {/* Opções do DuckStation (2026-10-05, decisão do Douglas: na tela do
+              console PS1). Só quando o DuckStation é o emulador escolhido —
+              o painel mesmo explica quando a instalação não é do ZeuX. */}
+          {consoleId === "ps1" && readiness.chosen?.adapter_id === "duckstation" && (
+            <section className="flex flex-col gap-3">
+              <SectionHeading>{t("duckStationOptionsHeading")}</SectionHeading>
+              <DuckStationSettingsPanel />
+            </section>
+          )}
 
           {/* Saves (docs/pendencias.md, "Ver saves dentro do ZeuX — MVP de
               inspeção"): só aparece com um emulador resolvido — sem isso não

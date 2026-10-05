@@ -328,7 +328,7 @@ func (m *Manager) promote(stagingDir, adapterID string) error {
 		// firstrun.go) guardam esses arquivos dentro do diretório gerenciado, e
 		// o backup é apagado no fim desta função: sem essa cópia, atualizar o
 		// emulador pelo ZeuX destruiria o progresso salvo do usuário.
-		if err := preservePortableUserData(final, stagingDir); err != nil {
+		if err := preservePortableUserData(final, stagingDir, adapterID); err != nil {
 			return fmt.Errorf("preservando dados da instalação anterior: %w", err)
 		}
 		if err := os.Rename(final, backup); err != nil {

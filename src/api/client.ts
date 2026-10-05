@@ -5,6 +5,7 @@ import type {
   ConsentStatus,
   ConsoleEntry,
   CustomDefinition,
+  DuckStationSettings,
   CustomEmulatorsResponse,
   ControllerAssignment,
   ControllerProfile,
@@ -247,6 +248,13 @@ export const api = {
     request<{ restored: boolean }>(`/emulators/${encodeURIComponent(id)}/config`, { method: "DELETE" }),
 
   // --- Inspeção de saves (MVP de listar/ver, não gerenciar) ---
+  getDuckStationSettings: () => request<DuckStationSettings>("/emulators/duckstation/settings"),
+  setDuckStationSettings: (values: Record<string, string>) =>
+    request<DuckStationSettings>("/emulators/duckstation/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values }),
+    }),
   getSaveData: (id: string) => request<SaveData>(`/emulators/${encodeURIComponent(id)}/save-data`),
   setSaveData: (id: string, dirs: SaveDataDirs) =>
     postJSON<{ saved: boolean }>(`/emulators/${encodeURIComponent(id)}/save-data`, dirs),

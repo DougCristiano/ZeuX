@@ -561,6 +561,31 @@ export type BulkMatchedFolder = {
   games_found: number;
 };
 
+/** Opção do settings.ini do DuckStation exposta na tela do PS1 (2026-10-05). */
+export type DuckStationSetting = {
+  /** "Seção.Chave" — também é a chave do texto em i18n. */
+  id: string;
+  section: string;
+  key: string;
+  kind: "bool" | "choice" | "int";
+  /** Padrão do próprio DuckStation, usado quando a chave não está no arquivo. */
+  default: string;
+  choices?: string[];
+  min?: number;
+  max?: number;
+  /** Valor no arquivo; ausente = vale o padrão. */
+  value?: string;
+};
+
+export type DuckStationSettings = {
+  available: boolean;
+  /** Frase do servidor quando `available` é false. */
+  message?: string;
+  /** DuckStation aberto agora: gravar é recusado (ele regrava ao fechar). */
+  running?: boolean;
+  settings?: DuckStationSetting[];
+};
+
 export type LibraryGame = {
   id: number;
   folder_id: number;
