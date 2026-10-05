@@ -246,8 +246,9 @@ func TestSeedPCSX2DoesNotWriteInsideManagedDir(t *testing.T) {
 }
 
 // Trava a regra: um PCSX2.ini pré-existente é a configuração de verdade do
-// usuário (jogos, controle, BIOS) e nunca é sobrescrito.
-func TestSeedPCSX2DoesNotOverwriteExistingSettings(t *testing.T) {
+// usuário (jogos, controle, BIOS) e nunca é sobrescrito — a mesclagem de
+// 2026-10-05 só acrescenta o auto-update desligado, preservando todo o resto.
+func TestSeedPCSX2PreservesExistingSettings(t *testing.T) {
 	iniPath := pcsx2SeedEmTempDir(t)
 	if err := os.MkdirAll(filepath.Dir(iniPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -266,8 +267,29 @@ func TestSeedPCSX2DoesNotOverwriteExistingSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != custom {
-		t.Errorf("PCSX2.ini existente foi alterado: got %q, want %q", got, custom)
+	want := custom + "\n[AutoUpdater]\nCheckAtStartup = false\n"
+	if string(got) != want {
+		t.Errorf("PCSX2.ini existente: got %q, want %q", got, want)
+	}
+}
+
+// Trava o modo portátil na instalação nova: sem config em Documentos, o
+// portable.ini nasce junto do .exe; com config lá, NÃO (quem liga é a
+// migração, com confirmação — senão o PCSX2 "esqueceria" BIOS e saves).
+func TestSeedPCSX2EnablesPortableOnlyWithoutLegacyData(t *testing.T) {
+	orig := pcsx2PortableSupported
+	pcsx2PortableSupported = func() bool { return true }
+	t.Cleanup(func() { pcsx2PortableSupported = orig })
+	pcsx2SeedEmTempDir(t)
+	t.Setenv("HOME", t.TempDir()) // Documentos vazio
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	dir := t.TempDir()
+	if err := seedFirstRun(dir, "pcsx2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "portable.ini")); err != nil {
+		t.Fatalf("portable.ini não foi criado numa instalação nova: %v", err)
 	}
 }
 

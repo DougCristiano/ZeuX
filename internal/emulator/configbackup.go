@@ -25,7 +25,18 @@ const configBackupSuffix = ".zeux-backup"
 // vazio nele, que para um .ini poderia ter efeito diferente de "arquivo
 // ausente" dependendo do emulador.
 func backupBeforeFirstWrite(path string) error {
-	if _, err := os.Stat(path + configBackupSuffix); err == nil {
+	if info, err := os.Stat(path + configBackupSuffix); err == nil {
+		// Backup vazio = "o arquivo não existia quando o ZeuX escreveu pela
+		// primeira vez". Se, desde então, o próprio emulador criou a config
+		// de verdade (o PCSX2 grava um PCSX2.ini completo ao rodar), esse
+		// marcador virou armadilha: "restaurar" apagaria a config inteira.
+		// Achado do Douglas (2026-10-05, PCSX2.ini.zeux-backup com 0 bytes):
+		// troca o marcador pelo conteúdo atual antes desta escrita.
+		if info.Size() == 0 {
+			if current, err := os.ReadFile(path); err == nil && len(current) > 0 {
+				return os.WriteFile(path+configBackupSuffix, current, 0o644)
+			}
+		}
 		return nil // já existe um backup — é o original, preservado
 	}
 

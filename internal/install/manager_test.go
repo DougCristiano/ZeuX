@@ -121,10 +121,40 @@ func TestUninstallRemovesFromTheSameFolderPromoteUsed(t *testing.T) {
 		t.Fatalf("Uninstall: %v", err)
 	}
 
+	// O binário sai do mesmo lugar onde promote o pôs. A pasta fica, com só
+	// os dados do usuário (2026-10-05: em modo portátil o desinstalador
+	// nunca apaga config, cartões, states nem BIOS).
 	root, _ := emulator.ManagedRoot()
 	dir := filepath.Join(root, "ps1", "emuladores", "duckstation")
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Errorf("esperava %s removido, stat = %v", dir, err)
+	if _, err := os.Stat(filepath.Join(dir, "duckstation-qt")); !os.IsNotExist(err) {
+		t.Errorf("esperava o binário removido de %s, stat = %v", dir, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "settings.ini")); err != nil {
+		t.Errorf("a configuração do usuário deveria ter ficado: %v", err)
+	}
+}
+
+// Trava a regra do desinstalador em modo portátil: cartões, states, BIOS e
+// config do PCSX2 ficam; o programa sai.
+func TestRemoveKeepingUserDataPCSX2(t *testing.T) {
+	dir := t.TempDir()
+	for _, rel := range []string{"portable.ini", "pcsx2-qt.exe", "inis/PCSX2.ini", "memcards/Mcd001.ps2", "sstates/a.p2s", "bios/x.bin", "resources/r.dat", "logs/emulog.txt"} {
+		p := filepath.Join(dir, filepath.FromSlash(rel))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte("x"), 0o644)
+	}
+	if _, err := removeKeepingUserData(dir, "pcsx2"); err != nil {
+		t.Fatal(err)
+	}
+	for _, kept := range []string{"inis/PCSX2.ini", "memcards/Mcd001.ps2", "sstates/a.p2s", "bios/x.bin", "portable.ini"} {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(kept))); err != nil {
+			t.Errorf("%s deveria ter ficado: %v", kept, err)
+		}
+	}
+	for _, gone := range []string{"pcsx2-qt.exe", "resources", "logs"} {
+		if _, err := os.Stat(filepath.Join(dir, gone)); !os.IsNotExist(err) {
+			t.Errorf("%s deveria ter saído", gone)
+		}
 	}
 }
 

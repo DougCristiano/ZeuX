@@ -118,7 +118,7 @@ func TestWriteDuckStationSettingsValidates(t *testing.T) {
 		{"GPU.Renderer": "Vulkan"},
 		{"Main.StartFullscreen": "true", "Audio.Backend": "XAudio2"},
 	} {
-		if err := WriteDuckStationSettings(install, bad); err == nil {
+		if err := WriteEmulatorSettings("duckstation", install, bad); err == nil {
 			t.Errorf("aceitou %v", bad)
 		}
 	}
@@ -126,10 +126,10 @@ func TestWriteDuckStationSettingsValidates(t *testing.T) {
 		t.Fatalf("gravou pela metade:\n%s", data)
 	}
 
-	if err := WriteDuckStationSettings(install, map[string]string{"Main.StartFullscreen": "true", "Audio.StretchMode": "Resample"}); err != nil {
+	if err := WriteEmulatorSettings("duckstation", install, map[string]string{"Main.StartFullscreen": "true", "Audio.StretchMode": "Resample"}); err != nil {
 		t.Fatal(err)
 	}
-	settings, err := ReadDuckStationSettings(install)
+	settings, err := ReadEmulatorSettings("duckstation", install)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestWriteDuckStationSettingsValidates(t *testing.T) {
 
 // Trava que instalação feita fora do ZeuX não é editada.
 func TestDuckStationSettingsRequireManagedInstall(t *testing.T) {
-	if _, err := ReadDuckStationSettings(Installation{BinaryPath: "/opt/ds/duckstation"}); err != ErrDuckStationNotManaged {
+	if _, err := ReadEmulatorSettings("duckstation", Installation{BinaryPath: "/opt/ds/duckstation"}); err != ErrDuckStationNotManaged {
 		t.Fatalf("got %v", err)
 	}
 }

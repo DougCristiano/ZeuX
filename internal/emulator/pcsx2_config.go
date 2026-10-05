@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -67,22 +66,13 @@ import (
 // continuam recusando apontar qualquer caminho. Mesma regra de "melhor não
 // apontar do que apontar errado" que já vale para o resto do arquivo.
 func pcsx2DataDir() (string, error) {
-	switch runtime.GOOS {
-	case "linux":
-		dir, err := os.UserConfigDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(dir, "PCSX2"), nil
-	case "windows":
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, "Documents", "PCSX2"), nil
-	default:
-		return "", fmt.Errorf("caminho de configuração do PCSX2 não confirmado neste sistema operacional")
+	// Modo portátil na instalação do ZeuX (2026-10-05, pcsx2_portable.go)
+	// vence: é o que o próprio PCSX2 faz ("Portable mode has the absolute
+	// priority", EmuFolders::SetDataDirectory).
+	if dir, ok := pcsx2PortableDir(); ok {
+		return dir, nil
 	}
+	return pcsx2LegacyDataDir()
 }
 
 // PCSX2ConfigPath expõe para fora do pacote o arquivo que o PCSX2 de fato

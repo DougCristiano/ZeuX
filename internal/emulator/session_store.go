@@ -223,3 +223,38 @@ func (s *SQLiteSessions) ResumeStates(ctx context.Context) (map[string]ResumeSta
 	}
 	return states, rows.Err()
 }
+
+// RecordDiscID guarda (ou troca) o serial do disco de um jogo — ver
+// game_saves.go. Implementa DiscIDRepository.
+func (s *SQLiteSessions) RecordDiscID(ctx context.Context, id GameDiscID) error {
+	if _, err := s.db.ExecContext(ctx, `
+		INSERT INTO game_disc_ids (rom_path, adapter_id, serial, crc, seen_at)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT (rom_path) DO UPDATE SET
+			adapter_id = excluded.adapter_id,
+			serial     = excluded.serial,
+			crc        = excluded.crc,
+			seen_at    = excluded.seen_at
+	`, id.ROMPath, id.AdapterID, id.Serial, id.CRC, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("gravando serial do jogo: %w", err)
+	}
+	return nil
+}
+
+// DiscIDs devolve os seriais conhecidos, por ROM.
+func (s *SQLiteSessions) DiscIDs(ctx context.Context) (map[string]GameDiscID, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT rom_path, adapter_id, serial, crc FROM game_disc_ids`)
+	if err != nil {
+		return nil, fmt.Errorf("lendo seriais: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]GameDiscID{}
+	for rows.Next() {
+		var id GameDiscID
+		if err := rows.Scan(&id.ROMPath, &id.AdapterID, &id.Serial, &id.CRC); err != nil {
+			return nil, err
+		}
+		out[id.ROMPath] = id
+	}
+	return out, rows.Err()
+}

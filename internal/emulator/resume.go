@@ -78,11 +78,11 @@ func resumeStateLocation(adapterID string, install Installation) (dir string, ma
 		}
 		return dir, func(name string) bool { return strings.HasSuffix(strings.ToLower(name), "_resume.sav") }, true
 	case "pcsx2":
-		data, err := pcsx2DataDir()
-		if err != nil {
+		_, _, states, _, ok := pcsx2Dirs()
+		if !ok {
 			return "", nil, false
 		}
-		return filepath.Join(data, "sstates"), func(name string) bool {
+		return states, func(name string) bool {
 			return strings.HasSuffix(strings.ToLower(name), ".resume.p2s")
 		}, true
 	default:
@@ -172,29 +172,45 @@ func (l *Launcher) resumeStateFor(ctx context.Context, romPath, adapterID string
 	return state.StatePath, nil
 }
 
-// ensurePCSX2SaveStateOnShutdown liga `[EmuCore] SaveStateOnShutdown` no
-// PCSX2.ini quando a chave não existe — sem ela o PCSX2 não grava o estado de
-// retomada ao fechar e o "Continuar" nunca apareceria. Chave lida do código
-// (Pcsx2Config.cpp: seção "EmuCore", SettingsWrapBitBool). Se a pessoa já
-// escolheu um valor, ele vale. O DuckStation não precisa disto:
-// SaveStateOnExit já vem ligado por padrão (core/settings.cpp).
-func ensurePCSX2SaveStateOnShutdown() error {
+// MergePCSX2Defaults devolve o PCSX2.ini com os padrões do ZeuX mesclados.
+// Arquivo novo: o esboço mínimo medido em 2026-09-11 (SettingsVersion +
+// SetupWizardIncomplete — ver seedPCSX2) + [Pad1]. Sempre: auto-update
+// desligado — o ZeuX gerencia a versão (levantamento do Douglas,
+// 2026-10-05: a seção [AutoUpdater] só aparece quando alguém mexe, e o
+// padrão do PCSX2 é checar ao abrir). Fora isso nada muda: "não mudar
+// comportamento sem o usuário pedir".
+func MergePCSX2Defaults(existing []byte, fresh bool) []byte {
+	ini := parseINI(existing)
+	if fresh {
+		ini.set("UI", "SettingsVersion", "1")
+		ini.set("UI", "SetupWizardIncomplete", "false")
+		for _, e := range pcsx2ControllerPreset {
+			ini.setAll("Pad1", e.action, e.values)
+		}
+	}
+	ini.set("AutoUpdater", "CheckAtStartup", "false")
+	return ini.bytes()
+}
+
+// EnsurePCSX2Defaults aplica MergePCSX2Defaults no PCSX2.ini que o PCSX2 lê
+// agora, quando ele existe — conserta instalações anteriores sem reinstalar.
+// Quem chama garante o PCSX2 fechado.
+func EnsurePCSX2Defaults() error {
 	path, err := pcsx2ConfigPath()
 	if err != nil {
 		return nil
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		// Sem arquivo ainda: o seed ou o próprio PCSX2 cria; não é aqui.
+		// Sem arquivo: o seed ou o próprio PCSX2 cria; não é aqui.
 		return nil
 	}
-	ini := parseINI(data)
-	if _, has := ini.get("EmuCore", "SaveStateOnShutdown"); has {
+	merged := MergePCSX2Defaults(data, false)
+	if string(merged) == string(data) {
 		return nil
 	}
-	ini.set("EmuCore", "SaveStateOnShutdown", "true")
 	if err := backupBeforeFirstWrite(path); err != nil {
 		return err
 	}
-	return os.WriteFile(path, ini.bytes(), 0o644)
+	return os.WriteFile(path, merged, 0o644)
 }

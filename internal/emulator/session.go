@@ -161,9 +161,13 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 			l.logger.Warn("não foi possível completar a configuração do DuckStation", "erro", err)
 		}
 	}
-	if adapter.ID() == "pcsx2" {
-		if err := ensurePCSX2SaveStateOnShutdown(); err != nil {
-			l.logger.Warn("não foi possível ligar o estado de retomada do PCSX2", "erro", err)
+	// O PCSX2 grava o estado de retomada só com SaveStateOnShutdown ligado,
+	// e o padrão é desligado. Até 2026-10-05 o ZeuX ligava sozinho; agora é
+	// opção do usuário na tela do PS2 ("não mudar comportamento sem o usuário
+	// pedir"). Aqui só entra o auto-update desligado.
+	if adapter.ID() == "pcsx2" && !l.AdapterRunning(ctx, "pcsx2") {
+		if err := EnsurePCSX2Defaults(); err != nil {
+			l.logger.Warn("não foi possível completar a configuração do PCSX2", "erro", err)
 		}
 	}
 
@@ -334,6 +338,7 @@ func (l *Launcher) supervise(session Session, cmd *exec.Cmd, install Installatio
 		l.logger.Error("não foi possível fechar a sessão no banco", "sessao", session.ID, "erro", err)
 	}
 
+	l.recordDiscID(session)
 	l.recordResumeState(session, install)
 
 	l.logger.Info("jogo encerrado",

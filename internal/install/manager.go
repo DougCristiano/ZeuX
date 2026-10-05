@@ -376,7 +376,11 @@ func (m *Manager) Uninstall(adapterID string) error {
 		return fmt.Errorf("o ZeuX não instalou este emulador; nada a remover")
 	}
 
-	return os.RemoveAll(target)
+	// Em modo portátil a pasta guarda config, cartões, states e BIOS do
+	// usuário: esses ficam (ver removeKeepingUserData). Reinstalar depois
+	// encontra tudo no lugar.
+	_, err = removeKeepingUserData(target, adapterID)
+	return err
 }
 
 // managedDirFor resolve o diretório gerenciado de um adapter a partir do seu

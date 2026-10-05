@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/doufl/zeux/internal/emulator"
@@ -42,9 +43,7 @@ func seedFirstRun(installDir, adapterID string) error {
 	case "duckstation":
 		return seedDuckStationPortable(installDir)
 	case "pcsx2":
-		// Sem installDir: o PCSX2 no Windows e no Linux ignora a pasta
-		// gerenciada e lê a config do diretório de dados do usuário.
-		return seedPCSX2()
+		return seedPCSX2(installDir)
 	case "dolphin":
 		return seedDolphin(installDir)
 	case "ppsspp":
@@ -133,6 +132,50 @@ var portableUserPaths = map[string]map[string]bool{
 		"settings.ini": true, "portable.txt": true, "memcards": true, "savestates": true,
 		"bios": true, "gamesettings": true, "inputprofiles": true, "playtime.dat": true,
 	},
+	// PCSX2 em modo portátil (2026-10-05): tudo que a migração leva de
+	// Documentos\PCSX2, mais o marcador. Logs ficam de fora (recriados).
+	"pcsx2": {
+		"portable.ini": true, "portable.txt": true, "inis": true, "memcards": true, "sstates": true,
+		"bios": true, "cache": true, "cheats": true, "covers": true, "gamesettings": true,
+		"inputprofiles": true, "patches": true, "textures": true, "snaps": true, "videos": true,
+	},
+}
+
+// isPortableInstall: DuckStation usa portable.txt; o PCSX2, portable.ini.
+func isPortableInstall(dir string) bool {
+	for _, marker := range []string{"portable.txt", "portable.ini"} {
+		if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// removeKeepingUserData apaga a instalação, menos o que é do usuário
+// (portableUserPaths) — "o desinstalador nunca apaga config, cartões,
+// states nem BIOS" (pedido do Douglas, 2026-10-05). Devolve se sobrou algo.
+func removeKeepingUserData(dir, adapterID string) (kept bool, err error) {
+	protected := portableUserPaths[adapterID]
+	if len(protected) == 0 || !isPortableInstall(dir) {
+		return false, os.RemoveAll(dir)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, e := range entries {
+		if protected[strings.ToLower(e.Name())] {
+			kept = true
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+			return kept, err
+		}
+	}
+	if !kept {
+		return false, os.Remove(dir)
+	}
+	return true, nil
 }
 
 // preservePortableUserData copia da instalação anterior para a nova qualquer
@@ -146,7 +189,7 @@ var portableUserPaths = map[string]map[string]bool{
 // portable.txt — emuladores sem modo portátil não guardam nada de usuário no
 // diretório gerenciado, então não há o que preservar.
 func preservePortableUserData(oldDir, newDir, adapterID string) error {
-	if _, err := os.Stat(filepath.Join(oldDir, "portable.txt")); err != nil {
+	if !isPortableInstall(oldDir) {
 		return nil
 	}
 	protected := portableUserPaths[adapterID]
@@ -217,7 +260,18 @@ var pcsx2SeedPath = emulator.PCSX2ConfigPath
 // jeito pior. Com o assistente suprimido o PCSX2 procura o BIOS só na raiz
 // da pasta apontada por BiosDir — quem cobre esse buraco é o aviso de BIOS
 // do próprio ZeuX, não este arquivo.
-func seedPCSX2() error {
+func seedPCSX2(installDir string) error {
+	// Modo portátil (2026-10-05): numa instalação nova, sem configuração em
+	// Documentos\PCSX2, liga o portable.ini já — tudo do PCSX2 passa a morar
+	// na pasta do ZeuX. Com configuração lá, quem liga é a migração, com
+	// confirmação do usuário (ligar antes faria o PCSX2 "esquecer" BIOS,
+	// cartões e states). Ver emulator/pcsx2_portable.go.
+	if pcsx2PortableSupported() && !emulator.PCSX2HasLegacyData() {
+		if err := os.WriteFile(filepath.Join(installDir, emulator.PCSX2PortableMarker), nil, 0o644); err != nil {
+			return fmt.Errorf("ligando o modo portátil do PCSX2: %w", err)
+		}
+	}
+
 	iniPath, err := pcsx2SeedPath()
 	if err != nil {
 		// Sistema operacional em que o caminho do PCSX2 não foi confirmado
@@ -227,29 +281,30 @@ func seedPCSX2() error {
 		return nil
 	}
 
-	if _, err := os.Stat(iniPath); err == nil {
-		// Já existe: é a configuração de verdade do usuário, com jogos,
-		// controles e BIOS já ajustados. Não se toca.
+	// Mescla (2026-10-05): arquivo existente é a config de verdade do
+	// usuário — só o auto-update é forçado desligado (o ZeuX gerencia a
+	// versão). Arquivo novo ganha o esboço mínimo + [Pad1]. Nunca reescreve.
+	data, err := os.ReadFile(iniPath)
+	fresh := os.IsNotExist(err)
+	if err != nil && !fresh {
+		return fmt.Errorf("lendo %s: %w", iniPath, err)
+	}
+	merged := emulator.MergePCSX2Defaults(data, fresh)
+	if !fresh && string(merged) == string(data) {
 		return nil
 	}
-
 	if err := os.MkdirAll(filepath.Dir(iniPath), 0o755); err != nil {
 		return fmt.Errorf("criando a pasta de configuração do PCSX2: %w", err)
 	}
-
-	// O [Pad1] vai junto (2026-09-29): com "SettingsVersion" presente o
-	// PCSX2 considera o arquivo válido e não aplica o mapeamento padrão dele
-	// — sem esta seção o jogador 1 ficava sem bind nenhum, nem teclado. Ver
-	// ControllerPresetSeed.
-	seed := "[UI]\nSettingsVersion = 1\nSetupWizardIncomplete = false\n"
-	if pad, ok := emulator.ControllerPresetSeed("pcsx2"); ok {
-		seed += "\n" + pad
-	}
-	if err := os.WriteFile(iniPath, []byte(seed), 0o644); err != nil {
-		return fmt.Errorf("criando %s: %w", iniPath, err)
+	if err := os.WriteFile(iniPath, merged, 0o644); err != nil {
+		return fmt.Errorf("gravando %s: %w", iniPath, err)
 	}
 	return nil
 }
+
+// pcsx2PortableSupported: var para os testes rodarem a regra do Windows em
+// qualquer sistema.
+var pcsx2PortableSupported = func() bool { return runtime.GOOS == "windows" }
 
 // seedDolphin escreve a chave que marca o prompt de analytics como respondido,
 // suprimindo o wizard de primeira execução do Dolphin.
