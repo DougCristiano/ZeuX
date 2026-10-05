@@ -186,3 +186,33 @@ func TestRetroArchTiersDeclareCore(t *testing.T) {
 		}
 	}
 }
+
+// Trava onde o ZeuX reconhece jogo compactado (2026-10-05): .zip/.7z só nos
+// consoles cujo emulador do catálogo abre o arquivo compactado sozinho
+// (RetroArch nos cartuchos, melonDS no DS, MAME/FBNeo nos romsets). Num
+// console de disco o jogo apareceria na biblioteca e o emulador recusaria
+// abrir — e extrair seria o ZeuX copiar a ROM, o que não foi decidido.
+func TestArchivesOnlyWhereTheEmulatorOpensThem(t *testing.T) {
+	catalog, err := LoadCatalog()
+	if err != nil {
+		t.Fatalf("carregando catálogo: %v", err)
+	}
+	opensArchives := map[string]bool{
+		"atari2600": true, "nes": true, "mastersystem": true, "pcengine": true,
+		"megadrive": true, "gb": true, "gamegear": true, "snes": true,
+		"sega32x": true, "virtualboy": true, "n64": true, "gbc": true,
+		"wonderswan": true, "ngpc": true, "gba": true, "nds": true,
+		"arcade": true, "neogeo": true,
+	}
+	for _, console := range catalog.Consoles {
+		hasZip := false
+		for _, ext := range console.Extensions {
+			if ext == "zip" || ext == "7z" {
+				hasZip = true
+			}
+		}
+		if hasZip != opensArchives[console.ID] {
+			t.Errorf("%s: reconhece zip/7z = %v, esperado %v", console.ID, hasZip, opensArchives[console.ID])
+		}
+	}
+}

@@ -1,14 +1,14 @@
 {
   "schema_version": 5,
   "updated_at": "2026-08-03",
-  "_comment": "Dicionário-semente de requisitos por console. Os patamares são avaliados de cima para baixo: vale o primeiro cujos requisitos sejam todos atendidos. O campo 'preset' é o texto que o usuário lê; 'options' é o mesmo preset em forma que o emulador obedece. Os dois precisam contar a mesma história. Os limiares são estimativas iniciais e precisam de calibração com hardware real — o sistema de compatibilidade comunitário previsto no PRD é a fonte natural desses dados. Este arquivo passará a ser atualizável via nuvem. O campo 'extensions' (adicionado no schema_version 4) é a lista de extensões de arquivo reconhecidas na varredura de biblioteca (internal/library) — minúsculas, sem o ponto; consoles cujos jogos circulam como romset de arcade (arcade, neogeo) reconhecem só '.zip', que é o formato universal desses dois no MAME/FBNeo/RetroArch. O campo 'requires_external_file' (adicionado no schema_version 5, docs/roadmap.md item L3) marca, sem citar arquivo nenhum, os consoles amplamente conhecidos por exigir BIOS/firmware para emulação — julgamento documentado no roadmap, não pesquisa individual por console; ausente (nunca 'false' explícito) equivale a não marcado.",
+  "_comment": "Dicionário-semente de requisitos por console. Os patamares são avaliados de cima para baixo: vale o primeiro cujos requisitos sejam todos atendidos. O campo 'preset' é o texto que o usuário lê; 'options' é o mesmo preset em forma que o emulador obedece. Os dois precisam contar a mesma história. Os limiares são estimativas iniciais e precisam de calibração com hardware real — o sistema de compatibilidade comunitário previsto no PRD é a fonte natural desses dados. Este arquivo passará a ser atualizável via nuvem. O campo 'extensions' (adicionado no schema_version 4) é a lista de extensões de arquivo reconhecidas na varredura de biblioteca (internal/library) — minúsculas, sem o ponto; consoles cujos jogos circulam como romset de arcade (arcade, neogeo) reconhecem só '.zip', que é o formato universal desses dois no MAME/FBNeo/RetroArch. Os consoles de cartucho atendidos pelo RetroArch, e o Nintendo DS (melonDS), também reconhecem '.zip' e '.7z' (2026-10-05, pedido de usuários): esses emuladores abrem o jogo compactado sozinhos. Consoles de disco (DuckStation, PCSX2, Dolphin, RPCS3, xemu...) NÃO ganham zip de propósito: o emulador não abre, e extrair seria o ZeuX copiar a ROM — decisão pendente com o dono do produto; o formato compactado que esses emuladores aceitam é o CHD. O campo 'requires_external_file' (adicionado no schema_version 5, docs/roadmap.md item L3) marca, sem citar arquivo nenhum, os consoles amplamente conhecidos por exigir BIOS/firmware para emulação — julgamento documentado no roadmap, não pesquisa individual por console; ausente (nunca 'false' explícito) equivale a não marcado.",
   "consoles": [
     {
       "id": "atari2600",
       "name": "Atari 2600",
       "short_name": "Atari 2600",
       "year": 1977,
-      "extensions": ["a26", "bin"],
+      "extensions": ["a26", "bin", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -63,7 +63,7 @@
       "name": "Nintendo Entertainment System",
       "short_name": "NES",
       "year": 1983,
-      "extensions": ["nes"],
+      "extensions": ["nes", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -90,7 +90,7 @@
       "name": "Sega Master System",
       "short_name": "Master System",
       "year": 1985,
-      "extensions": ["sms"],
+      "extensions": ["sms", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -117,7 +117,7 @@
       "name": "PC Engine / TurboGrafx-16",
       "short_name": "PC Engine",
       "year": 1987,
-      "extensions": ["pce"],
+      "extensions": ["pce", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -144,7 +144,7 @@
       "name": "Mega Drive / Genesis",
       "short_name": "Mega Drive",
       "year": 1988,
-      "extensions": ["md", "gen", "bin", "smd"],
+      "extensions": ["md", "gen", "bin", "smd", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -171,7 +171,7 @@
       "name": "Game Boy",
       "short_name": "Game Boy",
       "year": 1989,
-      "extensions": ["gb"],
+      "extensions": ["gb", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -226,7 +226,7 @@
       "name": "Sega Game Gear",
       "short_name": "Game Gear",
       "year": 1990,
-      "extensions": ["gg"],
+      "extensions": ["gg", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -253,7 +253,7 @@
       "name": "Super Nintendo",
       "short_name": "SNES",
       "year": 1990,
-      "extensions": ["sfc", "smc"],
+      "extensions": ["sfc", "smc", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -336,7 +336,7 @@
       "name": "Sega 32X",
       "short_name": "32X",
       "year": 1994,
-      "extensions": ["32x"],
+      "extensions": ["32x", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -434,7 +434,7 @@
       "name": "Nintendo Virtual Boy",
       "short_name": "Virtual Boy",
       "year": 1995,
-      "extensions": ["vb"],
+      "extensions": ["vb", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -461,7 +461,7 @@
       "name": "Nintendo 64",
       "short_name": "N64",
       "year": 1996,
-      "extensions": ["n64", "z64", "v64"],
+      "extensions": ["n64", "z64", "v64", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -495,7 +495,7 @@
       "name": "Game Boy Color",
       "short_name": "GB Color",
       "year": 1998,
-      "extensions": ["gbc"],
+      "extensions": ["gbc", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -556,7 +556,7 @@
       "name": "Bandai WonderSwan",
       "short_name": "WonderSwan",
       "year": 1999,
-      "extensions": ["ws", "wsc"],
+      "extensions": ["ws", "wsc", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -583,7 +583,7 @@
       "name": "Neo Geo Pocket Color",
       "short_name": "NGP Color",
       "year": 1999,
-      "extensions": ["ngp", "ngc"],
+      "extensions": ["ngp", "ngc", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -677,7 +677,7 @@
       "name": "Game Boy Advance",
       "short_name": "GBA",
       "year": 2001,
-      "extensions": ["gba"],
+      "extensions": ["gba", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",
@@ -771,7 +771,7 @@
       "name": "Nintendo DS",
       "short_name": "DS",
       "year": 2004,
-      "extensions": ["nds"],
+      "extensions": ["nds", "zip", "7z"],
       "tiers": [
         {
           "level": "otimo",

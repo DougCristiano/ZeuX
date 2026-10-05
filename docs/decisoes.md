@@ -2139,3 +2139,23 @@ embaixo ou na terceira coluna). Armadilha registrada no código: breakpoint
 arbitrário em px é ordenado antes do `sm:` (rem) no CSS do Tailwind v4 e
 perde para ele; tem que ser em rem.
 
+---
+
+## Jogos em .zip/.7z nos consoles de cartucho e no DS (2026-10-05)
+
+Pedido de usuários. Os consoles de cartucho atendidos pelo RetroArch (Atari
+2600, NES, Master System, PC Engine, Mega Drive, Game Boy/Color/Advance, Game
+Gear, SNES, 32X, Virtual Boy, N64, WonderSwan, Neo Geo Pocket) e o Nintendo
+DS (melonDS) passaram a reconhecer `.zip` e `.7z` na varredura — só a lista
+de extensões do catálogo mudou: o lançamento já passa o caminho do arquivo
+direto ao emulador, que abre o compactado sozinho (o RetroArch extrai para a
+pasta temporária dele quando o core exige arquivo solto). Não foi validado
+contra os binários reais, como o resto dos adapters.
+
+Consoles de disco **não** ganharam zip, de propósito: DuckStation, PCSX2,
+Dolphin, RPCS3, xemu e companhia não abrem, e a alternativa seria o ZeuX
+extrair o jogo — copiar a ROM, o que a regra do produto proíbe sem decisão
+explícita do Douglas (e custa minutos e GB por abertura num jogo de PS2). O
+formato compactado que esses emuladores aceitam é o CHD, que o catálogo já
+reconhece. `TestArchivesOnlyWhereTheEmulatorOpensThem` trava a lista.
+
