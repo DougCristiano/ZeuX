@@ -79,10 +79,13 @@ function SpecsPanel() {
     <PostScreen title={t("postTitle")} meta={t("scannedAt", { date: formatFileDate(hardware.scanned_at) })}>
       <dl className="flex flex-col">
         <PostRow label={t("system")} read={t("statusRead")}>
-          <PostValue>
-            {hardware.os.platform} {hardware.os.version}
-          </PostValue>
-          <PostDetail>{hardware.os.arch}</PostDetail>
+          {/* `name` (2026-10-05): a versão do kernel do Windows 11 ainda é
+              "10.0.x", e a tela mostrava "windows 10.0…" para quem está no
+              11. O kernel continua no detalhe, para quem quiser o número. */}
+          <PostValue>{hardware.os.name ?? `${hardware.os.platform} ${hardware.os.version}`}</PostValue>
+          <PostDetail>
+            {hardware.os.name ? `${hardware.os.arch} · kernel ${hardware.os.version}` : hardware.os.arch}
+          </PostDetail>
         </PostRow>
 
         <PostRow label={t("processor")} read={t("statusRead")}>

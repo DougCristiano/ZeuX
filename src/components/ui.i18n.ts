@@ -9,6 +9,8 @@ export const dict = {
     "pt-BR": "página {{page}} de {{totalPages}}",
     en: "page {{page}} of {{totalPages}}",
   },
+  perPage: { "pt-BR": "Por página", en: "Per page" },
+  perPageLabel: { "pt-BR": "Itens por página", en: "Items per page" },
   nextPage: {
     "pt-BR": "Próxima",
     en: "Next",

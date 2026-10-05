@@ -99,3 +99,20 @@ func TestPrimaryGPUEmpty(t *testing.T) {
 		t.Error("esperava nenhuma GPU principal quando a lista está vazia")
 	}
 }
+
+// Trava o conserto do "Windows 11 aparece como 10": o nome exibido vem do
+// produto do sistema, nunca da versão do kernel (que no 11 continua "10.0").
+func TestOSDisplayName(t *testing.T) {
+	cases := []struct{ goos, platform, version, want string }{
+		{"windows", "Microsoft Windows 11 Pro", "23H2", "Windows 11 Pro 23H2"},
+		{"windows", "Microsoft Windows 10 Home", "", "Windows 10 Home"},
+		{"linux", "ubuntu", "24.04", "Ubuntu 24.04"},
+		{"darwin", "darwin", "15.1", "macOS 15.1"},
+		{"linux", "", "", ""},
+	}
+	for _, c := range cases {
+		if got := osDisplayName(c.goos, c.platform, c.version); got != c.want {
+			t.Errorf("osDisplayName(%q, %q, %q) = %q, esperado %q", c.goos, c.platform, c.version, got, c.want)
+		}
+	}
+}

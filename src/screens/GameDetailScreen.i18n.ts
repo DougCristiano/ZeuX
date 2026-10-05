@@ -135,7 +135,9 @@ export const dict = {
   yourStats: { "pt-BR": "Suas estatísticas", en: "Your stats" },
   playtime: { "pt-BR": "Tempo jogado", en: "Playtime" },
   lastPlayed: { "pt-BR": "Última vez", en: "Last played" },
-  sessions: { "pt-BR": "Sessões", en: "Sessions" },
+  emulatorStat: { "pt-BR": "Emulador", en: "Emulator" },
+  formatStat: { "pt-BR": "Formato", en: "Format" },
+  addedStat: { "pt-BR": "Na biblioteca desde", en: "In library since" },
   // "Remover da biblioteca" (2026-09-09). O texto deixa claro que o arquivo
   // no disco não é tocado — só a entrada na biblioteca some.
   editTitle: { "pt-BR": "Editar título", en: "Edit title" },
@@ -202,8 +204,8 @@ export const dict = {
     en: "The last IGDB search failed — it may have been the connection. Try again.",
   },
   aboutNothingInIgdb: {
-    "pt-BR": "O IGDB tem este jogo, mas sem resumo nem gêneros.",
-    en: "IGDB has this game, but no summary or genres.",
+    "pt-BR": "O IGDB tem este jogo, mas sem resumo.",
+    en: "IGDB has this game, but no summary.",
   },
   fetchInfo: { "pt-BR": "Buscar informações", en: "Fetch info" },
   fetchingInfo: { "pt-BR": "Buscando…", en: "Fetching…" },

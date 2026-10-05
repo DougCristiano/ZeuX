@@ -3,6 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleEntry, ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
+import { usePageSize } from "../lib/pageSize";
 import { FOCUS_RESCAN_INTERVAL_MS, rescanAllFoldersIfStale, rescanAllFoldersNow } from "../lib/autoRescan";
 import {
   Badge,
@@ -16,6 +17,7 @@ import {
   SectionHeading,
   InlineError,
   ManualInstallModal,
+  PAGE_SIZE_OPTIONS,
   Pagination,
   Toast,
 } from "../components/ui";
@@ -51,7 +53,9 @@ import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
 // fechava fileira numa grade de 5 ou 6 colunas; 30 é múltiplo dos dois. O
 // `defaultLibraryPageSize` do servidor (internal/api/server.go) acompanha o
 // mesmo valor — os dois divergiam em silêncio antes desta sprint.
-const PAGE_SIZE = 60;
+// Padrão de jogos por página (2026-10-05: 60 fixo era muito — a pessoa escolhe
+// entre PAGE_SIZE_OPTIONS no rodapé, ver `usePageSize`).
+const DEFAULT_PAGE_SIZE = 24;
 // Espera digitar antes de consultar o backend — evita uma requisição por
 // tecla. 300ms é o padrão comum para busca "enquanto digita".
 const SEARCH_DEBOUNCE_MS = 300;
@@ -216,6 +220,7 @@ export function AllGamesScreen({
   initialScrollTop: number;
 }) {
   const t = useT(dict);
+  const [pageSize, setPageSize] = usePageSize("games", DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS);
   const { page, search, platformFilter, favoriteOnly, missingOnly, playedOnly, excludedOnly, sort, viewMode, coverDensity } =
     view;
   const [games, setGames] = useState<LibraryGame[] | null>(null);
@@ -338,7 +343,7 @@ export function AllGamesScreen({
   // página. Voltar do detalhe reabre a mesma página (M4).
   function loadGames() {
     api
-      .getAllLibraryGames(page, PAGE_SIZE, {
+      .getAllLibraryGames(page, pageSize, {
         query: debouncedSearch || undefined,
         favoriteOnly,
         missingOnly,
@@ -351,7 +356,7 @@ export function AllGamesScreen({
         // Revarredura/remoção pode ter encolhido a lista abaixo da página
         // atual — volta para a última página que ainda existe em vez de
         // mostrar uma página vazia.
-        const pages = Math.max(1, Math.ceil(res.total / PAGE_SIZE));
+        const pages = Math.max(1, Math.ceil(res.total / pageSize));
         if (page > pages) {
           onViewChange({ page: pages });
           return;
@@ -370,7 +375,7 @@ export function AllGamesScreen({
       .catch((err) => setError(err instanceof ApiError ? err.message : t("failedToListGames")));
   }
 
-  useEffect(loadGames, [page, debouncedSearch, favoriteOnly, missingOnly, playedOnly, excludedOnly, platformFilter, sort]);
+  useEffect(loadGames, [page, pageSize, debouncedSearch, favoriteOnly, missingOnly, playedOnly, excludedOnly, platformFilter, sort]);
 
   // Auto-rescan (2026-09-06): "Todos os jogos" é a tela de entrada mais
   // comum do app (ver comentário de App.tsx sobre a fase "all-games") — é
@@ -1067,7 +1072,7 @@ export function AllGamesScreen({
         <div role="status" aria-live="polite">
           <span className="sr-only">{t("loadingGames")}</span>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7 min-[2400px]:grid-cols-9">
-            {Array.from({ length: PAGE_SIZE }, (_, i) => (
+            {Array.from({ length: pageSize }, (_, i) => (
               <GameTileSkeleton key={i} />
             ))}
           </div>
@@ -1271,8 +1276,14 @@ export function AllGamesScreen({
 
           <Pagination
             page={page}
-            totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))}
+            totalPages={Math.max(1, Math.ceil(total / pageSize))}
             onChange={(next) => onViewChange({ page: next })}
+            pageSize={pageSize}
+            totalItems={total}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              onViewChange({ page: 1 });
+            }}
           />
         </>
       )}

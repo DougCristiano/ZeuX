@@ -2087,3 +2087,25 @@ console (`GamesScreen`) também ganhou paginação — no cliente, 60 por págin
 depois de filtrar/ordenar —, porque montava todos os jogos de uma vez. Se o
 scroll infinito voltar a ser preferido, é só reverter este item.
 
+---
+
+## Tela do jogo sem "Sessões", itens por página e nome do Windows (2026-10-05)
+
+- **Tela do jogo:** a contagem de sessões saiu (o Douglas: "não importa muito")
+  junto com a chamada a `GET /sessions` que só existia para ela. O card "Suas
+  estatísticas" foi absorvido pelo hero, que tinha um vão grande ao lado do
+  "Jogar": uma faixa com tempo jogado, última vez, emulador (do parecer),
+  formato do arquivo e "na biblioteca desde" — todos dados que a tela já
+  tinha, sem rota nova. Os gêneros do IGDB subiram para o hero também;
+  "Sobre o jogo" ficou só com o resumo.
+- **Itens por página escolhíveis:** jogos (Todos os jogos e por console, mesma
+  preferência) em 12/24/48/96, padrão 24; emuladores em 12/24/48, padrão 24
+  (o catálogo inteiro cabe numa página, como decidido em 2026-09-28, mas quem
+  quer menos escolhe). Guardado em `localStorage` (`src/lib/pageSize.ts`).
+- **Windows 11 aparecia como "10":** a tela de Especificações mostrava
+  `os.version`, que é a versão do **kernel** — e o kernel do Windows 11
+  continua "10.0.x". Agora o scan devolve `os.name` (ProductName do registro
+  via gopsutil, que já corrige o "Windows 10" para "11" quando o build é
+  ≥ 22000, mais o DisplayVersion: "Windows 11 Pro 23H2"). O kernel fica no
+  detalhe da linha. Não validado numa máquina Windows real nesta sessão.
+

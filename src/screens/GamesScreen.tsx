@@ -15,6 +15,7 @@ import {
   ErrorModal,
   InlineError,
   ManualInstallModal,
+  PAGE_SIZE_OPTIONS,
   Pagination,
   ProgressBar,
   ScreenContainer,
@@ -42,11 +43,12 @@ import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
 import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { useT } from "../i18n/i18n";
+import { usePageSize } from "../lib/pageSize";
 import { dict } from "./GamesScreen.i18n";
 
-// Jogos por página da lista de um console — divisível pelas colunas comuns da
-// grade (2, 3, 4, 5, 6) para a última linha de cada página não ficar vazia.
-const GAMES_PAGE_SIZE = 60;
+// Padrão de jogos por página da lista de um console; a pessoa troca no rodapé
+// (mesma preferência de "Todos os jogos", chave "games").
+const DEFAULT_GAMES_PAGE_SIZE = 24;
 
 type RowStatus =
   | { kind: "idle" }
@@ -330,14 +332,15 @@ export function GamesScreen({
   // filtrar/ordenar é o que mantém a ordem certa entre páginas. Sem isto, um
   // console com milhares de jogos montava milhares de tiles de uma vez.
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSize("games", DEFAULT_GAMES_PAGE_SIZE, PAGE_SIZE_OPTIONS);
   useEffect(() => {
     setPage(1);
-  }, [consoleId, trimmedSearch, missingOnly, sort]);
-  const totalPages = Math.max(1, Math.ceil(visibleGames.length / GAMES_PAGE_SIZE));
+  }, [consoleId, trimmedSearch, missingOnly, sort, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(visibleGames.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pagedGames = useMemo(
-    () => visibleGames.slice((currentPage - 1) * GAMES_PAGE_SIZE, currentPage * GAMES_PAGE_SIZE),
-    [visibleGames, currentPage],
+    () => visibleGames.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [visibleGames, currentPage, pageSize],
   );
 
   return (
@@ -870,7 +873,14 @@ export function GamesScreen({
         </div>
       )}
 
-      <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
+      <Pagination
+        page={currentPage}
+        totalPages={totalPages}
+        onChange={setPage}
+        pageSize={pageSize}
+        totalItems={visibleGames.length}
+        onPageSizeChange={setPageSize}
+      />
     </ScreenContainer>
   );
 }

@@ -7,7 +7,7 @@ import { consoleAccentColor } from "../lib/consoleColor";
 import { useT } from "../i18n/i18n";
 import { dict } from "./ui.i18n";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
-import { Select, SelectContent, SelectTrigger, SelectValue } from "./ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 /**
  * N14 (docs/roadmap.md, Sprint N): decisão do Douglas — `lucide-react` (já
@@ -1205,36 +1205,72 @@ export function FavoriteToggle({
 
 /**
  * Paginação — "Anterior/Próxima" mais indicador de página, extraída de
- * `AllGamesScreen` (2026-08-04) para reaproveitar em `EmulatorsScreen` e
- * `VerdictScreen`, que ganharam o mesmo padrão. Sempre "página N de M",
- * nunca números de página clicáveis — a lista é pequena o bastante (dezenas
- * de itens, não milhares) para não precisar de navegação mais complexa.
+ * `AllGamesScreen` (2026-08-04). Sempre "página N de M", nunca números de
+ * página clicáveis.
+ *
+ * Itens por página escolhíveis (2026-10-05, pedido do Douglas — 60 fixo era
+ * muito): com `pageSize`/`onPageSizeChange`, aparece o seletor ao lado. O
+ * seletor continua visível mesmo com uma página só, desde que haja mais itens
+ * que a menor opção — senão quem escolheu 96 nunca acharia o caminho de volta.
  */
 export function Pagination({
   page,
   totalPages,
   onChange,
+  pageSize,
+  pageSizeOptions = PAGE_SIZE_OPTIONS,
+  onPageSizeChange,
+  totalItems,
 }: {
   page: number;
   totalPages: number;
   onChange: (page: number) => void;
+  pageSize?: number;
+  pageSizeOptions?: readonly number[];
+  onPageSizeChange?: (size: number) => void;
+  /** Total de itens — só decide se o seletor de tamanho vale a pena aparecer. */
+  totalItems?: number;
 }) {
   const t = useT(dict);
-  if (totalPages <= 1) return null;
+  const showSizePicker =
+    pageSize !== undefined && onPageSizeChange !== undefined && (totalItems ?? Infinity) > Math.min(...pageSizeOptions);
+  if (totalPages <= 1 && !showSizePicker) return null;
   return (
-    <div className="mt-6 flex items-center justify-center gap-3">
-      <Button variant="chrome" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        {t("previousPage")}
-      </Button>
-      <span className="font-mono text-sm text-muted">
-        {t("pageIndicator", { page, totalPages })}
-      </span>
-      <Button variant="chrome" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-        {t("nextPage")}
-      </Button>
+    <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+      {totalPages > 1 && (
+        <>
+          <Button variant="chrome" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+            {t("previousPage")}
+          </Button>
+          <span className="font-mono text-sm text-muted">{t("pageIndicator", { page, totalPages })}</span>
+          <Button variant="chrome" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
+            {t("nextPage")}
+          </Button>
+        </>
+      )}
+      {showSizePicker && (
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs tracking-wide text-muted uppercase">{t("perPage")}</span>
+          <ZSelect
+            value={String(pageSize)}
+            onValueChange={(v) => onPageSizeChange(Number(v))}
+            ariaLabel={t("perPageLabel")}
+            className="w-20"
+          >
+            {pageSizeOptions.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}
+              </SelectItem>
+            ))}
+          </ZSelect>
+        </div>
+      )}
     </div>
   );
 }
+
+/** Opções padrão de itens por página das listas de jogos. */
+export const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const;
 
 /**
  * Barra de progresso — mesmo vocabulário do wireframe (`.bar`/`.bar span`).

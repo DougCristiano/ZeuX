@@ -31,6 +31,9 @@ export type OSInfo = {
   platform: "windows" | "linux" | "darwin" | (string & {});
   version: string;
   arch: string;
+  /** Nome para exibição ("Windows 11 Pro 23H2"). `version` é a do kernel —
+   * no Windows 11 continua "10.0.x", por isso não serve para mostrar. */
+  name?: string;
 };
 
 export type CPUInfo = {

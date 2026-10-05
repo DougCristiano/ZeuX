@@ -44,6 +44,9 @@ func (systemProbe) Detect(ctx context.Context) (HardwareInfo, error) {
 	if version, err := host.KernelVersionWithContext(ctx); err == nil {
 		info.OS.Version = version
 	}
+	if platform, _, version, err := host.PlatformInformationWithContext(ctx); err == nil {
+		info.OS.Name = osDisplayName(runtime.GOOS, platform, version)
+	}
 
 	cpuInfo, err := detectCPU(ctx)
 	if err != nil {
@@ -176,3 +179,29 @@ func classifyGPUVendor(model string) (vendor string, integrated bool) {
 
 	return vendor, integrated
 }
+
+// osDisplayName monta o nome do sistema a partir do que o gopsutil devolve.
+// No Windows, platform é o ProductName do registro (o gopsutil já troca
+// "Windows 10" por "Windows 11" quando o build é ≥ 22000 — o registro mente
+// nisso) e version é o DisplayVersion ("23H2"). No Linux, platform é o id da
+// distribuição ("ubuntu"); no macOS, "darwin" com a versão do macOS.
+func osDisplayName(goos, platform, version string) string {
+	platform = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(platform), "Microsoft "))
+	version = strings.TrimSpace(version)
+	switch goos {
+	case "darwin":
+		platform = "macOS"
+	case "linux":
+		if platform != "" {
+			platform = strings.ToUpper(platform[:1]) + platform[1:]
+		}
+	}
+	if platform == "" {
+		return ""
+	}
+	if version == "" {
+		return platform
+	}
+	return platform + " " + version
+}
+

@@ -32,8 +32,15 @@ type HardwareInfo struct {
 // OSInfo identifica o sistema operacional.
 type OSInfo struct {
 	Platform string `json:"platform"` // "windows", "linux", "darwin"
-	Version  string `json:"version"`
-	Arch     string `json:"arch"`
+	// Version é a versão do KERNEL — no Windows 11 ela continua "10.0.x",
+	// porque a Microsoft não mudou o número do kernel. Mostrar isto ao
+	// usuário fazia o Windows 11 aparecer como "10" (relato do Douglas,
+	// 2026-10-05); para exibir, use Name.
+	Version string `json:"version"`
+	Arch    string `json:"arch"`
+	// Name é o nome do sistema para exibição ("Windows 11 Pro 23H2",
+	// "Ubuntu 24.04", "macOS 15.1"). Ausente quando o sistema não informou.
+	Name string `json:"name,omitempty"`
 }
 
 // CPUInfo descreve o processador.

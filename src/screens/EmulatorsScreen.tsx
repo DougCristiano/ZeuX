@@ -32,6 +32,7 @@ import {
   InlineError,
   InlineWarning,
   inputClass,
+  Pagination,
   ProgressBar,
   ScreenAtmosphere,
   ScreenContainer,
@@ -50,6 +51,13 @@ import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { percentOf } from "../lib/format";
 import { parentDir } from "../lib/paths";
+import { usePageSize } from "../lib/pageSize";
+
+// Emuladores por página. O padrão (24) cabe o catálogo inteiro numa página só
+// — a decisão de 2026-09-28 continua valendo para quem não mexe —, e quem
+// prefere listas menores escolhe 12 no rodapé (pedido do Douglas, 2026-10-05).
+const EMULATOR_PAGE_SIZE_OPTIONS = [12, 24, 48] as const;
+const DEFAULT_EMULATOR_PAGE_SIZE = 24;
 
 // Quantos cards de esqueleto mostrar enquanto a lista carrega — o bastante
 // para preencher duas fileiras da grade na janela padrão, sem prometer uma
@@ -1073,6 +1081,15 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
     );
   });
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePageSize("emulators", DEFAULT_EMULATOR_PAGE_SIZE, EMULATOR_PAGE_SIZE_OPTIONS);
+  useEffect(() => {
+    setPage(1);
+  }, [consoleFilter, statusFilter, search, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedEmulators = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   // Contagens do resumo e dos chips: sempre sobre a lista INTEIRA, nunca sobre
   // o resultado filtrado — um chip que muda de número conforme o próprio chip
   // ativo não é um índice do catálogo, é um espelho da última escolha.
@@ -1233,7 +1250,7 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           com identidade em cima, ação embaixo, e o respiro entre os dois. */}
       {filtered.length > 0 && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2400px]:grid-cols-5">
-          {filtered.map((entry) => (
+          {pagedEmulators.map((entry) => (
             <EmulatorCard
               key={entry.adapter_id}
               entry={entry}
@@ -1247,6 +1264,15 @@ export function EmulatorsScreen({ onBack, report }: { onBack?: () => void; repor
           ))}
         </div>
       )}
+      <Pagination
+        page={currentPage}
+        totalPages={totalPages}
+        onChange={setPage}
+        pageSize={pageSize}
+        pageSizeOptions={EMULATOR_PAGE_SIZE_OPTIONS}
+        totalItems={filtered.length}
+        onPageSizeChange={setPageSize}
+      />
 
       {/* Porta de cadastro manual. O backend aceita emulador de console fora
           do catálogo (internal/emulator/custom.go), e o B2b

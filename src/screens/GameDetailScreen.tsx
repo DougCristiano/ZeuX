@@ -51,6 +51,12 @@ function formatPlaytime(
   return remainder > 0 ? `${hours}${hUnitText}${remainder}${minUnitText}` : `${hours}${hUnitText}`;
 }
 
+function formatAddedAt(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("pt-BR");
+}
+
 function formatLastPlayed(iso: string | undefined, neverPlayedText: string): string {
   if (!iso) return neverPlayedText;
   const date = new Date(iso);
@@ -117,19 +123,8 @@ export function GameDetailScreen({
   onOpenConsole?: () => void;
 }) {
   const t = useT(dict);
-  const [sessionCount, setSessionCount] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [emulators, setEmulators] = useState<EmulatorEntry[] | null>(null);
-  // 2026-09-09: recarrega a contagem de sessões quando o jogo abre de fato —
-  // era o único número desta tela que ficava velho até um F5.
-  const { statusFor, launch, cancelCoreDownload, launchError, launchErrorCode, clearLaunchError } = useLaunchGame({
-    onLaunched: () => {
-      api
-        .getSessions()
-        .then((res) => setSessionCount(res.sessions.filter((s) => s.rom_path === game.path).length))
-        .catch(() => {});
-    },
-  });
+  const { statusFor, launch, cancelCoreDownload, launchError, launchErrorCode, clearLaunchError } = useLaunchGame();
   // B2 (docs/pendencias.md): mesmo papel do estado equivalente em
   // HomeScreen/AllGamesScreen — pré-preenche o cadastro manual. Aqui `game` é
   // um prop fixo (uma tela por jogo), então não precisa do `lastGame` que as
@@ -429,16 +424,6 @@ export function GameDetailScreen({
 
   useEffect(() => {
     api
-      .getSessions()
-      .then((res) => {
-        setSessionCount(res.sessions.filter((s) => s.rom_path === game.path).length);
-      })
-      .catch((err) => setError(err instanceof ApiError ? err.message : t("errorReadingSessions")));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.path, t]);
-
-  useEffect(() => {
-    api
       .getEmulators()
       .then((res) => setEmulators(res.emulators))
       .catch(() => setEmulators([]));
@@ -446,7 +431,8 @@ export function GameDetailScreen({
 
   const status = statusFor(game.id);
   const verdict = report?.verdicts.find((v) => v.console_id === game.console_id);
-  const hasAbout = Boolean(about.summary || (about.genres && about.genres.length > 0));
+  // Gêneros moram no hero desde 2026-10-05; esta seção é só o resumo.
+  const hasAbout = Boolean(about.summary);
   const heroCoverUrl = coverImageURL(coverUrl, coverVersion || undefined);
   const accent = consoleAccentColor(game.console_id);
 
@@ -492,6 +478,20 @@ export function GameDetailScreen({
       setFolderError(t("errorOpeningFolder", { error: err instanceof Error ? err.message : String(err) }));
     }
   }
+
+  const fileExtension = game.path.includes(".") ? game.path.slice(game.path.lastIndexOf(".") + 1).toUpperCase() : "";
+  const heroStats = [
+    {
+      label: t("playtime"),
+      value: formatPlaytime(game.playtime_seconds, t("neverPlayed"), t("lessThanOneMinute"), t("minuteUnit"), t("hourUnit")),
+    },
+    { label: t("lastPlayed"), value: formatLastPlayed(game.last_played_at, t("neverPlayed")) },
+    // Ausente sem parecer (sem consentimento/scan) ou no patamar
+    // "improvável" — o item some em vez de mostrar um palpite (princípio 4).
+    ...(verdict?.emulator ? [{ label: t("emulatorStat"), value: verdict.emulator }] : []),
+    ...(fileExtension ? [{ label: t("formatStat"), value: fileExtension }] : []),
+    { label: t("addedStat"), value: formatAddedAt(game.added_at) },
+  ];
 
   const heroContent = (
     <>
@@ -651,6 +651,15 @@ export function GameDetailScreen({
               {[about.developer, about.release_year].filter(Boolean).join(" · ")}
             </p>
           )}
+          {about.genres && about.genres.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={t("genresLabel")}>
+              {about.genres.map((genre) => (
+                <li key={genre}>
+                  <Badge>{genre}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <Button
@@ -749,19 +758,32 @@ export function GameDetailScreen({
         {game.missing && (
           <InlineError>{t("fileMissingError")}</InlineError>
         )}
+
+        {/* Faixa de estatísticas DENTRO do hero (2026-10-05, pedido do
+            Douglas): o hero tinha capa + título + "Jogar" e um vão enorme do
+            lado, enquanto os números moravam num card separado lá embaixo. A
+            contagem de sessões saiu ("não importa muito"); entraram dados que
+            a tela já tinha à mão — emulador do parecer, formato do arquivo e
+            quando o jogo entrou na biblioteca. Nenhuma chamada nova. */}
+        <dl className="mt-auto grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 sm:grid-cols-3 lg:grid-cols-5">
+          {heroStats.map((stat) => (
+            <div key={stat.label} className="min-w-0">
+              <dt className="font-mono text-[11px] tracking-wide text-muted uppercase">{stat.label}</dt>
+              <dd className="mt-0.5 truncate font-mono text-sm text-ink" title={stat.value}>
+                {stat.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </>
   );
 
   return (
     <ScreenContainer variant="listing">
-      {/* A contagem de sessões falhar não impede o resto da tela de
-          funcionar — mas o texto vermelho solto dentro do card de
-          estatísticas era fácil de perder (mesmo achado do Douglas em
-          GamesScreen/AllGamesScreen, 2026-08-07). `favoriteError`/
-          `coverError`/`folderError` continuam inline, de propósito: aparecem
-          colados no botão que falhou (favoritar, buscar capa, abrir pasta),
-          não soltos pela tela. */}
+      {/* `favoriteError`/`coverError`/`folderError` ficam inline, de
+          propósito: aparecem colados no botão que falhou (favoritar, buscar
+          capa, abrir pasta), não soltos pela tela. */}
       {toastMessage && <Toast message={toastMessage} />}
       {confirmingExclude && (
         <ConfirmModal
@@ -819,9 +841,7 @@ export function GameDetailScreen({
               : undefined
           }
         />
-      ) : (
-        error && <ErrorModal title={t("errorReadingStats")} message={error} onClose={() => setError(null)} />
-      )}
+      ) : null}
 
       {/* 2026-09-09: as mesmas confirmações das outras telas de jogo (M8/N13)
           — instalar/lançar mesmo assim toca disco/rede ou ignora um aviso de
@@ -1043,15 +1063,7 @@ export function GameDetailScreen({
               <Card filled className="flex flex-col gap-3">
                 {hasAbout ? (
                   <>
-                    {about.genres && about.genres.length > 0 && (
-                      <ul className="flex flex-wrap gap-1.5" aria-label={t("genresLabel")}>
-                        {about.genres.map((genre) => (
-                          <li key={genre}>
-                            <Badge>{genre}</Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    {/* Gêneros subiram para o hero (2026-10-05). */}
                     {about.summary && (
                       <>
                         <p lang="en" className="max-w-prose text-sm leading-relaxed whitespace-pre-line text-ink">
@@ -1083,41 +1095,6 @@ export function GameDetailScreen({
           </div>
 
         <div className="flex flex-col gap-6">
-          <section>
-            <SectionHeading className="mb-3">{t("yourStats")}</SectionHeading>
-            <Card filled>
-              {/* Empilhado em linhas rotuladas, não em três colunas: na
-                  coluna estreita da grade os valores ("nunca jogado",
-                  "07/09/2026 21:14") quebravam em duas linhas cada um e
-                  desalinhavam entre si. Rótulo em `font-mono` caixa alta é o
-                  mesmo acabamento de legenda que `Callout`/`Badge` já usam —
-                  nenhum estilo novo entra no projeto. O valor em `font-mono`
-                  alinha os dígitos verticalmente, que é a única razão de a
-                  fonte mudar aqui. */}
-              <dl className="flex flex-col gap-3">
-                {[
-                  {
-                    label: t("playtime"),
-                    value: formatPlaytime(
-                      game.playtime_seconds,
-                      t("neverPlayed"),
-                      t("lessThanOneMinute"),
-                      t("minuteUnit"),
-                      t("hourUnit"),
-                    ),
-                  },
-                  { label: t("lastPlayed"), value: formatLastPlayed(game.last_played_at, t("neverPlayed")) },
-                  { label: t("sessions"), value: sessionCount === null ? "…" : String(sessionCount) },
-                ].map((stat) => (
-                  <div key={stat.label}>
-                    <dt className="font-mono text-xs tracking-wide text-muted uppercase">{stat.label}</dt>
-                    <dd className="mt-0.5 font-mono text-lg text-ink">{stat.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </Card>
-          </section>
-
           {/* Achado #5 do critico-layout-biblioteca: "Abrir pasta"/"Revarrer"
               moraram no hero até esta sessão, competindo em peso visual com
               "Jogar" — a única ação primária que um hero deveria ter. Viraram
