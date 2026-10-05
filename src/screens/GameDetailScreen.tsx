@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  FOCUS_RING,
   CHROME_TINT_DANGER,
   PathTail,
   ConfirmModal,
@@ -219,6 +220,7 @@ export function GameDetailScreen({
   const [about, setAbout] = useState(() => aboutOf(game));
   const [fetchingInfo, setFetchingInfo] = useState(false);
   const [infoError, setInfoError] = useState<string | null>(null);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   // `null` enquanto não respondeu — a seção não diz nada sobre a conta até
   // saber, para não mostrar "sem conta" num piscar a quem tem conta.
   const [igdbConfigured, setIgdbConfigured] = useState<boolean | null>(null);
@@ -571,7 +573,16 @@ export function GameDetailScreen({
           então o título não casava nem com o topo nem com o meio da arte, e
           sobrava um vão acima dele. Agora o título começa na linha do topo
           da capa, como a página de jogo de Steam/GOG. */}
-      <div className="flex min-w-0 max-w-3xl flex-1 flex-col justify-start gap-4 sm:pt-1">
+      {/* 2026-10-05 (pedido do Douglas, "ainda mal otimizado"): o teto
+          `max-w-3xl` desta coluna deixava metade do hero vazia numa janela
+          larga. Saiu o teto; a coluna virou duas no `lg:` — identidade e
+          "Jogar" à esquerda, o resumo do IGDB à direita (antes um card
+          separado lá embaixo) — e a faixa de estatísticas atravessa as duas.
+          O gradiente do fundo ficou mais denso na direita para o texto
+          continuar legível sobre a arte. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-4 sm:pt-1">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
+        <div className="flex min-w-0 flex-col gap-4">
         <div>
           {editingTitle ? (
             <form
@@ -758,6 +769,44 @@ export function GameDetailScreen({
         {game.missing && (
           <InlineError>{t("fileMissingError")}</InlineError>
         )}
+        </div>
+
+        <section aria-label={t("aboutGame")} className="flex min-w-0 flex-col gap-2 lg:border-l lg:border-line lg:pl-6">
+          <h2 className="font-mono text-[11px] tracking-wide text-muted uppercase">{t("aboutGame")}</h2>
+          {hasAbout ? (
+            <>
+              {/* Resumo em inglês (o IGDB só tem esse idioma, decisão do
+                  Douglas): `lang="en"` para o leitor de tela. Corta em 7
+                  linhas para o hero não crescer sem limite; "Ler mais" abre. */}
+              <p
+                lang="en"
+                className={`text-sm leading-relaxed whitespace-pre-line text-ink ${summaryExpanded ? "" : "line-clamp-7"}`}
+              >
+                {about.summary}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSummaryExpanded((v) => !v)}
+                  className={`font-mono text-xs tracking-wide text-accent-hover uppercase hover:underline ${FOCUS_RING}`}
+                >
+                  {summaryExpanded ? t("readLess") : t("readMore")}
+                </button>
+                <span className="font-mono text-[11px] tracking-wide text-muted">{t("summarySource")}</span>
+              </div>
+            </>
+          ) : (
+            <AboutMissing
+              status={about.metadata_status}
+              igdbConfigured={igdbConfigured}
+              title={title}
+              fetching={fetchingInfo}
+              onFetch={handleFetchInfo}
+            />
+          )}
+          {infoError && <InlineError>{infoError}</InlineError>}
+        </section>
+        </div>
 
         {/* Faixa de estatísticas DENTRO do hero (2026-10-05, pedido do
             Douglas): o hero tinha capa + título + "Jogar" e um vão enorme do
@@ -1017,7 +1066,7 @@ export function GameDetailScreen({
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 55%, color-mix(in srgb, var(--paper) 88%, transparent) 72%, color-mix(in srgb, var(--paper) 18%, transparent) 100%)",
+                "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 55%, color-mix(in srgb, var(--paper) 86%, transparent) 85%, color-mix(in srgb, var(--paper) 62%, transparent) 100%)",
             }}
           />
           {/* Mesmas linhas de CRT da abertura do app e da faixa inicial — a
@@ -1050,42 +1099,7 @@ export function GameDetailScreen({
             dizia sozinho o que ele responde. O título fala do jogo, nunca da
             máquina (princípio 2 do CLAUDE.md). */}
         <div className="flex flex-col gap-6 lg:col-span-2">
-            {/* "Sobre o jogo" (2026-09-28): gêneros e resumo vindos do IGDB.
-                O resumo é em inglês (o IGDB só tem esse idioma, decisão do
-                Douglas): `lang="en"` para o leitor de tela pronunciar certo, e
-                a legenda diz de onde veio. Desde 2026-09-29 a seção aparece
-                sempre — antes sumia sem nada, e o Douglas não tinha como saber
-                se faltava conta, se o IGDB não achou o título ou se a busca
-                nem tinha rodado. Cada caso diz o que fazer; nunca um palpite
-                no lugar do dado (princípio 4). */}
-            <section>
-              <SectionHeading className="mb-3">{t("aboutGame")}</SectionHeading>
-              <Card filled className="flex flex-col gap-3">
-                {hasAbout ? (
-                  <>
-                    {/* Gêneros subiram para o hero (2026-10-05). */}
-                    {about.summary && (
-                      <>
-                        <p lang="en" className="max-w-prose text-sm leading-relaxed whitespace-pre-line text-ink">
-                          {about.summary}
-                        </p>
-                        <p className="font-mono text-[11px] tracking-wide text-muted">{t("summarySource")}</p>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <AboutMissing
-                    status={about.metadata_status}
-                    igdbConfigured={igdbConfigured}
-                    title={title}
-                    fetching={fetchingInfo}
-                    onFetch={handleFetchInfo}
-                  />
-                )}
-                {infoError && <InlineError>{infoError}</InlineError>}
-              </Card>
-            </section>
-
+            {/* "Sobre o jogo" subiu para o hero em 2026-10-05. */}
             {verdict && (
               <section>
                 <SectionHeading className="mb-3">{t("howItRuns")}</SectionHeading>

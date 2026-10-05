@@ -184,6 +184,8 @@ export const dict = {
   },
   // Seção de informações do IGDB (2026-09-28).
   aboutGame: { "pt-BR": "Sobre o jogo", en: "About the game" },
+  readMore: { "pt-BR": "Ler mais", en: "Read more" },
+  readLess: { "pt-BR": "Mostrar menos", en: "Show less" },
   // Por que não há resumo (2026-09-29) — um motivo por estado da busca.
   aboutNeedsAccount: {
     "pt-BR":

@@ -2109,3 +2109,15 @@ scroll infinito voltar a ser preferido, é só reverter este item.
   ≥ 22000, mais o DisplayVersion: "Windows 11 Pro 23H2"). O kernel fica no
   detalhe da linha. Não validado numa máquina Windows real nesta sessão.
 
+---
+
+## Hero do jogo ocupa a largura toda (2026-10-05, segunda rodada)
+
+Com as estatísticas no hero, metade dele continuava vazia: a coluna de texto
+tinha teto `max-w-3xl` para não passar por cima da arte (contraste). Agora a
+coluna não tem teto e vira duas no `lg:` — título, gêneros e "Jogar" à
+esquerda; o resumo do IGDB ("Sobre o jogo", antes um card abaixo do hero) à
+direita, cortado em 7 linhas com "Ler mais"; a faixa de estatísticas
+atravessa as duas. O gradiente do fundo ficou mais denso na direita (62% de
+`--paper` na borda, era 18%) para o texto continuar legível sobre a arte.
+
