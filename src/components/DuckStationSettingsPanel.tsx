@@ -5,6 +5,7 @@ import { useToast } from "../hooks/useToast";
 import { useT } from "../i18n/i18n";
 import { dict } from "./DuckStationSettingsPanel.i18n";
 import { Button, Callout, InlineError, Toast, inputClass, ZSelect } from "./ui";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { SelectItem } from "./ui/select";
 
 // Grupos da tela, pela ID que o servidor devolve. Uma opção nova no catálogo
@@ -145,12 +146,33 @@ export function DuckStationSettingsPanel() {
       </div>
 
       {error && <InlineError>{error}</InlineError>}
-      <div className="flex items-center gap-3">
+      {/* Rodapé fixo: no modal a lista rola, e "Salvar" no fim da rolagem
+          ficava fora de vista. */}
+      <div className="sticky -bottom-1 z-10 -mx-5 flex items-center gap-3 border-t border-line bg-fill px-5 pt-3 pb-4">
         <Button variant="primary" disabled={locked || saving || changed.length === 0} onClick={() => void save()}>
           {saving ? t("saving") : t("save")}
         </Button>
         {changed.length === 0 && <span className="text-xs text-muted">{t("noChanges")}</span>}
       </div>
     </div>
+  );
+}
+
+/**
+ * O painel dentro de um modal, aberto pelo botão no topo da tela do console
+ * PS1. Largura com teto (`max-w`), nunca fixa; a altura acompanha a janela e
+ * o conteúdo rola por dentro — a lista de opções passa da altura de uma
+ * janela pequena.
+ */
+export function DuckStationSettingsModal({ onClose }: { onClose: () => void }) {
+  const t = useT(dict);
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto rounded-lg border border-line bg-fill p-5 pb-0 ring-0 sm:max-w-3xl">
+        <DialogTitle className="text-lg font-semibold text-ink">{t("modalTitle")}</DialogTitle>
+        <DialogDescription className="mb-2 text-sm text-muted">{t("modalDescription")}</DialogDescription>
+        <DuckStationSettingsPanel />
+      </DialogContent>
+    </Dialog>
   );
 }

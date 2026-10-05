@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
-import { Pencil } from "lucide-react";
+import { Pencil, Settings2 } from "lucide-react";
 import { api, ApiError } from "../api";
 import type {
   ConsoleEmulatorOption,
@@ -38,7 +38,7 @@ import { useStandaloneFirstSteps } from "../hooks/useFirstSteps";
 import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { SaveDataPanel } from "../components/SaveDataPanel";
-import { DuckStationSettingsPanel } from "../components/DuckStationSettingsPanel";
+import { DuckStationSettingsModal } from "../components/DuckStationSettingsPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { percentOf } from "../lib/format";
@@ -304,7 +304,9 @@ function EmulatorOptionCard({
       {/* Degrada visivelmente (H5) em vez de simplesmente não ter botão: o
           usuário precisa saber que aquele emulador ainda se configura por
           fora, não ficar procurando um botão que nunca existiu. */}
-      {installed && !entry?.configurable && !entry?.bindable && (
+      {/* O DuckStation passou a ter as opções no botão do topo da tela
+          (2026-10-05) — dizer "só dentro do emulador" ali seria falso. */}
+      {installed && !entry?.configurable && !entry?.bindable && option.adapter_id !== "duckstation" && (
         <p className="text-xs text-muted">
           {t("configureElsewhereMessage", { emulatorName: option.name })}
         </p>
@@ -724,6 +726,7 @@ export function ConsoleDetailScreen({
   // imagem carregada para o mesmo `src` sem esse empurrão.
   const [imageVersion, setImageVersion] = useState(0);
   const [imageBusy, setImageBusy] = useState(false);
+  const [emulatorSettingsOpen, setEmulatorSettingsOpen] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
   // B2 (docs/pendencias.md): "já tenho um emulador deste console, aponte
@@ -1039,7 +1042,22 @@ export function ConsoleDetailScreen({
             </li>
           ))}
         </ul>
+
+        {/* Configurações do emulador no topo, num modal (2026-10-05, pedido
+            do Douglas): no meio da coluna elas ficavam perdidas entre BIOS e
+            saves. Só para o DuckStation por enquanto — único com o catálogo
+            de opções verificado. */}
+        {consoleId === "ps1" && readiness.chosen?.adapter_id === "duckstation" && (
+          <div>
+            <Button variant="chrome" onClick={() => setEmulatorSettingsOpen(true)}>
+              <Settings2 size={14} aria-hidden="true" />
+              {t("duckStationOptionsButton")}
+            </Button>
+          </div>
+        )}
       </Card>
+
+      {emulatorSettingsOpen && <DuckStationSettingsModal onClose={() => setEmulatorSettingsOpen(false)} />}
 
       {/* Dica logo abaixo da trilha que ela explica — o `mb-6` do card acima
           já separa da dica, então o espaço para a coluna vem daqui. */}
@@ -1093,16 +1111,6 @@ export function ConsoleDetailScreen({
 
             <BiosSection entry={chosenEntry} requiresExternalFile={requiresExternalFile} onChanged={reload} />
           </section>
-
-          {/* Opções do DuckStation (2026-10-05, decisão do Douglas: na tela do
-              console PS1). Só quando o DuckStation é o emulador escolhido —
-              o painel mesmo explica quando a instalação não é do ZeuX. */}
-          {consoleId === "ps1" && readiness.chosen?.adapter_id === "duckstation" && (
-            <section className="flex flex-col gap-3">
-              <SectionHeading>{t("duckStationOptionsHeading")}</SectionHeading>
-              <DuckStationSettingsPanel />
-            </section>
-          )}
 
           {/* Saves (docs/pendencias.md, "Ver saves dentro do ZeuX — MVP de
               inspeção"): só aparece com um emulador resolvido — sem isso não

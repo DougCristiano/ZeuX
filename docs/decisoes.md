@@ -2228,3 +2228,10 @@ Levantamento do Douglas com o DuckStation 0.1-12070 rodando no Windows
   instalação anterior, mesmo que o pacote novo traga item de mesmo nome
   (`portableUserPaths`, só DuckStation).
 
+**Ajuste no mesmo dia (pedido do Douglas, "meio jogado"):** as opções do
+DuckStation saíram do meio da coluna da tela do PS1 e viraram um modal,
+aberto pelo botão "Configurações do DuckStation" no cartão de prontidão, logo
+abaixo do título do console. O modal tem altura com teto (85% da janela),
+rola por dentro e mantém "Salvar opções" fixo no rodapé. O cartão do
+DuckStation deixou de dizer "configuração só dentro do emulador".
+

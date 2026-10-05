@@ -3,6 +3,11 @@ import type { Dict } from "../i18n/i18n";
 // Rótulos das opções do DuckStation, pela ID "Seção.Chave" que o servidor
 // devolve (internal/emulator/duckstation_settings.go).
 export const dict = {
+  modalTitle: { "pt-BR": "Configurações do DuckStation", en: "DuckStation settings" },
+  modalDescription: {
+    "pt-BR": "Gravadas direto no settings.ini do DuckStation instalado pelo ZeuX. Só muda o que você alterar aqui.",
+    en: "Written straight to the settings.ini of the DuckStation installed by ZeuX. Only what you change here is touched.",
+  },
   loading: { "pt-BR": "Lendo as opções do DuckStation…", en: "Reading DuckStation options…" },
   readError: { "pt-BR": "Não foi possível ler as opções do DuckStation.", en: "Could not read DuckStation options." },
   saveError: { "pt-BR": "Não foi possível salvar as opções.", en: "Could not save the options." },
