@@ -38,7 +38,7 @@ import { useStandaloneFirstSteps } from "../hooks/useFirstSteps";
 import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { SaveDataPanel } from "../components/SaveDataPanel";
-import { DuckStationSettingsModal } from "../components/DuckStationSettingsPanel";
+import { EmulatorSettingsModal } from "../components/EmulatorSettingsPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { percentOf } from "../lib/format";
@@ -306,7 +306,7 @@ function EmulatorOptionCard({
           fora, não ficar procurando um botão que nunca existiu. */}
       {/* O DuckStation passou a ter as opções no botão do topo da tela
           (2026-10-05) — dizer "só dentro do emulador" ali seria falso. */}
-      {installed && !entry?.configurable && !entry?.bindable && option.adapter_id !== "duckstation" && (
+      {installed && !entry?.configurable && !entry?.bindable && option.adapter_id !== "duckstation" && option.adapter_id !== "pcsx2" && (
         <p className="text-xs text-muted">
           {t("configureElsewhereMessage", { emulatorName: option.name })}
         </p>
@@ -862,6 +862,14 @@ export function ConsoleDetailScreen({
   const emulatorById = new Map(emulators.map((e) => [e.adapter_id, e]));
   const coreByName = new Map(cores.map((c) => [c.name, c]));
   const consoleFolders = folders.filter((f) => f.console_id === consoleId);
+  // Botão de configurações no topo (2026-10-05): DuckStation no PS1 e PCSX2
+  // no PS2 — os dois com catálogo de opções verificado.
+  const settingsEmulator =
+    consoleId === "ps1" && readiness.chosen?.adapter_id === "duckstation"
+      ? { id: "duckstation", name: "DuckStation" }
+      : consoleId === "ps2" && readiness.chosen?.adapter_id === "pcsx2"
+        ? { id: "pcsx2", name: "PCSX2" }
+        : null;
   const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
   const chosenEntry = readiness.chosen ? emulatorById.get(readiness.chosen.adapter_id) : undefined;
   const requiresExternalFile = entry.requires_external_file ?? false;
@@ -1047,17 +1055,23 @@ export function ConsoleDetailScreen({
             do Douglas): no meio da coluna elas ficavam perdidas entre BIOS e
             saves. Só para o DuckStation por enquanto — único com o catálogo
             de opções verificado. */}
-        {consoleId === "ps1" && readiness.chosen?.adapter_id === "duckstation" && (
+        {settingsEmulator && (
           <div>
             <Button variant="chrome" onClick={() => setEmulatorSettingsOpen(true)}>
               <Settings2 size={14} aria-hidden="true" />
-              {t("duckStationOptionsButton")}
+              {t("emulatorSettingsButton", { name: settingsEmulator.name })}
             </Button>
           </div>
         )}
       </Card>
 
-      {emulatorSettingsOpen && <DuckStationSettingsModal onClose={() => setEmulatorSettingsOpen(false)} />}
+      {emulatorSettingsOpen && settingsEmulator && (
+        <EmulatorSettingsModal
+          adapterId={settingsEmulator.id}
+          name={settingsEmulator.name}
+          onClose={() => setEmulatorSettingsOpen(false)}
+        />
+      )}
 
       {/* Dica logo abaixo da trilha que ela explica — o `mb-6` do card acima
           já separa da dica, então o espaço para a coluna vem daqui. */}

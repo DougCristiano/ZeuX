@@ -561,8 +561,8 @@ export type BulkMatchedFolder = {
   games_found: number;
 };
 
-/** Opção do settings.ini do DuckStation exposta na tela do PS1 (2026-10-05). */
-export type DuckStationSetting = {
+/** Opção do arquivo de configuração de um emulador (DuckStation, PCSX2 — 2026-10-05). */
+export type EmulatorSetting = {
   /** "Seção.Chave" — também é a chave do texto em i18n. */
   id: string;
   section: string;
@@ -577,14 +577,53 @@ export type DuckStationSetting = {
   value?: string;
 };
 
-export type DuckStationSettings = {
+export type EmulatorSettings = {
   available: boolean;
   /** Frase do servidor quando `available` é false. */
   message?: string;
-  /** DuckStation aberto agora: gravar é recusado (ele regrava ao fechar). */
+  /** Emulador aberto agora: gravar é recusado (ele regrava ao fechar). */
   running?: boolean;
-  settings?: DuckStationSetting[];
+  settings?: EmulatorSetting[];
 };
+
+/** Modo portátil do PCSX2 e o que ainda mora em Documentos (2026-10-05). */
+export type PCSX2Portable = {
+  supported: boolean;
+  managed: boolean;
+  portable: boolean;
+  target_dir?: string;
+  legacy_dir?: string;
+  legacy_exists: boolean;
+  items: { name: string; files: number; bytes: number; target_files: number; target_bytes: number }[];
+};
+
+export type SaveFileInfo = {
+  path: string;
+  name: string;
+  size_bytes: number;
+  modified_at: string;
+  /** Slot do state; -1 = "continuar". Ausente em cartão de memória. */
+  slot?: number;
+  /** Cópia do state anterior que o emulador guarda sozinho. */
+  backup?: boolean;
+};
+
+export type GameSaves = {
+  adapter_id: string;
+  memory_cards: SaveFileInfo[];
+  /** Cartão único para todos os jogos (PCSX2). */
+  memory_card_shared?: boolean;
+  memory_cards_approximate?: boolean;
+  save_states: SaveFileInfo[];
+  /** Ausente = o jogo ainda não foi fechado pelo ZeuX; states ficam de fora. */
+  serial?: string;
+  cards_dir?: string;
+  states_dir?: string;
+};
+
+export type SaveBackup = { id: string; created_at: string; files: number; has_memory_card: boolean };
+
+export type GameSavesResponse = { known: boolean; saves?: GameSaves; backups?: SaveBackup[] };
 
 export type LibraryGame = {
   id: number;

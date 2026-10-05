@@ -148,6 +148,24 @@ func (l *Launcher) ResumeStates(ctx context.Context) (map[string]ResumeState, er
 	if err != nil {
 		return nil, err
 	}
+	// PCSX2 com serial e CRC conhecidos (lidos do log, game_saves.go): o
+	// estado de retomada tem nome determinístico, então vale mesmo sem a
+	// sessão ter registrado o arquivo — ex.: jogo fechado antes desta versão.
+	if ids, ok := l.sessions.(DiscIDRepository); ok {
+		if known, err := ids.DiscIDs(ctx); err == nil {
+			if _, _, states, _, ok := pcsx2Dirs(); ok {
+				for path, id := range known {
+					if _, has := all[path]; has || id.AdapterID != "pcsx2" || id.CRC == "" {
+						continue
+					}
+					p := filepath.Join(states, id.Serial+" ("+strings.ToUpper(id.CRC)+").resume.p2s")
+					if info, err := os.Stat(p); err == nil {
+						all[path] = ResumeState{ROMPath: path, AdapterID: "pcsx2", StatePath: p, SavedAt: info.ModTime().UTC()}
+					}
+				}
+			}
+		}
+	}
 	for path, state := range all {
 		if _, err := os.Stat(state.StatePath); err != nil {
 			delete(all, path)

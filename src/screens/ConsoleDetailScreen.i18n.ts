@@ -185,7 +185,7 @@ export const dict = {
     en:
       "No folder assigned yet. Choose the folder that holds your {{shortName}} games: ZeuX reads the files directly from where they are on your disk — nothing is copied or moved.",
   },
-  duckStationOptionsButton: { "pt-BR": "Configurações do DuckStation", en: "DuckStation settings" },
+  emulatorSettingsButton: { "pt-BR": "Configurações do {{name}}", en: "{{name}} settings" },
   rescan: {
     "pt-BR": "Revarrer",
     en: "Rescan",

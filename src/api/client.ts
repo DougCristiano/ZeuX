@@ -5,7 +5,10 @@ import type {
   ConsentStatus,
   ConsoleEntry,
   CustomDefinition,
-  DuckStationSettings,
+  EmulatorSettings,
+  GameSavesResponse,
+  PCSX2Portable,
+  SaveBackup,
   CustomEmulatorsResponse,
   ControllerAssignment,
   ControllerProfile,
@@ -248,13 +251,20 @@ export const api = {
     request<{ restored: boolean }>(`/emulators/${encodeURIComponent(id)}/config`, { method: "DELETE" }),
 
   // --- Inspeção de saves (MVP de listar/ver, não gerenciar) ---
-  getDuckStationSettings: () => request<DuckStationSettings>("/emulators/duckstation/settings"),
-  setDuckStationSettings: (values: Record<string, string>) =>
-    request<DuckStationSettings>("/emulators/duckstation/settings", {
+  getEmulatorSettings: (id: string) => request<EmulatorSettings>(`/emulators/${encodeURIComponent(id)}/settings`),
+  setEmulatorSettings: (id: string, values: Record<string, string>) =>
+    request<EmulatorSettings>(`/emulators/${encodeURIComponent(id)}/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ values }),
     }),
+  getPCSX2Portable: () => request<PCSX2Portable>("/emulators/pcsx2/portable"),
+  migratePCSX2: () => request<PCSX2Portable>("/emulators/pcsx2/portable/migrate", { method: "POST" }),
+  removePCSX2Legacy: () => request<PCSX2Portable>("/emulators/pcsx2/portable/cleanup", { method: "POST" }),
+  getGameSaves: (gameId: number) => request<GameSavesResponse>(`/library/games/${gameId}/saves`),
+  backupGameSaves: (gameId: number) => request<SaveBackup>(`/library/games/${gameId}/saves/backup`, { method: "POST" }),
+  restoreGameSaves: (gameId: number, backup: string, includeMemoryCard: boolean) =>
+    postJSON<{ restored: number }>(`/library/games/${gameId}/saves/restore`, { backup, include_memory_card: includeMemoryCard }),
   getSaveData: (id: string) => request<SaveData>(`/emulators/${encodeURIComponent(id)}/save-data`),
   setSaveData: (id: string, dirs: SaveDataDirs) =>
     postJSON<{ saved: boolean }>(`/emulators/${encodeURIComponent(id)}/save-data`, dirs),

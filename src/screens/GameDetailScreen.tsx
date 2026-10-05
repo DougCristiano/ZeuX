@@ -29,6 +29,7 @@ import { ManualEmulatorFormModal } from "../components/ManualEmulatorFormModal";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { Pencil } from "lucide-react";
+import { GameSavesPanel } from "../components/GameSavesPanel";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
@@ -1173,6 +1174,16 @@ export function GameDetailScreen({
               seção própria, mesmo texto/comportamento de antes (M6: nenhum
               link, nenhuma sugestão de onde obter o arquivo, regra 6 do
               CLAUDE.md — só revela o que já está no disco do usuário). */}
+          {/* Saves do jogo (2026-10-05): PS1 e PS2, os dois com o local dos
+              saves verificado. Antes de "Arquivo": é o que a pessoa mais
+              procura depois de jogar. */}
+          {(game.console_id === "ps1" || game.console_id === "ps2") && (
+            <section>
+              <SectionHeading className="mb-3">{t("savesHeading")}</SectionHeading>
+              <GameSavesPanel gameId={game.id} />
+            </section>
+          )}
+
           <section>
             <SectionHeading className="mb-3">{t("fileHeading")}</SectionHeading>
             <Card filled>

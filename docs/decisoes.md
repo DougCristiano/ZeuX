@@ -2235,3 +2235,58 @@ abaixo do título do console. O modal tem altura com teto (85% da janela),
 rola por dentro e mantém "Salvar opções" fixo no rodapé. O cartão do
 DuckStation deixou de dizer "configuração só dentro do emulador".
 
+---
+
+## PCSX2: modo portátil, opções, saves por jogo e backup (2026-10-05)
+
+Levantamento do Douglas com o PCSX2 2.8.2 rodando no Windows + leitura do
+código-fonte oficial (onde dito).
+
+- **Modo portátil** (código-fonte, `EmuFolders::ShouldUsePortableMode`):
+  `portable.ini` (ou `portable.txt` vazio) ao lado do `.exe` faz a pasta de
+  dados ser a do executável; `inis` fica sempre dentro dela. A nota de
+  2026-09-11 ("o PCSX2 ignora modo portátil") foi um teste sem esse arquivo.
+  Instalação nova sem config em Documentos: o seed já cria o `portable.ini`.
+  Com config em Documentos: só pela **migração**, com confirmação — copia
+  `inis, memcards, sstates, bios, cache, cheats, covers, gamesettings,
+  inputprofiles, patches, textures, snaps, videos`, sem sobrescrever o que já
+  existe, sem lixo de zip do Mac (`__MACOSX`, `.DS_Store`, `._*`), confere
+  arquivo a arquivo, troca caminho absoluto de `[Folders]` que apontava para
+  Documentos pelo relativo, e só então liga o portátil. Apagar
+  `Documentos\PCSX2` é um segundo passo, com outra confirmação, e só se
+  cada arquivo já estiver no destino. Só Windows: no Linux o PCSX2 é
+  AppImage e não lê o marcador ao lado do arquivo. **Não validado com o
+  binário** — critério de aceite "nenhum arquivo novo em Documentos" fica
+  para o Douglas conferir.
+- **Escrita:** seed e lançamento mesclam o `PCSX2.ini`; só `[AutoUpdater]
+  CheckAtStartup = false` é forçado. O ZeuX **deixou de ligar
+  `SaveStateOnShutdown` sozinho** ("não mudar comportamento sem o usuário
+  pedir"): virou opção "Salvar o estado ao fechar (permite Continuar)".
+  Nunca "Redefinir padrões".
+- **Opções** (`GET/PUT /emulators/{id}/settings`, agora genérico para
+  DuckStation e PCSX2): catálogo com as chaves do levantamento;
+  `InhibitScreensaver` é gravado em `[EmuCore]` e `[UI]`. Fora, de propósito:
+  `SPU2/Output Backend/SyncMode` (um valor confirmado cada),
+  `OutputLatencyMS` (não confirmado), `Renderer` (só `-1` confirmado), pastas.
+- **Backup `.zeux-backup` de 0 bytes:** o marcador vazio ("o arquivo não
+  existia na primeira escrita do ZeuX") virava armadilha depois que o
+  emulador criava a config completa — restaurar apagaria tudo. Agora um
+  backup vazio é trocado pelo conteúdo atual antes da próxima escrita (vale
+  para todos os emuladores).
+- **Saves por jogo:** serial e CRC lidos do `logs/emulog.txt` ao fim de cada
+  sessão (`  Serial: …` / `  CRC: …`, código-fonte `VMManager.cpp`; tabela
+  `game_disc_ids`). States `<serial> (<CRC>).NN.p2s`, `.p2s.backup` e
+  `.resume.p2s`; cartão compartilhado `Mcd001.ps2`/`Mcd002.ps2` (de
+  `[MemoryCards] Slot1/2_Filename`). Tela do jogo (PS1 e PS2): cartão,
+  states por slot, Continuar, backup para `AppData\ZeuX\backups\<console>\<jogo>`
+  e restauração (backup automático do atual antes; o cartão compartilhado
+  só volta se marcado, com aviso de que afeta todos os jogos).
+  "Continuar" também aparece quando serial e CRC são conhecidos e o
+  `.resume.p2s` existe.
+- **Atualização e desinstalação** preservam `portable.ini`, `inis`,
+  cartões, states, BIOS e o resto da lista (`portableUserPaths`); a
+  desinstalação passou a apagar só o programa nos emuladores portáteis
+  (DuckStation incluso).
+- **Não feito:** cartão por jogo no PCSX2 trocando `Slot1_Filename` antes de
+  cada jogo (não testado pelo Douglas); `[GameList] Paths`.
+

@@ -48,6 +48,7 @@ export const dict = {
   opening: { "pt-BR": "Abrindo…", en: "Opening…" },
   downloadingCore: { "pt-BR": "Baixando o core…", en: "Downloading core…" },
   playButton: { "pt-BR": "Jogar", en: "Play" },
+  savesHeading: { "pt-BR": "Saves", en: "Saves" },
   continueButton: { "pt-BR": "Continuar", en: "Continue" },
   playFromStart: { "pt-BR": "Jogar do início", en: "Play from start" },
   resumeSavedAt: { "pt-BR": "de onde você parou · {{date}}", en: "where you left off · {{date}}" },
