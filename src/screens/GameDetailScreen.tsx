@@ -510,7 +510,7 @@ export function GameDetailScreen({
       {/* `shrink-0` (2026-09-07): sem ele o `flex-1` da coluna de texto
           espremia a capa quando o título é longo — o `max-w` sozinho é teto,
           não piso. */}
-      <div className="w-full max-w-[220px] shrink-0">
+      <div className="w-full max-w-[220px] shrink-0 sm:row-span-2">
         {/* Halo na cor de identidade do console em volta da arte — a mesma
             regra dos cards de linha (`ConsoleVerdictCard`, `EmulatorCard`),
             que ali é uma borda esquerda de 3px e aqui contorna a peça toda,
@@ -816,13 +816,25 @@ export function GameDetailScreen({
           <InlineError>{t("fileMissingError")}</InlineError>
         )}
 
+      </div>
+
         {/* Faixa de estatísticas DENTRO do hero (2026-10-05, pedido do
             Douglas): o hero tinha capa + título + "Jogar" e um vão enorme do
             lado, enquanto os números moravam num card separado lá embaixo. A
             contagem de sessões saiu ("não importa muito"); entraram dados que
             a tela já tinha à mão — emulador do parecer, formato do arquivo e
             quando o jogo entrou na biblioteca. Nenhuma chamada nova. */}
-        <dl className="mt-auto grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 sm:grid-cols-3 lg:grid-cols-5">
+        {/* Janela larga (≥1440px, 2026-10-05): a faixa vira uma coluna
+            vertical à direita — em 1600px a coluna de texto termina na
+            medida de leitura e sobravam ~500px de arte sem função. Abaixo
+            disso continua faixa na base, alinhada ao pé da capa.
+            Breakpoint arbitrário de propósito: `xl` (1280) bateria no
+            tamanho padrão da janela, onde a coluna de texto ainda precisa
+            de toda a largura (regra de breakpoints do CLAUDE.md). Em `rem`
+            (90rem = 1440px), não em px: o Tailwind só ordena um breakpoint
+            arbitrário depois do `sm:`/`lg:` quando a unidade é a mesma —
+            em px ele saía antes e o `sm:` vencia. */}
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 sm:col-start-2 sm:self-end sm:grid-cols-3 lg:grid-cols-5 min-[90rem]:col-start-3 min-[90rem]:row-span-2 min-[90rem]:row-start-1 min-[90rem]:grid-cols-1 min-[90rem]:content-center min-[90rem]:gap-y-4 min-[90rem]:self-stretch min-[90rem]:border-t-0 min-[90rem]:border-l min-[90rem]:pt-0 min-[90rem]:pl-6">
           {heroStats.map((stat) => (
             <div key={stat.label} className="min-w-0">
               <dt className="font-mono text-[11px] tracking-wide text-muted uppercase">{stat.label}</dt>
@@ -832,7 +844,6 @@ export function GameDetailScreen({
             </div>
           ))}
         </dl>
-      </div>
     </>
   );
 
@@ -1082,7 +1093,12 @@ export function GameDetailScreen({
           <div className="zeux-scanlines absolute inset-0 opacity-40" />
         </div>
 
-        <div className="relative flex flex-col gap-5 p-5 sm:flex-row sm:gap-6 sm:p-6">{heroContent}</div>
+        {/* Grade, não flex (2026-10-05): a capa ocupa as duas linhas, o texto
+            fica na de cima e as estatísticas na de baixo — ou numa terceira
+            coluna em janela larga, ver o `<dl>` em `heroContent`. */}
+        <div className="relative grid grid-cols-1 gap-x-6 gap-y-5 p-5 sm:grid-cols-[220px_minmax(0,1fr)] sm:p-6 min-[90rem]:grid-cols-[220px_minmax(0,1fr)_15rem]">
+          {heroContent}
+        </div>
       </div>
 
       {/* Três cards de largura total empilhados viravam uma fita muito longa

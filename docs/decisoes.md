@@ -2131,3 +2131,11 @@ estatísticas na base. O lado direito do banner voltou a ser arte (gradiente
 mais leve). "Última vez" perdeu os segundos para não cortar em janela
 estreita. Conferido renderizado em 1600, 1280 e 900px de largura.
 
+**Quarta rodada:** em janela ≥1440px (`min-[90rem]`) as estatísticas viram
+uma coluna vertical à direita do banner, separada por um filete — em 1600px
+ainda sobravam ~500px sem função. Abaixo disso continuam como faixa na base.
+O hero virou grade (capa 220px nas duas linhas, texto em cima, estatísticas
+embaixo ou na terceira coluna). Armadilha registrada no código: breakpoint
+arbitrário em px é ordenado antes do `sm:` (rem) no CSS do Tailwind v4 e
+perde para ele; tem que ser em rem.
+
