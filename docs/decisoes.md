@@ -2073,3 +2073,17 @@ controle do PS3 não se configurava; o RPCS3 mostrava as boas-vindas sempre.
   direto de arquivo: URL/hash não puderam ser verificados daqui e a Sony
   troca a versão). Baixar o PUP junto com o emulador fica para quando houver
   URL e SHA256 confirmados — ver `docs/pendencias.md`.
+
+---
+
+## Paginação numerada na biblioteca (2026-10-05)
+
+O Douglas pediu paginação ("falta paginação, principalmente nos jogos da
+biblioteca"). Isto **desfaz** a troca por scroll infinito feita em 2026-09-06
+(achado #3 do `critico-layout-biblioteca`) em "Todos os jogos": voltou a
+"Anterior / página N de M / Próxima" (componente `Pagination`), 60 jogos por
+página, a grade continua virtualizada dentro da página. A tela de jogos de um
+console (`GamesScreen`) também ganhou paginação — no cliente, 60 por página,
+depois de filtrar/ordenar —, porque montava todos os jogos de uma vez. Se o
+scroll infinito voltar a ser preferido, é só reverter este item.
+

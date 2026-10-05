@@ -15,6 +15,7 @@ import {
   ErrorModal,
   InlineError,
   ManualInstallModal,
+  Pagination,
   ProgressBar,
   ScreenContainer,
   Toast,
@@ -42,6 +43,10 @@ import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { consoleAccentColor } from "../lib/consoleColor";
 import { useT } from "../i18n/i18n";
 import { dict } from "./GamesScreen.i18n";
+
+// Jogos por página da lista de um console — divisível pelas colunas comuns da
+// grade (2, 3, 4, 5, 6) para a última linha de cada página não ficar vazia.
+const GAMES_PAGE_SIZE = 60;
 
 type RowStatus =
   | { kind: "idle" }
@@ -319,6 +324,21 @@ export function GamesScreen({
     // último primeiro, nunca jogado no fim) — não reordena.
     return bySearch;
   }, [games, missingOnly, trimmedSearch, sort]);
+
+  // Paginação no cliente (2026-10-05, pedido do Douglas): esta tela busca os
+  // jogos do console de uma vez e filtra/ordena aqui, então fatiar depois de
+  // filtrar/ordenar é o que mantém a ordem certa entre páginas. Sem isto, um
+  // console com milhares de jogos montava milhares de tiles de uma vez.
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [consoleId, trimmedSearch, missingOnly, sort]);
+  const totalPages = Math.max(1, Math.ceil(visibleGames.length / GAMES_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedGames = useMemo(
+    () => visibleGames.slice((currentPage - 1) * GAMES_PAGE_SIZE, currentPage * GAMES_PAGE_SIZE),
+    [visibleGames, currentPage],
+  );
 
   return (
     // N3 (docs/roadmap.md, Sprint N): era `max-w-5xl` isolado — agora usa o
@@ -686,7 +706,7 @@ export function GamesScreen({
               : { display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: "1rem" }
           }
         >
-          {visibleGames.map((game, gameIndex) => {
+          {pagedGames.map((game, gameIndex) => {
             const status = rowStatus[game.id] ?? { kind: "idle" };
             const isPendingInstall =
               (install.state.kind === "installing" ||
@@ -849,6 +869,8 @@ export function GamesScreen({
           })}
         </div>
       )}
+
+      <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
     </ScreenContainer>
   );
 }
