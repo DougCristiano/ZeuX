@@ -28,6 +28,7 @@ import {
 import { ManualEmulatorFormModal } from "../components/ManualEmulatorFormModal";
 import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
+import { Pencil } from "lucide-react";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
@@ -62,7 +63,9 @@ function formatLastPlayed(iso: string | undefined, neverPlayedText: string): str
   if (!iso) return neverPlayedText;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return neverPlayedText;
-  return date.toLocaleString("pt-BR");
+  // Sem segundos: na faixa de estatísticas do hero o valor com segundos
+  // cortava em janela estreita, e o segundo não diz nada a ninguém.
+  return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
 /**
@@ -573,16 +576,13 @@ export function GameDetailScreen({
           então o título não casava nem com o topo nem com o meio da arte, e
           sobrava um vão acima dele. Agora o título começa na linha do topo
           da capa, como a página de jogo de Steam/GOG. */}
-      {/* 2026-10-05 (pedido do Douglas, "ainda mal otimizado"): o teto
-          `max-w-3xl` desta coluna deixava metade do hero vazia numa janela
-          larga. Saiu o teto; a coluna virou duas no `lg:` — identidade e
-          "Jogar" à esquerda, o resumo do IGDB à direita (antes um card
-          separado lá embaixo) — e a faixa de estatísticas atravessa as duas.
-          O gradiente do fundo ficou mais denso na direita para o texto
-          continuar legível sobre a arte. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4 sm:pt-1">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)]">
-        <div className="flex min-w-0 flex-col gap-4">
+      {/* Coluna única, lida de cima para baixo (2026-10-05, terceira rodada
+          com o Douglas): identidade → metadados → resumo → "Jogar" →
+          estatísticas. A versão anterior espalhava isso em três ilhas — o
+          "Jogar" solto no meio, o resumo numa coluna a ~700px do título —, e
+          nada formava grupo. O lado direito do banner fica para a arte
+          (gradiente mais leve ali), não para uma coluna vazia de texto. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-5 sm:pt-1">
         <div>
           {editingTitle ? (
             <form
@@ -624,7 +624,7 @@ export function GameDetailScreen({
               {titleError && <InlineError>{titleError}</InlineError>}
             </form>
           ) : (
-            <div className="flex items-start gap-2">
+            <div className="flex items-start gap-1.5">
               {/* O título aqui é o NOME DO JOGO — dado do disco do usuário, não voz
                 de marca: segue em Inter, e quem carrega a identidade acima
                 dele é o badge do console (logo abaixo, com a cor do console).
@@ -632,46 +632,92 @@ export function GameDetailScreen({
                 (`--text-2xl`): `text-3xl sm:text-4xl` inventava dois degraus
                 que não existem no sistema. */}
               <h1 className="text-2xl font-semibold text-balance text-ink">{title}</h1>
-              {/* `chrome` (chrome de arquivo, não ação sobre conteúdo) — mesma
-                  família de "Abrir pasta"/"Trocar capa". */}
-              <Button
-                variant="chrome"
-                className="mt-1 shrink-0"
+              {/* Ícone, não botão com borda (2026-10-05): o "Editar título"
+                  com borda tinha o mesmo peso do "Jogar" e disputava com o
+                  próprio título. Mesmo lápis de "trocar imagem" do console. */}
+              <button
+                type="button"
+                aria-label={t("editTitle")}
+                title={t("editTitle")}
+                className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-white/5 hover:text-ink ${FOCUS_RING}`}
                 onClick={() => {
                   setTitleDraft(title);
                   setTitleError(null);
                   setEditingTitle(true);
                 }}
               >
-                {t("editTitle")}
-              </Button>
+                <Pencil size={14} aria-hidden="true" />
+              </button>
             </div>
           )}
           {!editingTitle && titleOverride !== "" && (
             <p className="mt-1 text-xs text-muted">{t("titleIsCustom")}</p>
           )}
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          {/* Uma linha só de metadados — console, estúdio · ano, gêneros —
+              em vez de três linhas empilhadas que empurravam o "Jogar" para
+              baixo. O ano/estúdio são do JOGO (IGDB, 2026-09-28) e só
+              aparecem quando o IGDB os informou. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
             <Badge accentColor={accent}>{consoleName}</Badge>
             {game.missing && <Badge>{t("missingFile")}</Badge>}
+            {(about.release_year || about.developer) && (
+              <span className="font-mono text-sm tracking-wide text-muted">
+                {[about.developer, about.release_year].filter(Boolean).join(" · ")}
+              </span>
+            )}
+            {about.genres && about.genres.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5" aria-label={t("genresLabel")}>
+                {about.genres.map((genre) => (
+                  <li key={genre}>
+                    <Badge>{genre}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          {/* Ano e desenvolvedora DO JOGO, vindos do IGDB (2026-09-28). O
-              ano do console deixou de aparecer aqui por ser lido como ano do
-              jogo; este só aparece quando o IGDB o informou. */}
-          {(about.release_year || about.developer) && (
-            <p className="mt-2 font-mono text-sm tracking-wide text-muted">
-              {[about.developer, about.release_year].filter(Boolean).join(" · ")}
-            </p>
-          )}
-          {about.genres && about.genres.length > 0 && (
-            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={t("genresLabel")}>
-              {about.genres.map((genre) => (
-                <li key={genre}>
-                  <Badge>{genre}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
+
+        {/* Resumo colado na identidade, sem título de seção: logo abaixo do
+            nome do jogo ele já se explica. Medida de leitura (~68ch) e corte
+            em 3 linhas para o "Jogar" não descer; "Ler mais" abre o resto. */}
+        <section aria-label={t("aboutGame")} className="flex max-w-[68ch] min-w-0 flex-col gap-1.5">
+          {hasAbout ? (
+            <>
+              {/* Em inglês (o IGDB só tem esse idioma, decisão do Douglas):
+                  `lang="en"` para o leitor de tela. */}
+              <p
+                lang="en"
+                className={`text-sm leading-relaxed whitespace-pre-line text-ink ${summaryExpanded ? "" : "line-clamp-3"}`}
+              >
+                {about.summary}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Só oferece "Ler mais" quando o texto passa das 3 linhas
+                    (~240 caracteres na medida de 68ch) — num resumo curto o
+                    botão abriria nada. */}
+                {(about.summary?.length ?? 0) > 240 && (
+                <button
+                  type="button"
+                  onClick={() => setSummaryExpanded((v) => !v)}
+                  className={`font-mono text-xs tracking-wide text-accent-hover uppercase hover:underline ${FOCUS_RING}`}
+                >
+                  {summaryExpanded ? t("readLess") : t("readMore")}
+                </button>
+                )}
+                <span className="font-mono text-[11px] tracking-wide text-muted">{t("summarySource")}</span>
+              </div>
+            </>
+          ) : (
+            <AboutMissing
+              status={about.metadata_status}
+              igdbConfigured={igdbConfigured}
+              title={title}
+              fetching={fetchingInfo}
+              onFetch={handleFetchInfo}
+            />
+          )}
+          {infoError && <InlineError>{infoError}</InlineError>}
+        </section>
 
         <Button
           variant="primary"
@@ -769,44 +815,6 @@ export function GameDetailScreen({
         {game.missing && (
           <InlineError>{t("fileMissingError")}</InlineError>
         )}
-        </div>
-
-        <section aria-label={t("aboutGame")} className="flex min-w-0 flex-col gap-2 lg:border-l lg:border-line lg:pl-6">
-          <h2 className="font-mono text-[11px] tracking-wide text-muted uppercase">{t("aboutGame")}</h2>
-          {hasAbout ? (
-            <>
-              {/* Resumo em inglês (o IGDB só tem esse idioma, decisão do
-                  Douglas): `lang="en"` para o leitor de tela. Corta em 7
-                  linhas para o hero não crescer sem limite; "Ler mais" abre. */}
-              <p
-                lang="en"
-                className={`text-sm leading-relaxed whitespace-pre-line text-ink ${summaryExpanded ? "" : "line-clamp-7"}`}
-              >
-                {about.summary}
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSummaryExpanded((v) => !v)}
-                  className={`font-mono text-xs tracking-wide text-accent-hover uppercase hover:underline ${FOCUS_RING}`}
-                >
-                  {summaryExpanded ? t("readLess") : t("readMore")}
-                </button>
-                <span className="font-mono text-[11px] tracking-wide text-muted">{t("summarySource")}</span>
-              </div>
-            </>
-          ) : (
-            <AboutMissing
-              status={about.metadata_status}
-              igdbConfigured={igdbConfigured}
-              title={title}
-              fetching={fetchingInfo}
-              onFetch={handleFetchInfo}
-            />
-          )}
-          {infoError && <InlineError>{infoError}</InlineError>}
-        </section>
-        </div>
 
         {/* Faixa de estatísticas DENTRO do hero (2026-10-05, pedido do
             Douglas): o hero tinha capa + título + "Jogar" e um vão enorme do
@@ -1066,7 +1074,7 @@ export function GameDetailScreen({
             className="absolute inset-0"
             style={{
               background:
-                "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 55%, color-mix(in srgb, var(--paper) 86%, transparent) 85%, color-mix(in srgb, var(--paper) 62%, transparent) 100%)",
+                "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 55%, color-mix(in srgb, var(--paper) 82%, transparent) 72%, color-mix(in srgb, var(--paper) 25%, transparent) 100%)",
             }}
           />
           {/* Mesmas linhas de CRT da abertura do app e da faixa inicial — a

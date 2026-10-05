@@ -2121,3 +2121,13 @@ direita, cortado em 7 linhas com "Ler mais"; a faixa de estatísticas
 atravessa as duas. O gradiente do fundo ficou mais denso na direita (62% de
 `--paper` na borda, era 18%) para o texto continuar legível sobre a arte.
 
+**Terceira rodada (mesmo dia), com a skill `impeccable` (layout):** a versão
+em duas colunas ainda deixava o "Jogar" solto no meio, o "Editar título"
+com borda disputando com o título e o resumo a ~700px dele. Virou coluna
+única lida de cima para baixo — título (editar vira um lápis discreto) →
+uma linha de metadados (console, estúdio · ano, gêneros) → resumo em 3
+linhas com "Ler mais" (só quando passa de ~240 caracteres) → "Jogar" →
+estatísticas na base. O lado direito do banner voltou a ser arte (gradiente
+mais leve). "Última vez" perdeu os segundos para não cortar em janela
+estreita. Conferido renderizado em 1600, 1280 e 900px de largura.
+
