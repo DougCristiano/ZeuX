@@ -305,6 +305,9 @@ export const api = {
     request<{ removed: number }>(`/library/folders/${id}`, { method: "DELETE" }),
   rescanLibraryFolder: (id: number) =>
     request<{ games_found: number }>(`/library/folders/${id}/scan`, { method: "POST" }),
+  // Revarre todas as pastas de uma vez (botão "Revarrer pastas").
+  rescanLibrary: () =>
+    request<{ folders_scanned: number; games_found: number }>("/library/rescan", { method: "POST" }),
   getLibraryGames: (consoleId: string) =>
     request<{ games: LibraryGame[] }>(`/library/games?console_id=${encodeURIComponent(consoleId)}`),
   // Sem console_id: modo "todos os jogos" (2026-08-04), paginado — ver

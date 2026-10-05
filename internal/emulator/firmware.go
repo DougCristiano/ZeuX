@@ -49,6 +49,15 @@ func FirmwareInstallable(adapterID string) bool {
 	return adapterID == "rpcs3"
 }
 
+// FirmwareDownloadURL devolve a página oficial de download do firmware, ou ""
+// quando o ZeuX não conhece uma. Ver Status.FirmwareDownloadURL.
+func FirmwareDownloadURL(adapterID string) string {
+	if adapterID == "rpcs3" {
+		return "https://www.playstation.com/en-us/support/hardware/ps3/system-software/"
+	}
+	return ""
+}
+
 // rpcs3ConfigDir espelha fs::get_config_dir (Utilities/File.cpp do RPCS3):
 // uma pasta "portable/" ao lado do executável vence; senão, no Windows, a
 // variável RPCS3_CONFIG_DIR ou a pasta do próprio executável; no Linux,

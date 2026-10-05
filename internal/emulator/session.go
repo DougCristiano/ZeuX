@@ -137,6 +137,11 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 	// A escrita mora aqui, na camada de lançamento, e não em BuildCommand, que
 	// continua puro por regra do CLAUDE.md ("não faça BuildCommand executar
 	// nada nem tocar o sistema de arquivos").
+	if adapter.ID() == "rpcs3" {
+		if err := suppressRPCS3Welcome(install); err != nil {
+			l.logger.Warn("não foi possível silenciar a tela de boas-vindas do RPCS3", "erro", err)
+		}
+	}
 	options := input.Options
 	configUnapplied, persisted := l.applyPreset(ctx, adapter, install, options)
 
@@ -243,6 +248,12 @@ func (l *Launcher) LaunchStandalone(ctx context.Context, adapterID string) error
 	}
 	if install.BinaryPath == "" {
 		return fmt.Errorf("caminho do executável do %s não foi encontrado", adapter.Name())
+	}
+
+	if adapter.ID() == "rpcs3" {
+		if err := suppressRPCS3Welcome(install); err != nil {
+			l.logger.Warn("não foi possível silenciar a tela de boas-vindas do RPCS3", "erro", err)
+		}
 	}
 
 	// Contexto próprio, como em Launch: o emulador precisa continuar aberto

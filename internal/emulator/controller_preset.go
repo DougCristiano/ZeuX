@@ -402,19 +402,36 @@ func rpcs3Player1Handler(path string) (string, error) {
 // ganham o mapeamento padrão do XInput, e não os valores do teclado.
 const rpcs3XInputPreset = "Player 1 Input:\n  Handler: XInput\n  Device: XInput Pad #1\n"
 
-// writeRPCS3XInputPreset só grava quando não há configuração nenhuma: o
-// Default.yml é YAML aninhado, e editar um arquivo do usuário sem um parser
-// de verdade arriscaria corromper os outros jogadores. Trocar o teclado pelo
-// controle **desliga o teclado** no jogador 1 — é o preço do handler único
-// por jogador no RPCS3, e por isso este preset nunca é aplicado sem o
-// usuário pedir.
+// writeRPCS3XInputPreset liga o jogador 1 ao XInput. Arquivo ausente ou vazio
+// é gravado inteiro. Arquivo que o RPCS3 já criou com o jogador 1 no teclado
+// (o que ele faz sozinho na primeira abertura — antes disto o botão recusava
+// com "já tem configuração" mesmo sem a pessoa ter configurado nada, relato
+// do Douglas em 2026-10-05) tem só o jogador 1 reescrito, ver
+// retargetRPCS3Player1. Qualquer outro caso — jogador 1 já num controle, ou
+// handler desconhecido — é escolha da pessoa e fica intocado.
+//
+// Trocar o teclado pelo controle **desliga o teclado** no jogador 1 — é o
+// preço do handler único por jogador no RPCS3, e por isso este preset nunca
+// é aplicado sem o usuário pedir.
 func writeRPCS3XInputPreset(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("lendo %s: %w", path, err)
 	}
+	content := rpcs3XInputPreset
 	if strings.TrimSpace(string(data)) != "" {
-		return ErrControllerPresetExisting
+		handler, err := rpcs3Player1Handler(path)
+		if err != nil {
+			return err
+		}
+		if handler != "" && handler != "Keyboard" && handler != "Null" {
+			return ErrControllerPresetExisting
+		}
+		rewritten, ok := retargetRPCS3Player1(string(data))
+		if !ok {
+			return ErrControllerPresetExisting
+		}
+		content = rewritten
 	}
 	if err := backupBeforeFirstWrite(path); err != nil {
 		return err
@@ -422,10 +439,58 @@ func writeRPCS3XInputPreset(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("criando a pasta de controles do RPCS3: %w", err)
 	}
-	if err := os.WriteFile(path, []byte(rpcs3XInputPreset), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("gravando %s: %w", path, err)
 	}
 	return nil
+}
+
+// retargetRPCS3Player1 troca Handler/Device do bloco "Player 1 Input:" por
+// XInput e descarta o sub-bloco "Config:" dele (nomes de tecla que não
+// servem ao XInput — o RPCS3 preenche o que falta com o padrão do handler,
+// ver rpcs3XInputPreset). Os outros jogadores e as demais chaves do jogador 1
+// ficam como estavam. false quando não há bloco do jogador 1 para reescrever.
+func retargetRPCS3Player1(yaml string) (string, bool) {
+	lines := strings.Split(strings.ReplaceAll(yaml, "\r\n", "\n"), "\n")
+	out := make([]string, 0, len(lines)+2)
+	inPlayer1, found, skippingConfig := false, false, false
+	for _, raw := range lines {
+		if raw != "" && !strings.HasPrefix(raw, " ") {
+			inPlayer1 = strings.TrimSpace(raw) == "Player 1 Input:"
+			skippingConfig = false
+			if inPlayer1 {
+				found = true
+				out = append(out, raw, "  Handler: XInput", "  Device: XInput Pad #1")
+				continue
+			}
+			out = append(out, raw)
+			continue
+		}
+		if !inPlayer1 {
+			out = append(out, raw)
+			continue
+		}
+		trimmed := strings.TrimSpace(raw)
+		indent := len(raw) - len(strings.TrimLeft(raw, " "))
+		switch {
+		case raw == "":
+			out = append(out, raw)
+		case indent == 2 && (strings.HasPrefix(trimmed, "Handler:") || strings.HasPrefix(trimmed, "Device:")):
+			// Já reescritos acima.
+			skippingConfig = false
+		case indent == 2 && strings.HasPrefix(trimmed, "Config:"):
+			skippingConfig = true
+		case indent > 2 && skippingConfig:
+			// Linha do Config antigo.
+		default:
+			skippingConfig = false
+			out = append(out, raw)
+		}
+	}
+	if !found {
+		return "", false
+	}
+	return strings.Join(out, "\n"), true
 }
 
 // ControllerPresetSeed devolve a seção "[Pad1]" do mapeamento padrão pronta

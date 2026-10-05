@@ -190,3 +190,30 @@ func TestRPCS3PresetRefusesExistingConfig(t *testing.T) {
 		t.Fatalf("rpcs3 em %s: got %q, want %q", runtime.GOOS, got, want)
 	}
 }
+
+// Trava o conserto do "não consigo configurar o controle do PS3": o RPCS3 cria
+// o Default.yml sozinho com o jogador 1 no teclado, e o preset precisa
+// reescrever só esse bloco — sem tocar no jogador 2 — em vez de recusar.
+func TestRPCS3PresetRewritesUntouchedKeyboardDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "Default.yml")
+	original := "Player 1 Input:\n  Handler: Keyboard\n  Device: Keyboard\n  Config:\n    Left Stick Left: A\n    Start: Return\n  Buddy Device: \"\"\nPlayer 2 Input:\n  Handler: Null\n  Device: \"\"\n"
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeRPCS3XInputPreset(path); err != nil {
+		t.Fatalf("Default.yml no padrão do teclado deveria ser reescrito: %v", err)
+	}
+	data, _ := os.ReadFile(path)
+	got := string(data)
+	for _, want := range []string{"Handler: XInput", "Device: XInput Pad #1", "Buddy Device", "Player 2 Input:"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("faltou %q em:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "Left Stick Left") || strings.Contains(got, "Handler: Keyboard") {
+		t.Errorf("sobrou configuração de teclado do jogador 1:\n%s", got)
+	}
+	if h, _ := rpcs3Player1Handler(path); h != "XInput" {
+		t.Errorf("Handler do jogador 1 = %q, esperado XInput", h)
+	}
+}

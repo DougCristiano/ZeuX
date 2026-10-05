@@ -22,7 +22,7 @@
     },
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "ms-settings:*" }]
+      "allow": [{ "url": "ms-settings:*" }, { "url": "https://www.playstation.com/*" }]
     },
     {
       "identifier": "opener:allow-reveal-item-in-dir",

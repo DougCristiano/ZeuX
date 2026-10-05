@@ -88,6 +88,8 @@ export const dict = {
     "pt-BR": "Buscando capas…",
     en: "Fetching covers…",
   },
+  rescanFolders: { "pt-BR": "Revarrer pastas", en: "Rescan folders" },
+  rescanningFolders: { "pt-BR": "Revarrendo…", en: "Rescanning…" },
   fetchCoversButton: {
     "pt-BR": "Buscar capas",
     en: "Fetch covers",

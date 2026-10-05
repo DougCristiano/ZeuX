@@ -233,15 +233,17 @@ export const dict = {
     en:
       "The folder depends on the emulator. Install one above and it will appear here if ZeuX knows where that emulator reads the file.",
   },
-  // Firmware instalado pelo próprio emulador (RPCS3, 2026-09-29). Nunca diz
-  // de onde tirar o arquivo (princípio 6) — só como ele costuma se chamar.
+  // Firmware instalado pelo próprio emulador (RPCS3, 2026-09-29). O PUP do
+  // PS3 é distribuído de graça pela própria Sony (atualização de sistema), por
+  // isso o ZeuX aponta a página oficial dela (2026-10-05, pedido do Douglas) —
+  // a regra de nunca indicar fonte vale para ROMs/jogos, não para isto.
   firmwareTitle: { "pt-BR": "Firmware do console", en: "Console firmware" },
   firmwareInstalled: { "pt-BR": "instalado", en: "installed" },
   firmwareMissing: { "pt-BR": "faltando", en: "missing" },
   firmwareHelp: {
     "pt-BR":
-      "O {{emulatorName}} precisa do firmware do console instalado, e ele não fica numa pasta: o arquivo (normalmente PS3UPDAT.PUP) passa pelo instalador do próprio emulador. Escolha o arquivo que você já tem e o ZeuX abre o {{emulatorName}} para instalar.",
-    en: "{{emulatorName}} needs the console firmware installed, and it doesn't live in a folder: the file (usually PS3UPDAT.PUP) goes through the emulator's own installer. Pick the file you already have and ZeuX opens {{emulatorName}} to install it.",
+      "O {{emulatorName}} precisa do firmware do console instalado, e ele não fica numa pasta: o arquivo (normalmente PS3UPDAT.PUP) passa pelo instalador do próprio emulador. Baixe-o na página oficial da Sony, escolha o arquivo aqui e o ZeuX abre o {{emulatorName}} para instalar.",
+    en: "{{emulatorName}} needs the console firmware installed, and it doesn't live in a folder: the file (usually PS3UPDAT.PUP) goes through the emulator's own installer. Download it from Sony's official page, pick the file here and ZeuX opens {{emulatorName}} to install it.",
   },
   firmwareInstalledHelp: {
     "pt-BR": "O firmware já está instalado no {{emulatorName}}. Só reinstale se quiser trocar de versão.",
@@ -253,6 +255,7 @@ export const dict = {
   },
   firmwareInstall: { "pt-BR": "Instalar firmware…", en: "Install firmware…" },
   firmwareReinstall: { "pt-BR": "Reinstalar firmware…", en: "Reinstall firmware…" },
+  firmwareOfficialPage: { "pt-BR": "Baixar no site da Sony", en: "Get it from Sony's site" },
   firmwareRecheck: { "pt-BR": "Verificar de novo", en: "Check again" },
   firmwareFileFilter: { "pt-BR": "Firmware (PUP)", en: "Firmware (PUP)" },
   firmwareStartedLabel: { "pt-BR": "Instalando", en: "Installing" },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { Pencil } from "lucide-react";
 import { api, ApiError } from "../api";
 import type {
@@ -41,6 +41,7 @@ import { SaveDataPanel } from "../components/SaveDataPanel";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { percentOf } from "../lib/format";
+import { rescanAllFoldersIfStale } from "../lib/autoRescan";
 import { buildReadinessIndex, evaluateConsoleReadiness } from "../lib/consoleReadiness";
 import { useT } from "../i18n/i18n";
 import { dict } from "./ConsoleDetailScreen.i18n";
@@ -579,6 +580,11 @@ function FirmwareCard({ entry, onChanged }: { entry: EmulatorEntry; onChanged: (
         <Button type="button" variant={installed ? "chrome" : "primary"} disabled={busy} onClick={() => void pickAndInstall()}>
           {installed ? t("firmwareReinstall") : t("firmwareInstall")}
         </Button>
+        {entry.firmware_download_url && (
+          <Button type="button" variant="chrome" onClick={() => void openUrl(entry.firmware_download_url!)}>
+            {t("firmwareOfficialPage")}
+          </Button>
+        )}
         {started && (
           <Button type="button" variant="chrome" onClick={onChanged}>
             {t("firmwareRecheck")}
@@ -801,6 +807,12 @@ export function ConsoleDetailScreen({
     api.getEmulators().then((res) => setEmulators(res.emulators)).catch(() => {});
     api.getRetroArchCores().then((res) => setCores(res.cores)).catch(() => {});
     api.getLibraryFolders().then((res) => setFolders(res.folders)).catch(() => {});
+  }, [consoleId]);
+
+  // Quem aponta uma pasta em outra tela e abre o console depois vê o estado
+  // atual do disco: revarre (respeitando o cooldown) e relê as pastas.
+  useEffect(() => {
+    rescanAllFoldersIfStale().then(() => api.getLibraryFolders().then((res) => setFolders(res.folders)).catch(() => {}));
   }, [consoleId]);
 
   useEffect(() => {

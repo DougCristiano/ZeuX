@@ -1136,3 +1136,15 @@ adapter novo entrar no catálogo de instalação automática.
 - Trabalho já feito, mesmo que recente — isso vive só no código e no
   histórico de commits, não aqui.
 - Ideia sem especificação nenhuma ainda (não é pendência, é ainda-não-ideia).
+
+---
+
+## Baixar o firmware do PS3 junto com o RPCS3 (2026-10-05)
+
+Hoje o ZeuX só abre a página oficial da Sony e instala o `.PUP` que a pessoa
+escolhe (`rpcs3 --installfw`). Baixar sozinho exige confirmar uma URL estável
+do servidor de atualização da Sony e o SHA256, numa máquina com acesso a ela
+(o ambiente desta sessão não alcança `playstation.com`). Critério de aceite:
+botão "Baixar e instalar" com progresso e verificação de hash; falha de rede
+cai de volta para a página oficial.
+

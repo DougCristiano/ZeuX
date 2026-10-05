@@ -162,6 +162,10 @@ func run(addr string, parentStdinWatchdog bool, logger *slog.Logger) error {
 		}()
 	}
 
+	// Revarredura de hora em hora: jogo apagado da pasta some da biblioteca
+	// mesmo com o app aberto o dia todo.
+	server.StartLibraryAutoRescan(ctx, time.Hour)
+
 	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("daemon no ar", "endereco", "http://"+addr, "consoles", len(catalog.Consoles))

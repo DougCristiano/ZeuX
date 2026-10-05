@@ -239,6 +239,7 @@ export type EmulatorEntry = {
   firmware_installed?: boolean;
   /** O ZeuX sabe entregar o arquivo de firmware ao instalador do emulador. */
   firmware_installable?: boolean;
+  firmware_download_url?: string;
   /**
    * (2026-09-29) O que falta para o controle funcionar neste emulador:
    * `"auto"` — reconhece sozinho; `"preset"` — o ZeuX sabe gravar um

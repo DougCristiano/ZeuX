@@ -171,6 +171,12 @@ type Status struct {
 	// ao instalador deste emulador (POST /emulators/{id}/firmware).
 	FirmwareInstallable bool `json:"firmware_installable,omitempty"`
 
+	// FirmwareDownloadURL é a página OFICIAL do fabricante onde o firmware é
+	// distribuído de graça (PS3: atualização de sistema da Sony). Só página,
+	// nunca link direto de arquivo — o ZeuX não validou nenhum, e a página
+	// oficial continua certa quando a Sony troca a versão.
+	FirmwareDownloadURL string `json:"firmware_download_url,omitempty"`
+
 	// ControllerSupport diz o que falta para o controle funcionar neste
 	// emulador — "auto", "preset" ou "manual" (controller_preset.go). Ausente
 	// em emulador personalizado: o ZeuX não sabe o que ele é.
@@ -257,6 +263,7 @@ func (r *Registry) Survey(ctx context.Context) []Status {
 				status.FirmwareInstalled = &installed
 			}
 			status.FirmwareInstallable = FirmwareInstallable(adapter.ID())
+			status.FirmwareDownloadURL = FirmwareDownloadURL(adapter.ID())
 
 			if support, ok := ControllerSupportFor(adapter.ID(), install); ok {
 				status.ControllerSupport = support

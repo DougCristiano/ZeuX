@@ -17,8 +17,24 @@ import { api } from "../api";
  */
 const MIN_INTERVAL_MS = 30_000;
 
+/**
+ * Janela do app aberta por horas: voltar o foco para ela (alt-tab depois de
+ * apagar um jogo no Explorer) é o ponto previsível para revarrer. Mais largo
+ * que o cooldown de 30s de propósito — foco acontece o tempo todo.
+ */
+export const FOCUS_RESCAN_INTERVAL_MS = 5 * 60_000;
+
 let lastRunAt = 0;
 let inFlight: Promise<void> | null = null;
+
+/**
+ * Revarredura imediata, sem cooldown — o botão "Revarrer pastas". Reinicia o
+ * relógio do cooldown para a revarredura automática não repetir logo depois.
+ */
+export async function rescanAllFoldersNow(): Promise<void> {
+  lastRunAt = Date.now();
+  await api.rescanLibrary();
+}
 
 export function rescanAllFoldersIfStale(): Promise<void> {
   if (inFlight) return inFlight;

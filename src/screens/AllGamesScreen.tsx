@@ -3,7 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { api, ApiError } from "../api";
 import type { ConsoleEntry, ConsoleVerdict, EmulatorEntry, LibraryGame, Report, ScrapeJob } from "../api/types";
-import { rescanAllFoldersIfStale } from "../lib/autoRescan";
+import { FOCUS_RESCAN_INTERVAL_MS, rescanAllFoldersIfStale, rescanAllFoldersNow } from "../lib/autoRescan";
 import {
   Badge,
   Button,
@@ -394,6 +394,37 @@ export function AllGamesScreen({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Janela que ficou aberta: ao voltar o foco (depois de apagar/copiar jogos
+  // fora do ZeuX) revarre se já passou um tempo, senão o jogo apagado da
+  // pasta continuava na biblioteca até o app ser reaberto.
+  const lastFocusRescanRef = useRef(Date.now());
+  useEffect(() => {
+    function onFocus() {
+      if (Date.now() - lastFocusRescanRef.current < FOCUS_RESCAN_INTERVAL_MS) return;
+      lastFocusRescanRef.current = Date.now();
+      rescanAllFoldersNow()
+        .catch(() => {})
+        .then(() => loadGames());
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [rescanning, setRescanning] = useState(false);
+  async function rescanNow() {
+    setRescanning(true);
+    try {
+      await rescanAllFoldersNow();
+    } catch {
+      // Sem erro visível: a lista logo abaixo continua valendo, e o
+      // botão volta a ficar disponível para tentar de novo.
+    } finally {
+      setRescanning(false);
+      loadGames();
+    }
+  }
 
   // Depois de remover/trazer de volta pelo menu de botão direito: o jogo
   // some (ou volta) da lista atual, e o destaque "Continue jogando" pode ter
@@ -935,6 +966,10 @@ export function AllGamesScreen({
                 (2026-08-04, Sprint 1) — "Gerenciar pastas" continua aqui
                 porque é sub-navegação da própria Biblioteca, não um destino
                 de primeiro nível. */}
+            <Button variant="chrome" disabled={rescanning} onClick={() => void rescanNow()}>
+              {rescanning ? t("rescanningFolders") : t("rescanFolders")}
+            </Button>
+
             <Button variant="chrome" onClick={onOpenLibrary}>
               {t("manageFolders")}
             </Button>

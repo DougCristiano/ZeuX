@@ -2042,3 +2042,34 @@ na máquina, pode apagar emuladores instalados de verdade.
 - Convenção de pasta/pacote sem trade-off por trás — isso é
   `arquitetura-do-codigo.md`.
 - Trabalho ainda não feito — isso é `pendencias.md`.
+
+---
+
+## Revarredura periódica, casamento de pastas tolerante e RPCS3 (2026-10-05)
+
+Relatos do Douglas no Windows: jogo apagado da pasta continuava na biblioteca;
+a pasta de ROMs certa apontada, mas o console dizia "nenhuma pasta"; o
+controle do PS3 não se configurava; o RPCS3 mostrava as boas-vindas sempre.
+
+- **Revarredura no servidor** (`internal/api/library_autorescan.go`): ao subir
+  (+10 s) e a cada hora. Antes só o front revarria, ao abrir uma tela. Jogo
+  que sumiu continua só marcado como ausente (`SyncFolder`), nunca apagado.
+  `POST /library/rescan` e o botão "Revarrer pastas" cobrem o pedido manual; a
+  janela também revarre ao ganhar foco (no máx. a cada 5 min).
+- **Pasta para todos os consoles** (`console_match.go`): além do nome exato,
+  aceita fabricante/ruído ("Sony - PlayStation 3", "PS3 Games"), apelidos
+  (PSX, Genesis, SFC), um nível extra (`Roms/Sony/PS3`) e a própria pasta
+  apontada ser a do console. Continua só por NOME de pasta, nunca por extensão.
+  Isto é uma hipótese para o "nenhuma pasta": não foi reproduzido com a
+  árvore real do Douglas.
+- **RPCS3 — boas-vindas:** `GuiConfigs/CurrentSettings.ini` ganha
+  `[infoBox] showWelcome=false` ao lançar (só se a chave não existir). Chave
+  lida do código do RPCS3, não validada contra o binário.
+- **RPCS3 — controle:** o RPCS3 cria o `Default.yml` no teclado na primeira
+  abertura, e o preset recusava ("já tem configuração"). Agora reescreve só o
+  jogador 1 quando ele ainda está em Teclado/Null; jogador já em controle é
+  preservado. Só Windows (XInput), como antes.
+- **Firmware do PS3:** o ZeuX abre a página **oficial** da Sony (não link
+  direto de arquivo: URL/hash não puderam ser verificados daqui e a Sony
+  troca a versão). Baixar o PUP junto com o emulador fica para quando houver
+  URL e SHA256 confirmados — ver `docs/pendencias.md`.

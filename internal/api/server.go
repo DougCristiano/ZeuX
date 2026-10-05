@@ -188,6 +188,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/library/folders", s.handleListLibraryFolders)
 	mux.HandleFunc("DELETE /api/v1/library/folders/{id}", s.handleRemoveLibraryFolder)
 	mux.HandleFunc("POST /api/v1/library/folders/{id}/scan", s.handleScanLibraryFolder)
+	mux.HandleFunc("POST /api/v1/library/rescan", s.handleRescanLibrary)
 	mux.HandleFunc("GET /api/v1/library/games", s.handleListLibraryGames)
 	// G4 (docs/roadmap.md): favoritar/desfavoritar. Rota própria, não um
 	// PATCH em /library/games/{id} — só um campo, sem motivo para um
@@ -1637,20 +1638,6 @@ type bulkAddLibraryFoldersBody struct {
 	Path string `json:"path"`
 }
 
-// normalizeConsoleMatch reduz um nome (de console ou de subpasta) a
-// minúsculas sem separadores, para comparar "Mega Drive", "mega-drive" e
-// "MEGADRIVE" como o mesmo texto — sem isso, a varredura em lote exigiria que
-// o usuário nomeasse as subpastas exatamente como o catálogo interno.
-func normalizeConsoleMatch(s string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(s) {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
 // handleBulkAddLibraryFolders implementa "selecionar um caminho para todos os
 // jogos" (2026-08-05, a pedido do Douglas): ele aponta UMA pasta-raiz
 // organizada com uma subpasta por console (ex. `Roms/PS1`, `Roms/SNES`), e o
@@ -1680,15 +1667,7 @@ func (s *Server) handleBulkAddLibraryFolders(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Índice normalizado -> console, construído uma vez: cada console entra
-	// pelo id, pelo nome e pela sigla, todos normalizados — uma subpasta
-	// "ps1", "PlayStation" ou "PS1" acham o mesmo console.
-	byNormalized := make(map[string]verdict.Console)
-	for _, console := range s.catalog.Consoles {
-		byNormalized[normalizeConsoleMatch(console.ID)] = console
-		byNormalized[normalizeConsoleMatch(console.Name)] = console
-		byNormalized[normalizeConsoleMatch(console.ShortName)] = console
-	}
+	matcher := newConsoleMatcher(s.catalog.Consoles)
 
 	type matchedFolder struct {
 		ConsoleID  string `json:"console_id"`
@@ -1699,35 +1678,76 @@ func (s *Server) handleBulkAddLibraryFolders(w http.ResponseWriter, r *http.Requ
 	matched := []matchedFolder{}
 	unmatched := []string{}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		console, ok := byNormalized[normalizeConsoleMatch(entry.Name())]
-		if !ok {
-			unmatched = append(unmatched, entry.Name())
-			continue
-		}
-
-		subPath := filepath.Join(body.Path, entry.Name())
+	// pointFolder aponta subPath para o console e varre. Bulk continua
+	// catálogo-only de propósito: casar subpasta por nome com um console
+	// fora do catálogo exigiria decidir qual CustomDefinition (podem existir
+	// várias) dá nome à pasta — sem uma "definição de console" única, isso é
+	// ambíguo o bastante para merecer decisão própria.
+	pointFolder := func(console verdict.Console, subPath string) bool {
 		folder, err := s.library.AddFolder(r.Context(), console.ID, subPath)
 		if err != nil {
 			s.writeError(w, http.StatusInternalServerError, "library_write_failed", err.Error())
-			return
+			return false
 		}
-		// Bulk continua catálogo-only de propósito: casar subpasta por nome
-		// com um console fora do catálogo exigiria decidir qual
-		// CustomDefinition (podem existir várias) dá nome à pasta — sem uma
-		// "definição de console" única, isso é ambíguo o bastante para
-		// merecer decisão própria, não um efeito colateral deste item.
 		found, err := s.syncLibraryFolder(r.Context(), folder, console.Extensions)
 		if err != nil {
 			s.writeError(w, http.StatusInternalServerError, "library_scan_failed", err.Error())
-			return
+			return false
 		}
 		matched = append(matched, matchedFolder{
 			ConsoleID: console.ID, Name: console.Name, Path: subPath, GamesFound: found,
 		})
+		return true
+	}
+
+	// A própria pasta apontada pode ser a de um console ("D:\Roms\PS3"): quem
+	// aponta a pasta certa não deveria precisar de uma pasta-pai só para o
+	// ZeuX enxergá-la.
+	if console, ok := matcher.match(filepath.Base(filepath.Clean(body.Path))); ok {
+		if !pointFolder(console, body.Path) {
+			return
+		}
+		go s.autoScrapeCovers()
+		writeJSON(w, http.StatusOK, map[string]any{"matched": matched, "unmatched": unmatched})
+		return
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		subPath := filepath.Join(body.Path, entry.Name())
+		if console, ok := matcher.match(entry.Name()); ok {
+			if !pointFolder(console, subPath) {
+				return
+			}
+			continue
+		}
+
+		// Um nível a mais ("Roms/Sony/PS3", "Roms/Nintendo/SNES"): agrupar
+		// por fabricante é comum, e sem isto toda a coleção ficava "sem
+		// pasta" mesmo com as pastas de console nomeadas certo. Só um nível
+		// — descer sem limite varreria árvores imprevisíveis.
+		children, err := os.ReadDir(subPath)
+		if err != nil {
+			unmatched = append(unmatched, entry.Name())
+			continue
+		}
+		foundInside := false
+		for _, child := range children {
+			if !child.IsDir() {
+				continue
+			}
+			if console, ok := matcher.match(child.Name()); ok {
+				if !pointFolder(console, filepath.Join(subPath, child.Name())) {
+					return
+				}
+				foundInside = true
+			}
+		}
+		if !foundInside {
+			unmatched = append(unmatched, entry.Name())
+		}
 	}
 
 	// Uma única chamada depois do laço inteiro, não uma por subpasta: assim
