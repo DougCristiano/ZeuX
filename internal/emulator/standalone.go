@@ -100,6 +100,12 @@ func newDuckStation() Adapter {
 				unapplied = append(unapplied,
 					"O backend gráfico precisa ser escolhido dentro do DuckStation.")
 			}
+			// `-statefile <arquivo>` está na ajuda do próprio DuckStation
+			// (duckstation-qt/qthost.cpp, PrintCommandLineHelp) — "Loads state
+			// from the specified filename". Não validado contra o binário.
+			if req.StatePath != "" {
+				opts = append(opts, "-statefile", req.StatePath)
+			}
 
 			return opts, []string{req.ROMPath}, unapplied
 		},
@@ -136,6 +142,11 @@ func newPCSX2() Adapter {
 			if req.Options.Renderer != RendererDefault {
 				unapplied = append(unapplied,
 					"O backend gráfico precisa ser escolhido dentro do PCSX2.")
+			}
+			// Mesma flag do DuckStation, na ajuda do PCSX2
+			// (pcsx2-qt/QtHost.cpp). Fica antes do "--": é opção, não jogo.
+			if req.StatePath != "" {
+				opts = append(opts, "-statefile", req.StatePath)
 			}
 
 			// O "--" separa as opções do caminho do jogo. Sem ele, ROMs cujo nome

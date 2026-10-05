@@ -719,9 +719,35 @@ export function GameDetailScreen({
           {infoError && <InlineError>{infoError}</InlineError>}
         </section>
 
+        {/* "Continuar" (2026-10-05, pedido do Douglas): quando o emulador
+            gravou um estado de retomada ao fechar, ele vira a ação principal
+            e "Jogar" vira "Jogar do início". O save do memory card continua
+            valendo nos dois — o estado é o ponto exato em que a pessoa saiu.
+            Vai direto para `launch`, sem a cadeia de instalação: se há
+            estado, o emulador já está instalado. */}
+        <div className="flex flex-wrap items-center gap-3">
+        {game.resume_saved_at && (
+          <Button
+            variant="primary"
+            autoFocus
+            disabled={playBusy}
+            onClick={() => void launch(game, false, { resume: true })}
+            size="lg"
+            className="w-fit"
+          >
+            {status.kind === "launching" ? (
+              t("opening")
+            ) : (
+              <>
+                <PlayIcon size={16} />
+                {t("continueButton")}
+              </>
+            )}
+          </Button>
+        )}
         <Button
-          variant="primary"
-          autoFocus
+          variant={game.resume_saved_at ? "chrome" : "primary"}
+          autoFocus={!game.resume_saved_at}
           disabled={playBusy}
           // 2026-09-09: passa pela cadeia de decisão compartilhada
           // (`useInlineInstall.handlePlay`) em vez de `launch` direto —
@@ -729,7 +755,7 @@ export function GameDetailScreen({
           // sem preset deixa o clique cair no lançamento sem `options` (o
           // emulador abre na config padrão dele). Princípio 5.
           onClick={() => install.handlePlay(game, verdict, adapterEntry)}
-          size="lg" className="w-fit"
+          size={game.resume_saved_at ? "md" : "lg"} className="w-fit"
         >
           {/* N14 (docs/roadmap.md, Sprint N): era o caractere "▶".
               A4 (achado do critico-design, 2026-08-18): o botão só
@@ -751,6 +777,8 @@ export function GameDetailScreen({
             t("downloadingCore")
           ) : launchability && !launchability.launchable && launchability.reason === "not_installed" ? (
             t("installAndPlay")
+          ) : game.resume_saved_at ? (
+            t("playFromStart")
           ) : (
             <>
               <PlayIcon size={16} />
@@ -758,6 +786,12 @@ export function GameDetailScreen({
             </>
           )}
         </Button>
+        {game.resume_saved_at && (
+          <span className="font-mono text-xs tracking-wide text-muted">
+            {t("resumeSavedAt", { date: formatLastPlayed(game.resume_saved_at, "") })}
+          </span>
+        )}
+        </div>
 
         {/* Princípios 2 e 3: quando o jogo não abre no clique simples, dizer
             o motivo — e, para "sem preset", qual componente barra (a frase

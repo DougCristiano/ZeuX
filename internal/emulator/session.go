@@ -111,6 +111,10 @@ type LaunchInput struct {
 	Core string
 
 	Options Options
+
+	// Resume abre o jogo no estado de retomada gravado na última sessão
+	// ("Continuar", resume.go), em vez de começar do início.
+	Resume bool
 }
 
 // Launch inicia o jogo e passa a acompanhar o processo.
@@ -142,6 +146,19 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 			l.logger.Warn("não foi possível silenciar a tela de boas-vindas do RPCS3", "erro", err)
 		}
 	}
+	var statePath string
+	if input.Resume {
+		statePath, err = l.resumeStateFor(ctx, input.ROMPath, adapter.ID())
+		if err != nil {
+			return Session{}, err
+		}
+	}
+	if adapter.ID() == "pcsx2" {
+		if err := ensurePCSX2SaveStateOnShutdown(); err != nil {
+			l.logger.Warn("não foi possível ligar o estado de retomada do PCSX2", "erro", err)
+		}
+	}
+
 	options := input.Options
 	configUnapplied, persisted := l.applyPreset(ctx, adapter, install, options)
 
@@ -175,6 +192,7 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		ConsoleID: input.ConsoleID,
 		Core:      input.Core,
 		Options:   options,
+		StatePath: statePath,
 	})
 	if err != nil {
 		return Session{}, err
@@ -220,7 +238,7 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		"console", input.ConsoleID,
 		"pid", session.pid)
 
-	go l.supervise(session, cmd)
+	go l.supervise(session, cmd, install)
 
 	return session, nil
 }
@@ -281,7 +299,7 @@ func (l *Launcher) LaunchStandalone(ctx context.Context, adapterID string) error
 }
 
 // supervise espera o emulador terminar e fecha a sessão no repositório.
-func (l *Launcher) supervise(session Session, cmd *exec.Cmd) {
+func (l *Launcher) supervise(session Session, cmd *exec.Cmd, install Installation) {
 	waitErr := cmd.Wait()
 
 	endedAt := time.Now().UTC()
@@ -290,6 +308,8 @@ func (l *Launcher) supervise(session Session, cmd *exec.Cmd) {
 	if err := l.sessions.Close(context.Background(), session.ID, endedAt, exitError); err != nil {
 		l.logger.Error("não foi possível fechar a sessão no banco", "sessao", session.ID, "erro", err)
 	}
+
+	l.recordResumeState(session, install)
 
 	l.logger.Info("jogo encerrado",
 		"sessao", session.ID,

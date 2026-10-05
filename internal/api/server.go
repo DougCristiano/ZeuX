@@ -1313,6 +1313,8 @@ type launchBody struct {
 	EmulatorID string            `json:"emulator_id,omitempty"`
 	Core       string            `json:"core,omitempty"`
 	Options    *emulator.Options `json:"options,omitempty"`
+	// Resume abre no estado de retomada da última sessão ("Continuar").
+	Resume bool `json:"resume,omitempty"`
 }
 
 // toInput converte o corpo da requisição no pedido do launcher, preenchendo as
@@ -1337,6 +1339,7 @@ func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 		ConsoleID:  body.ConsoleID,
 		EmulatorID: body.EmulatorID,
 		Core:       body.Core,
+		Resume:     body.Resume,
 	}
 
 	if body.Options != nil {
@@ -1886,6 +1889,11 @@ type gameWithStats struct {
 	// uma URL de terceiro. omitempty garante o campo AUSENTE (nunca "") quando
 	// a capa não foi resolvida, contrato documentado em docs/api.md.
 	CoverURL string `json:"cover_url,omitempty"`
+
+	// ResumeSavedAt é quando o emulador gravou o estado de retomada deste
+	// jogo ("Continuar", emulator/resume.go). Ausente quando não há estado
+	// cujo arquivo ainda exista — a tela só mostra "Continuar" com ele.
+	ResumeSavedAt string `json:"resume_saved_at,omitempty"`
 }
 
 // coverURLFor converte o caminho relativo guardado no banco (G1) na URL
@@ -1947,6 +1955,14 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Falhar em ler os estados de retomada só tira o "Continuar" da tela —
+	// não é motivo para a biblioteca inteira não carregar.
+	resumeStates, err := s.launcher.ResumeStates(r.Context())
+	if err != nil {
+		s.logger.Warn("não foi possível ler os estados de retomada", "erro", err)
+		resumeStates = nil
+	}
+
 	type stat struct {
 		seconds int
 		last    time.Time
@@ -1967,6 +1983,9 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 		if st, ok := byPath[game.Path]; ok {
 			gw.PlaytimeSeconds = st.seconds
 			gw.LastPlayedAt = st.last.Format(time.RFC3339)
+		}
+		if rs, ok := resumeStates[game.Path]; ok {
+			gw.ResumeSavedAt = rs.SavedAt.Format(time.RFC3339)
 		}
 		result = append(result, gw)
 	}

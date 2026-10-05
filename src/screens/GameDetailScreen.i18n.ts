@@ -48,6 +48,9 @@ export const dict = {
   opening: { "pt-BR": "Abrindo…", en: "Opening…" },
   downloadingCore: { "pt-BR": "Baixando o core…", en: "Downloading core…" },
   playButton: { "pt-BR": "Jogar", en: "Play" },
+  continueButton: { "pt-BR": "Continuar", en: "Continue" },
+  playFromStart: { "pt-BR": "Jogar do início", en: "Play from start" },
+  resumeSavedAt: { "pt-BR": "de onde você parou · {{date}}", en: "where you left off · {{date}}" },
   coreDownloadingMessage: {
     "pt-BR": "O core {{core_name}} ainda não estava no seu computador. Baixando…{{extra}}{{percent}}",
     en: "The {{core_name}} core wasn't on your computer yet. Downloading…{{extra}}{{percent}}",

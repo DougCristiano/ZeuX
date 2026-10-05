@@ -483,6 +483,9 @@ export type LaunchBody = {
   core?: string;
   /** Ausente aciona a autoconfiguração a partir do parecer do console. */
   options?: LaunchOptions;
+  /** Abre no estado de retomada da última sessão ("Continuar"). Só faz
+   * sentido quando o jogo traz `resume_saved_at`. */
+  resume?: boolean;
 };
 
 export type Command = {
@@ -610,6 +613,10 @@ export type LibraryGame = {
    * falhou (volta a ser tentada no próximo lote). É o que deixa a tela do
    * jogo dizer por que o resumo não aparece. */
   metadata_status?: "found" | "not_found" | "error";
+  /** Quando o emulador gravou o estado de retomada ao fechar (2026-10-05,
+   * DuckStation e PCSX2). Ausente = não há de onde continuar; a tela só
+   * oferece "Jogar". */
+  resume_saved_at?: string;
 };
 
 // --- Scraper de metadados IGDB (G1, docs/roadmap.md) ---

@@ -72,6 +72,11 @@ type Request struct {
 	Core string
 
 	Options Options
+
+	// StatePath, quando preenchido, abre o jogo já carregando este save
+	// state ("Continuar", resume.go). Só os adapters de SupportsResume o
+	// usam; o Launcher nunca o preenche para os outros.
+	StatePath string
 }
 
 // Command é a linha de comando pronta, junto do que não coube nela.

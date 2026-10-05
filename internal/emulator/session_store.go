@@ -186,3 +186,40 @@ func parseSessionID(id string) (int64, error) {
 	}
 	return seq, nil
 }
+
+// RecordResumeState guarda (ou troca) o estado de retomada de um jogo — ver
+// resume.go. Implementa ResumeRepository.
+func (s *SQLiteSessions) RecordResumeState(ctx context.Context, state ResumeState) error {
+	if _, err := s.db.ExecContext(ctx, `
+		INSERT INTO resume_states (rom_path, adapter_id, state_path, saved_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT (rom_path) DO UPDATE SET
+			adapter_id = excluded.adapter_id,
+			state_path = excluded.state_path,
+			saved_at   = excluded.saved_at
+	`, state.ROMPath, state.AdapterID, state.StatePath, state.SavedAt.Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("gravando estado de retomada: %w", err)
+	}
+	return nil
+}
+
+// ResumeStates devolve todos os estados de retomada gravados, por ROM.
+func (s *SQLiteSessions) ResumeStates(ctx context.Context) (map[string]ResumeState, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT rom_path, adapter_id, state_path, saved_at FROM resume_states`)
+	if err != nil {
+		return nil, fmt.Errorf("lendo estados de retomada: %w", err)
+	}
+	defer rows.Close()
+
+	states := map[string]ResumeState{}
+	for rows.Next() {
+		var st ResumeState
+		var savedAt string
+		if err := rows.Scan(&st.ROMPath, &st.AdapterID, &st.StatePath, &savedAt); err != nil {
+			return nil, fmt.Errorf("lendo linha de estado de retomada: %w", err)
+		}
+		st.SavedAt, _ = time.Parse(time.RFC3339Nano, savedAt)
+		states[st.ROMPath] = st
+	}
+	return states, rows.Err()
+}

@@ -2159,3 +2159,32 @@ explícita do Douglas (e custa minutos e GB por abertura num jogo de PS2). O
 formato compactado que esses emuladores aceitam é o CHD, que o catálogo já
 reconhece. `TestArchivesOnlyWhereTheEmulatorOpensThem` trava a lista.
 
+---
+
+## "Continuar de onde parei" — DuckStation e PCSX2 (2026-10-05)
+
+Pedido do Douglas: além do save do jogo (memory card), abrir o jogo no ponto
+exato em que a pessoa saiu. Lido no código-fonte dos emuladores (GitHub,
+branch master), **não validado com o binário rodando**:
+
+- Os dois gravam um save state de retomada ao fechar: DuckStation
+  `[Main] SaveStateOnExit` (padrão ligado, `core/settings.cpp`), arquivo
+  `<serial>_resume.sav` em `savestates/`; PCSX2 `[EmuCore]
+  SaveStateOnShutdown` (o ZeuX liga ao lançar quando a chave não existe),
+  arquivo `<serial> (<CRC>).resume.p2s` em `sstates/`.
+- Os dois aceitam `-statefile <arquivo>` (está na ajuda de cada um) e
+  **recusam abrir** se o arquivo não existe — por isso o ZeuX só mostra
+  "Continuar" com o arquivo presente.
+- O ZeuX não lê o serial do disco. Liga estado e jogo pela sessão: ao fim de
+  cada sessão, o arquivo de retomada gravado durante ela é deste jogo
+  (tabela `resume_states`, migração 0011). Some da tela se o arquivo some.
+- DuckStation só na instalação gerenciada (modo portátil): é a única em que
+  a pasta de dados é conhecida.
+
+Tela do jogo: com estado, "Continuar" é a ação principal e "Jogar" vira
+"Jogar do início". Fica para depois: RetroArch (tem `--entryslot` e
+`savestate_auto_save`/`savestate_auto_load`, mas o carregamento automático
+vem ligado por padrão, então separar "continuar" de "do início" exige um
+`--appendconfig` por lançamento), demais emuladores, e o "Continuar" na
+faixa "Continue jogando" da biblioteca.
+
