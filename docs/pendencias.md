@@ -1148,3 +1148,94 @@ do servidor de atualização da Sony e o SHA256, numa máquina com acesso a ela
 botão "Baixar e instalar" com progresso e verificação de hash; falha de rede
 cai de volta para a página oficial.
 
+
+---
+
+# Proposta (2026-10-05): saves pelo ZeuX + perfil base de cada emulador
+
+**Origem:** pedido do Douglas — "editar/apagar/adicionar os saves de jogos
+pelo ZeuX" e "configurações iniciais de todos os emuladores, para estarem
+sempre otimizados (áudio, tudo que pode ser editado antes de abrir a
+primeira vez)". Ainda **não implementado**; é desenho para decidir.
+
+## A ideia que junta as duas coisas
+
+Hoje o ZeuX tenta **descobrir** onde cada emulador grava save — e só sabe
+para PCSX2 e RetroArch (ver "Pesquisa (não verificada): save/continuidade"
+acima). Inverter: nas instalações **gerenciadas** pelo ZeuX, o próprio seed
+de primeira execução **define** onde o emulador grava save, numa árvore do
+ZeuX:
+
+```
+%AppData%\ZeuX\saves\<console>\<emulador>\{saves,states}\
+```
+
+Com isso o local deixa de ser palpite (foi o ZeuX que escreveu a chave) e a
+gerência de saves vira possível para todo emulador cujo seed for verificado.
+Emulador que o usuário já tinha instalado por conta própria **não** é
+mexido: lá o ZeuX continua só lendo, como hoje.
+
+## Fase 1 — perfil base na primeira execução (seed ampliado)
+
+Hoje `seedFirstRun` (`internal/install/firstrun.go`) só suprime o
+assistente. O perfil base acrescentaria, por emulador, só o que vale para
+qualquer máquina (o que depende de hardware — resolução interna, renderer —
+já vem do parecer e é aplicado no lançamento):
+
+| Categoria | O quê | Por quê |
+|---|---|---|
+| Entrada | sem assistente, sem boas-vindas, sem "novidades da versão" | já é o que existe; estender a quem falta (RPCS3 feito hoje) |
+| Comportamento de console | abrir em tela cheia, sair ao fechar o jogo, sem confirmar saída, esconder cursor | quem entrou pelo ZeuX escolheu um jogo, não um emulador |
+| Áudio | manter o backend padrão do emulador; ligar esticamento/sincronia de áudio onde existir; volume 100 | evita estalo em queda de FPS — não trocar backend sem medir |
+| Atualização e telemetria | desligar checagem de atualização e envio de estatística | o ZeuX gerencia a versão; pergunta de telemetria é mais uma tela |
+| Pastas | saves e states na árvore do ZeuX (acima); BIOS na pasta que o ZeuX já mostra | base da Fase 2 |
+| Controle | o que já existe (preset XInput/SDL) | — |
+
+**Regras:** só no seed (instalação nova pelo ZeuX); depois disso o arquivo
+é do usuário — nada é reaplicado por cima de escolha dele
+(`UserConfigStore`). Backup antes da primeira escrita (`configbackup.go`),
+como toda escrita de config. **Nenhuma chave entra sem ser confirmada contra
+o binário real** (regra do CLAUDE.md: flag/chave inventada faz o emulador
+ignorar ou recusar).
+
+## Fase 2 — saves pelo ZeuX
+
+Na tela do jogo, seção "Saves":
+
+1. **Ver** os saves e states daquele jogo (data, tamanho, slot).
+2. **Exportar** (cópia para onde o usuário escolher — backup, outro PC).
+3. **Importar** um save escolhido pelo usuário para o lugar certo.
+4. **Apagar** — move para uma lixeira do ZeuX, restaurável, nunca apaga
+   direto.
+
+Travas: nenhuma escrita enquanto o emulador daquele jogo estiver aberto
+(`is_running` de `GET /sessions`); backup automático antes de importar por
+cima. Save é dado do usuário, não ROM — exportar/importar não esbarra no
+princípio 6 (a camada social do PRODUCT.md já prevê compartilhar save).
+
+**Saber qual save é de qual jogo** varia por emulador, e define a ordem:
+
+| Grau | Emuladores | Como o save se liga ao jogo |
+|---|---|---|
+| Por jogo, pelo nome do arquivo | RetroArch (todos os cartuchos) | `<nome da ROM>.srm` / `.state<N>` — segundo a doc do libretro |
+| Por jogo, pelo ID do jogo | RPCS3, PPSSPP, Vita3K, Azahar | pasta por ID (ex.: `savedata/BCUS98174/`) — precisa ler o ID da ROM |
+| Por jogo, se configurado | DuckStation | opção de cartão por jogo — o seed ligaria |
+| Cartão compartilhado | PCSX2, Dolphin (GC), Flycast | um cartão para todos os jogos: só dá para gerir o cartão inteiro; states são por jogo |
+
+## O que bloqueia, e como destravar
+
+Tudo acima depende de confirmar chaves e pastas **rodando cada emulador no
+Windows** — esta sessão de nuvem não tem como. Proposta para baratear:
+uma rota de diagnóstico (`POST /debug/emulator-snapshot/{id}`) que fotografa
+as pastas candidatas antes/depois de o Douglas abrir o emulador, salvar um
+jogo e mudar uma opção, e devolve a lista do que mudou. Transforma "verificar
+um emulador" numa tarefa de minutos, com o resultado pronto para virar
+código e entrada em `decisoes.md`.
+
+## Decisões pendentes do Douglas
+
+- [ ] Centralizar saves das instalações gerenciadas em `%AppData%\ZeuX\saves`?
+- [ ] "Apagar" vai para lixeira do ZeuX (quanto tempo guarda?) ou apaga de vez?
+- [ ] Ordem: começar pelo RetroArch (save por jogo já é determinístico) e
+      pelo DuckStation (mais usado)?
+- [ ] Topa rodar a rota de diagnóstico no Windows, emulador por emulador?
