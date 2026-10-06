@@ -39,6 +39,7 @@ import { dict } from "./AllGamesScreen.i18n";
 import { FirstStepsChecklist } from "../components/FirstStepsChecklist";
 import { GameContextMenu } from "../components/GameContextMenu";
 import { GameHero } from "../components/GameHero";
+import { RecentScreenshotsStrip } from "../components/RecentScreenshotsStrip";
 import { GameListRow } from "../components/GameListRow";
 import { GameTile, GameTileSkeleton } from "../components/GameTile";
 import { useFirstSteps } from "../hooks/useFirstSteps";
@@ -1035,6 +1036,17 @@ export function AllGamesScreen({
           })()}
         </div>
       )}
+
+      <RecentScreenshotsStrip
+        onOpenGame={(gameId) => {
+          // O jogo pode estar fora da página carregada; aí vem do servidor
+          // (sem tempo de jogo, que a tela do jogo busca por conta própria).
+          const known = [...(recentGames ?? []), ...(games ?? [])].find((g) => g.id === gameId);
+          const go = (g: LibraryGame) => onOpenGame(g, nameFor(g.console_id), shortNameFor(g.console_id));
+          if (known) go(known);
+          else api.getGame(gameId).then(go).catch(() => {});
+        }}
+      />
 
       {/* Régua de controle compartilhada com `GamesScreen` (2026-09-09,
           redesenho retrô): busca, ordenação, grade/lista, densidade das capas

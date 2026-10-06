@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
-import { Pencil, Settings2 } from "lucide-react";
+import { Camera, Pencil, Settings2 } from "lucide-react";
 import { api, ApiError } from "../api";
 import type {
   ConsoleEmulatorOption,
@@ -39,6 +39,7 @@ import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { SaveDataPanel } from "../components/SaveDataPanel";
 import { EmulatorSettingsModal } from "../components/EmulatorSettingsPanel";
+import { ScreenshotHotkeyModal } from "../components/ScreenshotHotkeySection";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { percentOf } from "../lib/format";
@@ -870,6 +871,10 @@ export function ConsoleDetailScreen({
       : consoleId === "ps2" && readiness.chosen?.adapter_id === "pcsx2"
         ? { id: "pcsx2", name: "PCSX2" }
         : null;
+  // RetroArch (2026-10-06): sem catálogo de opções, mas com a tecla de print
+  // levantada — botão próprio, abre um modal só com ela.
+  const hotkeyOnlyEmulator =
+    !settingsEmulator && readiness.chosen?.adapter_id === "retroarch" ? { id: "retroarch", name: "RetroArch" } : null;
   const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
   const chosenEntry = readiness.chosen ? emulatorById.get(readiness.chosen.adapter_id) : undefined;
   const requiresExternalFile = entry.requires_external_file ?? false;
@@ -1063,7 +1068,23 @@ export function ConsoleDetailScreen({
             </Button>
           </div>
         )}
+        {hotkeyOnlyEmulator && (
+          <div>
+            <Button variant="chrome" onClick={() => setEmulatorSettingsOpen(true)}>
+              <Camera size={14} aria-hidden="true" />
+              {t("screenshotKeyButton", { name: hotkeyOnlyEmulator.name })}
+            </Button>
+          </div>
+        )}
       </Card>
+
+      {emulatorSettingsOpen && hotkeyOnlyEmulator && (
+        <ScreenshotHotkeyModal
+          adapterId={hotkeyOnlyEmulator.id}
+          name={hotkeyOnlyEmulator.name}
+          onClose={() => setEmulatorSettingsOpen(false)}
+        />
+      )}
 
       {emulatorSettingsOpen && settingsEmulator && (
         <EmulatorSettingsModal

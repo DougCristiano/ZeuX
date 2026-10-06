@@ -7,6 +7,11 @@ import type {
   CustomDefinition,
   EmulatorSettings,
   GameSavesResponse,
+  GameScreenshotsResponse,
+  Screenshot,
+  RecentScreenshot,
+  ScreenshotHotkey,
+  ScreenshotHotkeyResponse,
   PCSX2Portable,
   SaveBackup,
   CustomEmulatorsResponse,
@@ -251,6 +256,14 @@ export const api = {
     request<{ restored: boolean }>(`/emulators/${encodeURIComponent(id)}/config`, { method: "DELETE" }),
 
   // --- Inspeção de saves (MVP de listar/ver, não gerenciar) ---
+  getScreenshotHotkey: (id: string) =>
+    request<ScreenshotHotkeyResponse>(`/emulators/${encodeURIComponent(id)}/screenshot-hotkey`),
+  setScreenshotHotkey: (id: string, hotkey: ScreenshotHotkey) =>
+    request<ScreenshotHotkeyResponse>(`/emulators/${encodeURIComponent(id)}/screenshot-hotkey`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(hotkey),
+    }),
   getEmulatorSettings: (id: string) => request<EmulatorSettings>(`/emulators/${encodeURIComponent(id)}/settings`),
   setEmulatorSettings: (id: string, values: Record<string, string>) =>
     request<EmulatorSettings>(`/emulators/${encodeURIComponent(id)}/settings`, {
@@ -425,4 +438,21 @@ export const api = {
   // sobrescrita sozinha.
   setGameCover: (gameId: number, sourcePath: string) =>
     postJSON<{ cover_url: string }>(`/library/games/${gameId}/cover`, { source_path: sourcePath }),
+  // Galeria de prints (2026-10-06): os arquivos chegam movidos pelo zeuxd
+  // ao fim de cada sessão; a tela só lista, apaga e escolhe o banner.
+  getGameScreenshots: (gameId: number) =>
+    request<GameScreenshotsResponse>(`/library/games/${gameId}/screenshots`),
+  // Envio manual (2026-10-06): o zeuxd COPIA os arquivos escolhidos no
+  // diálogo nativo; os originais ficam onde estavam.
+  addGameScreenshots: (gameId: number, sourcePaths: string[]) =>
+    postJSON<{ added: Screenshot[]; errors: { path: string; message: string }[] }>(
+      `/library/games/${gameId}/screenshots`,
+      { source_paths: sourcePaths },
+    ),
+  deleteGameScreenshot: (gameId: number, name: string) =>
+    request<void>(`/library/games/${gameId}/screenshots/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  setGameBanner: (gameId: number, name: string) =>
+    postJSON<{ banner_url?: string }>(`/library/games/${gameId}/banner`, { name }),
+  getRecentScreenshots: (limit = 12) =>
+    request<{ screenshots: RecentScreenshot[] }>(`/library/screenshots/recent?limit=${limit}`),
 };

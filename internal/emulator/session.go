@@ -171,6 +171,14 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		}
 	}
 
+	// Sem isto o RetroArch grava o print ao lado do jogo, na pasta de ROMs
+	// do usuário — onde o ZeuX não escreve nem recolhe (screenshots.go).
+	if adapter.ID() == "retroarch" && !l.AdapterRunning(ctx, "retroarch") {
+		if err := ensureRetroArchScreenshotDir(install); err != nil {
+			l.logger.Warn("não foi possível apontar a pasta de prints do RetroArch", "erro", err)
+		}
+	}
+
 	options := input.Options
 	configUnapplied, persisted := l.applyPreset(ctx, adapter, install, options)
 
@@ -340,6 +348,7 @@ func (l *Launcher) supervise(session Session, cmd *exec.Cmd, install Installatio
 
 	l.recordDiscID(session)
 	l.recordResumeState(session, install)
+	l.collectScreenshots(session, install)
 
 	l.logger.Info("jogo encerrado",
 		"sessao", session.ID,

@@ -681,6 +681,31 @@ export type LibraryGame = {
    * DuckStation e PCSX2). Ausente = não há de onde continuar; a tela só
    * oferece "Jogar". */
   resume_saved_at?: string;
+  /** Print da galeria escolhido como fundo do topo da tela do jogo
+   * (2026-10-06). Ausente = sem banner, a tela usa a capa. */
+  banner_url?: string;
+};
+
+// --- Galeria de prints (2026-10-06) ---
+
+export type Screenshot = {
+  name: string;
+  size_bytes: number;
+  taken_at: string;
+  url: string;
+};
+
+export type GameScreenshotsResponse = {
+  screenshots: Screenshot[];
+  /** Pasta da galeria no disco, para o botão "abrir pasta". */
+  folder: string;
+  banner_name: string;
+};
+
+export type RecentScreenshot = Screenshot & {
+  game_id: number;
+  game_title: string;
+  console_id: string;
 };
 
 // --- Scraper de metadados IGDB (G1, docs/roadmap.md) ---
@@ -720,3 +745,32 @@ export type ScrapeJob = {
    * em results[].message). */
   error?: string;
 };
+
+// --- Tecla de print por emulador (2026-10-06) ---
+
+export type ScreenshotButton = "back" | "start" | "l1" | "r1" | "l3" | "r3";
+
+export type ScreenshotHotkey = {
+  /** "F10", ou "" sem tecla. */
+  keyboard: string;
+  /** Dois botões: o que se segura e o que se aperta. Vazio = sem combinação. */
+  controller: ScreenshotButton[] | null;
+};
+
+export type ScreenshotHotkeyState = {
+  current: ScreenshotHotkey;
+  /** Valor gravado que não cabe nas opções do ZeuX (escolhido no emulador). */
+  unrecognized?: string;
+  /** Teclado e controle juntos (só RetroArch). */
+  coexist: boolean;
+  default_keyboard: string;
+  folder?: string;
+  folder_exists: boolean;
+  warnings: string[];
+  keys: string[];
+  buttons: ScreenshotButton[];
+};
+
+export type ScreenshotHotkeyResponse =
+  | { available: false; message: string }
+  | { available: true; running: boolean; hotkey: ScreenshotHotkeyState };

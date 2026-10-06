@@ -9,6 +9,7 @@ export const dict = {
     "pt-BR": "Gravadas direto no arquivo de configuração do {{name}}. Só muda o que você alterar aqui — o resto do arquivo fica como está.",
     en: "Written straight to {{name}}'s configuration file. Only what you change here is touched — the rest of the file stays as is.",
   },
+  screenshotKey: { "pt-BR": "Tecla de print", en: "Screenshot key" },
   loading: { "pt-BR": "Lendo as opções…", en: "Reading options…" },
   readError: { "pt-BR": "Não foi possível ler as opções.", en: "Could not read the options." },
   saveError: { "pt-BR": "Não foi possível salvar as opções.", en: "Could not save the options." },

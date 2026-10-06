@@ -4,6 +4,7 @@ import type { EmulatorSetting, EmulatorSettings, PCSX2Portable } from "../api/ty
 import { useToast } from "../hooks/useToast";
 import { useT } from "../i18n/i18n";
 import { dict } from "./EmulatorSettingsPanel.i18n";
+import { ScreenshotHotkeySection } from "./ScreenshotHotkeySection";
 import { formatBytes } from "../lib/format";
 import { Button, Callout, ConfirmModal, InlineError, Toast, inputClass, ZSelect } from "./ui";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
@@ -189,6 +190,12 @@ export function EmulatorSettingsModal({ adapterId, name, onClose }: { adapterId:
         <DialogTitle className="text-lg font-semibold text-ink">{t("modalTitle", { name })}</DialogTitle>
         <DialogDescription className="mb-2 text-sm text-muted">{t("modalDescription", { name })}</DialogDescription>
         {adapterId === "pcsx2" && <PCSX2PortableSection />}
+        {/* Tecla de print (2026-10-06) no topo: é a opção que a pessoa vem
+            procurar com o jogo na cabeça, não uma preferência de fundo. */}
+        <section className="mb-5 flex flex-col gap-2 border-b border-line pb-5">
+          <h3 className="font-mono text-[11px] tracking-wide text-muted uppercase">{t("screenshotKey")}</h3>
+          <ScreenshotHotkeySection adapterId={adapterId} name={name} />
+        </section>
         <EmulatorSettingsPanel adapterId={adapterId} name={name} />
       </DialogContent>
     </Dialog>

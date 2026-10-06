@@ -1239,3 +1239,15 @@ código e entrada em `decisoes.md`.
 - [ ] Ordem: começar pelo RetroArch (save por jogo já é determinístico) e
       pelo DuckStation (mais usado)?
 - [ ] Topa rodar a rota de diagnóstico no Windows, emulador por emulador?
+
+## Prints: o que ficou do atalho de print (2026-10-06)
+
+A tecla de print por emulador existe (ver `docs/decisoes.md`). Pendente:
+
+- **RetroArch em tela cheia** sai com o OSD (aviso de controle e FPS) no
+  print, porque `video_gpu_screenshot = "true"`. Avaliar `"false"` ou
+  desligar notificações — não testado.
+- **"Nenhum" no DuckStation/PCSX2** grava `Screenshot =` vazio; confirmar
+  com o emulador aberto que nenhum atalho dispara.
+- **Outros emuladores** (Flycast, RPCS3, Vita3K, xemu, Dolphin...): precisam
+  do mesmo levantamento antes de ganhar a opção.

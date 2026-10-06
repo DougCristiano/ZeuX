@@ -186,6 +186,7 @@ export const dict = {
       "No folder assigned yet. Choose the folder that holds your {{shortName}} games: ZeuX reads the files directly from where they are on your disk — nothing is copied or moved.",
   },
   emulatorSettingsButton: { "pt-BR": "Configurações do {{name}}", en: "{{name}} settings" },
+  screenshotKeyButton: { "pt-BR": "Tecla de print do {{name}}", en: "{{name}} screenshot key" },
   rescan: {
     "pt-BR": "Revarrer",
     en: "Rescan",

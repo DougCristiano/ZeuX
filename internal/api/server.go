@@ -154,6 +154,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/emulators/{id}/managed-dir", s.handleEnsureManagedDir)
 	mux.HandleFunc("GET /api/v1/emulators/{id}/settings", s.handleEmulatorSettings)
 	mux.HandleFunc("PUT /api/v1/emulators/{id}/settings", s.handleSetEmulatorSettings)
+	mux.HandleFunc("GET /api/v1/emulators/{id}/screenshot-hotkey", s.handleScreenshotHotkey)
+	mux.HandleFunc("PUT /api/v1/emulators/{id}/screenshot-hotkey", s.handleSetScreenshotHotkey)
 	mux.HandleFunc("GET /api/v1/library/games/{id}/saves", s.handleGameSaves)
 	mux.HandleFunc("POST /api/v1/library/games/{id}/saves/backup", s.handleBackupGameSaves)
 	mux.HandleFunc("POST /api/v1/library/games/{id}/saves/restore", s.handleRestoreGameSaves)
@@ -230,6 +232,12 @@ func (s *Server) Routes() http.Handler {
 	// Serve as capas já baixadas em disco (nunca a URL do IGDB direto — G1
 	// exige arquivo local). Primeiro uso de http.FileServer neste servidor.
 	mux.HandleFunc("GET /api/v1/covers/", s.handleCoverFile)
+	mux.HandleFunc("GET /api/v1/library/games/{id}/screenshots", s.handleGameScreenshots)
+	mux.HandleFunc("POST /api/v1/library/games/{id}/screenshots", s.handleAddGameScreenshots)
+	mux.HandleFunc("DELETE /api/v1/library/games/{id}/screenshots/{name}", s.handleDeleteGameScreenshot)
+	mux.HandleFunc("POST /api/v1/library/games/{id}/banner", s.handleSetGameBanner)
+	mux.HandleFunc("GET /api/v1/library/screenshots/recent", s.handleRecentScreenshots)
+	mux.HandleFunc("GET /api/v1/screenshots/", s.handleScreenshotFile)
 
 	return s.withLogging(s.withCORS(mux))
 }
@@ -280,7 +288,11 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		}
 
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE")
+			// PUT entrou em 2026-10-06: as opções de emulador e a tecla de
+			// print gravam com PUT, e sem ele aqui o WebView barrava a
+			// requisição no preflight — "Salvar opções" falhava com "Failed
+			// to fetch" desde que foi criado.
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -1902,6 +1914,9 @@ type gameWithStats struct {
 	// jogo ("Continuar", emulator/resume.go). Ausente quando não há estado
 	// cujo arquivo ainda exista — a tela só mostra "Continuar" com ele.
 	ResumeSavedAt string `json:"resume_saved_at,omitempty"`
+
+	// BannerURL é o print da galeria escolhido como fundo do topo do jogo.
+	BannerURL string `json:"banner_url,omitempty"`
 }
 
 // coverURLFor converte o caminho relativo guardado no banco (G1) na URL
@@ -1987,7 +2002,7 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 
 	result := make([]gameWithStats, 0, len(games))
 	for _, game := range games {
-		gw := gameWithStats{Game: game, CoverURL: coverURLFor(game.CoverPath)}
+		gw := gameWithStats{Game: game, CoverURL: coverURLFor(game.CoverPath), BannerURL: bannerURLFor(game)}
 		if st, ok := byPath[game.Path]; ok {
 			gw.PlaytimeSeconds = st.seconds
 			gw.LastPlayedAt = st.last.Format(time.RFC3339)
@@ -2358,8 +2373,9 @@ func (s *Server) handleGetGame(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, struct {
 		library.Game
-		CoverURL string `json:"cover_url,omitempty"`
-	}{game, coverURLFor(game.CoverPath)})
+		CoverURL  string `json:"cover_url,omitempty"`
+		BannerURL string `json:"banner_url,omitempty"`
+	}{game, coverURLFor(game.CoverPath), bannerURLFor(game)})
 }
 
 // handleFetchGameMetadata busca só ano, resumo, gêneros e desenvolvedora de

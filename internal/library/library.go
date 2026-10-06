@@ -104,6 +104,11 @@ type Game struct {
 	// o resumo não aparece — "ainda não buscado", "o IGDB não achou este
 	// título" e "a busca falhou" pedem ações diferentes do usuário.
 	MetadataStatus string `json:"metadata_status,omitempty"`
+
+	// BannerName é o print da galeria escolhido como fundo do topo da tela do
+	// jogo. `json:"-"` pelo mesmo motivo de CoverPath: a API devolve
+	// `banner_url`, derivada daqui.
+	BannerName string `json:"-"`
 }
 
 // Metadata é o que a busca no IGDB grava de um jogo (SetMetadata).
@@ -117,7 +122,7 @@ type Metadata struct {
 // gameColumns e scanGame existem porque a mesma lista de colunas era copiada
 // em cinco consultas, cada uma com seu `Scan` — um campo novo exigia cinco
 // edições idênticas, e esquecer uma quebrava só aquela tela.
-const gameColumns = `id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded, release_year, summary, genres, developer, metadata_status`
+const gameColumns = `id, folder_id, console_id, path, CASE WHEN title_override != '' THEN title_override ELSE title END AS title, title_override, added_at, missing, cover_path, cover_status, favorite, excluded, release_year, summary, genres, developer, metadata_status, banner_name`
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -132,7 +137,7 @@ func scanGame(row rowScanner) (Game, error) {
 		excluded int
 		genres   string
 	)
-	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded, &game.ReleaseYear, &game.Summary, &genres, &game.Developer, &game.MetadataStatus); err != nil {
+	if err := row.Scan(&game.ID, &game.FolderID, &game.ConsoleID, &game.Path, &game.Title, &game.TitleOverride, &addedAt, &missing, &game.CoverPath, &game.CoverStatus, &favorite, &excluded, &game.ReleaseYear, &game.Summary, &genres, &game.Developer, &game.MetadataStatus, &game.BannerName); err != nil {
 		return Game{}, err
 	}
 	parsed, err := time.Parse(time.RFC3339Nano, addedAt)
@@ -747,6 +752,16 @@ func (s *Store) SetTitleOverride(ctx context.Context, gameID int64, title string
 	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET title_override = ? WHERE id = ?`, trimmed, gameID)
 	if err != nil {
 		return fmt.Errorf("gravando o título do jogo %d: %w", gameID, err)
+	}
+	return checkAffected(result, gameID)
+}
+
+// SetBanner grava (ou limpa, com nome vazio) o print usado como banner.
+// Quem chama valida que o nome é de um print da galeria do jogo.
+func (s *Store) SetBanner(ctx context.Context, gameID int64, name string) error {
+	result, err := s.db.ExecContext(ctx, `UPDATE library_games SET banner_name = ? WHERE id = ?`, name, gameID)
+	if err != nil {
+		return fmt.Errorf("gravando o banner do jogo %d: %w", gameID, err)
 	}
 	return checkAffected(result, gameID)
 }

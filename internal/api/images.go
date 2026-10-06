@@ -36,6 +36,17 @@ var (
 // reencoda: os bytes originais são preservados como vieram, do jeito que o
 // próprio scraper já trata capas baixadas.
 func copyValidatedImage(sourcePath, destPath string) error {
+	return copyValidatedImageMax(sourcePath, destPath, maxUploadedImageBytes)
+}
+
+// maxScreenshotBytes é o teto de um print enviado à galeria. Maior que o de
+// capa: um print em PNG de tela 4K passa fácil de 8 MiB, e aqui a imagem
+// grande é o caso legítimo, não engano.
+const maxScreenshotBytes int64 = 64 << 20 // 64 MiB
+
+// copyValidatedImageMax é copyValidatedImage com teto próprio; passar do
+// teto devolve errImageTooLarge.
+func copyValidatedImageMax(sourcePath, destPath string, maxBytes int64) error {
 	source, err := os.Open(sourcePath)
 	if err != nil {
 		return fmt.Errorf("abrindo %q: %w", sourcePath, err)
@@ -75,7 +86,7 @@ func copyValidatedImage(sourcePath, destPath string) error {
 	// +1 pelo mesmo motivo de downloadImage: detecta excesso mesmo sem um
 	// Content-Length confiável, já que aqui nem existe um — é leitura de
 	// arquivo local.
-	remaining := maxUploadedImageBytes - written + 1
+	remaining := maxBytes - written + 1
 	copied, err := io.Copy(dest, io.LimitReader(source, remaining))
 	closeErr := dest.Close()
 	if err != nil {
@@ -86,7 +97,7 @@ func copyValidatedImage(sourcePath, destPath string) error {
 		os.Remove(temp)
 		return fmt.Errorf("gravando a imagem: %w", closeErr)
 	}
-	if written+copied > maxUploadedImageBytes {
+	if written+copied > maxBytes {
 		os.Remove(temp)
 		return errImageTooLarge
 	}
