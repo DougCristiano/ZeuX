@@ -2377,3 +2377,24 @@ do console ("Tecla de print do RetroArch").
   a coleta já desce um nível); o OSD no print em tela cheia do RetroArch
   (`video_gpu_screenshot`, não testado); Flycast, RPCS3, Vita3K, xemu e os
   demais (sem levantamento — o recurso fica desligado para eles).
+
+## Galeria: visualizador grande e releitura ao fechar o jogo (2026-10-06)
+
+Achado do Douglas com o FIFA Street 2 no PCSX2: o print chegava na galeria
+(`screenshots\ps2\<ROM>\`), mas a tela do jogo só o mostrava saindo e
+voltando — ela lia a pasta uma vez, ao abrir. A associação pasta↔jogo
+(console + nome da ROM) estava certa; não há índice além do arquivo.
+
+- O shell já faz poll de `GET /sessions` a cada 4 s (`useSessionWatcher`);
+  quando a sessão que rodava some, ele dispara o evento de janela
+  `zeux:session-ended`. A galeria e a faixa "Últimos prints" escutam e
+  releem. A galeria também relê ao ganhar foco (print posto por fora).
+- No zeuxd, a coleta dos prints passou para ANTES de fechar a sessão no
+  banco: com a ordem antiga, a tela via a sessão encerrada e relia a pasta
+  antes de o print chegar.
+- A coleta continua só para jogo aberto pelo ZeuX — é a sessão que liga o
+  print ao jogo. Print tirado com o emulador aberto por fora fica na pasta
+  do emulador.
+- Pedido do Douglas no mesmo dia: o print mais recente aparece grande, como
+  um visualizador (setas, contador, clique abre em tela cheia), com as
+  miniaturas numa faixa embaixo. Print novo vira o selecionado sozinho.

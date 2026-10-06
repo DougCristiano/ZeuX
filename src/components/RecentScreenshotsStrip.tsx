@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, coverImageURL } from "../api";
 import type { RecentScreenshot } from "../api/types";
+import { SESSION_ENDED_EVENT } from "../hooks/useSessionWatcher";
 import { useT } from "../i18n/i18n";
 import { ScreenshotLightbox } from "./ScreenshotLightbox";
 import { dict } from "./Screenshots.i18n";
@@ -18,11 +19,16 @@ export function RecentScreenshotsStrip({ onOpenGame }: { onOpenGame: (gameId: nu
   const [shots, setShots] = useState<RecentScreenshot[]>([]);
   const [open, setOpen] = useState<number | null>(null);
 
+  // Relê quando um jogo fecha: é a hora em que o zeuxd move os prints.
   useEffect(() => {
-    api
-      .getRecentScreenshots(12)
-      .then((res) => setShots(res.screenshots))
-      .catch(() => setShots([]));
+    const load = () =>
+      api
+        .getRecentScreenshots(12)
+        .then((res) => setShots(res.screenshots))
+        .catch(() => setShots([]));
+    load();
+    window.addEventListener(SESSION_ENDED_EVENT, load);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, load);
   }, []);
 
   if (shots.length === 0) return null;

@@ -342,13 +342,18 @@ func (l *Launcher) supervise(session Session, cmd *exec.Cmd, install Installatio
 	endedAt := time.Now().UTC()
 	exitError := describeExitError(waitErr)
 
+	// Prints antes de fechar a sessão no banco: a tela recarrega a galeria
+	// quando vê a sessão encerrada (GET /sessions), e com a ordem inversa
+	// ela relia a pasta antes de o print chegar — o print só aparecia
+	// saindo da tela e voltando (achado do Douglas, 2026-10-06).
+	l.collectScreenshots(session, install)
+
 	if err := l.sessions.Close(context.Background(), session.ID, endedAt, exitError); err != nil {
 		l.logger.Error("não foi possível fechar a sessão no banco", "sessao", session.ID, "erro", err)
 	}
 
 	l.recordDiscID(session)
 	l.recordResumeState(session, install)
-	l.collectScreenshots(session, install)
 
 	l.logger.Info("jogo encerrado",
 		"sessao", session.ID,
