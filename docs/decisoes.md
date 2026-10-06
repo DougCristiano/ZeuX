@@ -2333,3 +2333,47 @@ tela inicial.
   levantamento do Cowork (`docs/prompt-cowork-prints-controle.md`) sobre
   como cada emulador grava uma combinação de botões no arquivo — não se
   inventa formato de bind.
+
+## Tecla de print por emulador (2026-10-06)
+
+Levantamento do Douglas com os emuladores rodando (DuckStation 0.1-12070,
+PCSX2 2.8.2, RetroArch com mGBA). Tela: "Tecla de print" no modal de
+configurações do DuckStation e do PCSX2; no RetroArch, botão próprio na tela
+do console ("Tecla de print do RetroArch").
+
+- **DuckStation e PCSX2:** `[Hotkeys] Screenshot`. Teclado `Keyboard/F10`
+  (padrão do DuckStation) / `Keyboard/F8` (PCSX2); controle
+  `SDL-0/Back & SDL-0/RightStick` (observado nos dois). Uma ligação por
+  atalho — a interface deles substitui a anterior, e gravar duas não foi
+  testado —, então o ZeuX grava teclado OU controle. "Nenhum" grava a chave
+  vazia em vez de apagar: sem a chave, o DuckStation ganharia F10 de novo
+  (`duckStationDefaults` preenche o que falta). Que o emulador leia a chave
+  vazia como "sem atalho" não foi testado. `set()` cria `[Hotkeys]` quando
+  falta (DuckStation com o assistente pulado).
+- **RetroArch:** teclado e controle coexistem. `input_screenshot = "f8"`;
+  combo = `input_enable_hotkey_btn` (segura) + `input_screenshot_btn`
+  (aperta), em índices do driver xinput: Select+R3 = 7 e 9 (observado), o
+  que bate com a tabela de `xinput_joypad.c` (código-fonte) — de onde vêm
+  também Start 6, L1 4, R1 5, L3 8. Com outro `input_joypad_driver` o ZeuX
+  recusa: os números mudam e chutar quebraria o atalho em silêncio. **Nunca
+  cria nem altera `input_enable_hotkey` (teclado)**: o RetroArch a liga
+  sozinho como "alt" ao configurar pela interface, e aí os atalhos de
+  teclado passam a exigir Alt; a tela avisa quando ela existe. Tirar o combo
+  zera só `input_screenshot_btn` — o botão de ativação pode servir a outros
+  atalhos.
+- **Opções fechadas:** F1–F12 e seis botões (Select, Start, L1, R1, L3, R3).
+  O botão Xbox fica de fora (a Game Bar pega antes do emulador; Xbox+Share
+  grava em Vídeos\Capturas) e PrintScreen também (do Windows). O servidor
+  recusa o mesmo valor de outro atalho do emulador lendo o arquivo de
+  verdade (no RetroArch, outra tecla de teclado ou outro hotkey de controle
+  no botão de apertar).
+- **Pasta do RetroArch:** o valor real era `screenshot_directory =
+  ":\screenshots"` — o ":" é a pasta do retroarch.exe. O ZeuX passava o
+  valor cru adiante e recolhia de uma pasta que não existe; agora resolve.
+- **Bug achado no caminho (já na v0.1.37):** o CORS não liberava PUT, e
+  "Salvar opções" do DuckStation/PCSX2 (que grava com PUT) falhava no app
+  com "Failed to fetch". Corrigido, com teste que trava todo método em uso.
+- **Não feito:** `OrganizeScreenshotsByGame` do PCSX2 (não testado ligado;
+  a coleta já desce um nível); o OSD no print em tela cheia do RetroArch
+  (`video_gpu_screenshot`, não testado); Flycast, RPCS3, Vita3K, xemu e os
+  demais (sem levantamento — o recurso fica desligado para eles).

@@ -10,6 +10,8 @@ import type {
   GameScreenshotsResponse,
   Screenshot,
   RecentScreenshot,
+  ScreenshotHotkey,
+  ScreenshotHotkeyResponse,
   PCSX2Portable,
   SaveBackup,
   CustomEmulatorsResponse,
@@ -254,6 +256,14 @@ export const api = {
     request<{ restored: boolean }>(`/emulators/${encodeURIComponent(id)}/config`, { method: "DELETE" }),
 
   // --- Inspeção de saves (MVP de listar/ver, não gerenciar) ---
+  getScreenshotHotkey: (id: string) =>
+    request<ScreenshotHotkeyResponse>(`/emulators/${encodeURIComponent(id)}/screenshot-hotkey`),
+  setScreenshotHotkey: (id: string, hotkey: ScreenshotHotkey) =>
+    request<ScreenshotHotkeyResponse>(`/emulators/${encodeURIComponent(id)}/screenshot-hotkey`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(hotkey),
+    }),
   getEmulatorSettings: (id: string) => request<EmulatorSettings>(`/emulators/${encodeURIComponent(id)}/settings`),
   setEmulatorSettings: (id: string, values: Record<string, string>) =>
     request<EmulatorSettings>(`/emulators/${encodeURIComponent(id)}/settings`, {

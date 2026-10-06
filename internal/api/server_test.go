@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -554,6 +555,24 @@ func TestCORSPreflightAllowsKnownWebViewOrigin(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "tauri://localhost" {
 		t.Fatalf("Access-Control-Allow-Origin = %q, esperado a origem ecoada", got)
+	}
+}
+
+// Trava o bug de 2026-10-06: o preflight precisa liberar todo método que
+// alguma rota usa. PUT ficou de fora, e "Salvar opções" do DuckStation/PCSX2
+// falhava no app com "Failed to fetch" sem o servidor nem ver o pedido.
+func TestCORSPreflightAllowsEveryMethodInUse(t *testing.T) {
+	server := newTestServer(t, fakeProbe{})
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/emulators/pcsx2/settings", nil)
+	req.Header.Set("Origin", "tauri://localhost")
+	req.Header.Set("Access-Control-Request-Method", "PUT")
+	rec := httptest.NewRecorder()
+	server.Routes().ServeHTTP(rec, req)
+	allowed := rec.Header().Get("Access-Control-Allow-Methods")
+	for _, m := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+		if !strings.Contains(allowed, m) {
+			t.Errorf("Access-Control-Allow-Methods = %q, falta %s", allowed, m)
+		}
 	}
 }
 

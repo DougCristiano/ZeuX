@@ -745,3 +745,32 @@ export type ScrapeJob = {
    * em results[].message). */
   error?: string;
 };
+
+// --- Tecla de print por emulador (2026-10-06) ---
+
+export type ScreenshotButton = "back" | "start" | "l1" | "r1" | "l3" | "r3";
+
+export type ScreenshotHotkey = {
+  /** "F10", ou "" sem tecla. */
+  keyboard: string;
+  /** Dois botões: o que se segura e o que se aperta. Vazio = sem combinação. */
+  controller: ScreenshotButton[] | null;
+};
+
+export type ScreenshotHotkeyState = {
+  current: ScreenshotHotkey;
+  /** Valor gravado que não cabe nas opções do ZeuX (escolhido no emulador). */
+  unrecognized?: string;
+  /** Teclado e controle juntos (só RetroArch). */
+  coexist: boolean;
+  default_keyboard: string;
+  folder?: string;
+  folder_exists: boolean;
+  warnings: string[];
+  keys: string[];
+  buttons: ScreenshotButton[];
+};
+
+export type ScreenshotHotkeyResponse =
+  | { available: false; message: string }
+  | { available: true; running: boolean; hotkey: ScreenshotHotkeyState };

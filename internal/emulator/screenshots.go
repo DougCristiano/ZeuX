@@ -115,6 +115,12 @@ func screenshotSourceDirs(adapterID string, install Installation) (dirs []string
 		if v == "" || v == "default" {
 			return nil, false
 		}
+		// ":" no começo é a pasta do retroarch.exe — o valor observado no
+		// levantamento foi ":\screenshots" (retroarch\screenshots ao lado
+		// do exe). Sem resolver, o ZeuX procurava numa pasta que não existe.
+		if rest, ok := strings.CutPrefix(v, ":"); ok && install.BinaryPath != "" {
+			v = filepath.Join(filepath.Dir(install.BinaryPath), strings.TrimLeft(rest, `/\`))
+		}
 		return []string{v}, false
 	}
 	return nil, false

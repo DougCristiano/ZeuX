@@ -154,6 +154,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/emulators/{id}/managed-dir", s.handleEnsureManagedDir)
 	mux.HandleFunc("GET /api/v1/emulators/{id}/settings", s.handleEmulatorSettings)
 	mux.HandleFunc("PUT /api/v1/emulators/{id}/settings", s.handleSetEmulatorSettings)
+	mux.HandleFunc("GET /api/v1/emulators/{id}/screenshot-hotkey", s.handleScreenshotHotkey)
+	mux.HandleFunc("PUT /api/v1/emulators/{id}/screenshot-hotkey", s.handleSetScreenshotHotkey)
 	mux.HandleFunc("GET /api/v1/library/games/{id}/saves", s.handleGameSaves)
 	mux.HandleFunc("POST /api/v1/library/games/{id}/saves/backup", s.handleBackupGameSaves)
 	mux.HandleFunc("POST /api/v1/library/games/{id}/saves/restore", s.handleRestoreGameSaves)
@@ -286,7 +288,11 @@ func (s *Server) withCORS(next http.Handler) http.Handler {
 		}
 
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE")
+			// PUT entrou em 2026-10-06: as opções de emulador e a tecla de
+			// print gravam com PUT, e sem ele aqui o WebView barrava a
+			// requisição no preflight — "Salvar opções" falhava com "Failed
+			// to fetch" desde que foi criado.
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.WriteHeader(http.StatusNoContent)
 			return
