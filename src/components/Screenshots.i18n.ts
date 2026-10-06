@@ -46,6 +46,8 @@ export const dict = {
   },
   uploadBanner: { "pt-BR": "Enviar imagem…", en: "Upload image…" },
   useCover: { "pt-BR": "Usar a capa", en: "Use the cover" },
+  latest: { "pt-BR": "Último print", en: "Latest" },
+  fullscreen: { "pt-BR": "Ver em tela cheia", en: "View fullscreen" },
   openGame: { "pt-BR": "Abrir o jogo", en: "Open game" },
   position: { "pt-BR": "{{i}} de {{n}}", en: "{{i}} of {{n}}" },
 } satisfies Dict;

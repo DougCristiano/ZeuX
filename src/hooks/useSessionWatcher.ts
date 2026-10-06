@@ -25,6 +25,14 @@ const VCREDIST_MARKER = "Visual C++ Redistributable";
 const RECENT_LAUNCH_WINDOW_MS = 20_000;
 
 /**
+ * Evento de janela disparado quando uma sessão que estava rodando termina
+ * (2026-10-06). Quem mostra algo que muda ao fim do jogo — a galeria de
+ * prints, que o zeuxd preenche nessa hora — escuta este evento em vez de
+ * fazer um poll próprio. `detail` é o `rom_path` da sessão.
+ */
+export const SESSION_ENDED_EVENT = "zeux:session-ended";
+
+/**
  * Acompanha `GET /sessions` em segundo plano, para o shell do app (não uma
  * tela específica) saber duas coisas sem que cada tela de biblioteca precise
  * perguntar por conta própria:
@@ -44,6 +52,7 @@ export function useSessionWatcher() {
   const [runningSession, setRunningSession] = useState<SessionWithStats | null>(null);
   const [vcredistSession, setVcredistSession] = useState<SessionWithStats | null>(null);
   const dismissedRef = useRef<Set<string>>(new Set());
+  const runningRef = useRef<SessionWithStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +63,13 @@ export function useSessionWatcher() {
         const res = await api.getSessions();
         if (cancelled) return;
 
-        setRunningSession(res.sessions.find((s) => s.is_running) ?? null);
+        const running = res.sessions.find((s) => s.is_running) ?? null;
+        const previous = runningRef.current;
+        if (previous && previous.id !== running?.id) {
+          window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: previous.rom_path }));
+        }
+        runningRef.current = running;
+        setRunningSession(running);
 
         const candidate =
           res.sessions.find((s) => {
