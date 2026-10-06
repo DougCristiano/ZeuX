@@ -7,6 +7,8 @@ import type {
   CustomDefinition,
   EmulatorSettings,
   GameSavesResponse,
+  GameScreenshotsResponse,
+  RecentScreenshot,
   PCSX2Portable,
   SaveBackup,
   CustomEmulatorsResponse,
@@ -425,4 +427,14 @@ export const api = {
   // sobrescrita sozinha.
   setGameCover: (gameId: number, sourcePath: string) =>
     postJSON<{ cover_url: string }>(`/library/games/${gameId}/cover`, { source_path: sourcePath }),
+  // Galeria de prints (2026-10-06): os arquivos chegam movidos pelo zeuxd
+  // ao fim de cada sessão; a tela só lista, apaga e escolhe o banner.
+  getGameScreenshots: (gameId: number) =>
+    request<GameScreenshotsResponse>(`/library/games/${gameId}/screenshots`),
+  deleteGameScreenshot: (gameId: number, name: string) =>
+    request<void>(`/library/games/${gameId}/screenshots/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  setGameBanner: (gameId: number, name: string) =>
+    postJSON<{ banner_url?: string }>(`/library/games/${gameId}/banner`, { name }),
+  getRecentScreenshots: (limit = 12) =>
+    request<{ screenshots: RecentScreenshot[] }>(`/library/screenshots/recent?limit=${limit}`),
 };

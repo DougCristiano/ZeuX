@@ -82,6 +82,10 @@ export function GameHero({
   const t = useT(dict);
   const accent = consoleAccentColor(game.console_id);
   const cover = coverImageURL(game.cover_url);
+  // Print escolhido como banner na tela do jogo (2026-10-06) — a mesma
+  // escolha vale aqui, para a faixa de destaque mostrar o jogo como a
+  // pessoa quis.
+  const banner = coverImageURL(game.banner_url);
   const lastPlayed = formatLastPlayedShort(game.last_played_at);
   const blocked = launchability !== undefined && !launchability.launchable;
 
@@ -109,7 +113,9 @@ export function GameHero({
           revela borda/vazamento fora do frame caso o elemento não estoure a
           área visível por uma margem generosa. */}
       <div aria-hidden="true" className="absolute inset-0">
-        {cover ? (
+        {banner ? (
+          <img src={banner} alt="" className="h-full w-full object-cover [image-rendering:pixelated] brightness-[0.55]" />
+        ) : cover ? (
           <img
             src={cover}
             alt=""
@@ -127,15 +133,20 @@ export function GameHero({
             for fria/neutra no recorte que sobrou depois do blur pesado
             acima. `mix-blend-overlay`: realça o que já é claro/escuro na
             arte em vez de pintar uma camada plana por cima dela. */}
-        <div
-          className="absolute inset-0 mix-blend-overlay"
-          style={{ background: `linear-gradient(135deg, ${accent}, transparent 70%)`, opacity: 0.55 }}
-        />
+        {/* Banner: sem tingimento e com véu mais leve — mesma regra da tela
+            do jogo (GameDetailScreen). */}
+        {!banner && (
+          <div
+            className="absolute inset-0 mix-blend-overlay"
+            style={{ background: `linear-gradient(135deg, ${accent}, transparent 70%)`, opacity: 0.55 }}
+          />
+        )}
         <div
           className="absolute inset-0"
           style={{
-            background:
-              "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 88%, transparent) 55%, color-mix(in srgb, var(--paper) 80%, transparent) 70%, color-mix(in srgb, var(--paper) 12%, transparent) 100%)",
+            background: banner
+              ? "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 85%, transparent) 40%, color-mix(in srgb, var(--paper) 55%, transparent) 70%, color-mix(in srgb, var(--paper) 10%, transparent) 100%)"
+              : "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 88%, transparent) 55%, color-mix(in srgb, var(--paper) 80%, transparent) 70%, color-mix(in srgb, var(--paper) 12%, transparent) 100%)",
           }}
         />
         <div className="zeux-scanlines absolute inset-0 opacity-40" />

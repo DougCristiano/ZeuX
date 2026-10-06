@@ -30,6 +30,7 @@ import { useInlineInstall } from "../hooks/useInlineInstall";
 import { useLaunchGame } from "../hooks/useLaunchGame";
 import { Pencil } from "lucide-react";
 import { GameSavesPanel } from "../components/GameSavesPanel";
+import { GameScreenshotsPanel } from "../components/GameScreenshotsPanel";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
@@ -140,6 +141,9 @@ export function GameDetailScreen({
   // snapshot guardado no App.tsx no momento do clique e não muda sozinho
   // depois de uma busca de capa bem-sucedida nesta tela.
   const [coverUrl, setCoverUrl] = useState(game.cover_url);
+  // Banner (2026-10-06): um print da galeria escolhido pela pessoa. Estado
+  // próprio pelo mesmo motivo de coverUrl — a galeria troca sem recarregar.
+  const [bannerUrl, setBannerUrl] = useState(game.banner_url);
   const [scrapingCover, setScrapingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
   // 2026-09-08, a pedido do Douglas: troca manual de capa, independente do
@@ -292,12 +296,13 @@ export function GameDetailScreen({
 
   useEffect(() => {
     setCoverUrl(game.cover_url);
+    setBannerUrl(game.banner_url);
     setFavorite(game.favorite);
     setTitle(game.title);
     setTitleOverride(game.title_override);
     setEditingTitle(false);
     setTitleError(null);
-  }, [game.id, game.cover_url, game.favorite, game.title, game.title_override]);
+  }, [game.id, game.cover_url, game.banner_url, game.favorite, game.title, game.title_override]);
 
   // `value` vazio limpa o override e volta ao título derivado do nome do
   // arquivo. A resposta traz o `title` de exibição já resolvido — não é
@@ -1100,7 +1105,16 @@ export function GameDetailScreen({
         }}
       >
         <div aria-hidden="true" className="absolute inset-0">
-          {heroCoverUrl ? (
+          {/* Com banner, a imagem entra nítida: é um print que a pessoa
+              escolheu para ser visto, não atmosfera. O gradiente de
+              `--paper` abaixo continua garantindo o contraste do texto. */}
+          {bannerUrl ? (
+            <img
+              src={coverImageURL(bannerUrl)}
+              alt=""
+              className="h-full w-full object-cover [image-rendering:pixelated] brightness-[0.55]"
+            />
+          ) : heroCoverUrl ? (
             <img
               src={heroCoverUrl}
               alt=""
@@ -1112,15 +1126,22 @@ export function GameDetailScreen({
               style={{ background: `linear-gradient(135deg, ${accent}55, transparent 65%)` }}
             />
           )}
-          <div
-            className="absolute inset-0 mix-blend-overlay"
-            style={{ background: `linear-gradient(135deg, ${accent}, transparent 70%)`, opacity: 0.55 }}
-          />
+          {/* Sem tingimento sobre o banner: o print vale pela cor real dele.
+              O véu de `--paper` também é mais leve, para o print aparecer
+              além da faixa direita; o contraste do texto vem do brilho baixo
+              da imagem (0.55) somado ao véu. */}
+          {!bannerUrl && (
+            <div
+              className="absolute inset-0 mix-blend-overlay"
+              style={{ background: `linear-gradient(135deg, ${accent}, transparent 70%)`, opacity: 0.55 }}
+            />
+          )}
           <div
             className="absolute inset-0"
             style={{
-              background:
-                "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 55%, color-mix(in srgb, var(--paper) 82%, transparent) 72%, color-mix(in srgb, var(--paper) 25%, transparent) 100%)",
+              background: bannerUrl
+                ? "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 85%, transparent) 40%, color-mix(in srgb, var(--paper) 55%, transparent) 70%, color-mix(in srgb, var(--paper) 10%, transparent) 100%)"
+                : "linear-gradient(to right, var(--paper) 0%, color-mix(in srgb, var(--paper) 90%, transparent) 55%, color-mix(in srgb, var(--paper) 82%, transparent) 72%, color-mix(in srgb, var(--paper) 25%, transparent) 100%)",
             }}
           />
           {/* Mesmas linhas de CRT da abertura do app e da faixa inicial — a
@@ -1165,6 +1186,12 @@ export function GameDetailScreen({
                 <ConsoleVerdictCard verdict={verdict} />
               </section>
             )}
+            {/* Galeria (2026-10-06) na coluna larga: imagem pede espaço, e a
+                coluna estreita ao lado é de serviço (saves, arquivo). */}
+            <section>
+              <SectionHeading className="mb-3">{t("screenshotsHeading")}</SectionHeading>
+              <GameScreenshotsPanel gameId={game.id} gameTitle={title} onBannerChange={setBannerUrl} />
+            </section>
           </div>
 
         <div className="flex flex-col gap-6">

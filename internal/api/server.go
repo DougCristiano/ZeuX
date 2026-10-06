@@ -230,6 +230,11 @@ func (s *Server) Routes() http.Handler {
 	// Serve as capas já baixadas em disco (nunca a URL do IGDB direto — G1
 	// exige arquivo local). Primeiro uso de http.FileServer neste servidor.
 	mux.HandleFunc("GET /api/v1/covers/", s.handleCoverFile)
+	mux.HandleFunc("GET /api/v1/library/games/{id}/screenshots", s.handleGameScreenshots)
+	mux.HandleFunc("DELETE /api/v1/library/games/{id}/screenshots/{name}", s.handleDeleteGameScreenshot)
+	mux.HandleFunc("POST /api/v1/library/games/{id}/banner", s.handleSetGameBanner)
+	mux.HandleFunc("GET /api/v1/library/screenshots/recent", s.handleRecentScreenshots)
+	mux.HandleFunc("GET /api/v1/screenshots/", s.handleScreenshotFile)
 
 	return s.withLogging(s.withCORS(mux))
 }
@@ -1902,6 +1907,9 @@ type gameWithStats struct {
 	// jogo ("Continuar", emulator/resume.go). Ausente quando não há estado
 	// cujo arquivo ainda exista — a tela só mostra "Continuar" com ele.
 	ResumeSavedAt string `json:"resume_saved_at,omitempty"`
+
+	// BannerURL é o print da galeria escolhido como fundo do topo do jogo.
+	BannerURL string `json:"banner_url,omitempty"`
 }
 
 // coverURLFor converte o caminho relativo guardado no banco (G1) na URL
@@ -1987,7 +1995,7 @@ func (s *Server) handleListLibraryGames(w http.ResponseWriter, r *http.Request) 
 
 	result := make([]gameWithStats, 0, len(games))
 	for _, game := range games {
-		gw := gameWithStats{Game: game, CoverURL: coverURLFor(game.CoverPath)}
+		gw := gameWithStats{Game: game, CoverURL: coverURLFor(game.CoverPath), BannerURL: bannerURLFor(game)}
 		if st, ok := byPath[game.Path]; ok {
 			gw.PlaytimeSeconds = st.seconds
 			gw.LastPlayedAt = st.last.Format(time.RFC3339)
@@ -2358,8 +2366,9 @@ func (s *Server) handleGetGame(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, struct {
 		library.Game
-		CoverURL string `json:"cover_url,omitempty"`
-	}{game, coverURLFor(game.CoverPath)})
+		CoverURL  string `json:"cover_url,omitempty"`
+		BannerURL string `json:"banner_url,omitempty"`
+	}{game, coverURLFor(game.CoverPath), bannerURLFor(game)})
 }
 
 // handleFetchGameMetadata busca só ano, resumo, gêneros e desenvolvedora de

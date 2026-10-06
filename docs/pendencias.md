@@ -1239,3 +1239,15 @@ código e entrada em `decisoes.md`.
 - [ ] Ordem: começar pelo RetroArch (save por jogo já é determinístico) e
       pelo DuckStation (mais usado)?
 - [ ] Topa rodar a rota de diagnóstico no Windows, emulador por emulador?
+
+## Prints: atalho no controle (2026-10-06)
+
+A galeria de prints existe (ver `docs/decisoes.md`, "Galeria de prints por
+jogo"), mas o print ainda sai só pelo atalho de teclado do emulador. O
+Douglas quer uma combinação de botões no controle. Bloqueado no levantamento
+do Cowork (`docs/prompt-cowork-prints-controle.md` → `PRINTS.md`): como
+DuckStation (`[Hotkeys] Screenshot`), PCSX2 e RetroArch
+(`input_screenshot_btn` + `input_enable_hotkey_btn`) gravam a combinação no
+arquivo. Critério de aceite: com o controle padrão, a combinação gera o
+print em janela e em tela cheia nos três, sem tirar um bind que a pessoa já
+fez.

@@ -2290,3 +2290,38 @@ código-fonte oficial (onde dito).
 - **Não feito:** cartão por jogo no PCSX2 trocando `Slot1_Filename` antes de
   cada jogo (não testado pelo Douglas); `[GameList] Paths`.
 
+
+## Galeria de prints por jogo (2026-10-06)
+
+Pedido do Douglas: tirar print pelo ZeuX e ter a galeria do jogo nos
+detalhes, com um print podendo virar banner e os prints aparecendo também na
+tela inicial.
+
+- **O print é tirado pelo atalho do próprio emulador**; o ZeuX não captura
+  tela. Ao fim de cada sessão (`Launcher.supervise`), as imagens que o
+  emulador gravou durante ela (data a partir do início da sessão, com 2 s de
+  folga) são **MOVIDAS** (decisão do Douglas, não copiadas) para
+  `AppData\ZeuX\screenshots\<console>\<nome do arquivo da ROM>\`. A sessão é o
+  que liga print e jogo — o mesmo método do "Continuar".
+- **Por que fora de `emulators\<console>\jogos\<id>\`:** aquela pasta é
+  apagada quando a pasta de jogos é removida, e o id muda quando ela é
+  apontada de novo. O nome da ROM é estável. O banner fica no banco
+  (`library_games.banner_name`, migração 0013) só com o nome do arquivo.
+- **Pastas de origem, lidas no código-fonte (não observadas com o binário
+  rodando):** DuckStation `<dados>\screenshots` ou `[Folders] Screenshots`;
+  PCSX2 `<dados>\snaps` ou `[Folders] Snapshots`, descendo um nível por causa
+  de "OrganizeScreenshotsByGame"; RetroArch `screenshot_directory`.
+- **RetroArch:** o padrão grava o print ao lado da ROM, na pasta do usuário,
+  onde o ZeuX não escreve nem recolhe. Por isso, antes de abrir o RetroArch
+  (fechado), o ZeuX aponta `screenshot_directory` para
+  `screenshots\_entrada\retroarch` **só quando a chave está vazia ou
+  "default"** — um caminho escolhido pela pessoa é respeitado e recolhido de
+  lá. Backup `.zeux-backup` antes da primeira escrita, como sempre.
+- **Risco conhecido:** dois emuladores iguais abertos ao mesmo tempo com
+  jogos diferentes dividiriam a mesma pasta de origem — o print iria para o
+  jogo cuja sessão fechar primeiro. O ZeuX não abre dois do mesmo emulador
+  na prática; fica registrado.
+- **Atalho no controle:** pedido do Douglas, ainda não feito. Depende do
+  levantamento do Cowork (`docs/prompt-cowork-prints-controle.md`) sobre
+  como cada emulador grava uma combinação de botões no arquivo — não se
+  inventa formato de bind.
