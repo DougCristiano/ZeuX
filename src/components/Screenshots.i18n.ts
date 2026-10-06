@@ -27,6 +27,25 @@ export const dict = {
   cancel: { "pt-BR": "Cancelar", en: "Cancel" },
   previous: { "pt-BR": "Print anterior", en: "Previous screenshot" },
   next: { "pt-BR": "Próximo print", en: "Next screenshot" },
+  addShots: { "pt-BR": "Enviar prints", en: "Add screenshots" },
+  adding: { "pt-BR": "Enviando…", en: "Adding…" },
+  added: { "pt-BR": "{{n}} print(s) adicionado(s) à galeria.", en: "{{n}} screenshot(s) added to the gallery." },
+  addedWithErrors: {
+    "pt-BR": "{{n}} adicionado(s); {{failed}} não entrou: {{reason}}",
+    en: "{{n}} added; {{failed}} skipped: {{reason}}",
+  },
+  imageFilter: { "pt-BR": "Imagens", en: "Images" },
+  bannerTitle: { "pt-BR": "Banner do jogo", en: "Game banner" },
+  bannerHelp: {
+    "pt-BR": "A imagem escolhida vira o fundo do topo desta tela e da faixa \"Continue jogando\". Sem banner, o topo usa a capa.",
+    en: "The chosen image becomes the background of this screen's header and of the \"Continue playing\" strip. Without a banner, the header uses the cover.",
+  },
+  bannerEmpty: {
+    "pt-BR": "A galeria deste jogo está vazia. Envie uma imagem para usar como banner.",
+    en: "This game's gallery is empty. Add an image to use as banner.",
+  },
+  uploadBanner: { "pt-BR": "Enviar imagem…", en: "Upload image…" },
+  useCover: { "pt-BR": "Usar a capa", en: "Use the cover" },
   openGame: { "pt-BR": "Abrir o jogo", en: "Open game" },
   position: { "pt-BR": "{{i}} de {{n}}", en: "{{i}} of {{n}}" },
 } satisfies Dict;

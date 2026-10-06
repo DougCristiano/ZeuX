@@ -96,6 +96,80 @@ func (s *Server) handleGameScreenshots(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleAddGameScreenshots copia para a galeria imagens que a pessoa tirou
+// por conta própria (2026-10-06, pedido do Douglas). Copia, não move: ao
+// contrário dos prints do emulador, que caem numa pasta de trabalho dele,
+// estes são arquivos da pessoa, em qualquer lugar do disco — sumir com eles
+// da pasta original seria surpresa. Cada arquivo é validado como imagem pelos
+// bytes (copyValidatedImage, o mesmo da troca de capa); um que falha não
+// impede os outros e volta em `errors`.
+func (s *Server) handleAddGameScreenshots(w http.ResponseWriter, r *http.Request) {
+	game, ok := s.screenshotGame(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		SourcePaths []string `json:"source_paths"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.SourcePaths) == 0 {
+		s.writeError(w, http.StatusBadRequest, "invalid_body", `O corpo deve ser um JSON com {"source_paths": ["..."]}.`)
+		return
+	}
+	dir, err := emulator.GameScreenshotsDir(game.ConsoleID, game.Path)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "screenshots_root_unavailable", "Não foi possível localizar a pasta de prints do ZeuX.")
+		return
+	}
+	type addError struct {
+		Path    string `json:"path"`
+		Message string `json:"message"`
+	}
+	added := []screenshotView{}
+	failed := []addError{}
+	for _, src := range body.SourcePaths {
+		name := filepath.Base(src)
+		if !emulator.IsScreenshotFile(name) {
+			failed = append(failed, addError{src, "Formato não aceito na galeria: use PNG, JPG, BMP ou WebP."})
+			continue
+		}
+		dest := emulator.UniqueScreenshotPath(dir, name)
+		if err := copyValidatedImageMax(src, dest, maxScreenshotBytes); err != nil {
+			msg := err.Error()
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				msg = fmt.Sprintf("O arquivo %q não existe.", src)
+			case errors.Is(err, errInvalidImage):
+				msg = errInvalidImage.Error()
+			case errors.Is(err, errImageTooLarge):
+				msg = "A imagem passa de 64 MB, o limite da galeria."
+			}
+			failed = append(failed, addError{src, msg})
+			continue
+		}
+		// A data da cópia, não a do original: o print entra no topo da
+		// galeria, onde a pessoa acabou de colocá-lo.
+		now := time.Now()
+		_ = os.Chtimes(dest, now, now)
+		info, err := os.Stat(dest)
+		if err != nil {
+			continue
+		}
+		added = append(added, screenshotView{
+			Screenshot: emulator.Screenshot{Name: filepath.Base(dest), SizeBytes: info.Size(), TakenAt: info.ModTime()},
+			URL:        screenshotURLFor(game, filepath.Base(dest)),
+		})
+	}
+	if len(added) == 0 {
+		msg := "Nenhuma imagem foi adicionada."
+		if len(failed) > 0 {
+			msg = failed[0].Message
+		}
+		s.writeError(w, http.StatusBadRequest, "invalid_image", msg)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"added": added, "errors": failed})
+}
+
 // handleDeleteGameScreenshot apaga um print. Se era o banner, o banner é
 // limpo junto — senão a tela continuaria pedindo um arquivo que não existe.
 func (s *Server) handleDeleteGameScreenshot(w http.ResponseWriter, r *http.Request) {

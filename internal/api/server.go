@@ -231,6 +231,7 @@ func (s *Server) Routes() http.Handler {
 	// exige arquivo local). Primeiro uso de http.FileServer neste servidor.
 	mux.HandleFunc("GET /api/v1/covers/", s.handleCoverFile)
 	mux.HandleFunc("GET /api/v1/library/games/{id}/screenshots", s.handleGameScreenshots)
+	mux.HandleFunc("POST /api/v1/library/games/{id}/screenshots", s.handleAddGameScreenshots)
 	mux.HandleFunc("DELETE /api/v1/library/games/{id}/screenshots/{name}", s.handleDeleteGameScreenshot)
 	mux.HandleFunc("POST /api/v1/library/games/{id}/banner", s.handleSetGameBanner)
 	mux.HandleFunc("GET /api/v1/library/screenshots/recent", s.handleRecentScreenshots)

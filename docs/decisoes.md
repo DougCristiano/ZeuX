@@ -2321,6 +2321,14 @@ tela inicial.
   jogos diferentes dividiriam a mesma pasta de origem — o print iria para o
   jogo cuja sessão fechar primeiro. O ZeuX não abre dois do mesmo emulador
   na prática; fica registrado.
+- **Prints manuais e escolha do banner** (mesmo dia): "Enviar prints" na
+  galeria e "Escolher banner" no topo da tela do jogo (grade da galeria,
+  enviar uma imagem já como banner, ou voltar à capa). O envio **copia** —
+  diferente da coleta do emulador, que move: aqueles caem numa pasta de
+  trabalho do emulador, estes são arquivos da pessoa em qualquer lugar do
+  disco. Teto de 64 MB por imagem (a capa tem 8 MB): print 4K em PNG passa
+  de 8 MB e é legítimo. O banner é sempre um arquivo da galeria — imagem
+  enviada pelo modal entra nela, para ser achada e apagada no mesmo lugar.
 - **Atalho no controle:** pedido do Douglas, ainda não feito. Depende do
   levantamento do Cowork (`docs/prompt-cowork-prints-controle.md`) sobre
   como cada emulador grava uma combinação de botões no arquivo — não se

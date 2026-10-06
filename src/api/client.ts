@@ -8,6 +8,7 @@ import type {
   EmulatorSettings,
   GameSavesResponse,
   GameScreenshotsResponse,
+  Screenshot,
   RecentScreenshot,
   PCSX2Portable,
   SaveBackup,
@@ -431,6 +432,13 @@ export const api = {
   // ao fim de cada sessão; a tela só lista, apaga e escolhe o banner.
   getGameScreenshots: (gameId: number) =>
     request<GameScreenshotsResponse>(`/library/games/${gameId}/screenshots`),
+  // Envio manual (2026-10-06): o zeuxd COPIA os arquivos escolhidos no
+  // diálogo nativo; os originais ficam onde estavam.
+  addGameScreenshots: (gameId: number, sourcePaths: string[]) =>
+    postJSON<{ added: Screenshot[]; errors: { path: string; message: string }[] }>(
+      `/library/games/${gameId}/screenshots`,
+      { source_paths: sourcePaths },
+    ),
   deleteGameScreenshot: (gameId: number, name: string) =>
     request<void>(`/library/games/${gameId}/screenshots/${encodeURIComponent(name)}`, { method: "DELETE" }),
   setGameBanner: (gameId: number, name: string) =>

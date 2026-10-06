@@ -5,6 +5,7 @@ import type { GameScreenshotsResponse } from "../api/types";
 import { useToast } from "../hooks/useToast";
 import { useT } from "../i18n/i18n";
 import { ScreenshotLightbox } from "./ScreenshotLightbox";
+import { pickAndAddScreenshots } from "../lib/pickScreenshots";
 import { dict } from "./Screenshots.i18n";
 import { Button, Card, ConfirmModal, InlineError, Toast } from "./ui";
 
@@ -17,10 +18,13 @@ export function GameScreenshotsPanel({
   gameId,
   gameTitle,
   onBannerChange,
+  version = 0,
 }: {
   gameId: number;
   gameTitle: string;
   onBannerChange: (bannerUrl: string | undefined) => void;
+  /** Sobe quando outra parte da tela (o modal de banner) mexeu na galeria. */
+  version?: number;
 }) {
   const t = useT(dict);
   const [data, setData] = useState<GameScreenshotsResponse | null>(null);
@@ -36,11 +40,30 @@ export function GameScreenshotsPanel({
       .then(setData)
       .catch((err) => setError(err instanceof ApiError ? err.message : t("readError")));
   }
-  useEffect(load, [gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [gameId, version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error && !data) return <InlineError>{error}</InlineError>;
   if (!data) return <p className="text-sm text-muted">{t("loading")}</p>;
   const shots = data.screenshots;
+
+  async function addShots() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await pickAndAddScreenshots(gameId, t("imageFilter"), true);
+      if (!res) return;
+      load();
+      showToast(
+        res.errors.length > 0
+          ? t("addedWithErrors", { n: res.added.length, failed: res.errors.length, reason: res.errors[0].message })
+          : t("added", { n: res.added.length }),
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function toggleBanner(name: string) {
     if (!data) return;
@@ -119,14 +142,23 @@ export function GameScreenshotsPanel({
 
       {error && <InlineError>{error}</InlineError>}
 
-      {shots.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {shots.length > 0 ? (
           <span className="font-mono text-xs text-muted">{t("count", { n: shots.length })}</span>
-          <Button variant="chrome" size="sm" onClick={() => void openPath(data.folder).catch(() => {})}>
-            {t("openFolder")}
+        ) : (
+          <span />
+        )}
+        <div className="flex flex-wrap gap-2">
+          {shots.length > 0 && (
+            <Button variant="chrome" size="sm" onClick={() => void openPath(data.folder).catch(() => {})}>
+              {t("openFolder")}
+            </Button>
+          )}
+          <Button variant="chrome" size="sm" disabled={busy} onClick={() => void addShots()}>
+            {busy ? t("adding") : t("addShots")}
           </Button>
         </div>
-      )}
+      </div>
 
       {current && open !== null && (
         <ScreenshotLightbox

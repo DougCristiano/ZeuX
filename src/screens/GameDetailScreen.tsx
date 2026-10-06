@@ -31,6 +31,7 @@ import { useLaunchGame } from "../hooks/useLaunchGame";
 import { Pencil } from "lucide-react";
 import { GameSavesPanel } from "../components/GameSavesPanel";
 import { GameScreenshotsPanel } from "../components/GameScreenshotsPanel";
+import { BannerPickerModal } from "../components/BannerPickerModal";
 import { useToast } from "../hooks/useToast";
 import { evaluateGameLaunchability } from "../lib/gameLaunchability";
 import { isEmulatorMissingErrorCode } from "../lib/emulatorMissingError";
@@ -144,6 +145,9 @@ export function GameDetailScreen({
   // Banner (2026-10-06): um print da galeria escolhido pela pessoa. Estado
   // próprio pelo mesmo motivo de coverUrl — a galeria troca sem recarregar.
   const [bannerUrl, setBannerUrl] = useState(game.banner_url);
+  const [pickingBanner, setPickingBanner] = useState(false);
+  // Sobe quando o modal de banner envia uma imagem: a galeria abaixo relê.
+  const [galleryVersion, setGalleryVersion] = useState(0);
   const [scrapingCover, setScrapingCover] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
   // 2026-09-08, a pedido do Douglas: troca manual de capa, independente do
@@ -558,6 +562,13 @@ export function GameDetailScreen({
             {scrapingCover ? t("searching") : coverUrl ? t("searchCoverAgain") : t("searchCover")}
           </Button>
           {coverError && <InlineError className="mt-1">{coverError}</InlineError>}
+        </div>
+        {/* Banner (2026-10-06): junto das ações de capa porque é a mesma
+            pergunta — "qual imagem representa este jogo". */}
+        <div className="mt-2">
+          <Button variant="chrome" onClick={() => setPickingBanner(true)} className="w-full">
+            {t("chooseBanner")}
+          </Button>
         </div>
       </div>
 
@@ -1074,6 +1085,17 @@ export function GameDetailScreen({
         />
       )}
 
+      {pickingBanner && (
+        <BannerPickerModal
+          gameId={game.id}
+          onClose={() => setPickingBanner(false)}
+          onChanged={(url) => {
+            setBannerUrl(url);
+            setGalleryVersion((v) => v + 1);
+          }}
+        />
+      )}
+
       <BackButton label={t("backButton")} onClick={onBack} />
 
       {/* Hero (redesenho de 2026-09-07). Antes: a capa desfocada entrava como
@@ -1190,7 +1212,12 @@ export function GameDetailScreen({
                 coluna estreita ao lado é de serviço (saves, arquivo). */}
             <section>
               <SectionHeading className="mb-3">{t("screenshotsHeading")}</SectionHeading>
-              <GameScreenshotsPanel gameId={game.id} gameTitle={title} onBannerChange={setBannerUrl} />
+              <GameScreenshotsPanel
+                gameId={game.id}
+                gameTitle={title}
+                onBannerChange={setBannerUrl}
+                version={galleryVersion}
+              />
             </section>
           </div>
 

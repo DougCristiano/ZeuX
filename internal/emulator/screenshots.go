@@ -282,6 +282,26 @@ func (l *Launcher) collectScreenshots(session Session, install Installation) int
 	return moved
 }
 
+// GameScreenshotsDir é a pasta absoluta da galeria de um jogo.
+func GameScreenshotsDir(consoleID, romPath string) (string, error) {
+	root, err := ScreenshotsRoot()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, GameScreenshotsSubdir(consoleID, romPath)), nil
+}
+
+// IsScreenshotFile diz se a extensão é de uma imagem que a galeria aceita.
+func IsScreenshotFile(name string) bool {
+	return imageExts[strings.ToLower(filepath.Ext(name))]
+}
+
+// UniqueScreenshotPath é uniquePath para quem grava na galeria de fora
+// deste pacote (o envio manual de prints, na API).
+func UniqueScreenshotPath(dir, name string) string {
+	return uniquePath(dir, name)
+}
+
 // Screenshot é um print na galeria de um jogo.
 type Screenshot struct {
 	Name      string    `json:"name"`
