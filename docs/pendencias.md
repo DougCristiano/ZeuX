@@ -1316,9 +1316,11 @@ para PS3 e PSP.
   veio desta documentação, não do código lido.
 - **RMG:** saber o slot do último estado e o goodname da ROM, para "Continuar" e
   saves por jogo.
-- **Flycast, "Continuar" depende da opção "Automatic State: Save" do usuário.**
-  O ZeuX não liga `Dreamcast.AutoSaveState` (como liga o `savestate_auto_save`
-  do RetroArch). Decidir se liga por lançamento, transitório.
+- ~~**Flycast, "Continuar" depende da opção "Automatic State: Save" do usuário.**~~ —
+  **RESOLVIDO em 2026-10-09** (decisão do Douglas): o ZeuX liga
+  `Dreamcast.AutoSaveState` por `-config` transitório em todo lançamento, e a
+  opção aparece na tela do Flycast. Ver `docs/decisoes.md`, "Auto-save de estado
+  ligado pelo ZeuX em todos os emuladores (2026-10-09)".
 - **Flycast, cartão VMU com `PerGameVmu` ligado (padrão):** o arquivo leva o
   código do disco (`<gameId>_vmu_save_A1.bin`). Falta ler o código do disco
   (IP.BIN) nos formatos `.gdi`, `.cdi` e `.chd`.
@@ -1387,3 +1389,34 @@ ficou pendente:
       (`-dvd_path`, `-full-screen`, `--fullscreen=true`, `-f`, `-g`, a ROM posicional
       da Vita3K) abre o emulador recusando argumento. Ressalva registrada em
       `decisoes.md`.
+
+## Salvar estado ao fechar, ligado por padrão (2026-10-09)
+
+Implementado nesta data (decisão do Douglas: ligado por padrão em todo emulador
+que tem a opção, com controle na tela de cada um). Detalhes e fontes em
+`docs/decisoes.md`, "Auto-save de estado ligado pelo ZeuX em todos os emuladores
+(2026-10-09)". O que ficou aberto:
+
+- **Validar com o binário:** que DuckStation (`[Main] SaveStateOnExit`) e PCSX2
+  (`[EmuCore] SaveStateOnShutdown`) gravam o estado de retomada com a chave ligada,
+  no caminho que o ZeuX procura (`<serial>_resume.sav` e `.resume.p2s`).
+- **Validar com o binário:** `-config Dreamcast:AutoSaveState=yes|no` no Flycast
+  (aceito na linha de comando e prevalece sobre o `emu.cfg`) e que o estado sai como
+  `<jogo>.state` no slot 0.
+- **Validar com o binário:** `savestate_auto_save = "true"|"false"` no
+  `--appendconfig`, com a prioridade sobre o `retroarch.cfg` (ver também a
+  pendência de 2026-10-09 sobre "Iniciar do zero" no RetroArch).
+- **Não encontrado nas fontes lidas:** opção de salvar ao fechar em Dolphin, RPCS3,
+  PPSSPP, melonDS, RMG, Cemu e Xenia (busca por palavras-chave). Em Azahar a leitura
+  não foi exaustiva. **xemu e Vita3K não foram verificados** (os caminhos de fonte
+  tentados deram 404). Se alguma dessas tiver a opção, entra no mesmo padrão.
+- **RetroArch com "Salvar estado ao fechar" desligado no `retroarch.cfg` do usuário:**
+  o ZeuX passa a sobrepor esse valor com `"true"` nos lançamentos dele. É a escolha
+  do produto, mas o efeito sobre a configuração do usuário precisa ser conferido com
+  ele.
+- **Tela:** o botão "Continuar" desabilitado diz que o salvamento está desligado
+  só quando a tela consegue ler a opção (`GET /emulators/{id}/settings` com
+  `available: true`). Sem instalação do emulador, a frase genérica continua.
+- **Prévia:** `POST /games/preview` mostra o `-config ...AutoSaveState=` com a
+  escolha atual, mas o RetroArch não mostra o `--appendconfig` (a prévia não grava
+  o arquivo, como já era).

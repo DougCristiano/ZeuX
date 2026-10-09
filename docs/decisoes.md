@@ -2969,3 +2969,98 @@ real. Os trechos citados são de código-fonte, não de execução.
 flag confirmada faria o `-statefile`/`-loadvm` ser montado com um arquivo que
 o emulador talvez não aceite, e a tela mostraria "Continuar" habilitado
 quando não há como cumprir. Os testes de `sem_retomada_test.go` pegam isso.
+
+## Auto-save de estado ligado pelo ZeuX em todos os emuladores (2026-10-09)
+
+**Decisão do Douglas (2026-10-09):** em todo emulador que oferece salvar o estado
+automaticamente ao fechar o jogo, o ZeuX liga essa opção por padrão, porque é ela
+que gera o estado que o "Continuar" retoma. A opção aparece nas configurações de
+cada emulador dentro do ZeuX, com a mesma chave (`auto_save_state`, padrão
+ligado), para a pessoa poder desligar.
+
+**Reverte** a decisão de 2026-10-05 sobre o PCSX2 ("o ZeuX deixou de ligar
+`SaveStateOnShutdown` sozinho"). Naquela data a regra era "não mudar o
+comportamento do emulador sem o usuário pedir"; agora o pedido é do Douglas, e
+vale para todos. A decisão de 2026-10-09 sobre o RetroArch ("o ZeuX liga
+`savestate_auto_save`") fica como estava; a nova entrada estende a mesma escolha
+para o controle na tela. A frase "o ZeuX não liga `Dreamcast.AutoSaveState`" do
+Flycast, em "Saves e retomada: Azahar, melonDS e Flycast", está superada por esta.
+
+**Verificação na fonte** (código-fonte oficial, lido com `curl` no raw do GitHub
+em 2026-10-09; nada observado com o binário rodando):
+
+| Emulador | Tem a opção? | Mecanismo do ZeuX | Onde fica a escolha | Fonte |
+|---|---|---|---|---|
+| DuckStation | Sim: `[Main] SaveStateOnExit`, padrão `true` | Chave no `settings.ini` (já escrito pelo ZeuX na instalação gerenciada) | No próprio `settings.ini`. Padrão reforçado só se a chave falta (`dsIfAbsent`) | https://raw.githubusercontent.com/stenzek/duckstation/master/src/core/settings.cpp (`save_state_on_exit = si.GetBoolValue("Main", "SaveStateOnExit", true)`) |
+| PCSX2 | Sim: `[EmuCore] SaveStateOnShutdown`, padrão `false` | Chave no `PCSX2.ini` (já escrito pelo ZeuX). `MergePCSX2Defaults` grava `true` só se a chave falta | No próprio `PCSX2.ini` | `pcsx2/Config.h` (campo `SaveStateOnShutdown`); `pcsx2-qt/MainWindow.cpp` (`requestShutdown(..., EmuConfig.SaveStateOnShutdown)`); `pcsx2-qt/QtHost.cpp` (`VMManager::Shutdown(m_save_state_on_shutdown)`); `pcsx2/VMManager.cpp` (`Shutdown(save_resume_state)` grava `GetCurrentSaveStateFileName(-1)`) |
+| RetroArch | Sim: `savestate_auto_save`, padrão `false` | Override `--appendconfig` com `savestate_auto_save = "true"` ou `"false"`, sempre explícito | Tabela `emulator_launch_prefs` (migração 0014) | `retroarch.cfg` (comentário de `savestate_auto_save`); `config.def.h` (`DEFAULT_SAVESTATE_AUTO_SAVE false`) |
+| Flycast | Sim: `Dreamcast.AutoSaveState`, padrão `false` | `-config Dreamcast:AutoSaveState=yes` ou `=no`, transitório, em todos os modos | Tabela `emulator_launch_prefs` | `core/cfg/option.cpp`; `core/emulator.cpp` (`unloadGame`: `gui_saveState(false)` quando `AutoSaveState`); `core/cfg/cl.cpp` (`-config`: "Transient config values won't be saved to emu.cfg.") |
+| Dolphin | Não encontrado | — | — | `Source/Core/Core/Config/MainSettings.cpp` lido: só `Core.EnableSaveStates`, sem salvar ao fechar |
+| RPCS3 | Não encontrado | — | — | `rpcs3/Emu/system_config.h`, nó `savestate` lido: `Suspend Emulation Savestate Mode` ("Close emulation when saving, delete save after loading") e `Maximum SaveState Files`. Não é salvar ao fechar; não usado |
+| PPSSPP | Não encontrado | — | — | `Core/Config.cpp` lido: só `AutoLoadSaveState` (carregar, por jogo) e `SaveStateSlotCount`, sem salvar ao fechar |
+| melonDS | Não encontrado | — | — | `Config.cpp` lido: só `SaveFilePath` e `SavestatePath` |
+| RMG (mupen64plus) | Não encontrado | — | — | `Source/RMG-Core/Settings.cpp` lido: só `SaveStatePath` e atalhos de `SaveState` |
+| Azahar | Não encontrado nos arquivos lidos | — | — | `src/citra_qt/citra_qt.cpp` e `configure_general` (não lido inteiro): nenhuma chave de auto-save. Não exaustivo |
+| Cemu | Não encontrado | — | — | `src/config/CemuConfig.h` lido: sem opção de estado ao fechar |
+| Xenia | Não encontrado | — | — | `src/xenia/app/xenia_main.cc` lido: só `content_root` |
+| xemu, Vita3K | Não verificado | — | — | Os caminhos de fonte tentados deram 404; nada foi confirmado. Ficam sem a opção |
+
+As linhas "Não encontrado" vêm de busca por palavras-chave (`auto`, `exit`,
+`shut`, `save`) nos arquivos citados, não de leitura integral dos arquivos.
+
+Onde a opção não existe, ela **não aparece** na tela, e o "Continuar" segue com a
+frase que já existia para o emulador (sem estado de retomada, ou "não há como").
+
+**Mecanismo, e por que não há um segundo lugar quando o emulador já tem um:**
+
+- **DuckStation e PCSX2** guardam a escolha na própria chave do arquivo de
+  configuração, que o ZeuX já escreve na instalação gerenciada. A tela lê e grava
+  a chave; o lançamento só garante o padrão (`MergeDuckStationDefaults` com
+  `dsIfAbsent`; `MergePCSX2Defaults` grava `true` se a chave falta). Um
+  "desligado" escolhido pela pessoa não é revertido no lançamento seguinte.
+- **RetroArch e Flycast** não têm um arquivo que o ZeuX possa usar como fonte de
+  verdade: o RetroArch recebe um override por lançamento, e o Flycast recebe
+  `-config` transitório. A escolha vai para a tabela `emulator_launch_prefs`
+  (migração `0014_emulator_launch_prefs.sql`, SQLite local, sem ORM). Sem linha,
+  vale o padrão, ligado. Lida por `Launcher.AutoSaveStateFor`; gravada por
+  `SetStoredEmulatorSettings`.
+- **O ID é o mesmo em todos** (`auto_save_state`), para a tela ter um só texto e um
+  só controle (`EmulatorSettingsPanel.i18n.ts`, chave `auto_save_state`).
+
+**Ajustes de código decorrentes:**
+
+- `Request.AutoSaveStateOff` (zero = ligado): `BuildCommand` do Flycast emite
+  sempre o `-config Dreamcast:AutoSaveState=` explícito. O zero é o padrão do
+  produto, então a prévia (`POST /games/preview`) continua mostrando o que o
+  lançamento real faria.
+- `writeRetroArchAppendConfig(mode, autoSave)` e `retroArchAppendConfigContent`
+  recebem a escolha; `savestate_auto_save` sai sempre explícito (`"true"` ou
+  `"false"`), porque desligada a opção do ZeuX também precisa sobrepor um
+  `savestate_auto_save` ligado no `retroarch.cfg` do usuário.
+- A tela do RetroArch e a do Flycast abrem o mesmo modal de configurações
+  (`EmulatorSettingsModal`), com o texto `modalDescriptionZeuX` no lugar de "gravadas
+  direto no arquivo", e a tecla de print só no RetroArch. O botão do RetroArch que
+  abria só a tecla de print (2026-10-06) foi substituído por esse modal.
+- Com a opção desligada, o botão "Continuar" desabilitado diz isso
+  (`resumeAutoSaveOff`, `GameDetailScreen`): a tela lê `auto_save_state` de
+  `GET /emulators/{id}/settings` e só mostra a frase se o valor é `false`.
+
+**O que quebra se desfizer:** tirar o `-config Dreamcast:AutoSaveState=yes` do
+Flycast faz o "Continuar" sumir sem erro visível (o estado não nasce). Tirar a
+linha `savestate_auto_save` do override do RetroArch tem o mesmo efeito. Tirar o
+`SaveStateOnShutdown = true` do `MergePCSX2Defaults` volta a PCSX2 para o padrão
+desligado, e o "Continuar" do PS2 some sem erro visível.
+
+**Não validado com o binário:** que o DuckStation e o PCSX2 gravam o estado de
+retomada com a chave ligada (o caminho do arquivo confere com o código lido); que o
+`-config Dreamcast:AutoSaveState=yes|no` é aceito pelo Flycast na linha de comando
+e prevalece sobre o `emu.cfg`; e que o `savestate_auto_save` do override sobrepõe o
+`retroarch.cfg`. Nenhuma destas afirmações foi testada com um jogo rodando.
+
+**Riscos:**
+
+- Quem desligou "Salvar estado ao fechar" no RetroArch por fora, no próprio
+  `retroarch.cfg`, passa a ter o ZeuX sobrepondo esse valor com `"true"` (padrão).
+  É a escolha do produto, mas vale saber.
+- O Flycast recebe `AutoSaveState=no` quando o ZeuX está desligado, mesmo que o
+  `emu.cfg` tenha o salvamento ligado. Mesma regra do RetroArch.
