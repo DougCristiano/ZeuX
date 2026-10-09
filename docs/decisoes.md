@@ -2702,6 +2702,7 @@ não de uma execução com ROM. Um teste com jogo de verdade é o que confirma `
   só um jogo roda por vez, mas o ZeuX não confere o GameID do estado com o do jogo.
 - Se o Dolphin consultar XDG antes de `~/.dolphin-emu` no Linux, a pasta de estados sai errada e o ZeuX não acha
   os estados (falha segura: aparece como "ainda não há estado").
+
 ## Saves e retomada: RPCS3 e PPSSPP (2026-10-09)
 
 Pedido do Douglas: copiar para RPCS3 e PPSSPP o que já existe em DuckStation,
@@ -2770,11 +2771,11 @@ resumo); nada foi observado com o binário rodando.
   saves apareçam mesmo que o state seja apagado depois.
 
 **Ordem de `saveAdapterFor` (`internal/api/emulator_settings.go`):** PS3 passa a
-usar `rpcs3` e PSP passa a usar `ppsspp`. Antes, esses consoles caíam no
-RetroArch, quando ele cobre o console. Agora, se o RPCS3 ou o PPSSPP não estiver
-instalado, a tela mostra `known: false` mesmo que o RetroArch tenha saves desse
-jogo. É uma troca de propósito: a tela mostra os saves do emulador que de fato
-roda o jogo, quando o ZeuX consegue dizer qual é.
+mapear para `rpcs3` e PSP para `ppsspp`. Com o fallback introduzido depois no
+mesmo dia (ver "Azahar, melonDS e Flycast"), se o RPCS3 ou o PPSSPP não estiver
+instalado e o RetroArch cobrir o console, a tela cai nos saves do RetroArch; só
+sem nenhum dos dois ela mostra `known: false`. A versão original desta decisão
+dizia que PS3/PSP "deixam de cair no RetroArch"; isso foi superado pelo fallback.
 
 **Decisões de desenho:**
 
@@ -2803,5 +2804,108 @@ PPSSPP com o jogo rodando de fato; que os dois arquivos gerados têm o nome e a
 pasta descritos aqui; e a convenção do prefixo do save do PPSSPP (`PSP/SAVEDATA`).
 
 **O que quebra se desfizer:** a tela do jogo deixa de listar saves de PS3 e PSP
-(volta a `known: false`); "Continuar" nesses dois emuladores vira "Unapplied"
+do emulador dedicado (cai no RetroArch ou em `known: false`); "Continuar" nesses dois emuladores vira "Unapplied"
 com a frase genérica de que o ZeuX ainda não sabe continuar aquele jogo.
+
+## Saves e retomada: Azahar, melonDS e Flycast (2026-10-09)
+
+Pedido do Douglas: localizar saves e states destes três emuladores e, onde o
+código-fonte permitir, "Iniciar do zero" e "Continuar". Pesquisa feita no
+código-fonte oficial (raw do GitHub, baixado com `curl`), **não observada com o
+binário rodando**. Cada afirmação abaixo traz o arquivo de onde saiu.
+
+**Resultado por emulador:**
+
+| Emulador | Saves de jogo | States | Fresh | Resume | Status |
+|---|---|---|---|---|---|
+| Azahar (3DS) | `<usuário>\sdmc\Nintendo 3DS\<id0>\<id1>\title\<alto>\<baixo>\data\00000001\` (árvore) | `<usuário>\states\<ID 16 hex>.<slot 02d>.cst` | Sem flag (boot normal) | **Não**: nenhuma flag de estado em `citra_qt.cpp` (`-d -f -g -h -i -p -r -a -m -v -w`) | Saves e states listados; ID lido do `.3ds`; `.cia` desconhecido |
+| melonDS (DS) | `<ROM>.sav` na pasta da ROM, ou `SaveFilePath` do `melonDS.toml` | `<ROM>.ml0`–`.ml9`, ou `SavestatePath` | Sem flag | **Não**: `CLI.cpp` só tem `-b`, `-f`, `-a`, `-A` | Saves e states listados; sem o toml, aproximado |
+| Flycast (Dreamcast, Windows) | VMU `<gameId>_vmu_save_A1.bin` (com `PerGameVmu`, padrão) — o código vem do disco | `<ROM>.state` (slot 0), `<ROM>_N.state` (1–9), na pasta `data` ao lado do `.exe` | `-config Dreamcast:AutoLoadState=no` | `-config Dreamcast:AutoLoadState=yes` + `-config Dreamcast:SavestateSlot=N` | Estados listados e "Continuar" ligado; cartão desconhecido com `PerGameVmu` ligado |
+
+**Fontes com trecho citado:**
+
+- Azahar, `src/core/savestate.cpp`, `GetSaveStatePath`: `fmt::format("{}{:016X}.{:02d}.cst", StatesDir, program_id, slot)`.
+  Azahar, `src/core/file_sys/archive_source_sd_savedata.cpp`, `GetSaveDataPath`: `"{}{:08x}/{:08x}/data/00000001/"` com as metades do ID, dentro de
+  `"{}Nintendo 3DS/{}/{}/title/"`. Azahar, `src/common/file_util.cpp`, `SetUserPath`: `user` ao lado do exe, senão `%AppData%\Azahar`.
+  Azahar, `src/common/common_paths.h`: `USERDATA_DIR "user"`, `EMU_DATA_DIR "Azahar"` (Windows), `STATES_DIR "states"`, `SDMC_DIR "sdmc"`.
+  Azahar, `src/core/file_sys/ncch_container.h`: `NCSD_Header.partitions` em 0x120; `NCCH_Header.program_id` depois de `product`/`maker` (offset 0x118 pela soma dos campos).
+  Azahar, `src/core/hle/service/fs/archive.cpp`: `ArchiveIdCode::SaveData` usa `ArchiveSource_SDSaveData`, então o save de jogo fica no sdmc.
+  Azahar, `src/citra_qt/citra_qt.cpp`: lista de opções da linha de comando (sem flag de estado).
+- melonDS, `src/frontend/qt_sdl/EmuInstance.cpp`: `getAssetPath` (pasta configurada ou da ROM; nome `baseAssetName` = ROM sem a última extensão), `getSavestateName` (`".ml" + slot`), `loadROMData`/DS (`".sav"` com `SaveFilePath`); `main.cpp`, `pathInit`: `portable` ao lado do exe, senão a pasta de config do Qt; `Config.cpp`: `kConfigFile = "melonDS.toml"` e as chaves `SaveFilePath`/`SavestatePath` na raiz. `CLI.cpp`: só `-b`, `-f`, `-a`, `-A`.
+- Flycast, `core/cfg/cl.cpp`, `usage()`: `-config section:key=value` ("set a transient config value") e "Transient config values won't be saved to emu.cfg."
+  Flycast, `core/cfg/option.cpp`: `Option<bool> AutoLoadState("Dreamcast.AutoLoadState")` (padrão false), `Option<bool> AutoSaveState("Dreamcast.AutoSaveState")`, `Option<int, false> SavestateSlot("Dreamcast.SavestateSlot")`, `Option<bool> PerGameVmu("PerGameVmu", true, "config")`, `Dreamcast.SavestatePath` (lista separada por `;`).
+  Flycast, `core/emulator.cpp`, `Emulator::loadGame`: `else if (config::AutoLoadState ...) dc_loadstate(config::SavestateSlot);`; `unloadGame`: `gui_saveState(false)` quando `AutoSaveState`.
+  Flycast, `core/nullDC.cpp`, `dc_savestate`/`dc_loadstate`; `core/oslib/oslib.cpp`, `getSavestatePath`: `<nome sem última extensão>` + `_N` (se N > 0) + `.state`.
+  Flycast, `core/ui/settings_general.cpp`: rótulos "Automatic State:", "Load" e "Save" (o texto da UI usa essa mesma opção).
+  Flycast, `core/cfg/ini.cpp`, `getBool`: só `yes`, `true`, `on`, `1` ligam.
+  Flycast, `core/windows/winmain.cpp`, `setupPath`: `emu.cfg` na pasta do exe, dados em `data\` ao lado dele (portátil).
+
+**Mecanismo escolhido:**
+
+- **Azahar e melonDS, saves e states:** localização por nome/ID, sem nenhum
+  argumento de linha de comando. Azahar: o ID do programa é lido do cabeçalho do
+  `.3ds` (`azaharProgramID`, só os bytes do cabeçalho). Save de jogo é uma
+  árvore; cada arquivo entra na lista e o backup copia um a um (o backup não
+  precisou de mudança: `Restore` recria as subpastas com `MkdirAll`).
+- **Flycast, retomada:** `-config` transitório, por ser o único mecanismo
+  documentado que não grava no `emu.cfg` do usuário. "Iniciar do zero" manda
+  `AutoLoadState=no` em todo lançamento, então um `emu.cfg` com o carregamento
+  ligado não abre o jogo no estado. "Continuar" manda `AutoLoadState=yes` e o
+  `SavestateSlot` do arquivo escolhido. O slot não é lido do nome do arquivo
+  sozinho: `flycastStateSlot` compara com o nome da ROM do pedido, porque
+  `Crazy_1.state` pode ser o slot 0 de `Crazy_1` ou o slot 1 de `Crazy`.
+- **Azahar e melonDS, retomada:** não implementada. Sem flag documentada, o
+  `Continuar` fica desabilitado e a tela mostra "Este emulador ainda não abre o
+  jogo num estado salvo" (`resumeUnsupported`). Editar o `config` do emulador
+  para forçar isso foi descartado, pelo mesmo motivo das decisões de 2026-10-05.
+- **Flycast, "Continuar" depende de uma opção do usuário:** o Flycast só grava o
+  estado ao fechar se `AutoSaveState` estiver ligada no emulador. O ZeuX **não
+  liga essa opção** nos lançamentos (diferente do RetroArch, que o Douglas
+  autorizou em 2026-10-09). A tela diz a condição (`resumeNoStateFlycast`).
+  Ligar com `-config Dreamcast:AutoSaveState=yes` transitório é tecnicamente
+  igual ao caso do RetroArch: fica como decisão pendente do Douglas.
+- **Flycast, cartão:** com `PerGameVmu` ligado (padrão), o arquivo do cartão é
+  `<código do disco>_vmu_save_A1.bin`, e o código vem do disco, que o ZeuX não
+  lê. Então o resultado sai com `memory_cards_unknown: true` e a lista vazia — o
+  que a tela mostra como "desconhecido", não "nenhum cartão". Com `PerGameVmu`
+  desligado, lista o `vmu_save_A1.bin` compartilhado e marca
+  `memory_card_shared`.
+
+**Mudanças que afetam emuladores já existentes:**
+
+- `saveAdapterFor` ganhou 3DS, DS e Dreamcast. Se o emulador dedicado **não**
+  estiver instalado, `gameSavesContext` cai no RetroArch quando ele cobre o
+  console. Isso vale também para PS1 e PS2: antes, sem DuckStation/PCSX2
+  instalados, a resposta era `known: false`; agora pode mostrar os saves do
+  RetroArch (com a mesma ressalva de "pode não ser o último emulador usado").
+- A tela de saves só exige o serial do disco para DuckStation e PCSX2. Antes,
+  qualquer jogo sem `serial` mostrava "Os estados aparecem depois que você
+  jogar…" — **inclusive o RetroArch, cujos states nunca apareciam**. Isso foi
+  corrigido de carona.
+- `GameSaves` ganhou `memory_cards_unknown` (JSON `memory_cards_unknown`).
+
+**O que quebra se desfizer:** tirar o `-config Dreamcast:AutoLoadState=no` do
+fresh faz o "Iniciar do zero" do Flycast abrir no estado se o `emu.cfg` do
+usuário tiver o carregamento ligado. Tirar os `-config` do resume faz o
+"Continuar" do Flycast abrir no início sem aviso (o estado fica ali, sem
+uso). Remover os casos de `saveAdapterFor` faz 3DS/DS/Dreamcast voltarem a
+depender só do RetroArch.
+
+**Não validado com o binário (todos):**
+
+- Azahar: que o save do jogo cai mesmo em `sdmc\…\data\00000001\` (a árvore
+  foi lida no código, não num save real); que não existe auto-load de state por
+  config (não achado nos arquivos lidos, não exaustivo); que os IDs `<id0>/<id1>`
+  são os que a pasta usa. A pasta do usuário no Linux e no macOS não foi lida: lá
+  o ZeuX não aponta nada.
+- melonDS: que o Qt grava o `melonDS.toml` em `%LocalAppData%\melonDS` (a tabela
+  da documentação do Qt aponta `AppData/Local` para `ConfigLocation`, não foi
+  testado). Sem o arquivo, o resultado sai aproximado.
+- Flycast: que `-config Dreamcast:AutoLoadState=yes|no` e
+  `Dreamcast:SavestateSlot=N` são aceitos pelo binário na linha de comando, e que o
+  valor transitório não é sobrescrito pelo `loadGameSpecificSettings`. Que o
+  autosave grava `<nome>.state` no slot configurado (lido em `nullDC.cpp`, não
+  observado).
+- Os três: nenhuma flag foi confirmada com o binário; as flags do Flycast estão
+  no código-fonte de `cl.cpp` e `option.cpp`, e a ajuda do binário (que diz a
+  mesma coisa) não foi conferida ao vivo.

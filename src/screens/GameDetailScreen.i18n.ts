@@ -73,6 +73,13 @@ export const dict = {
     "pt-BR": "Ainda não há estado salvo. Salve um estado durante o jogo, no próprio Dolphin; depois disso, Continuar abre dali.",
     en: "No saved state yet. Save a state during the game, inside Dolphin itself; after that, Continue picks up there.",
   },
+  // O Flycast só grava o estado ao fechar se a opção "Automatic State: Save"
+  // dele estiver ligada (core/ui/settings_general.cpp, rótulo "Save"). O ZeuX
+  // não liga essa opção sozinho, então a frase diz a condição.
+  resumeNoStateFlycast: {
+    "pt-BR": "Ainda não há estado salvo. O Flycast grava um ao fechar o jogo se a opção \"Estado automático: Salvar\" estiver ligada nele; depois disso, Continuar abre dali.",
+    en: "No saved state yet. Flycast writes one when you close the game if its \"Automatic State: Save\" option is on; after that, Continue picks up there.",
+  },
   resumeUnsupported: {
     "pt-BR": "Este emulador ainda não abre o jogo num estado salvo. Por enquanto o jogo abre do início.",
     en: "This emulator can't open a game from a saved state yet. For now the game starts from the beginning.",
