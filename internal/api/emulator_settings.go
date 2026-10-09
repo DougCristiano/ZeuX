@@ -91,7 +91,7 @@ func (s *Server) handleSetEmulatorSettings(w http.ResponseWriter, r *http.Reques
 }
 
 // saveAdapterFor diz qual emulador guarda os saves de um console (só os
-// dois com o local verificado).
+// com o local verificado: PS1, PS2, PS3 e PSP).
 func saveAdapterFor(consoleID string) string {
 	switch consoleID {
 	case "ps1":
@@ -102,6 +102,10 @@ func saveAdapterFor(consoleID string) string {
 		// Dolphin: os estados vêm do GameID do jogo (dolphin_saves.go). A
 		// listagem não mostra cartão nem NAND do Wii ainda.
 		return "dolphin"
+	case "ps3":
+		return "rpcs3"
+	case "psp":
+		return "ppsspp"
 	}
 	return ""
 }

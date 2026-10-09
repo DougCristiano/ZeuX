@@ -44,7 +44,8 @@ var ErrNoResumeState = errors.New("não há um estado salvo para continuar este 
 
 // SupportsResume diz se o ZeuX sabe abrir este emulador num estado salvo.
 func SupportsResume(adapterID string) bool {
-	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch" || adapterID == "dolphin"
+	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch" ||
+		adapterID == "dolphin" || adapterID == "rpcs3" || adapterID == "ppsspp"
 }
 
 // resumeStateLocation devolve a pasta de save states do emulador e como
@@ -135,6 +136,18 @@ func (l *Launcher) recordResumeState(session Session, install Installation) {
 		// O RetroArch grava um arquivo fixo por jogo (<jogo>.state.auto), e não
 		// um arquivo de retomada numa pasta compartilhada: o lookup é por nome.
 		path, savedAt, ok = retroArchResumeFile(install, session.ROMPath, session.StartedAt)
+	} else if session.AdapterID == "rpcs3" {
+		// O RPCS3 não tem arquivo de retomada fixo: o state é o que apareceu na
+		// pasta do ID do jogo durante a sessão (rpcs3_saves.go).
+		path, savedAt, ok = rpcs3ResumeFile(install, session.ROMPath, session.StartedAt)
+	} else if session.AdapterID == "ppsspp" {
+		// O nome do state também revela o DISC_ID; guardá-lo cobre o caso de o
+		// state ser apagado depois (ppsspp_saves.go).
+		var discID string
+		path, savedAt, discID, ok = ppssppResumeFile(install, session.StartedAt)
+		if ok {
+			l.recordPPSSPPDiscID(session, discID)
+		}
 	} else {
 		var dir string
 		var match func(string) bool

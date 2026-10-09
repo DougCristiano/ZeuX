@@ -109,6 +109,12 @@ func FindGameSaves(adapterID string, install Installation, romPath string, id Ga
 		return findRetroArchGameSaves(install, romPath)
 	case "dolphin":
 		return findDolphinGameSaves(install, id)
+	case "rpcs3":
+		return findRPCS3GameSaves(install, romPath)
+	case "ppsspp":
+		// O ID do jogo (DISC_ID) vem do DiscIDFor: o do repositório ou o do nome
+		// do state. Sem ele, ppsspp_saves.go devolve "não sei".
+		return findPPSSPPGameSaves(install, id.Serial)
 	default:
 		return GameSaves{}, false
 	}
@@ -287,6 +293,10 @@ func (l *Launcher) DiscIDFor(ctx context.Context, romPath string) GameDiscID {
 			case "dolphin":
 				if gameID, ok := dolphinGameIDFromState(st.StatePath); ok {
 					return GameDiscID{ROMPath: romPath, AdapterID: st.AdapterID, Serial: gameID}
+				}
+			case "ppsspp":
+				if m := ppssppStateName.FindStringSubmatch(name); m != nil {
+					return GameDiscID{ROMPath: romPath, AdapterID: st.AdapterID, Serial: m[1]}
 				}
 			}
 		}

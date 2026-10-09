@@ -1335,7 +1335,11 @@ apareceu em fonte oficial está como **desconhecido**. Os itens marcados como
 - **RMG.** Pode abrir o slot. Para o "Continuar", o ZeuX precisaria saber o slot
   da última sessão, o que a pesquisa não cobriu.
 
-**Ordem sugerida de implementação (só recomendação; nada foi implementado):**
+**Atualização (2026-10-09):** RPCS3 e PPSSPP foram implementados (saves e
+"Continuar"); ver a seção "Saves RPCS3 e PPSSPP: o que falta" no fim deste
+arquivo e a entrada de decisoes.md de mesma data. A ordem abaixo é o histórico da pesquisa.
+
+**Ordem sugerida de implementação (histórico, de 2026-10-09):**
 
 1. **Dolphin:** flag documentada, nome do estado por GameID já conhecido. Maior
    retorno com menor risco.
@@ -1348,10 +1352,39 @@ apareceu em fonte oficial está como **desconhecido**. Os itens marcados como
    fonte para a flag, ou aceitar que não terão "Continuar".
 
 **Desconhecido (não achado em fonte oficial nesta rodada):**
-- Nome da flag de estado do PPSSPP (`stateToLoad`).
+- ~~Nome da flag de estado do PPSSPP (`stateToLoad`).~~ Resolvido em 2026-10-09: `--state`, em `Core/CmdLine.cpp` (ver decisoes.md).
 - Pastas padrão por SO de todos os emuladores, exceto onde foi citado.
 - Se algum emulador tem auto-load de estado por config (Dolphin, PPSSPP, RPCS3,
   Azahar, melonDS, RMG). Não foi procurado sistematicamente.
 - Nome dos saves de jogo de Azahar, melonDS e RMG.
 - Como forçar boot limpo quando o emulador tem auto-load ligado. Só o RetroArch
   tem esse caso mapeado (ver 2026-10-09).
+
+## Saves RPCS3 e PPSSPP: o que falta (2026-10-09)
+
+Implementado nesta data (saves por jogo e "Iniciar do zero"/"Continuar"), com
+o que ficou aberto registrado aqui. Detalhes e fontes em `docs/decisoes.md`.
+
+- **PPSSPP — auto-load por jogo.** A opção "Auto load savestate" do PPSSPP
+  (`AutoLoadSaveState`, padrão desligada, por jogo) pode fazer o "Iniciar do zero"
+  abrir num state. O ZeuX não a desliga. Falta descobrir onde essa chave por jogo
+  fica no `ppsspp.ini` e se dá para gravá-la sem mexer no resto.
+- **PPSSPP — Linux e macOS.** Só o Windows foi confirmado (documentação oficial de
+  storage). Nos outros sistemas as listas de saves dão "não sei". Falta ler a pasta
+  padrão de memstick de cada um, no código-fonte ou por observação.
+- **PPSSPP — ID antes do primeiro state.** O DISC_ID só aparece no nome do state.
+  Ler o `PARAM.SFO` de dentro de ISO/CSO daria o ID antes, mas exige parser de
+  ISO9660 e CSO, fora do escopo desta rodada.
+- **RPCS3 — `games.yml` e caminhos.** O ID vem do mapa `games.yml`, que só tem a
+  entrada depois do primeiro boot pelo RPCS3. Caminho de disco não casado (ex.:
+  jogo em pasta com outro formato) deixa o ID desconhecido. Falta testar com jogos
+  reais de cada formato.
+- **RPCS3 — `vfs.yml` e usuário.** O ZeuX assume `dev_hdd0` na pasta de
+  configuração e o usuário `00000001`. Um `vfs.yml` que mude `dev_hdd0`, ou outro
+  usuário, faz a lista de saves sair vazia (sem erro). Falta ler o `vfs.yml`, como
+  o ZeuX já faz para o firmware (`rpcs3CustomDevFlash`).
+- **RPCS3 — state automático.** Não achei auto-load de state ao abrir o jogo sem
+  flag, mas a leitura do código não foi exaustiva. Falta confirmar com o binário.
+- **Tudo, com o binário.** Nenhuma das flags (`--savestate`, `--state`) foi
+  testada com o emulador rodando um jogo real; os nomes de arquivo e de pasta
+  também não.
