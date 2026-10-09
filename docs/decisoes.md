@@ -2398,3 +2398,36 @@ voltando — ela lia a pasta uma vez, ao abrir. A associação pasta↔jogo
 - Pedido do Douglas no mesmo dia: o print mais recente aparece grande, como
   um visualizador (setas, contador, clique abre em tela cheia), com as
   miniaturas numa faixa embaixo. Print novo vira o selecionado sozinho.
+
+## Saves por jogo no RetroArch (2026-10-09)
+
+Pedido do Douglas: o ZeuX localizar e gerir cartão e save states de todos os
+emuladores, como já faz com DuckStation e PCSX2. Esta rodada cobre o RetroArch,
+que é o adapter que mais consoles atende.
+
+- **Diretórios:** `savefile_directory` e `savestate_directory` lidos do
+  `retroarch.cfg` real (`retroArchSaveDataDirs`, já existente). Chave vazia ou
+  `"default"` cai na pasta da ROM. Fonte primária: comentário do
+  `retroarch.cfg` oficial (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.cfg):
+  "Save all save files (*.srm) to this directory" / "Save all save states
+  (*.state) to this directory" / "This will be overridden by explicit command
+  line options".
+- **Nome do arquivo de cada jogo: NÃO verificado em documentação oficial.** As
+  fontes encontradas foram fóruns e readme de core (RetroPie, forums.libretro.com):
+  o save leva o nome da ROM sem extensão, `<jogo>.srm`; states `<jogo>.state`,
+  `<jogo>.stateN` (slot N) e `<jogo>.state.auto` (auto-save, comentário de
+  `savestate_auto_save` no retroarch.cfg: "The path is $SRAM_PATH.auto"). Por
+  isso o resultado sai com `memory_cards_approximate: true`. O slot 0 para
+  `.state` sem número é dedução, não documentado.
+- **Flag de linha de comando:** não usada. `--appendconfig` aparece no código
+  (`RA_OPT_APPENDCONFIG`), mas o significado exato não foi confirmado; nenhuma
+  flag de save foi inventada. A pasta de save continua vindo da config.
+- **Ligação com a API:** consoles sem emulador dedicado de save
+  (`saveAdapterFor`: só PS1 e PS2) passam a usar o RetroArch quando ele cobre o
+  console no registro. O ZeuX não sabe qual emulador abriu o jogo, então a
+  resposta é "saves do RetroArch", não certeza sobre o último lançamento.
+- **O que quebra se desfizer:** a tela do jogo deixa de listar saves de
+  RetroArch (volta a `known: false`), e o backup/restauração desses consoles
+  para de funcionar, sem erro visível.
+- **Não validado com o binário:** a convenção de nomes precisa de uma sessão
+  real (salvar um jogo e conferir o arquivo gerado).

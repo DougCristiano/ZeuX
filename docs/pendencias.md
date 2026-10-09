@@ -1251,3 +1251,17 @@ A tecla de print por emulador existe (ver `docs/decisoes.md`). Pendente:
   com o emulador aberto que nenhum atalho dispara.
 - **Outros emuladores** (Flycast, RPCS3, Vita3K, xemu, Dolphin...): precisam
   do mesmo levantamento antes de ganhar a opção.
+
+## Saves por jogo: o que falta além do RetroArch (2026-10-09)
+
+Feito nesta rodada: RetroArch com saves por jogo (`internal/emulator/retroarch_saves.go`,
+decisão em `docs/decisoes.md`, 2026-10-09). Continua pendente:
+
+- **Confirmar o nome do save do RetroArch ao vivo** (`<jogo>.srm`,
+  `<jogo>.state[N]`, `.state.auto`). Hoje vem de fonte secundária.
+- **Demais emuladores** (Dolphin, PPSSPP, Flycast, RPCS3, melonDS, Azahar,
+  xemu, Vita3K, Xenia, Cemu, RMG): a tabela desta seção de 2026-09-11 é pesquisa
+  não verificada contra o binário. Nenhum deles tem `FindGameSaves` ainda — a
+  tela do jogo mostra `known: false`.
+- **Cartão do RetroArch por jogo** exige o `savefile_directory` fixo; com
+  `default`, o ZeuX procura ao lado da ROM e isso ainda não foi testado.

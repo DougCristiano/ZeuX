@@ -105,6 +105,8 @@ func FindGameSaves(adapterID string, install Installation, romPath string, id Ga
 		}
 		sortStates(out.SaveStates)
 		return out, true
+	case "retroarch":
+		return findRetroArchGameSaves(install, romPath)
 	default:
 		return GameSaves{}, false
 	}
