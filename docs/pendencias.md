@@ -1292,3 +1292,66 @@ decisão em `docs/decisoes.md`, 2026-10-09). Continua pendente:
   tela do jogo mostra `known: false`.
 - **Cartão do RetroArch por jogo** exige o `savefile_directory` fixo; com
   `default`, o ZeuX procura ao lado da ROM e isso ainda não foi testado.
+
+## Pesquisa: saves e retomada nos demais emuladores (2026-10-09)
+
+**Escopo:** pesquisa só, sem implementação. Fonte: código-fonte oficial no GitHub
+(lido com `curl` no raw, não por resumo), docs oficiais quando existem. O que não
+apareceu em fonte oficial está como **desconhecido**. Os itens marcados como
+"não pesquisado" ficaram fora desta rodada por falta de tempo.
+
+**Prioridade desta rodada:** Dolphin, PPSSPP, RPCS3, Azahar, melonDS, e RMG
+(que estava na lista). Flycast, xemu, Vita3K, Xenia e Cemu: não pesquisado.
+
+| Emulador | Save de jogo (cartão/SRAM/NAND/HDD) | Save state (nome) | Flag para abrir num estado | Boot limpo | Viabilidade no ZeuX | Fonte principal |
+|---|---|---|---|---|---|---|
+| Dolphin | Cartão GC em pasta por jogo (GCI, pasta com o GameID); cartão raw e NAND do Wii: **nome e pasta não lidos** | `<pasta de estados do User>/<GameID>.sNN` (NN = slot, 2 dígitos) | **Sim, documentada:** `-s, --save_state <file>` ("Load the initial save state") | Omitir `-s` | **Fácil** (flag documentada; falta só escolher o arquivo) | [CommandLineParse.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/UICommon/CommandLineParse.cpp), [State.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/Core/State.cpp), [EXI_DeviceMemoryCard.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp) |
+| PPSSPP | Memstick/SAVEDATA: **não lido** | `.ppst` (`STATE_EXTENSION`); nome por jogo e slot: **não lido por completo** | **Desconhecido.** Ajuda oficial não lista flag de estado. O código tem `cmdLineOptions.stateToLoad` (`SaveState::Load` na abertura), mas o nome da flag não foi achado | Omitir (sem flag) | **Médio**, se a flag for confirmada. Hoje não dá para afirmar | [docs](https://www.ppsspp.org/docs/reference/command-line/), [NativeApp.cpp](https://raw.githubusercontent.com/hrydgard/ppsspp/master/UI/NativeApp.cpp) (linhas 788-789), [SaveState.cpp](https://raw.githubusercontent.com/hrydgard/ppsspp/master/Core/SaveState.cpp) |
+| RPCS3 | HDD virtual: `dev_hdd0/home/<usuário>/savedata/` (por jogo). Pasta de config do SO: **não lida** | `<config>/savestates/<TITLE>/<TITLE>_<prefixo>_<id>.SAVESTAT` | **Sim, documentadas:** `--savestate <path>` ("Path for directly loading a savestate.") e `--last-savestate <Title-ID ou caminho>` ("Loading the last savestate of a game.") | Omitir as flags | **Médio.** Flag existe e é oficial; falta resolver a pasta de config por SO | [rpcs3.cpp](https://raw.githubusercontent.com/RPCS3/rpcs3/master/rpcs3/rpcs3.cpp) (linhas 839-842, 1191-1205), [savestate_utils.cpp](https://raw.githubusercontent.com/RPCS3/rpcs3/master/rpcs3/Emu/savestate_utils.cpp) (linhas 288-303, 435), [System.cpp](https://raw.githubusercontent.com/RPCS3/rpcs3/master/rpcs3/Emu/System.cpp) (linha 634) |
+| Azahar | **Não lido** (pasta de usuário/NAND) | `<pasta de estados>/<PROGRAM_ID em 16 hex>.<slot 2 dígitos>.cst` | **Não encontrada** nas fontes lidas (`citra_qt.cpp` não tem opção de estado na linha de comando). Não exaustivo | Omitir | **Difícil** sem flag; há o estado por slot, mas nenhuma forma de abri-lo pela linha de comando foi achada | [savestate.cpp](https://raw.githubusercontent.com/azahar-emu/azahar/master/src/core/savestate.cpp) (linhas 41-48), [citra_qt.cpp](https://raw.githubusercontent.com/azahar-emu/azahar/master/src/citra_qt/citra_qt.cpp) |
+| melonDS | Config `SaveFilePath` (pasta do save): **padrão não lido** | Config `SavestatePath` (pasta): **nome não lido** | **Não existe** na linha de comando: `CLI.cpp` só tem `-b/--boot`, `-f`, `-a`, `-A` e as ROMs | Sem flag | **Difícil.** Retomada exigiria controlar a GUI ou mexer na config, o que o ZeuX não faz hoje | [CLI.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/CLI.cpp), [Config.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/Config.cpp) (linhas 302-303), [main.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/main.cpp) (pasta `portable` ao lado do executável) |
+| RMG | **Não lido** | Slots numerados (0 a 9); pasta e nome **não lidos** | **Sim, documentada:** `--load-state-slot <n>` ("Loads save state slot when launching the ROM"). Só aceita slot, não arquivo | Omitir a flag | **Médio.** Abre por slot, não por arquivo; o ZeuX teria de saber qual slot é o último | [RMG main.cpp](https://raw.githubusercontent.com/Rosalie241/RMG/master/Source/RMG/main.cpp) (linhas 218, 280-287) |
+| Flycast, xemu, Vita3K, Xenia, Cemu | **Não pesquisado** | Não pesquisado | Não pesquisado | Não pesquisado | Não pesquisado | — |
+
+**Notas por emulador:**
+
+- **Dolphin.** `-s` pede o arquivo de estado e o ZeuX já sabe o caminho (um
+  arquivo por jogo e slot). A pasta portátil existe: se houver `portable.txt`
+  ao lado do executável, a pasta `User` fica ali
+  ([FileUtil.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/Common/FileUtil.cpp), linhas 317-374). A pasta padrão por SO não foi lida.
+  **Desconhecido:** se existe auto-load de estado por config. Não apareceu nos
+  arquivos lidos, mas não foi procurado no `Config` inteiro.
+- **PPSSPP.** A ajuda oficial não lista flag de estado, mas o código usa uma opção
+  de linha de comando de estado. Enquanto o nome não for confirmado, a
+  viabilidade fica em aberto. **Não afirmar que a flag existe.**
+- **RPCS3.** Melhor caso documentado de carregamento por arquivo. `--savestate`
+  aceita caminho. A pasta de config muda por SO e precisa ser lida antes de
+  implementar.
+- **Azahar.** Nomes de estado são previsíveis (por ID do programa e slot), mas a
+  flag não foi achada. Só vale implementar se alguém confirmar.
+- **melonDS.** Sem flag de estado. O único caminho seria mexer na config do
+  usuário, o que vai contra o princípio de não alterar o emulador sem pedido
+  (ver 2026-10-05 sobre PCSX2 e RetroArch).
+- **RMG.** Pode abrir o slot. Para o "Continuar", o ZeuX precisaria saber o slot
+  da última sessão, o que a pesquisa não cobriu.
+
+**Ordem sugerida de implementação (só recomendação; nada foi implementado):**
+
+1. **Dolphin:** flag documentada, nome do estado por GameID já conhecido. Maior
+   retorno com menor risco.
+2. **RPCS3:** `--savestate` com caminho e `--last-savestate` são documentados.
+   Antes, levantar a pasta de config por SO.
+3. **RMG:** `--load-state-slot` existe, mas só por slot. Precisa de uma forma de
+   o ZeuX guardar o slot da última sessão.
+4. **PPSSPP:** só depois de confirmar o nome da flag na fonte oficial.
+5. **Azahar, melonDS:** deixar como `Unapplied` (comportamento atual) até achar
+   fonte para a flag, ou aceitar que não terão "Continuar".
+
+**Desconhecido (não achado em fonte oficial nesta rodada):**
+- Nome da flag de estado do PPSSPP (`stateToLoad`).
+- Pastas padrão por SO de todos os emuladores, exceto onde foi citado.
+- Se algum emulador tem auto-load de estado por config (Dolphin, PPSSPP, RPCS3,
+  Azahar, melonDS, RMG). Não foi procurado sistematicamente.
+- Nome dos saves de jogo de Azahar, melonDS e RMG.
+- Como forçar boot limpo quando o emulador tem auto-load ligado. Só o RetroArch
+  tem esse caso mapeado (ver 2026-10-09).
