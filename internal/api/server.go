@@ -1333,8 +1333,35 @@ type launchBody struct {
 	EmulatorID string            `json:"emulator_id,omitempty"`
 	Core       string            `json:"core,omitempty"`
 	Options    *emulator.Options `json:"options,omitempty"`
-	// Resume abre no estado de retomada da última sessão ("Continuar").
+	// Mode é "fresh" (do início) ou "resume" ("Continuar"). Vazio vale fresh.
+	// Ver launchMode para a regra de convivência com o campo antigo Resume.
+	Mode string `json:"mode,omitempty"`
+	// Resume é o formato anterior de "Continuar": `true` equivale a
+	// mode "resume". Mantido para não quebrar quem já manda só esse campo.
 	Resume bool `json:"resume,omitempty"`
+}
+
+// launchMode traduz o pedido para o modo do launcher. `mode` manda; `resume`
+// só vale quando `mode` não veio. Combinar `mode: "fresh"` com `resume: true`
+// é contraditório e é recusado em vez de escolher um dos dois em silêncio —
+// escolher em silêncio seria justamente o risco de carregar um estado sem o
+// pedido ter dito que queria isso.
+func launchMode(body launchBody) (emulator.Mode, bool) {
+	switch body.Mode {
+	case "":
+		if body.Resume {
+			return emulator.ModeResume, true
+		}
+		return emulator.ModeFresh, true
+	case string(emulator.ModeFresh):
+		if body.Resume {
+			return "", false
+		}
+		return emulator.ModeFresh, true
+	case string(emulator.ModeResume):
+		return emulator.ModeResume, true
+	}
+	return "", false
 }
 
 // toInput converte o corpo da requisição no pedido do launcher, preenchendo as
@@ -1359,8 +1386,9 @@ func (s *Server) toInput(body launchBody) (emulator.LaunchInput, error) {
 		ConsoleID:  body.ConsoleID,
 		EmulatorID: body.EmulatorID,
 		Core:       body.Core,
-		Resume:     body.Resume,
 	}
+	// O modo já foi validado em decodeLaunch; aqui só se traduz.
+	input.Mode, _ = launchMode(body)
 
 	if body.Options != nil {
 		input.Options = *body.Options
@@ -1553,6 +1581,12 @@ func (s *Server) decodeLaunch(w http.ResponseWriter, r *http.Request) (emulator.
 	if body.ROMPath == "" || body.ConsoleID == "" {
 		s.writeError(w, http.StatusBadRequest, "missing_fields",
 			"Os campos rom_path e console_id são obrigatórios.")
+		return emulator.LaunchInput{}, false
+	}
+
+	if _, ok := launchMode(body); !ok {
+		s.writeError(w, http.StatusBadRequest, "invalid_mode",
+			`O modo deve ser "fresh" (do início) ou "resume" (continuar), e não pode vir com "resume": true contraditório.`)
 		return emulator.LaunchInput{}, false
 	}
 

@@ -2398,3 +2398,45 @@ voltando — ela lia a pasta uma vez, ao abrir. A associação pasta↔jogo
 - Pedido do Douglas no mesmo dia: o print mais recente aparece grande, como
   um visualizador (setas, contador, clique abre em tela cheia), com as
   miniaturas numa faixa embaixo. Print novo vira o selecionado sozinho.
+
+## "Iniciar do zero" e "Continuar" como modo explícito (2026-10-09)
+
+Pedido do Douglas: ao abrir um jogo, dois botões. "Continuar" retoma o último
+save state (o ponto exato onde a pessoa parou); "Iniciar do zero" dá boot
+normal, como colocar o disco no console, sem carregar estado nenhum — o save
+do memory card continua valendo lá dentro.
+
+- **Modo explícito na API:** `POST /games/launch` aceita `"mode": "fresh" |
+  "resume"`. Padrão `fresh`. `"resume": true` continua valendo como `resume`
+  (formato anterior). `mode: fresh` com `resume: true` é recusado (400
+  `invalid_mode`) em vez de escolher um dos dois em silêncio.
+- **Garantia do fresh:** o caminho do estado (`Request.StatePath`) só é
+  honrado com `ModeResume`. Em `fresh` ele é ignorado mesmo que sobre no
+  pedido, e nenhum argumento de carregamento sai na linha de comando
+  (`mode_test.go` trava isso para DuckStation e PCSX2).
+- **Disponibilidade do "Continuar":** continua sendo o `resume_saved_at` de
+  `GET /library/games`, lido do disco fora do `BuildCommand` (como já era). Sem
+  estado, a tela mostra "Continuar" desabilitado com o motivo.
+
+**Mecanismo por emulador** (leitura do código-fonte oficial, não observada com
+o binário rodando):
+
+| Emulador | Mecanismo | Fonte | Status |
+|---|---|---|---|
+| DuckStation | `-statefile <arquivo>` ("Loads state from the specified filename") e `-resume` ("Load resume save state", escolhe pelo nome do jogo ou pelo mais recente) | https://raw.githubusercontent.com/stenzek/duckstation/master/src/duckstation-qt/qthost.cpp (`PrintCommandLineHelp`, `ParseCommandLineParametersAndInitializeConfig`) | Implementado com `-statefile`, que aponta o estado deste jogo; `-resume` não foi usado porque escolheria pelo nome do jogo ou pelo mais recente. |
+| PCSX2 | `-statefile <filename>` ("Loads state from the specified filename."). Não há `-resume` no `QtHost.cpp`. | https://raw.githubusercontent.com/PCSX2/pcsx2/master/pcsx2-qt/QtHost.cpp | Implementado. |
+| RetroArch | `-e, --entryslot=NUMBER` ("Slot from which to load an entry state."); `--appendconfig=FILE` para config extra | https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c (`retroarch_print_help`) | Via `Unapplied`. O `-e` existe, mas abrir no estado depende de `savestate_auto_load` no `retroarch.cfg` do usuário, que o ZeuX não controla hoje. |
+| Demais standalone (Dolphin, PPSSPP, Flycast, RPCS3, MelonDS, Azahar, Xemu, Vita3K, Xenia, Cemu, RMG) | Nenhum levantado | — | Via `Unapplied` (`resumeUnappliedMessage`). |
+| Emulador personalizado | Gramática do template é do usuário | — | Via `Unapplied`. |
+
+**Correção de decisão anterior:** a entrada de 2026-10-05 dizia que o
+`savestate_auto_load` do RetroArch "vem ligado por padrão". Lendo
+`config.def.h` do RetroArch, o padrão é `false` (`DEFAULT_SAVESTATE_AUTO_LOAD
+false`). O risco real não é o padrão: é um `retroarch.cfg` do próprio usuário
+com o auto-load ligado, que faria o "fresh" do RetroArch abrir no estado
+mesmo assim. O ZeuX ainda não consegue garantir isso — pendência em
+`pendencias.md`.
+
+**Não validado:** que DuckStation e PCSX2 não carreguem um estado de retomada
+sozinhos ao iniciar sem nenhuma flag. A ajuda dos dois não descreve auto-load
+(só `SaveStateOnExit` grava), mas isso não foi confirmado com o binário.

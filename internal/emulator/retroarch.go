@@ -183,6 +183,15 @@ func (a retroArchAdapter) BuildCommand(install Installation, req Request) (Comma
 		unapplied = append(unapplied,
 			"O RetroArch volta ao próprio menu ao fechar o jogo; não há opção de linha de comando para encerrá-lo junto.")
 	}
+	// `-e/--entryslot` existe na ajuda do RetroArch (retroarch.c,
+	// retroarch_print_help), mas abrir no slot certo ainda depende de o
+	// carregamento automático estar desligado no retroarch.cfg do usuário
+	// (savestate_auto_load). Sem poder garantir os dois lados, o ZeuX declara
+	// em vez de aplicar — e o modo "fresh" também não consegue prometer que o
+	// auto-load do usuário fica de fora (ver docs/decisoes.md).
+	if req.Mode == ModeResume {
+		unapplied = append(unapplied, resumeUnappliedMessage)
+	}
 
 	// Os argumentos extras entram antes do caminho do jogo: depois dele, o
 	// RetroArch os trataria como conteúdo adicional em vez de opções.

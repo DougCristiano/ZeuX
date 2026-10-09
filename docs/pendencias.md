@@ -1251,3 +1251,17 @@ A tecla de print por emulador existe (ver `docs/decisoes.md`). Pendente:
   com o emulador aberto que nenhum atalho dispara.
 - **Outros emuladores** (Flycast, RPCS3, Vita3K, xemu, Dolphin...): precisam
   do mesmo levantamento antes de ganhar a opção.
+
+## "Continuar" no RetroArch e garantia do "Iniciar do zero" (2026-10-09)
+
+- **RetroArch sem "Continuar":** `-e/--entryslot` existe (ajuda do `retroarch.c`),
+  mas abrir no slot certo exige controlar `savestate_auto_load` (e
+  `savestate_auto_save`) por lançamento, via `--appendconfig` com um arquivo
+  do ZeuX. Hoje é `Unapplied`. Falta: decidir onde esse arquivo fica e validar
+  com o binário.
+- **"Iniciar do zero" no RetroArch não é garantido:** se o `retroarch.cfg` do
+  usuário tem `savestate_auto_load = true`, o boot carrega o estado mesmo sem
+  flag. Falta: checar o `retroarch.cfg` (o ZeuX já lê esse arquivo para as
+  pastas de save) e avisar ou forçar `false` via `--appendconfig`.
+- **Validar com o binário:** `-statefile` no DuckStation e no PCSX2, e a
+  ausência de auto-load nos dois sem flag (ver decisoes.md, 2026-10-09).

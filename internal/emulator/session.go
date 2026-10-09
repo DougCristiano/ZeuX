@@ -112,9 +112,11 @@ type LaunchInput struct {
 
 	Options Options
 
-	// Resume abre o jogo no estado de retomada gravado na última sessão
-	// ("Continuar", resume.go), em vez de começar do início.
-	Resume bool
+	// Mode escolhe "Continuar" (ModeResume, estado de retomada da última
+	// sessão, resume.go) ou começar do início (ModeFresh). Vazio vale
+	// ModeFresh. Valor fora dos conhecidos é recusado antes de qualquer
+	// processo subir.
+	Mode Mode
 }
 
 // Launch inicia o jogo e passa a acompanhar o processo.
@@ -146,8 +148,18 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 			l.logger.Warn("não foi possível silenciar a tela de boas-vindas do RPCS3", "erro", err)
 		}
 	}
+	mode := input.Mode
+	if mode == "" {
+		mode = ModeFresh
+	}
+	if !mode.Valid() {
+		return Session{}, fmt.Errorf("modo de lançamento %q desconhecido", string(input.Mode))
+	}
+	// Só o modo resume procura estado. No fresh o caminho fica vazio e nenhum
+	// argumento de carregamento é montado — a garantia de "do início" vive
+	// aqui e em BuildCommand, não só na tela.
 	var statePath string
-	if input.Resume {
+	if mode == ModeResume {
 		statePath, err = l.resumeStateFor(ctx, input.ROMPath, adapter.ID())
 		if err != nil {
 			return Session{}, err
@@ -212,6 +224,7 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		ConsoleID: input.ConsoleID,
 		Core:      input.Core,
 		Options:   options,
+		Mode:      mode,
 		StatePath: statePath,
 	})
 	if err != nil {

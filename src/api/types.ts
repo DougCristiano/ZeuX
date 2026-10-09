@@ -483,9 +483,10 @@ export type LaunchBody = {
   core?: string;
   /** Ausente aciona a autoconfiguração a partir do parecer do console. */
   options?: LaunchOptions;
-  /** Abre no estado de retomada da última sessão ("Continuar"). Só faz
-   * sentido quando o jogo traz `resume_saved_at`. */
-  resume?: boolean;
+  /** "fresh" começa do início (padrão do servidor); "resume" abre no estado
+   * de retomada da última sessão ("Continuar"). "resume" só faz sentido
+   * quando o jogo traz `resume_saved_at`. */
+  mode?: "fresh" | "resume";
 };
 
 export type Command = {

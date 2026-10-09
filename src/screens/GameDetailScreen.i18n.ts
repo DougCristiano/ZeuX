@@ -52,8 +52,16 @@ export const dict = {
   chooseBanner: { "pt-BR": "Escolher banner", en: "Choose banner" },
   screenshotsHeading: { "pt-BR": "Prints", en: "Screenshots" },
   continueButton: { "pt-BR": "Continuar", en: "Continue" },
-  playFromStart: { "pt-BR": "Jogar do início", en: "Play from start" },
+  playFromStart: { "pt-BR": "Iniciar do zero", en: "Start from scratch" },
   resumeSavedAt: { "pt-BR": "de onde você parou · {{date}}", en: "where you left off · {{date}}" },
+  resumeNoState: {
+    "pt-BR": "Ainda não há estado salvo. O emulador grava um ao fechar o jogo; depois disso, Continuar abre dali.",
+    en: "No saved state yet. The emulator writes one when you close the game; after that, Continue picks up there.",
+  },
+  resumeUnsupported: {
+    "pt-BR": "Este emulador ainda não abre o jogo num estado salvo. Por enquanto o jogo abre do início.",
+    en: "This emulator can't open a game from a saved state yet. For now the game starts from the beginning.",
+  },
   coreDownloadingMessage: {
     "pt-BR": "O core {{core_name}} ainda não estava no seu computador. Baixando…{{extra}}{{percent}}",
     en: "The {{core_name}} core wasn't on your computer yet. Downloading…{{extra}}{{percent}}",

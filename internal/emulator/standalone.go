@@ -56,6 +56,19 @@ func (a standaloneAdapter) BuildCommand(install Installation, req Request) (Comm
 
 	opts, romPart, unapplied := a.buildArgs(req)
 
+	// Continuar num emulador sem suporte não pode fingir que foi atendido: o
+	// jogo abre do início e o usuário precisa saber disso pela própria prévia.
+	if req.Mode == ModeResume {
+		if !SupportsResume(a.id) {
+			unapplied = append(unapplied, resumeUnappliedMessage)
+		} else if req.StatePath == "" {
+			// Prévia (POST /games/preview): não há disco consultado, então o
+			// estado só entra no lançamento de verdade.
+			unapplied = append(unapplied,
+				"O estado de retomada é localizado na hora de abrir o jogo; esta prévia mostra a linha sem ele.")
+		}
+	}
+
 	argv := append([]string{install.BinaryPath}, opts...)
 	argv = append(argv, req.Options.Extra...)
 	argv = append(argv, romPart...)
@@ -102,8 +115,11 @@ func newDuckStation() Adapter {
 			}
 			// `-statefile <arquivo>` está na ajuda do próprio DuckStation
 			// (duckstation-qt/qthost.cpp, PrintCommandLineHelp) — "Loads state
-			// from the specified filename". Não validado contra o binário.
-			if req.StatePath != "" {
+			// from the specified filename". Lido no código-fonte, não no binário.
+			// Usamos o caminho explícito e não o `-resume`, que escolhe o
+			// arquivo pelo nome do jogo ou pelo mais recente: aqui o estado
+			// deste jogo já é conhecido (resume.go).
+			if req.Mode == ModeResume && req.StatePath != "" {
 				opts = append(opts, "-statefile", req.StatePath)
 			}
 
@@ -145,7 +161,7 @@ func newPCSX2() Adapter {
 			}
 			// Mesma flag do DuckStation, na ajuda do PCSX2
 			// (pcsx2-qt/QtHost.cpp). Fica antes do "--": é opção, não jogo.
-			if req.StatePath != "" {
+			if req.Mode == ModeResume && req.StatePath != "" {
 				opts = append(opts, "-statefile", req.StatePath)
 			}
 
