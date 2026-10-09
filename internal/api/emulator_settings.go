@@ -98,6 +98,10 @@ func saveAdapterFor(consoleID string) string {
 		return "duckstation"
 	case "ps2":
 		return "pcsx2"
+	case "gamecube", "wii":
+		// Dolphin: os estados vêm do GameID do jogo (dolphin_saves.go). A
+		// listagem não mostra cartão nem NAND do Wii ainda.
+		return "dolphin"
 	}
 	return ""
 }

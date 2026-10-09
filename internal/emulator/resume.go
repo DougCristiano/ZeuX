@@ -44,7 +44,7 @@ var ErrNoResumeState = errors.New("não há um estado salvo para continuar este 
 
 // SupportsResume diz se o ZeuX sabe abrir este emulador num estado salvo.
 func SupportsResume(adapterID string) bool {
-	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch"
+	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch" || adapterID == "dolphin"
 }
 
 // resumeStateLocation devolve a pasta de save states do emulador e como
@@ -85,6 +85,14 @@ func resumeStateLocation(adapterID string, install Installation) (dir string, ma
 		return states, func(name string) bool {
 			return strings.HasSuffix(strings.ToLower(name), ".resume.p2s")
 		}, true
+	case "dolphin":
+		// Dolphin não tem arquivo de retomada próprio: a sessão pega o estado
+		// "<GameID>.sNN" gravado por ela (dolphin_saves.go).
+		dir, ok := dolphinStatesDir(install)
+		if !ok {
+			return "", nil, false
+		}
+		return dir, dolphinResumeMatch, true
 	default:
 		return "", nil, false
 	}

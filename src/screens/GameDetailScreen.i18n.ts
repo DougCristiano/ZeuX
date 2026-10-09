@@ -65,6 +65,14 @@ export const dict = {
     "pt-BR": "Ainda não há estado salvo. O RetroArch grava um ao fechar o jogo; depois disso, Continuar abre dali.",
     en: "No saved state yet. RetroArch writes one when you close the game; after that, Continue picks up there.",
   },
+  // O Dolphin não grava estado sozinho ao fechar (o ZeuX não liga nada para
+  // isso): o estado de "Continuar" só existe depois que a pessoa salva um
+  // durante o jogo. Por isso a frase do Dolphin não diz que o emulador grava
+  // ao fechar, como a do RetroArch e a do DuckStation/PCSX2 fazem.
+  resumeNoStateDolphin: {
+    "pt-BR": "Ainda não há estado salvo. Salve um estado durante o jogo, no próprio Dolphin; depois disso, Continuar abre dali.",
+    en: "No saved state yet. Save a state during the game, inside Dolphin itself; after that, Continue picks up there.",
+  },
   resumeUnsupported: {
     "pt-BR": "Este emulador ainda não abre o jogo num estado salvo. Por enquanto o jogo abre do início.",
     en: "This emulator can't open a game from a saved state yet. For now the game starts from the beginning.",

@@ -2634,3 +2634,71 @@ auto-load é controlado à parte).
 
 **Não validado com o binário:** que o arquivo gerado no disco tem o nome
 `<jogo>.state.auto` e fica na pasta de estados do `retroarch.cfg`.
+
+
+## Saves e retomada: Dolphin e RMG (2026-10-09)
+
+**Decisão:** o Dolphin ganha saves por jogo (só states) e "Continuar" via `-s`.
+O RMG ganha só o modo explícito de lançamento, sem retomada: o `--load-state-slot`
+existe, mas o ZeuX não consegue dizer em qual slot está o estado do jogo.
+Sem saves por jogo no RMG.
+
+**Fontes (lidas em 2026-10-09 com WebFetch no raw do GitHub):**
+
+- Dolphin, `Source/Core/UICommon/CommandLineParse.cpp`: `parser->add_option("-s", "--save_state")`,
+  `.metavar("<file>")`, `.help("Load the initial save state")`.
+- Dolphin, `Source/Core/Core/Core.cpp`: `if (savestate_path) { ::State::LoadAs(system, *savestate_path); ... }`,
+  executado depois do `CBoot::BootUp`. Por isso `-s` convive com `-e <jogo>`.
+- Dolphin, `Source/Core/Core/State.cpp`, `MakeStateFilename`: `"{}{}.s{:02d}"` com
+  `File::GetUserPath(D_STATESAVES_IDX)` e `SConfig::GetInstance().GetGameID()`.
+- Dolphin, `Source/Core/Common/CommonPaths.h`: `STATESAVES_DIR "StateSaves"`, `GC_USER_DIR "GC"`,
+  `NORMAL_USER_DIR` ("Dolphin Emulator" no Windows, "Library/Application Support/Dolphin" no macOS,
+  "dolphin-emu" nos demais), `PORTABLE_USER_DIR` ("User" no Windows e macOS, "user" nos demais).
+- Dolphin, `Source/Core/UICommon/UICommon.cpp`, `SetUserDirectory`: `File::Exists(exe_path + DIR_SEP "portable.txt")`
+  manda para a pasta portátil; no POSIX sem portátil, `home_path + "." NORMAL_USER_DIR`.
+- RMG, `Source/RMG/main.cpp`: `QCommandLineOption loadStateSlot("load-state-slot", "Loads save state slot when launching the ROM", "Slot Number")`,
+  com valor válido de 0 a 9.
+- mupen64plus-core, `src/main/savestates.c` (`savestates_generate_path`): `"%s%s.st%d"` com
+  `get_savestatepath()` e `ROM_SETTINGS.goodname` (ou `get_savestatefilename()` como fallback).
+  O nome do arquivo depende do *goodname* da ROM, que o ZeuX não tem.
+
+**O que foi implementado (Dolphin):**
+
+- Fresh: sem `-s`. O Dolphin não tem auto-load de estado por configuração, então omitir a flag basta.
+- Resume: `-s <StatePath>` antes de `-e <ROM>` (`standalone.go`). `SupportsResume("dolphin")` passa a ser verdadeiro.
+- Retomada registrada como nos demais: `resumeStateLocation` aponta para `<pasta de usuário>/StateSaves`,
+  com o casamento `^[A-Za-z0-9]{6}\.s\d{2}$`, e `recordResumeState` pega o estado mais recente
+  gravado a partir do início da sessão (janela de 2 s, como `newestResumeFile`).
+- GameID: sai do nome do estado de retomada (`DiscIDFor`). Sem estado, o ZeuX não conhece o GameID.
+- Saves por jogo: `findDolphinGameSaves` lista só os `<GameID>.sNN` do jogo. Sem GameID devolve `known: false`.
+- Pasta de usuário: `dolphinUserDirFor` aplica a regra de `SetUserDirectory` por SO.
+  Caminho `Documents\Dolphin Emulator` no Windows sem portátil **não** veio do trecho de UICommon.cpp lido;
+  veio da tabela de docs/pendencias.md.
+- UI: "Continuar" habilitado para o Dolphin, com frase própria (`resumeNoStateDolphin`) porque o Dolphin
+  não grava estado ao fechar (o ZeuX não liga nada para isso).
+- API: `saveAdapterFor` manda `gamecube` e `wii` para o Dolphin.
+
+**O que ficou de fora (Dolphin):**
+
+- **Cartão de memória GameCube** (arquivo raw ou pasta GCI) e **NAND do Wii**: o caminho do cartão sai de `Dolphin.ini`
+  (`MemcardAPath`), e a pasta GCI não foi lida até o fim. Sem isso, listar o cartão seria chutar.
+- **GameID a partir do ISO/RVZ**: o cabeçalho do disco não foi confirmado no código-fonte (`DiscIO/Volume.h` só declara
+  a interface). Por isso o GameID só existe depois do primeiro estado gravado pela sessão.
+
+**O que ficou de fora (RMG):**
+
+- `--load-state-slot` existe, mas o ZeuX não consegue saber o slot do estado do jogo: o nome do arquivo depende
+  do goodname da ROM e a pasta de estados depende do `mupen64plus.cfg` do RMG, que o ZeuX não lê. "Continuar"
+  no RMG cai no aviso genérico `resumeUnappliedMessage` (`Unapplied`). Não é `Unapplied` por falta de flag.
+- Saves do RMG (`.eep`/`.sra`/`.fla`/`.mpk`) seguem o mesmo goodname: sem ele, o ZeuX não tem como
+  associar o arquivo ao jogo.
+
+**Ressalva:** nada disso foi validado contra o binário real do Dolphin ou do RMG. As flags vêm do código-fonte,
+não de uma execução com ROM. Um teste com jogo de verdade é o que confirma `-s` e o caminho de `StateSaves`.
+
+**Riscos:**
+
+- Um estado mal atribuído (de outro jogo na mesma sessão) entraria no "Continuar". Hoje isso não acontece, porque
+  só um jogo roda por vez, mas o ZeuX não confere o GameID do estado com o do jogo.
+- Se o Dolphin consultar XDG antes de `~/.dolphin-emu` no Linux, a pasta de estados sai errada e o ZeuX não acha
+  os estados (falha segura: aparece como "ainda não há estado").
