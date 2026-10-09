@@ -1550,11 +1550,14 @@ func (s *Server) handlePreviewLaunch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A prévia mostra o que o lançamento real faria, inclusive a escolha de
+	// salvar estado ao fechar (launch_prefs.go).
 	cmd, err := adapter.BuildCommand(install, emulator.Request{
-		ROMPath:   input.ROMPath,
-		ConsoleID: input.ConsoleID,
-		Core:      input.Core,
-		Options:   input.Options,
+		ROMPath:          input.ROMPath,
+		ConsoleID:        input.ConsoleID,
+		Core:             input.Core,
+		Options:          input.Options,
+		AutoSaveStateOff: !s.launcher.AutoSaveStateFor(r.Context(), adapter.ID()),
 	})
 	if err != nil {
 		s.writeError(w, http.StatusBadRequest, "command_failed", err.Error())

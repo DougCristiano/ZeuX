@@ -183,13 +183,17 @@ func TestEmptyBackupIsReplacedByRealContent(t *testing.T) {
 	}
 }
 
-// Trava que a mesclagem do PCSX2 só força o auto-update desligado num
-// arquivo existente — nada mais muda sem o usuário pedir.
+// Trava que a mesclagem do PCSX2 força o auto-update desligado e não mexe no
+// resto das opções que a pessoa já tem. A única chave acrescentada é o
+// salvamento ao fechar, e só porque ela faltava (decisão de 2026-10-09).
 func TestMergePCSX2DefaultsOnlyAutoUpdater(t *testing.T) {
 	in := "[UI]\nSettingsVersion = 1\nStartFullscreen = true\n[AutoUpdater]\nCheckAtStartup = true\n"
 	got := string(MergePCSX2Defaults([]byte(in), false))
 	want := strings.Replace(in, "CheckAtStartup = true", "CheckAtStartup = false", 1)
-	if got != want {
-		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	if !strings.Contains(got, "CheckAtStartup = false") || !strings.Contains(got, "StartFullscreen = true") {
+		t.Errorf("auto-update ou opção existente não ficou como deveria:\n%s", got)
+	}
+	if strings.Replace(got, "\n[EmuCore]\nSaveStateOnShutdown = true\n", "", 1) != want {
+		t.Errorf("além do auto-update, só o salvamento ao fechar pode ser acrescentado:\n%s", got)
 	}
 }

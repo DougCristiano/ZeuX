@@ -234,8 +234,13 @@ func (l *Launcher) resumeStateFor(ctx context.Context, romPath, adapterID string
 // SetupWizardIncomplete — ver seedPCSX2) + [Pad1]. Sempre: auto-update
 // desligado — o ZeuX gerencia a versão (levantamento do Douglas,
 // 2026-10-05: a seção [AutoUpdater] só aparece quando alguém mexe, e o
-// padrão do PCSX2 é checar ao abrir). Fora isso nada muda: "não mudar
-// comportamento sem o usuário pedir".
+// padrão do PCSX2 é checar ao abrir).
+//
+// SaveStateOnShutdown (salvar estado ao fechar) entra ligado SÓ quando a chave
+// falta: o padrão do PCSX2 é desligado, e sem o estado ao fechar não há o que
+// o "Continuar" retome (decisão do Douglas, 2026-10-09, que reverte a de
+// 2026-10-05). Se a pessoa já desligou na tela de opções, a chave existe e
+// fica como está.
 func MergePCSX2Defaults(existing []byte, fresh bool) []byte {
 	ini := parseINI(existing)
 	if fresh {
@@ -246,6 +251,9 @@ func MergePCSX2Defaults(existing []byte, fresh bool) []byte {
 		}
 	}
 	ini.set("AutoUpdater", "CheckAtStartup", "false")
+	if _, has := ini.get("EmuCore", "SaveStateOnShutdown"); !has {
+		ini.set("EmuCore", "SaveStateOnShutdown", "true")
+	}
 	return ini.bytes()
 }
 

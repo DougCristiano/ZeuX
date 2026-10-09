@@ -40,6 +40,22 @@ func (s *Server) handleEmulatorSettings(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusOK, map[string]any{"available": false, "message": "Este emulador não está instalado."})
 		return
 	}
+	if emulator.StoresSettingsInZeuX(id) {
+		// RetroArch e Flycast: a opção mora no banco do ZeuX, não no arquivo do
+		// emulador, então não há o que ler do disco nem o que esperar do emulador
+		// fechado.
+		stored, err := s.launcher.StoredEmulatorSettings(r.Context(), id)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "emulator_settings_read_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"available": true,
+			"running":   s.launcher.AdapterRunning(r.Context(), id),
+			"settings":  stored,
+		})
+		return
+	}
 	settings, err := emulator.ReadEmulatorSettings(id, install)
 	if errors.Is(err, emulator.ErrDuckStationNotManaged) {
 		writeJSON(w, http.StatusOK, map[string]any{"available": false, "message": err.Error()})
@@ -68,14 +84,30 @@ func (s *Server) handleSetEmulatorSettings(w http.ResponseWriter, r *http.Reques
 		s.writeError(w, http.StatusBadRequest, "invalid_body", `O corpo deve ser {"values": {"Seção.Chave": "valor"}}.`)
 		return
 	}
-	if s.launcher.AdapterRunning(r.Context(), id) {
-		s.writeError(w, http.StatusConflict, "emulator_running",
-			"Feche o emulador antes de mudar as opções — ele grava a configuração dele ao fechar e desfaria a mudança.")
-		return
-	}
 	install, ok := s.emulatorInstall(r, id)
 	if !ok {
 		s.writeError(w, http.StatusBadRequest, "emulator_not_installed", "Este emulador não está instalado.")
+		return
+	}
+	if emulator.StoresSettingsInZeuX(id) {
+		// Guardada no ZeuX, não no arquivo do emulador: não há o que desfazer se
+		// o emulador regravar a própria configuração ao fechar, então o aberto
+		// não bloqueia a escolha. Vale para o próximo lançamento.
+		if err := s.launcher.SetStoredEmulatorSettings(r.Context(), id, body.Values); err != nil {
+			s.writeError(w, http.StatusBadRequest, "emulator_settings_invalid", err.Error())
+			return
+		}
+		stored, err := s.launcher.StoredEmulatorSettings(r.Context(), id)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "emulator_settings_read_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"available": true, "running": s.launcher.AdapterRunning(r.Context(), id), "settings": stored})
+		return
+	}
+	if s.launcher.AdapterRunning(r.Context(), id) {
+		s.writeError(w, http.StatusConflict, "emulator_running",
+			"Feche o emulador antes de mudar as opções — ele grava a configuração dele ao fechar e desfaria a mudança.")
 		return
 	}
 	if err := emulator.WriteEmulatorSettings(id, install, body.Values); err != nil {

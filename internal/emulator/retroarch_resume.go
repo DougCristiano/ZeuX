@@ -47,25 +47,33 @@ const retroArchAutoLoadKey = "savestate_auto_load"
 const retroArchAutoSaveKey = "savestate_auto_save"
 
 // retroArchAppendConfigContent devolve o arquivo de config extra para o modo
-// pedido. Função pura (sem disco), para o teste travar o conteúdo sem gravar
-// nada.
+// pedido e para a escolha de salvar estado ao fechar (autoSave). Função pura
+// (sem disco), para o teste travar o conteúdo sem gravar nada.
+//
+// savestate_auto_save vai sempre explícito, "true" ou "false": a opção do ZeuX
+// é o que vale nos lançamentos dele, então desligada ela também precisa
+// sobrepor um savestate_auto_save ligado no retroarch.cfg do usuário.
 //
 // config_save_on_exit = "false" é obrigatório: o help do --appendconfig diz que
 // as configurações do arquivo extra são gravadas no config principal "whenever
 // it is saved, on exit included", e sem essa linha o savestate_auto_load e o
 // savestate_auto_save do modo escolhido vazariam para o retroarch.cfg do
 // usuário.
-func retroArchAppendConfigContent(mode Mode) []byte {
+func retroArchAppendConfigContent(mode Mode, autoSave bool) []byte {
 	autoLoad := "false"
 	if mode == ModeResume {
 		autoLoad = "true"
 	}
+	autoSaveValue := "false"
+	if autoSave {
+		autoSaveValue = "true"
+	}
 	return []byte(fmt.Sprintf(
 		"# Gerado pelo ZeuX para o lançamento (%s). Não edite: é regravado a cada jogo.\n"+
 			"%s = %q\n"+
-			"%s = \"true\"\n"+
+			"%s = %q\n"+
 			"config_save_on_exit = \"false\"\n",
-		string(mode), retroArchAutoLoadKey, autoLoad, retroArchAutoSaveKey))
+		string(mode), retroArchAutoLoadKey, autoLoad, retroArchAutoSaveKey, autoSaveValue))
 }
 
 // retroArchAppendConfigPath é o caminho do arquivo de override de cada modo,
@@ -86,7 +94,7 @@ func retroArchAppendConfigPath(mode Mode) (string, error) {
 //
 // Recusa caminho com "|": o help do --appendconfig diz que vários arquivos são
 // separados por '|', então um caminho com esse caractere seria lido em pedaços.
-func writeRetroArchAppendConfig(mode Mode) (string, error) {
+func writeRetroArchAppendConfig(mode Mode, autoSave bool) (string, error) {
 	path, err := retroArchAppendConfigPath(mode)
 	if err != nil {
 		return "", fmt.Errorf("localizando a pasta de dados do ZeuX: %w", err)
@@ -97,7 +105,7 @@ func writeRetroArchAppendConfig(mode Mode) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", fmt.Errorf("criando a pasta da configuração do RetroArch: %w", err)
 	}
-	if err := os.WriteFile(path, retroArchAppendConfigContent(mode), 0o644); err != nil {
+	if err := os.WriteFile(path, retroArchAppendConfigContent(mode, autoSave), 0o644); err != nil {
 		return "", fmt.Errorf("gravando a configuração do RetroArch: %w", err)
 	}
 	return path, nil

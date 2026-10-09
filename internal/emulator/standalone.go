@@ -291,6 +291,16 @@ func newFlycast() Adapter {
 			if req.Options.Fullscreen {
 				opts = append(opts, "-config", "window:fullscreen=yes")
 			}
+			// Salvar estado ao fechar (decisão do Douglas, 2026-10-09): ligado por
+			// padrão do ZeuX, e explícito nos dois sentidos, para que o emu.cfg do
+			// usuário não decida no lugar da escolha feita na tela. Sem essa linha
+			// nenhum estado de retomada é gravado ao fechar (Dreamcast.AutoSaveState,
+			// core/emulator.cpp, unloadGame).
+			if req.AutoSaveStateOff {
+				opts = append(opts, "-config", "Dreamcast:AutoSaveState=no")
+			} else {
+				opts = append(opts, "-config", "Dreamcast:AutoSaveState=yes")
+			}
 			if req.Options.InternalScale > 1 {
 				unapplied = append(unapplied,
 					"A resolução interna precisa ser ajustada dentro do Flycast.")

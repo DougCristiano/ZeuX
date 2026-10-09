@@ -33,7 +33,7 @@ func retroArchWithCore(t *testing.T) Installation {
 // RetroArch carrega <jogo>.state.auto mesmo sem nenhuma flag de estado, se o
 // retroarch.cfg do usuário tiver o auto-load ligado.
 func TestRetroArchFreshOverrideDisablesAutoLoad(t *testing.T) {
-	content := string(retroArchAppendConfigContent(ModeFresh))
+	content := string(retroArchAppendConfigContent(ModeFresh, true))
 	if !strings.Contains(content, `savestate_auto_load = "false"`) {
 		t.Errorf("modo fresh deveria desligar o auto-load:\n%s", content)
 	}
@@ -45,7 +45,7 @@ func TestRetroArchFreshOverrideDisablesAutoLoad(t *testing.T) {
 // Trava que "Continuar" grava savestate_auto_load = "true", que é a condição
 // para o RetroArch carregar <jogo>.state.auto na abertura.
 func TestRetroArchResumeOverrideEnablesAutoLoad(t *testing.T) {
-	content := string(retroArchAppendConfigContent(ModeResume))
+	content := string(retroArchAppendConfigContent(ModeResume, true))
 	if !strings.Contains(content, `savestate_auto_load = "true"`) {
 		t.Errorf("modo resume deveria ligar o auto-load:\n%s", content)
 	}
@@ -57,7 +57,7 @@ func TestRetroArchResumeOverrideEnablesAutoLoad(t *testing.T) {
 // ao sair dessa partida que nasce o primeiro estado para continuar depois.
 func TestRetroArchOverridesEnableAutoSaveInBothModes(t *testing.T) {
 	for _, mode := range []Mode{ModeFresh, ModeResume} {
-		content := string(retroArchAppendConfigContent(mode))
+		content := string(retroArchAppendConfigContent(mode, true))
 		if !strings.Contains(content, `savestate_auto_save = "true"`) {
 			t.Errorf("modo %s: deveria ligar o savestate_auto_save:\n%s", mode, content)
 		}
@@ -70,7 +70,7 @@ func TestRetroArchOverridesEnableAutoSaveInBothModes(t *testing.T) {
 // included", a não ser que config_save_on_exit = "false" esteja nele.
 func TestRetroArchOverrideNeverWritesBackToUserConfig(t *testing.T) {
 	for _, mode := range []Mode{ModeFresh, ModeResume} {
-		content := string(retroArchAppendConfigContent(mode))
+		content := string(retroArchAppendConfigContent(mode, true))
 		if !strings.Contains(content, `config_save_on_exit = "false"`) {
 			t.Errorf("modo %s: falta config_save_on_exit = \"false\":\n%s", mode, content)
 		}
@@ -177,7 +177,7 @@ func TestWriteRetroArchAppendConfigUsesZeuXDataDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", root)
 	t.Setenv("APPDATA", root)
 
-	path, err := writeRetroArchAppendConfig(ModeResume)
+	path, err := writeRetroArchAppendConfig(ModeResume, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func TestWriteRetroArchAppendConfigUsesZeuXDataDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(data) != string(retroArchAppendConfigContent(ModeResume)) {
+	if string(data) != string(retroArchAppendConfigContent(ModeResume, true)) {
 		t.Errorf("conteúdo gravado diferente do esperado:\n%s", data)
 	}
 }
@@ -202,7 +202,7 @@ func TestWriteRetroArchAppendConfigRefusesPipeInPath(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", root)
 	t.Setenv("APPDATA", root)
 
-	if _, err := writeRetroArchAppendConfig(ModeFresh); err == nil {
+	if _, err := writeRetroArchAppendConfig(ModeFresh, true); err == nil {
 		t.Error("caminho com '|' deveria ser recusado")
 	}
 }

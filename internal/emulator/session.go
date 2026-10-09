@@ -173,10 +173,10 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 			l.logger.Warn("não foi possível completar a configuração do DuckStation", "erro", err)
 		}
 	}
-	// O PCSX2 grava o estado de retomada só com SaveStateOnShutdown ligado,
-	// e o padrão é desligado. Até 2026-10-05 o ZeuX ligava sozinho; agora é
-	// opção do usuário na tela do PS2 ("não mudar comportamento sem o usuário
-	// pedir"). Aqui só entra o auto-update desligado.
+	// O PCSX2 grava o estado de retomada só com SaveStateOnShutdown ligado, e
+	// o padrão dele é desligado. Desde 2026-10-09 (decisão do Douglas) o ZeuX
+	// liga essa chave quando ela falta, e a pessoa pode desligá-la na tela do
+	// PS2; EnsurePCSX2Defaults cuida das duas coisas.
 	if adapter.ID() == "pcsx2" && !l.AdapterRunning(ctx, "pcsx2") {
 		if err := EnsurePCSX2Defaults(); err != nil {
 			l.logger.Warn("não foi possível completar a configuração do PCSX2", "erro", err)
@@ -223,10 +223,14 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 	// config extra gravado no diretório do ZeuX (retroarch_resume.go). Não
 	// gravar não pode bloquear o jogo: o aviso vai para a sessão, e o
 	// retroarch.cfg do usuário segue valendo.
+	// A opção "Salvar estado ao fechar o jogo" do RetroArch e do Flycast mora no
+	// banco do ZeuX (launch_prefs.go); no RetroArch ela também vai para o
+	// arquivo de override, junto com o modo.
+	autoSave := l.AutoSaveStateFor(ctx, adapter.ID())
 	var appendConfig string
 	var appendUnapplied []string
 	if adapter.ID() == "retroarch" {
-		appendConfig, err = writeRetroArchAppendConfig(mode)
+		appendConfig, err = writeRetroArchAppendConfig(mode, autoSave)
 		if err != nil {
 			l.logger.Warn("não foi possível gravar a configuração de lançamento do RetroArch",
 				"modo", string(mode), "erro", err)
@@ -243,6 +247,7 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		Mode:             mode,
 		StatePath:        statePath,
 		AppendConfigPath: appendConfig,
+		AutoSaveStateOff: !autoSave,
 	})
 	if err != nil {
 		return Session{}, err

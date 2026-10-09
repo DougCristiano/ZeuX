@@ -114,6 +114,13 @@ type Request struct {
 	// fica ligado ou desligado naquele lançamento. BuildCommand só referencia o
 	// caminho. Vazio (prévia, ou a gravação falhou) vira aviso em Unapplied.
 	AppendConfigPath string
+
+	// AutoSaveStateOff desliga o salvamento do estado ao fechar o jogo. Vale
+	// só para os emuladores que o ZeuX guarda no próprio banco (RetroArch e
+	// Flycast, ver launch_prefs.go). O zero vale "ligado", que é o padrão do
+	// ZeuX: uma prévia ou um pedido sem a escolha continua mostrando o que
+	// o lançamento real faria.
+	AutoSaveStateOff bool
 }
 
 // resumeUnappliedMessage é o aviso que um adapter sem suporte a retomada
