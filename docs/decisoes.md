@@ -370,6 +370,21 @@ grava cores em `%APPDATA%\RetroArch\cores` — um core instalado por lá rodava
 de verdade no RetroArch, mas o ZeuX reportava "não instalado". Corrigido
 adicionando esse caminho à busca.
 
+**Achado real (2026-10-09): "falta core" com o jogo rodando — diretório
+configurado pelo usuário.** O RetroArch carrega cores de `libretro_directory`
+(retroarch.cfg) ou da variável `LIBRETRO_DIRECTORY`; o padrão é
+`$XDG_CONFIG_HOME/retroarch/cores` (ou `~/.config/retroarch/cores`) no Linux,
+`<pasta do exe>\cores` no Windows e `~/Library/Application Support/RetroArch/cores`
+no macOS (fontes: `retroarch.cfg`, `frontend/drivers/platform_unix.c`,
+`platform_win32.c` e `platform_darwin.m` do libretro/RetroArch). `coreDirs()`
+só tinha uma lista fixa e não lia nada disso; qualquer diretório
+personalizado fazia o ZeuX dizer "baixar core" (`consoleReadiness.ts`,
+`RetroArchCoreStatus`) enquanto o RetroArch rodava. `coreDirs()` agora inclui
+`LIBRETRO_DIRECTORY`, o `libretro_directory` do cfg (`configuredCoreDirs`),
+`$XDG_CONFIG_HOME` e `/usr/lib64/libretro`, logo depois da pasta gerida (que
+continua primeiro, de que `RetroArchManagedCoresDir` depende). Ficam de fora,
+sem fonte verificada: Steam e o bundle do .app no macOS.
+
 ### Auto-updater assinado via Tauri (v0.1.10, 2026-09-06)
 
 O app ganhou atualização automática: assinatura dos instaladores via

@@ -275,6 +275,9 @@ func locateCore(binaryPath, coreName string) (string, bool) {
 // macOS ficam no diretório de configuração do usuário ou caminhos do sistema.
 func coreDirs(binaryPath string) []string {
 	dirs := bundledCoreDirs()
+	// O diretório que o próprio RetroArch do usuário está configurado para
+	// usar vem logo depois da pasta gerida: é onde ele de fato carrega cores.
+	dirs = append(dirs, configuredCoreDirs(binaryPath)...)
 	dirs = append(dirs, filepath.Join(filepath.Dir(binaryPath), "cores"))
 
 	if home, err := os.UserHomeDir(); err == nil {
@@ -298,10 +301,16 @@ func coreDirs(binaryPath string) []string {
 			dirs = append(dirs,
 				filepath.Join(home, "Library", "Application Support", "RetroArch", "cores"))
 		default:
+			if xdg, err := os.UserConfigDir(); err == nil {
+				// O RetroArch usa $XDG_CONFIG_HOME/retroarch quando a variável
+				// existe (platform_unix.c); ~/.config só é o fallback.
+				dirs = append(dirs, filepath.Join(xdg, "retroarch", "cores"))
+			}
 			dirs = append(dirs,
 				filepath.Join(home, ".config", "retroarch", "cores"),
 				filepath.Join(home, ".var", "app", "org.libretro.RetroArch", "config", "retroarch", "cores"),
 				"/usr/lib/libretro",
+				"/usr/lib64/libretro",
 				"/usr/lib/x86_64-linux-gnu/libretro",
 				"/usr/local/lib/libretro",
 			)
@@ -309,6 +318,59 @@ func coreDirs(binaryPath string) []string {
 	}
 
 	return dirs
+}
+
+// configuredCoreDirs devolve o diretório de cores que o RetroArch do usuário
+// está configurado para usar: a variável LIBRETRO_DIRECTORY (que o RetroArch
+// lê ao definir o padrão, nos frontends unix e win32) e a chave
+// `libretro_directory` do retroarch.cfg.
+//
+// Achado (2026-10-09, relato do Douglas: "falta core, mas o jogo roda"): a
+// lista fixa de coreDirs não enxergava um diretório personalizado, então o
+// ZeuX dizia "core ausente" para um core que o RetroArch carregava normalmente.
+func configuredCoreDirs(binaryPath string) []string {
+	var dirs []string
+	add := func(raw string) {
+		if dir := resolveCfgCoreDir(raw, binaryPath); dir != "" {
+			dirs = append(dirs, dir)
+		}
+	}
+	add(os.Getenv("LIBRETRO_DIRECTORY"))
+
+	if cfgPath, err := retroArchConfigPath(Installation{BinaryPath: binaryPath}); err == nil {
+		if data, err := os.ReadFile(cfgPath); err == nil {
+			if value, ok := parseRetroArchCfg(data).get("libretro_directory"); ok {
+				add(value)
+			}
+		}
+	}
+	return dirs
+}
+
+// resolveCfgCoreDir traduz o valor de `libretro_directory` para um caminho
+// real. O RetroArch grava "default" quando o usuário nunca mexeu (equivale a
+// não ter configurado nada), usa o prefixo ":" para "pasta do executável" e
+// "~" para o diretório pessoal. Caminho relativo é descartado de propósito:
+// relativo a quê dependeria do diretório de trabalho do RetroArch, que o
+// ZeuX não conhece.
+func resolveCfgCoreDir(raw, binaryPath string) string {
+	raw = strings.TrimSpace(raw)
+	slashed := strings.ReplaceAll(raw, `\`, "/")
+	switch {
+	case raw == "" || raw == "default":
+		return ""
+	case strings.HasPrefix(raw, ":"):
+		return filepath.Join(filepath.Dir(binaryPath), filepath.FromSlash(strings.TrimLeft(slashed[1:], "/")))
+	case raw == "~" || strings.HasPrefix(slashed, "~/"):
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		return filepath.Join(home, filepath.FromSlash(strings.TrimLeft(slashed[1:], "/")))
+	case filepath.IsAbs(raw):
+		return filepath.Clean(raw)
+	}
+	return ""
 }
 
 // bundledCoreDirs retorna o diretório onde os cores empacotados com o ZeuX
