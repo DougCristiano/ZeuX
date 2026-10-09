@@ -9,6 +9,18 @@ export const dict = {
     "pt-BR": "Gravadas direto no arquivo de configuração do {{name}}. Só muda o que você alterar aqui — o resto do arquivo fica como está.",
     en: "Written straight to {{name}}'s configuration file. Only what you change here is touched — the rest of the file stays as is.",
   },
+  // RetroArch e Flycast não têm arquivo que o ZeuX escreva: a opção fica no
+  // ZeuX e vale nos próximos lançamentos (launch_prefs.go).
+  modalDescriptionZeuX: {
+    "pt-BR": "Estas opções ficam guardadas no ZeuX e valem para os próximos lançamentos do {{name}}. O arquivo de configuração do emulador não é alterado por aqui.",
+    en: "These options are kept in ZeuX and apply to the next launches of {{name}}. The emulator's configuration file is not changed here.",
+  },
+  // Um só texto para a opção de auto-save nos quatro emuladores que a têm: o
+  // ID é igual em todos (AutoSaveStateID no servidor).
+  auto_save_state: {
+    "pt-BR": "Salvar estado ao fechar o jogo — é desse estado que o botão Continuar retoma.",
+    en: "Save state when closing the game — the Continue button resumes from it.",
+  },
   screenshotKey: { "pt-BR": "Tecla de print", en: "Screenshot key" },
   loading: { "pt-BR": "Lendo as opções…", en: "Reading options…" },
   readError: { "pt-BR": "Não foi possível ler as opções.", en: "Could not read the options." },
@@ -39,7 +51,6 @@ export const dict = {
   "EmuCore.EnableDiscordPresence": { "pt-BR": "Mostrar o jogo no Discord", en: "Show the game on Discord" },
   "EmuCore.UseSavestateSelector": { "pt-BR": "Mostrar seletor de slot ao salvar/carregar", en: "Show slot selector on save/load" },
   "EmuCore.BackupSavestate": { "pt-BR": "Guardar cópia do estado anterior", en: "Keep a backup of the previous state" },
-  "EmuCore.SaveStateOnShutdown": { "pt-BR": "Salvar o estado ao fechar (permite Continuar)", en: "Save state on exit (enables Continue)" },
   "SPU2/Output.BufferMS": { "pt-BR": "Buffer de áudio (ms)", en: "Audio buffer (ms)" },
   "SPU2/Output.StandardVolume": { "pt-BR": "Volume (0–100)", en: "Volume (0–100)" },
   "EmuCore/GS.upscale_multiplier": { "pt-BR": "Resolução interna (multiplicador, 1–8)", en: "Internal resolution (multiplier, 1–8)" },
@@ -84,7 +95,6 @@ export const dict = {
   "Main.DoubleClickTogglesFullscreen": { "pt-BR": "Clique duplo alterna tela cheia", en: "Double-click toggles fullscreen" },
   "Display.AutoResizeWindow": { "pt-BR": "Ajustar o tamanho da janela ao jogo", en: "Resize window to the game" },
   "Main.ConfirmPowerOff": { "pt-BR": "Perguntar antes de fechar o jogo", en: "Confirm before closing the game" },
-  "Main.SaveStateOnExit": { "pt-BR": "Salvar o estado ao fechar (permite Continuar)", en: "Save state on exit (enables Continue)" },
   "Main.CreateSaveStateBackups": { "pt-BR": "Guardar cópia do estado anterior", en: "Keep a backup of the previous state" },
   "Main.PauseOnFocusLoss": { "pt-BR": "Pausar quando a janela perde o foco", en: "Pause when the window loses focus" },
   "Main.PauseOnControllerDisconnection": { "pt-BR": "Pausar quando o controle desconecta", en: "Pause when the controller disconnects" },

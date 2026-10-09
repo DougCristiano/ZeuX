@@ -24,7 +24,7 @@ const GROUPS: Record<string, Group[]> = {
       title: "groupBehavior",
       ids: [
         "Main.ConfirmPowerOff",
-        "Main.SaveStateOnExit",
+        "auto_save_state",
         "Main.CreateSaveStateBackups",
         "Main.PauseOnFocusLoss",
         "Main.PauseOnControllerDisconnection",
@@ -47,11 +47,14 @@ const GROUPS: Record<string, Group[]> = {
     },
     {
       title: "groupStates",
-      ids: ["EmuCore.SaveStateOnShutdown", "EmuCore.BackupSavestate", "EmuCore.UseSavestateSelector"],
+      ids: ["auto_save_state", "EmuCore.BackupSavestate", "EmuCore.UseSavestateSelector"],
     },
     { title: "groupAudio", ids: ["SPU2/Output.BufferMS", "SPU2/Output.StandardVolume"] },
     { title: "groupVideo", ids: ["EmuCore/GS.upscale_multiplier", "EmuCore/GS.VsyncEnable"] },
   ],
+  // RetroArch e Flycast: só a opção de salvar estado (guardada no ZeuX).
+  retroarch: [{ title: "groupStates", ids: ["auto_save_state"] }],
+  flycast: [{ title: "groupStates", ids: ["auto_save_state"] }],
 };
 
 /**
@@ -184,18 +187,27 @@ export function EmulatorSettingsPanel({ adapterId, name }: { adapterId: string; 
  */
 export function EmulatorSettingsModal({ adapterId, name, onClose }: { adapterId: string; name: string; onClose: () => void }) {
   const t = useT(dict);
+  // RetroArch e Flycast não têm arquivo que o ZeuX escreva: o texto diz que a
+  // escolha fica guardada no ZeuX (ver modalDescriptionZeuX).
+  const storedInZeuX = adapterId === "retroarch" || adapterId === "flycast";
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto rounded-lg border border-line bg-fill p-5 pb-0 ring-0 sm:max-w-3xl">
         <DialogTitle className="text-lg font-semibold text-ink">{t("modalTitle", { name })}</DialogTitle>
-        <DialogDescription className="mb-2 text-sm text-muted">{t("modalDescription", { name })}</DialogDescription>
+        <DialogDescription className="mb-2 text-sm text-muted">
+          {t(storedInZeuX ? "modalDescriptionZeuX" : "modalDescription", { name })}
+        </DialogDescription>
         {adapterId === "pcsx2" && <PCSX2PortableSection />}
         {/* Tecla de print (2026-10-06) no topo: é a opção que a pessoa vem
-            procurar com o jogo na cabeça, não uma preferência de fundo. */}
-        <section className="mb-5 flex flex-col gap-2 border-b border-line pb-5">
-          <h3 className="font-mono text-[11px] tracking-wide text-muted uppercase">{t("screenshotKey")}</h3>
-          <ScreenshotHotkeySection adapterId={adapterId} name={name} />
-        </section>
+            procurar com o jogo na cabeça, não uma preferência de fundo. Só
+            onde o servidor sabe ajustar o print (screenshot_hotkey.go); no
+            Flycast a seção não aparece. */}
+        {!storedInZeuX || adapterId === "retroarch" ? (
+          <section className="mb-5 flex flex-col gap-2 border-b border-line pb-5">
+            <h3 className="font-mono text-[11px] tracking-wide text-muted uppercase">{t("screenshotKey")}</h3>
+            <ScreenshotHotkeySection adapterId={adapterId} name={name} />
+          </section>
+        ) : null}
         <EmulatorSettingsPanel adapterId={adapterId} name={name} />
       </DialogContent>
     </Dialog>

@@ -45,6 +45,8 @@ import { dict } from "./GameDetailScreen.i18n";
 // para escolher o motivo certo quando "Continuar" aparece desabilitado — a
 // decisão de fato (há estado ou não) continua vindo do servidor.
 const RESUME_ADAPTERS = new Set(["duckstation", "pcsx2", "retroarch", "dolphin", "rpcs3", "ppsspp", "flycast"]);
+// Emuladores com a opção "Salvar estado ao fechar o jogo" (EmulatorSettingsPanel).
+const AUTO_SAVE_ADAPTERS = new Set(["duckstation", "pcsx2", "retroarch", "flycast"]);
 
 // Emuladores em que o ZeuX não achou, nas fontes lidas, nenhuma forma de abrir
 // o jogo num estado salvo (ver docs/decisoes.md, 2026-10-09). A frase é outra
@@ -473,6 +475,25 @@ export function GameDetailScreen({
     ? (emulators ?? []).find((e) => e.adapter_id === verdict.adapter_id)
     : undefined;
   const launchability = emulators ? evaluateGameLaunchability(game, verdict, adapterEntry) : undefined;
+  // "Salvar estado ao fechar o jogo" desligado nas configurações do emulador
+  // (decisão do Douglas, 2026-10-09): sem ele não nasce estado para o
+  // "Continuar", e o texto do botão desabilitado precisa dizer isso.
+  const autoSaveAdapterId = adapterEntry?.adapter_id;
+  const [autoSaveOff, setAutoSaveOff] = useState(false);
+  useEffect(() => {
+    if (!autoSaveAdapterId || !AUTO_SAVE_ADAPTERS.has(autoSaveAdapterId)) {
+      setAutoSaveOff(false);
+      return;
+    }
+    api
+      .getEmulatorSettings(autoSaveAdapterId)
+      .then((res) =>
+        setAutoSaveOff(
+          res.available && (res.settings ?? []).some((s) => s.id === "auto_save_state" && s.value === "false"),
+        ),
+      )
+      .catch(() => setAutoSaveOff(false));
+  }, [autoSaveAdapterId]);
   const install = useInlineInstall({
     onEmulatorInstalled: (adapterId) =>
       setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
@@ -827,7 +848,9 @@ export function GameDetailScreen({
         </div>
         {!game.resume_saved_at && adapterEntry && (
           <p className="max-w-md text-sm text-muted">
-            {adapterEntry.adapter_id === "retroarch"
+            {autoSaveOff && AUTO_SAVE_ADAPTERS.has(adapterEntry.adapter_id)
+              ? t("resumeAutoSaveOff", { name: adapterEntry.name })
+              : adapterEntry.adapter_id === "retroarch"
               ? t("resumeNoStateRetroArch")
               : adapterEntry.adapter_id === "dolphin"
                 ? t("resumeNoStateDolphin")

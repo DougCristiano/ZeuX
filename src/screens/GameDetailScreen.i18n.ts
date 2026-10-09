@@ -80,6 +80,13 @@ export const dict = {
     "pt-BR": "Ainda não há estado salvo. O Flycast grava um ao fechar o jogo se a opção \"Estado automático: Salvar\" estiver ligada nele; depois disso, Continuar abre dali.",
     en: "No saved state yet. Flycast writes one when you close the game if its \"Automatic State: Save\" option is on; after that, Continue picks up there.",
   },
+  // Salvar estado ao fechar desligado nas configurações do emulador: sem ele
+  // nenhum estado nasce ao fechar, e o "Continuar" não tem de onde retomar.
+  // A frase aponta onde a pessoa liga de novo (decisão de 2026-10-09).
+  resumeAutoSaveOff: {
+    "pt-BR": "Ainda não há estado salvo, e o salvamento ao fechar o jogo está desligado nas configurações do {{name}}. Ligue-o lá para o Continuar ter de onde retomar.",
+    en: "No saved state yet, and saving the state when closing the game is off in {{name}}'s settings. Turn it on there so Continue has somewhere to resume from.",
+  },
   resumeUnsupported: {
     "pt-BR": "Este emulador ainda não abre o jogo num estado salvo. Por enquanto o jogo abre do início.",
     en: "This emulator can't open a game from a saved state yet. For now the game starts from the beginning.",
