@@ -90,14 +90,21 @@ func (s *Server) handleSetEmulatorSettings(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"available": true, "running": false, "settings": settings})
 }
 
-// saveAdapterFor diz qual emulador guarda os saves de um console (só os
-// dois com o local verificado).
+// saveAdapterFor diz qual emulador dedicado guarda os saves de um console. Os
+// com local verificado no código-fonte: PS1, PS2, 3DS (Azahar), DS (melonDS) e
+// Dreamcast (Flycast). Os demais dependem do RetroArch (ver gameSavesContext).
 func saveAdapterFor(consoleID string) string {
 	switch consoleID {
 	case "ps1":
 		return "duckstation"
 	case "ps2":
 		return "pcsx2"
+	case "3ds":
+		return "azahar"
+	case "nds":
+		return "melonds"
+	case "dreamcast":
+		return "flycast"
 	}
 	return ""
 }
@@ -131,18 +138,23 @@ func (s *Server) gameSavesContext(w http.ResponseWriter, r *http.Request) (libra
 		return library.Game{}, "", emulator.GameSaves{}, false, false
 	}
 	adapterID := saveAdapterFor(game.ConsoleID)
-	if adapterID == "" && s.retroArchRunsConsole(game.ConsoleID) {
-		// Sem emulador dedicado de saves, o RetroArch é o que mais provavelmente
+	var install emulator.Installation
+	installed := false
+	if adapterID != "" {
+		install, installed = s.emulatorInstall(r, adapterID)
+	}
+	if !installed && s.retroArchRunsConsole(game.ConsoleID) {
+		// Sem o emulador dedicado instalado, o RetroArch é o que mais provavelmente
 		// abriu o jogo: é o único adapter que cobre a maioria dos consoles.
 		// Não há como saber, pela biblioteca, qual emulador foi usado de fato —
 		// a tela deve tratar o resultado como "saves do RetroArch", não como
 		// certeza sobre o último lançamento.
 		adapterID = "retroarch"
+		install, installed = s.emulatorInstall(r, adapterID)
 	}
 	if adapterID == "" {
 		return game, "", emulator.GameSaves{}, false, true
 	}
-	install, installed := s.emulatorInstall(r, adapterID)
 	if !installed {
 		return game, adapterID, emulator.GameSaves{}, false, true
 	}

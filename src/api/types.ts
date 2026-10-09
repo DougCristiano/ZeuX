@@ -615,6 +615,7 @@ export type GameSaves = {
   /** Cartão único para todos os jogos (PCSX2). */
   memory_card_shared?: boolean;
   memory_cards_approximate?: boolean;
+  memory_cards_unknown?: boolean;
   save_states: SaveFileInfo[];
   /** Ausente = o jogo ainda não foi fechado pelo ZeuX; states ficam de fora. */
   serial?: string;

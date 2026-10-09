@@ -43,8 +43,12 @@ type ResumeRepository interface {
 var ErrNoResumeState = errors.New("não há um estado salvo para continuar este jogo — use Jogar para começar do início")
 
 // SupportsResume diz se o ZeuX sabe abrir este emulador num estado salvo.
+// Azahar e melonDS ficam de fora: o Azahar tem o estado por slot, mas nenhuma
+// flag de linha de comando abre num estado (src/citra_qt/citra_qt.cpp), e o
+// melonDS só tem -b, -f, -a e -A (src/frontend/qt_sdl/CLI.cpp). Ver
+// docs/decisoes.md, "Saves e retomada: Azahar, melonDS e Flycast".
 func SupportsResume(adapterID string) bool {
-	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch"
+	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch" || adapterID == "flycast"
 }
 
 // resumeStateLocation devolve a pasta de save states do emulador e como
@@ -127,6 +131,10 @@ func (l *Launcher) recordResumeState(session Session, install Installation) {
 		// O RetroArch grava um arquivo fixo por jogo (<jogo>.state.auto), e não
 		// um arquivo de retomada numa pasta compartilhada: o lookup é por nome.
 		path, savedAt, ok = retroArchResumeFile(install, session.ROMPath, session.StartedAt)
+	} else if session.AdapterID == "flycast" {
+		// O Flycast grava um arquivo por slot, com o nome do jogo (<nome>.state,
+		// <nome>_N.state): o lookup é pelo nome da ROM, não por uma pasta inteira.
+		path, savedAt, ok = flycastResumeFile(install, session.ROMPath, session.StartedAt)
 	} else {
 		var dir string
 		var match func(string) bool

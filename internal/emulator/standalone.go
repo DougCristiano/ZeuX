@@ -3,6 +3,7 @@ package emulator
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strconv"
 )
 
@@ -284,6 +285,32 @@ func newFlycast() Adapter {
 			if req.Options.ExitOnClose {
 				unapplied = append(unapplied,
 					"O Flycast volta ao menu ao fechar o jogo; não há opção de linha de comando para encerrá-lo junto.")
+			}
+
+			// Iniciar do zero e Continuar (2026-10-09). Sem nenhuma opção, o Flycast
+			// segue o "Automatic State: Load" do emu.cfg do usuário, então o modo é
+			// dito explicitamente com "-config" transitório: Dreamcast.AutoLoadState
+			// (core/cfg/option.cpp) e, para Continuar, Dreamcast.SavestateSlot. A
+			// ajuda do binário diz que o valor transitório não vai para o emu.cfg
+			// (core/cfg/cl.cpp, usage: "Transient config values won't be saved to
+			// emu.cfg."). Lido no código-fonte, não no binário.
+			switch {
+			case req.Mode == ModeResume && req.StatePath != "":
+				if slot, ok := flycastStateSlot(filepath.Base(req.StatePath), req.ROMPath); ok {
+					opts = append(opts, "-config", "Dreamcast:AutoLoadState=yes",
+						"-config", "Dreamcast:SavestateSlot="+strconv.Itoa(slot))
+				} else {
+					// Nome que não casa com este jogo: melhor abrir do início e dizer
+					// isso do que carregar o estado de outro jogo.
+					opts = append(opts, "-config", "Dreamcast:AutoLoadState=no")
+					unapplied = append(unapplied,
+						"O estado escolhido não corresponde a este jogo; o jogo abre do início.")
+				}
+			case req.Mode == ModeResume:
+				// Prévia sem o caminho do estado: o aviso de "localizado na hora" já
+				// vem do standalone, e a linha fica sem a opção.
+			default:
+				opts = append(opts, "-config", "Dreamcast:AutoLoadState=no")
 			}
 
 			return opts, []string{req.ROMPath}, unapplied

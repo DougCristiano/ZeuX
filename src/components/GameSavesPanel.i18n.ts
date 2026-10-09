@@ -18,6 +18,12 @@ export const dict = {
     en: "The card name was guessed from the game file name — it may not be this game's.",
   },
   noMemoryCard: { "pt-BR": "Nenhum cartão gravado ainda.", en: "No card saved yet." },
+  // Flycast com PerGameVmu ligado: o arquivo do cartão leva o código do disco,
+  // que o ZeuX não lê. Dizer isso evita o "Nenhum cartão" falso.
+  memoryCardUnknown: {
+    "pt-BR": "O cartão deste jogo é guardado por um código de disco que o ZeuX ainda não lê.",
+    en: "This game's card is stored under a disc code that ZeuX doesn't read yet.",
+  },
   states: { "pt-BR": "Estados salvos", en: "Save states" },
   noStates: { "pt-BR": "Nenhum estado salvo deste jogo.", en: "No save states for this game." },
   noSerial: {

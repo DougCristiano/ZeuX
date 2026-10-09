@@ -55,8 +55,12 @@ type GameSaves struct {
 	MemoryCardShared bool `json:"memory_card_shared,omitempty"`
 	// MemoryCardsApproximate: o nome do cartão foi adivinhado (DuckStation
 	// com tipo de cartão que não é por nome de arquivo).
-	MemoryCardsApproximate bool           `json:"memory_cards_approximate,omitempty"`
-	SaveStates             []SaveFileInfo `json:"save_states"`
+	MemoryCardsApproximate bool `json:"memory_cards_approximate,omitempty"`
+	// MemoryCardsUnknown: o emulador guarda o cartão por um código que o ZeuX
+	// não lê (VMU do Flycast com PerGameVmu, que leva o código do disco). A
+	// lista fica vazia, e a tela diz que não sabe — vazio aqui não é "nenhum".
+	MemoryCardsUnknown bool           `json:"memory_cards_unknown,omitempty"`
+	SaveStates         []SaveFileInfo `json:"save_states"`
 	// Serial do disco; vazio = ainda desconhecido (o jogo nunca foi fechado
 	// pelo ZeuX), e então os states ficam de fora.
 	Serial    string `json:"serial,omitempty"`
@@ -107,6 +111,12 @@ func FindGameSaves(adapterID string, install Installation, romPath string, id Ga
 		return out, true
 	case "retroarch":
 		return findRetroArchGameSaves(install, romPath)
+	case "azahar":
+		return findAzaharGameSaves(install, romPath)
+	case "melonds":
+		return findMelonDSGameSaves(install, romPath)
+	case "flycast":
+		return findFlycastGameSaves(install, romPath)
 	default:
 		return GameSaves{}, false
 	}
