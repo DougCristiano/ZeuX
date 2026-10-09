@@ -95,14 +95,16 @@ export function useLaunchGame(opts?: { onLaunched?: () => void }) {
    * está errada (o core não ficou onde a busca procura) — parar ali evita
    * baixar em laço infinito, gastando banda até alguém perceber.
    */
-  async function launch(game: LibraryGame, afterCoreDownload = false, launchOpts?: { resume?: boolean }) {
+  async function launch(game: LibraryGame, afterCoreDownload = false, launchOpts?: { mode?: "fresh" | "resume" }) {
     setLastGame(game);
     setStatus(game.id, { kind: "launching" });
     try {
+      // O modo vai sempre explícito: quem lê o pedido na API não precisa
+      // adivinhar que a ausência de "resume" significava "do início".
       const result = await api.launch({
         rom_path: game.path,
         console_id: game.console_id,
-        ...(launchOpts?.resume ? { resume: true } : {}),
+        mode: launchOpts?.mode ?? "fresh",
       });
       // 202: o core do RetroArch faltava e está sendo baixado agora. Dizer
       // "jogo aberto" aqui seria mentira — o jogo só abre no fim do download.

@@ -43,8 +43,14 @@ type ResumeRepository interface {
 var ErrNoResumeState = errors.New("não há um estado salvo para continuar este jogo — use Jogar para começar do início")
 
 // SupportsResume diz se o ZeuX sabe abrir este emulador num estado salvo.
+// Azahar e melonDS ficam de fora: o Azahar tem o estado por slot, mas nenhuma
+// flag de linha de comando abre num estado (src/citra_qt/citra_qt.cpp), e o
+// melonDS só tem -b, -f, -a e -A (src/frontend/qt_sdl/CLI.cpp). Ver
+// docs/decisoes.md, "Saves e retomada: Azahar, melonDS e Flycast".
 func SupportsResume(adapterID string) bool {
-	return adapterID == "duckstation" || adapterID == "pcsx2"
+	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch" ||
+		adapterID == "dolphin" || adapterID == "rpcs3" || adapterID == "ppsspp" ||
+		adapterID == "flycast"
 }
 
 // resumeStateLocation devolve a pasta de save states do emulador e como
@@ -85,6 +91,14 @@ func resumeStateLocation(adapterID string, install Installation) (dir string, ma
 		return states, func(name string) bool {
 			return strings.HasSuffix(strings.ToLower(name), ".resume.p2s")
 		}, true
+	case "dolphin":
+		// Dolphin não tem arquivo de retomada próprio: a sessão pega o estado
+		// "<GameID>.sNN" gravado por ela (dolphin_saves.go).
+		dir, ok := dolphinStatesDir(install)
+		if !ok {
+			return "", nil, false
+		}
+		return dir, dolphinResumeMatch, true
 	default:
 		return "", nil, false
 	}
@@ -121,11 +135,36 @@ func (l *Launcher) recordResumeState(session Session, install Installation) {
 	if !ok || !SupportsResume(session.AdapterID) {
 		return
 	}
-	dir, match, ok := resumeStateLocation(session.AdapterID, install)
-	if !ok {
-		return
+	var path string
+	var savedAt time.Time
+	if session.AdapterID == "retroarch" {
+		// O RetroArch grava um arquivo fixo por jogo (<jogo>.state.auto), e não
+		// um arquivo de retomada numa pasta compartilhada: o lookup é por nome.
+		path, savedAt, ok = retroArchResumeFile(install, session.ROMPath, session.StartedAt)
+	} else if session.AdapterID == "rpcs3" {
+		// O RPCS3 não tem arquivo de retomada fixo: o state é o que apareceu na
+		// pasta do ID do jogo durante a sessão (rpcs3_saves.go).
+		path, savedAt, ok = rpcs3ResumeFile(install, session.ROMPath, session.StartedAt)
+	} else if session.AdapterID == "ppsspp" {
+		// O nome do state também revela o DISC_ID; guardá-lo cobre o caso de o
+		// state ser apagado depois (ppsspp_saves.go).
+		var discID string
+		path, savedAt, discID, ok = ppssppResumeFile(install, session.StartedAt)
+		if ok {
+			l.recordPPSSPPDiscID(session, discID)
+		}
+	} else if session.AdapterID == "flycast" {
+		// O Flycast grava um arquivo por slot, com o nome do jogo (<nome>.state,
+		// <nome>_N.state): o lookup é pelo nome da ROM, não por uma pasta inteira.
+		path, savedAt, ok = flycastResumeFile(install, session.ROMPath, session.StartedAt)
+	} else {
+		var dir string
+		var match func(string) bool
+		dir, match, ok = resumeStateLocation(session.AdapterID, install)
+		if ok {
+			path, savedAt, ok = newestResumeFile(dir, match, session.StartedAt)
+		}
 	}
-	path, savedAt, ok := newestResumeFile(dir, match, session.StartedAt)
 	if !ok {
 		return
 	}
@@ -195,8 +234,13 @@ func (l *Launcher) resumeStateFor(ctx context.Context, romPath, adapterID string
 // SetupWizardIncomplete — ver seedPCSX2) + [Pad1]. Sempre: auto-update
 // desligado — o ZeuX gerencia a versão (levantamento do Douglas,
 // 2026-10-05: a seção [AutoUpdater] só aparece quando alguém mexe, e o
-// padrão do PCSX2 é checar ao abrir). Fora isso nada muda: "não mudar
-// comportamento sem o usuário pedir".
+// padrão do PCSX2 é checar ao abrir).
+//
+// SaveStateOnShutdown (salvar estado ao fechar) entra ligado SÓ quando a chave
+// falta: o padrão do PCSX2 é desligado, e sem o estado ao fechar não há o que
+// o "Continuar" retome (decisão do Douglas, 2026-10-09, que reverte a de
+// 2026-10-05). Se a pessoa já desligou na tela de opções, a chave existe e
+// fica como está.
 func MergePCSX2Defaults(existing []byte, fresh bool) []byte {
 	ini := parseINI(existing)
 	if fresh {
@@ -207,6 +251,9 @@ func MergePCSX2Defaults(existing []byte, fresh bool) []byte {
 		}
 	}
 	ini.set("AutoUpdater", "CheckAtStartup", "false")
+	if _, has := ini.get("EmuCore", "SaveStateOnShutdown"); !has {
+		ini.set("EmuCore", "SaveStateOnShutdown", "true")
+	}
 	return ini.bytes()
 }
 

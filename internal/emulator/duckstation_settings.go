@@ -77,6 +77,13 @@ var duckStationDefaults = []dsDefault{
 	// que o ZeuX não tem. Nome do valor lido no código-fonte
 	// (core/settings.cpp, s_memory_card_type_names).
 	{"MemoryCards", "Card1Type", "PerGameFileTitle", dsFreshOnly},
+
+	// Salvar estado ao fechar liga por padrão do ZeuX (decisão do Douglas,
+	// 2026-10-09): é o estado que o "Continuar" retoma. Só entra se a chave
+	// falta, para que o "desligado" escolhido pela pessoa na tela de opções
+	// seja respeitado no lançamento seguinte. O padrão do próprio DuckStation
+	// também é ligado (core/settings.cpp, GetBoolValue("Main", "SaveStateOnExit", true)).
+	{"Main", "SaveStateOnExit", "true", dsIfAbsent},
 }
 
 // duckStationPadType é o tipo de controle do jogador 1 (decisão do Douglas:
@@ -169,7 +176,7 @@ var duckStationSettingsCatalog = []EmulatorSetting{
 	boolSetting("Main", "StartFullscreen", "false"),
 	boolSetting("Main", "HideMainWindowWhenRunning", "false"),
 	boolSetting("Main", "ConfirmPowerOff", "true"),
-	boolSetting("Main", "SaveStateOnExit", "true"),
+	fileAutoSaveSetting("Main", "SaveStateOnExit"),
 	boolSetting("Main", "CreateSaveStateBackups", "true"),
 	boolSetting("Main", "HideCursorInFullscreen", "true"),
 	boolSetting("Main", "PauseOnFocusLoss", "false"),

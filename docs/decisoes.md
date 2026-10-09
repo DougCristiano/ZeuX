@@ -370,6 +370,21 @@ grava cores em `%APPDATA%\RetroArch\cores` — um core instalado por lá rodava
 de verdade no RetroArch, mas o ZeuX reportava "não instalado". Corrigido
 adicionando esse caminho à busca.
 
+**Achado real (2026-10-09): "falta core" com o jogo rodando — diretório
+configurado pelo usuário.** O RetroArch carrega cores de `libretro_directory`
+(retroarch.cfg) ou da variável `LIBRETRO_DIRECTORY`; o padrão é
+`$XDG_CONFIG_HOME/retroarch/cores` (ou `~/.config/retroarch/cores`) no Linux,
+`<pasta do exe>\cores` no Windows e `~/Library/Application Support/RetroArch/cores`
+no macOS (fontes: `retroarch.cfg`, `frontend/drivers/platform_unix.c`,
+`platform_win32.c` e `platform_darwin.m` do libretro/RetroArch). `coreDirs()`
+só tinha uma lista fixa e não lia nada disso; qualquer diretório
+personalizado fazia o ZeuX dizer "baixar core" (`consoleReadiness.ts`,
+`RetroArchCoreStatus`) enquanto o RetroArch rodava. `coreDirs()` agora inclui
+`LIBRETRO_DIRECTORY`, o `libretro_directory` do cfg (`configuredCoreDirs`),
+`$XDG_CONFIG_HOME` e `/usr/lib64/libretro`, logo depois da pasta gerida (que
+continua primeiro, de que `RetroArchManagedCoresDir` depende). Ficam de fora,
+sem fonte verificada: Steam e o bundle do .app no macOS.
+
 ### Auto-updater assinado via Tauri (v0.1.10, 2026-09-06)
 
 O app ganhou atualização automática: assinatura dos instaladores via
@@ -2398,3 +2413,654 @@ voltando — ela lia a pasta uma vez, ao abrir. A associação pasta↔jogo
 - Pedido do Douglas no mesmo dia: o print mais recente aparece grande, como
   um visualizador (setas, contador, clique abre em tela cheia), com as
   miniaturas numa faixa embaixo. Print novo vira o selecionado sozinho.
+
+## "Iniciar do zero" e "Continuar" como modo explícito (2026-10-09)
+
+Pedido do Douglas: ao abrir um jogo, dois botões. "Continuar" retoma o último
+save state (o ponto exato onde a pessoa parou); "Iniciar do zero" dá boot
+normal, como colocar o disco no console, sem carregar estado nenhum — o save
+do memory card continua valendo lá dentro.
+
+- **Modo explícito na API:** `POST /games/launch` aceita `"mode": "fresh" |
+  "resume"`. Padrão `fresh`. `"resume": true` continua valendo como `resume`
+  (formato anterior). `mode: fresh` com `resume: true` é recusado (400
+  `invalid_mode`) em vez de escolher um dos dois em silêncio.
+- **Garantia do fresh:** o caminho do estado (`Request.StatePath`) só é
+  honrado com `ModeResume`. Em `fresh` ele é ignorado mesmo que sobre no
+  pedido, e nenhum argumento de carregamento sai na linha de comando
+  (`mode_test.go` trava isso para DuckStation e PCSX2).
+- **Disponibilidade do "Continuar":** continua sendo o `resume_saved_at` de
+  `GET /library/games`, lido do disco fora do `BuildCommand` (como já era). Sem
+  estado, a tela mostra "Continuar" desabilitado com o motivo.
+
+**Mecanismo por emulador** (leitura do código-fonte oficial, não observada com
+o binário rodando):
+
+| Emulador | Mecanismo | Fonte | Status |
+|---|---|---|---|
+| DuckStation | `-statefile <arquivo>` ("Loads state from the specified filename") e `-resume` ("Load resume save state", escolhe pelo nome do jogo ou pelo mais recente) | https://raw.githubusercontent.com/stenzek/duckstation/master/src/duckstation-qt/qthost.cpp (`PrintCommandLineHelp`, `ParseCommandLineParametersAndInitializeConfig`) | Implementado com `-statefile`, que aponta o estado deste jogo; `-resume` não foi usado porque escolheria pelo nome do jogo ou pelo mais recente. |
+| PCSX2 | `-statefile <filename>` ("Loads state from the specified filename."). Não há `-resume` no `QtHost.cpp`. | https://raw.githubusercontent.com/PCSX2/pcsx2/master/pcsx2-qt/QtHost.cpp | Implementado. |
+| RetroArch | `-e, --entryslot=NUMBER` ("Slot from which to load an entry state."); `--appendconfig=FILE` para config extra | https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c (`retroarch_print_help`) | Superado em 2026-10-09 (ver "Iniciar do zero e Continuar no RetroArch", no fim do arquivo). Na data desta entrada era `Unapplied`, porque o `-e` não resolvia sozinho o carregamento automático do `retroarch.cfg`. |
+| Demais standalone (Dolphin, PPSSPP, Flycast, RPCS3, MelonDS, Azahar, Xemu, Vita3K, Xenia, Cemu, RMG) | Nenhum levantado | — | Via `Unapplied` (`resumeUnappliedMessage`). |
+| Emulador personalizado | Gramática do template é do usuário | — | Via `Unapplied`. |
+
+**Correção de decisão anterior:** a entrada de 2026-10-05 dizia que o
+`savestate_auto_load` do RetroArch "vem ligado por padrão". Lendo
+`config.def.h` do RetroArch, o padrão é `false` (`DEFAULT_SAVESTATE_AUTO_LOAD
+false`). O risco real não é o padrão: é um `retroarch.cfg` do próprio usuário
+com o auto-load ligado, que faria o "fresh" do RetroArch abrir no estado
+mesmo assim. O ZeuX ainda não consegue garantir isso — pendência em
+`pendencias.md`.
+
+**Não validado:** que DuckStation e PCSX2 não carreguem um estado de retomada
+sozinhos ao iniciar sem nenhuma flag. A ajuda dos dois não descreve auto-load
+(só `SaveStateOnExit` grava), mas isso não foi confirmado com o binário.
+
+## Saves por jogo no RetroArch (2026-10-09)
+
+Pedido do Douglas: o ZeuX localizar e gerir cartão e save states de todos os
+emuladores, como já faz com DuckStation e PCSX2. Esta rodada cobre o RetroArch,
+que é o adapter que mais consoles atende.
+
+- **Diretórios:** `savefile_directory` e `savestate_directory` lidos do
+  `retroarch.cfg` real (`retroArchSaveDataDirs`, já existente). Chave vazia ou
+  `"default"` cai na pasta da ROM. Fonte primária: comentário do
+  `retroarch.cfg` oficial (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.cfg):
+  "Save all save files (*.srm) to this directory" / "Save all save states
+  (*.state) to this directory" / "This will be overridden by explicit command
+  line options".
+- **Nome do arquivo de cada jogo: NÃO verificado em documentação oficial.** As
+  fontes encontradas foram fóruns e readme de core (RetroPie, forums.libretro.com):
+  o save leva o nome da ROM sem extensão, `<jogo>.srm`; states `<jogo>.state`,
+  `<jogo>.stateN` (slot N) e `<jogo>.state.auto` (auto-save, comentário de
+  `savestate_auto_save` no retroarch.cfg: "The path is $SRAM_PATH.auto"). Por
+  isso o resultado sai com `memory_cards_approximate: true`. O slot 0 para
+  `.state` sem número é dedução, não documentado.
+- **Flag de linha de comando:** nenhuma flag de save foi usada nesta entrada.
+  `--appendconfig` e `-e/--entryslot` estão na ajuda do `retroarch.c` (ver a
+  entrada de 2026-10-09, "Iniciar do zero e Continuar no RetroArch"), mas o
+  que o ZeuX faz com eles é decisão daquela entrada, não desta. A pasta de
+  save continua vindo da config.
+- **Ligação com a API:** consoles sem emulador dedicado de save
+  (`saveAdapterFor`: só PS1 e PS2) passam a usar o RetroArch quando ele cobre o
+  console no registro. O ZeuX não sabe qual emulador abriu o jogo, então a
+  resposta é "saves do RetroArch", não certeza sobre o último lançamento.
+- **O que quebra se desfizer:** a tela do jogo deixa de listar saves de
+  RetroArch (volta a `known: false`), e o backup/restauração desses consoles
+  para de funcionar, sem erro visível.
+- **Não validado com o binário:** a convenção de nomes precisa de uma sessão
+  real (salvar um jogo e conferir o arquivo gerado).
+
+## Iniciar do zero e Continuar no RetroArch (2026-10-09)
+
+Pedido do Douglas: o modo "fresh"/"resume" da entrada anterior tem que valer
+no RetroArch também. Ele não tem flag de linha de comando que diga "abra no
+estado" ou "abra sem estado": quem decide é `savestate_auto_load` no
+`retroarch.cfg` do usuário. O ZeuX passa um arquivo extra que tem prioridade
+sobre o `retroarch.cfg`.
+
+**Fontes (lidas com WebFetch nesta data):**
+
+- `--appendconfig` (ajuda de `retroarch_print_help`, `retroarch.c`):
+  "Extra config files are loaded in, and take priority over config selected in
+  -c (or default)." e "To keep them out of it, put config_save_on_exit = "false"
+  in the appended file." (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c)
+- Carregamento do estado na abertura (`runloop.c`):
+  `if (runloop_st->entry_state_slot < 0 && settings->bools.savestate_auto_load) command_event_load_auto_state();`
+  e, antes, `if (entry_state_load && !command_event_load_entry_state(settings))`,
+  onde `entry_state_load` vem de `entry_state_slot > -1` (só `-e` define o slot).
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/runloop.c)
+- Caminho do estado automático (`retroarch.cfg`, comentário de `savestate_auto_load`):
+  "The path is $SRAM_PATH.auto" e "RetroArch will automatically load any savestate
+  with this path on startup if savestate_auto_load is set." Gravado ao fechar
+  quando `savestate_auto_save` está ligado. (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.cfg)
+- Padrões (`config.def.h`): `DEFAULT_SAVESTATE_AUTO_LOAD false` e
+  `DEFAULT_SAVESTATE_AUTO_SAVE false`.
+
+**Mecanismo escolhido:**
+
+- **Iniciar do zero:** arquivo extra com `savestate_auto_load = "false"`. O
+  RetroArch não carrega `<jogo>.state.auto` mesmo com o `retroarch.cfg` do
+  usuário ligado.
+- **Continuar:** arquivo extra com `savestate_auto_load = "true"`. Na abertura o
+  RetroArch carrega `<jogo>.state.auto`.
+- **Não usamos `-e/--entryslot`.** Ele existe ("Slot from which to load an entry
+  state.") e carregaria um slot numerado, mas o nome do arquivo de cada slot
+  (`.state`, `.stateN`) ainda é dedução (`retroarch_saves.go`), e o ZeuX não
+  confirmou isso contra o binário. O auto-load usa um nome que a fonte documenta.
+- `config_save_on_exit = "false"` vai em todo arquivo extra. Sem isso, o
+  `savestate_auto_load` de cada modo seria gravado no `retroarch.cfg` do usuário
+  quando o RetroArch salvar a config ao fechar, e o comportamento de outros jogos
+  mudaria sem pedido.
+
+**Quem grava o arquivo e onde:** `writeRetroArchAppendConfig` (em
+`internal/emulator/retroarch_resume.go`), chamado por `Launcher.Launch` antes de
+`BuildCommand`. Caminho: `<AppDataDir>/retroarch/lancamento-fresh.cfg` ou
+`lancamento-resume.cfg` (`AppDataDir` é a pasta de dados do ZeuX, nunca a do
+usuário). Regravado a cada lançamento, porque o conteúdo não depende do jogo.
+`BuildCommand` continua pura: recebe o caminho em `Request.AppendConfigPath`,
+monta `--appendconfig=<caminho>` antes do caminho do jogo, e declara em
+`Unapplied` se o caminho não veio (prévia, ou gravação que falhou). Caminho com
+`|` é recusado: o RetroArch separa vários arquivos por esse caractere. Falha de
+gravação não bloqueia o jogo; vira aviso na sessão.
+
+**"Continuar" no RetroArch.** O estado entra no mesmo `resume_states` dos outros
+emuladores. Ao fim da sessão, `recordResumeState` procura `<jogo>.state.auto`
+(pasta de estados do `retroarch.cfg`, ou a da ROM quando `default`) com data a
+partir do início da sessão (folga de 2 s). Se achar, grava o registro com
+`adapter_id: "retroarch"`. `GET /library/games` expõe `resume_saved_at` como para
+os demais, e a tela do jogo deixa "Continuar" habilitado. Um `.state.auto` de
+antes da sessão não conta, para que "Continuar" nunca mostre um "onde você
+parou" que ninguém salvou.
+
+**Consequências:**
+
+- "Continuar" só aparece no RetroArch quando o salvamento automático está ligado
+  no próprio RetroArch (`savestate_auto_save`). O ZeuX não liga essa opção
+  sozinho, pelo mesmo motivo da decisão de 2026-10-05 sobre o PCSX2: não mudar o
+  comportamento do emulador sem pedido. Sem ela, nenhum `.state.auto` é gravado
+  e o botão fica desabilitado com o motivo ("O RetroArch grava um ao fechar o
+  jogo se o salvamento automático estiver ligado nele").
+- A tela do RetroArch deixou de usar o texto genérico "Este emulador ainda não
+  abre o jogo num estado salvo" (`resumeUnsupported`), que não vale mais para ele.
+- **O que quebra se desfizer:** o "Iniciar do zero" no RetroArch volta a depender
+  do `retroarch.cfg` do usuário (se o auto-load estiver ligado, o jogo abre no
+  estado), e o "Continuar" some sem erro visível.
+
+**Não validado com o binário:** `--appendconfig` com `savestate_auto_load` nos
+dois valores, a prioridade do arquivo extra sobre o `retroarch.cfg`, e que o
+`config_save_on_exit = "false"` impede a gravação de volta. Também não foi
+verificado que o RetroArch não consulta playlist (`PLAYLIST_ENTRY_SLOT` em
+`runloop.c`) ao abrir por caminho de ROM.
+
+**Limite conhecido:** em `runloop.c`, o bloco que carrega estado na abertura só
+roda com `!cheevos_enable || !cheevos_hardcore_mode_enable`. Com RetroAchievements
+em modo hardcore, "Continuar" não carrega nada e o ZeuX não avisa isso.
+
+## savestate_auto_save ligado pelo ZeuX (2026-10-09)
+
+Decisão do Douglas (2026-10-09): o ZeuX liga `savestate_auto_save` do RetroArch
+nos dois arquivos de override (`lancamento-fresh.cfg` e `lancamento-resume.cfg`).
+Sem isso não nasce `<jogo>.state.auto`, e o "Continuar" nunca habilita. Vale
+também no "Iniciar do zero": é ao sair de uma partida iniciada do zero que nasce
+o primeiro estado para continuar depois.
+
+**Fontes (lidas em 2026-10-09 pelo `curl` no raw do GitHub, não por resumo):**
+
+- `retroarch.cfg`, comentário de `savestate_auto_save`: "Automatically saves a
+  savestate at the end of RetroArch's lifetime. The path is $SRAM_PATH.auto."
+  e "RetroArch will automatically load any savestate with this path on startup
+  if savestate_auto_load is set."
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.cfg)
+- `config.def.h`: `#define DEFAULT_SAVESTATE_AUTO_SAVE false` (o padrão é
+  desligado, por isso o ZeuX precisa ligar explicitamente).
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/config.def.h)
+- `retroarch.c`: três chamadas a `command_event_save_auto_state()` guardadas por
+  `settings->bools.savestate_auto_save` (uma delas com a condição
+  `RUNLOOP_FLAG_CORE_RUNNING && !RUNLOOP_FLAG_SHUTDOWN_INITIATED`, com o
+  comentário "Save auto state"). Não rastreei cada caminho até o fim do
+  encerramento; o que se afirma é que a gravação depende dessa chave.
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c)
+- `command.c`, `command_event_save_auto_state`: monta o nome como o nome do
+  estado mais `.auto` (`strlcpy_lit(... ".auto")`) e chama
+  `content_auto_save_state`. Não conferi de onde vem `runloop_st->name.savestate`
+  (espera-se `<jogo>.state`); essa parte segue sem verificação direta.
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/command.c)
+- `runloop.c`: o carregamento na abertura só roda com
+  `entry_state_slot < 0 && settings->bools.savestate_auto_load`. Já citado na
+  entrada de 2026-10-09 ("Iniciar do zero e Continuar no RetroArch").
+
+**Por que difere do PCSX2 (decisão de 2026-10-05):** naquela data o ZeuX não
+ligou o auto-save do PCSX2 sem pedido, porque isso muda o comportamento do
+emulador. Agora há pedido explícito do Douglas, registrado aqui, e a escolha vale
+só para os lançamentos feitos pelo ZeuX: `config_save_on_exit = "false"` impede
+que a chave escape para o `retroarch.cfg` do usuário. O PCSX2 segue como estava.
+
+**Consequências:**
+
+- Ao fechar um jogo aberto pelo ZeuX, o RetroArch grava `<jogo>.state.auto`
+  (nos dois modos). O "Continuar" passa a habilitar depois da primeira sessão.
+- Um estado de retomada gravado pelo ZeuX sobrescreve o anterior, mesmo quando a
+  sessão foi "Iniciar do zero". Isso é intencional: o último ponto da partida
+  passa a ser o que "Continuar" retoma.
+- Os textos de UI que condicionavam o "Continuar" ao auto-save do RetroArch
+  foram ajustados (`src/screens/GameDetailScreen.i18n.ts`).
+- A entrada de 2026-10-09 ("Iniciar do zero e Continuar no RetroArch") dizia que
+  o ZeuX não ligava essa opção; esta entrada a supera nesse ponto.
+
+**O que quebra se desfizer:** remover a linha do override faz o "Continuar" do
+RetroArch sumir sem erro visível, e o "Iniciar do zero" continua correto (o
+auto-load é controlado à parte).
+
+**Não validado com o binário:** que o arquivo gerado no disco tem o nome
+`<jogo>.state.auto` e fica na pasta de estados do `retroarch.cfg`.
+
+
+## Saves e retomada: Dolphin e RMG (2026-10-09)
+
+**Decisão:** o Dolphin ganha saves por jogo (só states) e "Continuar" via `-s`.
+O RMG ganha só o modo explícito de lançamento, sem retomada: o `--load-state-slot`
+existe, mas o ZeuX não consegue dizer em qual slot está o estado do jogo.
+Sem saves por jogo no RMG.
+
+**Fontes (lidas em 2026-10-09 com WebFetch no raw do GitHub):**
+
+- Dolphin, `Source/Core/UICommon/CommandLineParse.cpp`: `parser->add_option("-s", "--save_state")`,
+  `.metavar("<file>")`, `.help("Load the initial save state")`.
+- Dolphin, `Source/Core/Core/Core.cpp`: `if (savestate_path) { ::State::LoadAs(system, *savestate_path); ... }`,
+  executado depois do `CBoot::BootUp`. Por isso `-s` convive com `-e <jogo>`.
+- Dolphin, `Source/Core/Core/State.cpp`, `MakeStateFilename`: `"{}{}.s{:02d}"` com
+  `File::GetUserPath(D_STATESAVES_IDX)` e `SConfig::GetInstance().GetGameID()`.
+- Dolphin, `Source/Core/Common/CommonPaths.h`: `STATESAVES_DIR "StateSaves"`, `GC_USER_DIR "GC"`,
+  `NORMAL_USER_DIR` ("Dolphin Emulator" no Windows, "Library/Application Support/Dolphin" no macOS,
+  "dolphin-emu" nos demais), `PORTABLE_USER_DIR` ("User" no Windows e macOS, "user" nos demais).
+- Dolphin, `Source/Core/UICommon/UICommon.cpp`, `SetUserDirectory`: `File::Exists(exe_path + DIR_SEP "portable.txt")`
+  manda para a pasta portátil; no POSIX sem portátil, `home_path + "." NORMAL_USER_DIR`.
+- RMG, `Source/RMG/main.cpp`: `QCommandLineOption loadStateSlot("load-state-slot", "Loads save state slot when launching the ROM", "Slot Number")`,
+  com valor válido de 0 a 9.
+- mupen64plus-core, `src/main/savestates.c` (`savestates_generate_path`): `"%s%s.st%d"` com
+  `get_savestatepath()` e `ROM_SETTINGS.goodname` (ou `get_savestatefilename()` como fallback).
+  O nome do arquivo depende do *goodname* da ROM, que o ZeuX não tem.
+
+**O que foi implementado (Dolphin):**
+
+- Fresh: sem `-s`. O Dolphin não tem auto-load de estado por configuração, então omitir a flag basta.
+- Resume: `-s <StatePath>` antes de `-e <ROM>` (`standalone.go`). `SupportsResume("dolphin")` passa a ser verdadeiro.
+- Retomada registrada como nos demais: `resumeStateLocation` aponta para `<pasta de usuário>/StateSaves`,
+  com o casamento `^[A-Za-z0-9]{6}\.s\d{2}$`, e `recordResumeState` pega o estado mais recente
+  gravado a partir do início da sessão (janela de 2 s, como `newestResumeFile`).
+- GameID: sai do nome do estado de retomada (`DiscIDFor`). Sem estado, o ZeuX não conhece o GameID.
+- Saves por jogo: `findDolphinGameSaves` lista só os `<GameID>.sNN` do jogo. Sem GameID devolve `known: false`.
+- Pasta de usuário: `dolphinUserDirFor` aplica a regra de `SetUserDirectory` por SO.
+  Caminho `Documents\Dolphin Emulator` no Windows sem portátil **não** veio do trecho de UICommon.cpp lido;
+  veio da tabela de docs/pendencias.md.
+- UI: "Continuar" habilitado para o Dolphin, com frase própria (`resumeNoStateDolphin`) porque o Dolphin
+  não grava estado ao fechar (o ZeuX não liga nada para isso).
+- API: `saveAdapterFor` manda `gamecube` e `wii` para o Dolphin.
+
+**O que ficou de fora (Dolphin):**
+
+- **Cartão de memória GameCube** (arquivo raw ou pasta GCI) e **NAND do Wii**: o caminho do cartão sai de `Dolphin.ini`
+  (`MemcardAPath`), e a pasta GCI não foi lida até o fim. Sem isso, listar o cartão seria chutar.
+- **GameID a partir do ISO/RVZ**: o cabeçalho do disco não foi confirmado no código-fonte (`DiscIO/Volume.h` só declara
+  a interface). Por isso o GameID só existe depois do primeiro estado gravado pela sessão.
+
+**O que ficou de fora (RMG):**
+
+- `--load-state-slot` existe, mas o ZeuX não consegue saber o slot do estado do jogo: o nome do arquivo depende
+  do goodname da ROM e a pasta de estados depende do `mupen64plus.cfg` do RMG, que o ZeuX não lê. "Continuar"
+  no RMG cai no aviso genérico `resumeUnappliedMessage` (`Unapplied`). Não é `Unapplied` por falta de flag.
+- Saves do RMG (`.eep`/`.sra`/`.fla`/`.mpk`) seguem o mesmo goodname: sem ele, o ZeuX não tem como
+  associar o arquivo ao jogo.
+
+**Ressalva:** nada disso foi validado contra o binário real do Dolphin ou do RMG. As flags vêm do código-fonte,
+não de uma execução com ROM. Um teste com jogo de verdade é o que confirma `-s` e o caminho de `StateSaves`.
+
+**Riscos:**
+
+- Um estado mal atribuído (de outro jogo na mesma sessão) entraria no "Continuar". Hoje isso não acontece, porque
+  só um jogo roda por vez, mas o ZeuX não confere o GameID do estado com o do jogo.
+- Se o Dolphin consultar XDG antes de `~/.dolphin-emu` no Linux, a pasta de estados sai errada e o ZeuX não acha
+  os estados (falha segura: aparece como "ainda não há estado").
+
+## Saves e retomada: RPCS3 e PPSSPP (2026-10-09)
+
+Pedido do Douglas: copiar para RPCS3 e PPSSPP o que já existe em DuckStation,
+PCSX2 e RetroArch: localizar os saves de cada jogo e oferecer "Iniciar do zero"
+e "Continuar". Fontes lidas com `curl` no raw do GitHub nesta data (não por
+resumo); nada foi observado com o binário rodando.
+
+**RPCS3 (`rpcs3_saves.go`, `standalone.go`):**
+
+- **Retomada:** `--savestate <arquivo>` ("Path for directly loading a
+  savestate.", `rpcs3/rpcs3.cpp`, linhas 839-842). O bloco que trata a opção é um
+  `else if` antes do que abre o caminho posicional do jogo (linhas 1191 e 1251):
+  com `--savestate`, o RPCS3 **ignora o caminho do jogo**. Por isso o ZeuX tira o
+  jogo da linha quando o estado vai junto. Na prévia e no "do zero", o jogo entra
+  normalmente.
+- **ID do jogo:** o RPCS3 guarda `ID: caminho` no `games.yml`
+  (`rpcs3/Emu/games_config.cpp`, `save_nl` e `load`). No Windows o arquivo fica em
+  `<config>/config/games.yml` (`get_config_dir(true)` acrescenta `config/`); no
+  Linux e no macOS, em `<config>/games.yml`. O ZeuX lê esse mapa sem parser YAML,
+  porque o arquivo é plano e gravado pelo próprio RPCS3. Se o jogo nunca rodou
+  pelo RPCS3, o ID é desconhecido e a tela diz "não sei".
+- **Pasta de configuração:** `Utilities/File.cpp`, `fs::get_config_dir`. Usa a
+  pasta `portable/` ao lado do executável se existir; no Windows, `RPCS3_CONFIG_DIR`
+  ou a pasta do executável; no Linux, `$XDG_CONFIG_HOME/rpcs3` ou
+  `~/.config/rpcs3`; no macOS, `~/Library/Application Support/rpcs3`. É a mesma
+  lógica que `rpcs3ConfigDir` (firmware.go) já usa.
+- **Saves de jogo:** `<config>/dev_hdd0/home/00000001/savedata/<pasta>/`
+  (`System.cpp`, `cellSaveData.cpp`). A pasta é escolhida pelo jogo
+  (`SAVEDATA_DIRECTORY`), então o ZeuX casa pelo prefixo do ID. Usuário fixo em
+  `00000001` (padrão do RPCS3, sem `--user-id`). Resultado **aproximado**
+  (`memory_cards_approximate: true`). Só arquivos soltos em cada pasta entram, pelo
+  mesmo motivo do backup dos outros emuladores.
+- **States:** `<config>/savestates/<ID>/<ID>_<prefixo>_<id>.SAVESTAT`
+  (`savestate_utils.cpp`, `get_savestate_file`). A pasta `savestates` fica na
+  pasta de configuração **sem** o `config/` do Windows. Aceita `.SAVESTAT` e
+  `.SAVESTAT.zst` (`rpcs3_savestate.cpp`, `make_savestate_reader`).
+- **"Continuar":** o RPCS3 não tem arquivo de retomada fixo. O ZeuX registra o
+  state que apareceu na pasta do ID **depois** de a sessão começar. Um state
+  antigo não conta.
+
+**PPSSPP (`ppsspp_saves.go`, `standalone.go`):**
+
+- **Retomada:** `--state FILE` ("Load state from specified file",
+  `Core/CmdLine.cpp`, `g_autoParams`; a ajuda do próprio binário imprime
+  `--state=FILE`). **Não está na documentação pública**
+  (https://www.ppsspp.org/docs/reference/command-line/): a confirmação é do código,
+  e a ressalva fica no comentário de `standalone.go`. O estado só é carregado se o
+  jogo também vier na linha (`UI/NativeApp.cpp`, linha 788: `if
+  (!boot_filename.empty() && cmdLineOptions.stateToLoad.has_value())`), então aqui
+  o caminho do jogo continua indo junto.
+- **Nome do state:** `<DISC_ID>_<DISC_VERSION>_<slot>.ppst`
+  (`Core/SaveState.cpp`, `GenerateFullDiscId`, `GenerateSaveSlotFilename`,
+  `STATE_EXTENSION = "ppst"`). Os arquivos `.undo.ppst` e `load_undo.ppst` ficam de
+  fora. O DISC_ID é tirado do nome do state; o ZeuX **não lê o PARAM.SFO de dentro
+  do ISO**, então o ID só é conhecido depois do primeiro state gravado.
+- **Pastas:** `<memstick>/PSP/SAVEDATA/` e `<memstick>/PSP/PPSSPP_STATE/`
+  (`Core/Util/PathUtil.cpp`, `GetSysDirectory`). Se a pasta escolhida já se chamar
+  `PSP`, não ganha outro `PSP` dentro.
+- **Onde fica o Memory Stick:** só o **Windows** foi confirmado, na documentação
+  oficial (https://www.ppsspp.org/docs/getting-started/save-data-and-storage-windows/):
+  pasta `memstick` ao lado do executável; se houver `installed.txt` ao lado dele,
+  vazio = `%USERPROFILE%\Documents\PPSSPP`, com caminho = esse caminho. Linux e
+  macOS **não** foram confirmados, e lá o ZeuX devolve "não sei" em vez de chutar.
+- **"Continuar":** igual ao RPCS3, o state precisa ter sido gravado durante a
+  sessão. Ao achá-lo, o ZeuX também guarda o DISC_ID no repositório, para que os
+  saves apareçam mesmo que o state seja apagado depois.
+
+**Ordem de `saveAdapterFor` (`internal/api/emulator_settings.go`):** PS3 passa a
+mapear para `rpcs3` e PSP para `ppsspp`. Com o fallback introduzido depois no
+mesmo dia (ver "Azahar, melonDS e Flycast"), se o RPCS3 ou o PPSSPP não estiver
+instalado e o RetroArch cobrir o console, a tela cai nos saves do RetroArch; só
+sem nenhum dos dois ela mostra `known: false`. A versão original desta decisão
+dizia que PS3/PSP "deixam de cair no RetroArch"; isso foi superado pelo fallback.
+
+**Decisões de desenho:**
+
+- Nenhum arquivo do emulador é escrito para habilitar a retomada: nem
+  `games.yml`, nem `config.yml`, nem o `ppsspp.ini`. Quem decide o que o emulador
+  grava é a própria pessoa, como nos outros.
+- `BuildCommand` continua pura: a leitura do `games.yml` e do `installed.txt`
+  acontece em `FindGameSaves` e `recordResumeState`, fora do `BuildCommand`.
+- Os testes usam uma pasta `portable/` temporária e nunca tocam a configuração real
+  do usuário (`rpcs3PortableInstall`, `findPPSSPPSavesIn`, `ppssppResumeIn`).
+
+**Risco conhecido — "Iniciar do zero" no PPSSPP:** o PPSSPP tem a opção
+"Auto load savestate" (`AutoLoadSaveState`, `Core/Config.cpp`, padrão `0` = desligada,
+marcada como `PER_GAME`). Se a pessoa a ligou para um jogo, o "do zero" do ZeuX
+abre no state mesmo sem `--state`. O ZeuX **não** resolve isso: a chave é por jogo e
+não há certeza de onde ela fica no arquivo de configuração. Fica em
+`pendencias.md`.
+
+**Risco conhecido — RPCS3:** o RPCS3 pode ter `vfs.yml` que move `dev_hdd0` para
+outra pasta; o ZeuX não lê isso e assume a pasta padrão. Também não foi verificado
+se o RPCS3 carrega um state sozinho ao abrir o jogo, sem flag. Não encontrei esse
+caminho no código lido (`System.cpp`), mas a leitura não foi exaustiva.
+
+**Não validado com o binário:** a flag `--savestate` do RPCS3 e a `--state` do
+PPSSPP com o jogo rodando de fato; que os dois arquivos gerados têm o nome e a
+pasta descritos aqui; e a convenção do prefixo do save do PPSSPP (`PSP/SAVEDATA`).
+
+**O que quebra se desfizer:** a tela do jogo deixa de listar saves de PS3 e PSP
+do emulador dedicado (cai no RetroArch ou em `known: false`); "Continuar" nesses dois emuladores vira "Unapplied"
+com a frase genérica de que o ZeuX ainda não sabe continuar aquele jogo.
+
+## Saves e retomada: Azahar, melonDS e Flycast (2026-10-09)
+
+Pedido do Douglas: localizar saves e states destes três emuladores e, onde o
+código-fonte permitir, "Iniciar do zero" e "Continuar". Pesquisa feita no
+código-fonte oficial (raw do GitHub, baixado com `curl`), **não observada com o
+binário rodando**. Cada afirmação abaixo traz o arquivo de onde saiu.
+
+**Resultado por emulador:**
+
+| Emulador | Saves de jogo | States | Fresh | Resume | Status |
+|---|---|---|---|---|---|
+| Azahar (3DS) | `<usuário>\sdmc\Nintendo 3DS\<id0>\<id1>\title\<alto>\<baixo>\data\00000001\` (árvore) | `<usuário>\states\<ID 16 hex>.<slot 02d>.cst` | Sem flag (boot normal) | **Não**: nenhuma flag de estado em `citra_qt.cpp` (`-d -f -g -h -i -p -r -a -m -v -w`) | Saves e states listados; ID lido do `.3ds`; `.cia` desconhecido |
+| melonDS (DS) | `<ROM>.sav` na pasta da ROM, ou `SaveFilePath` do `melonDS.toml` | `<ROM>.ml0`–`.ml9`, ou `SavestatePath` | Sem flag | **Não**: `CLI.cpp` só tem `-b`, `-f`, `-a`, `-A` | Saves e states listados; sem o toml, aproximado |
+| Flycast (Dreamcast, Windows) | VMU `<gameId>_vmu_save_A1.bin` (com `PerGameVmu`, padrão) — o código vem do disco | `<ROM>.state` (slot 0), `<ROM>_N.state` (1–9), na pasta `data` ao lado do `.exe` | `-config Dreamcast:AutoLoadState=no` | `-config Dreamcast:AutoLoadState=yes` + `-config Dreamcast:SavestateSlot=N` | Estados listados e "Continuar" ligado; cartão desconhecido com `PerGameVmu` ligado |
+
+**Fontes com trecho citado:**
+
+- Azahar, `src/core/savestate.cpp`, `GetSaveStatePath`: `fmt::format("{}{:016X}.{:02d}.cst", StatesDir, program_id, slot)`.
+  Azahar, `src/core/file_sys/archive_source_sd_savedata.cpp`, `GetSaveDataPath`: `"{}{:08x}/{:08x}/data/00000001/"` com as metades do ID, dentro de
+  `"{}Nintendo 3DS/{}/{}/title/"`. Azahar, `src/common/file_util.cpp`, `SetUserPath`: `user` ao lado do exe, senão `%AppData%\Azahar`.
+  Azahar, `src/common/common_paths.h`: `USERDATA_DIR "user"`, `EMU_DATA_DIR "Azahar"` (Windows), `STATES_DIR "states"`, `SDMC_DIR "sdmc"`.
+  Azahar, `src/core/file_sys/ncch_container.h`: `NCSD_Header.partitions` em 0x120; `NCCH_Header.program_id` depois de `product`/`maker` (offset 0x118 pela soma dos campos).
+  Azahar, `src/core/hle/service/fs/archive.cpp`: `ArchiveIdCode::SaveData` usa `ArchiveSource_SDSaveData`, então o save de jogo fica no sdmc.
+  Azahar, `src/citra_qt/citra_qt.cpp`: lista de opções da linha de comando (sem flag de estado).
+- melonDS, `src/frontend/qt_sdl/EmuInstance.cpp`: `getAssetPath` (pasta configurada ou da ROM; nome `baseAssetName` = ROM sem a última extensão), `getSavestateName` (`".ml" + slot`), `loadROMData`/DS (`".sav"` com `SaveFilePath`); `main.cpp`, `pathInit`: `portable` ao lado do exe, senão a pasta de config do Qt; `Config.cpp`: `kConfigFile = "melonDS.toml"` e as chaves `SaveFilePath`/`SavestatePath` na raiz. `CLI.cpp`: só `-b`, `-f`, `-a`, `-A`.
+- Flycast, `core/cfg/cl.cpp`, `usage()`: `-config section:key=value` ("set a transient config value") e "Transient config values won't be saved to emu.cfg."
+  Flycast, `core/cfg/option.cpp`: `Option<bool> AutoLoadState("Dreamcast.AutoLoadState")` (padrão false), `Option<bool> AutoSaveState("Dreamcast.AutoSaveState")`, `Option<int, false> SavestateSlot("Dreamcast.SavestateSlot")`, `Option<bool> PerGameVmu("PerGameVmu", true, "config")`, `Dreamcast.SavestatePath` (lista separada por `;`).
+  Flycast, `core/emulator.cpp`, `Emulator::loadGame`: `else if (config::AutoLoadState ...) dc_loadstate(config::SavestateSlot);`; `unloadGame`: `gui_saveState(false)` quando `AutoSaveState`.
+  Flycast, `core/nullDC.cpp`, `dc_savestate`/`dc_loadstate`; `core/oslib/oslib.cpp`, `getSavestatePath`: `<nome sem última extensão>` + `_N` (se N > 0) + `.state`.
+  Flycast, `core/ui/settings_general.cpp`: rótulos "Automatic State:", "Load" e "Save" (o texto da UI usa essa mesma opção).
+  Flycast, `core/cfg/ini.cpp`, `getBool`: só `yes`, `true`, `on`, `1` ligam.
+  Flycast, `core/windows/winmain.cpp`, `setupPath`: `emu.cfg` na pasta do exe, dados em `data\` ao lado dele (portátil).
+
+**Mecanismo escolhido:**
+
+- **Azahar e melonDS, saves e states:** localização por nome/ID, sem nenhum
+  argumento de linha de comando. Azahar: o ID do programa é lido do cabeçalho do
+  `.3ds` (`azaharProgramID`, só os bytes do cabeçalho). Save de jogo é uma
+  árvore; cada arquivo entra na lista e o backup copia um a um (o backup não
+  precisou de mudança: `Restore` recria as subpastas com `MkdirAll`).
+- **Flycast, retomada:** `-config` transitório, por ser o único mecanismo
+  documentado que não grava no `emu.cfg` do usuário. "Iniciar do zero" manda
+  `AutoLoadState=no` em todo lançamento, então um `emu.cfg` com o carregamento
+  ligado não abre o jogo no estado. "Continuar" manda `AutoLoadState=yes` e o
+  `SavestateSlot` do arquivo escolhido. O slot não é lido do nome do arquivo
+  sozinho: `flycastStateSlot` compara com o nome da ROM do pedido, porque
+  `Crazy_1.state` pode ser o slot 0 de `Crazy_1` ou o slot 1 de `Crazy`.
+- **Azahar e melonDS, retomada:** não implementada. Sem flag documentada, o
+  `Continuar` fica desabilitado e a tela mostra "Este emulador ainda não abre o
+  jogo num estado salvo" (`resumeUnsupported`). Editar o `config` do emulador
+  para forçar isso foi descartado, pelo mesmo motivo das decisões de 2026-10-05.
+- **Flycast, "Continuar" depende de uma opção do usuário:** o Flycast só grava o
+  estado ao fechar se `AutoSaveState` estiver ligada no emulador. O ZeuX **não
+  liga essa opção** nos lançamentos (diferente do RetroArch, que o Douglas
+  autorizou em 2026-10-09). A tela diz a condição (`resumeNoStateFlycast`).
+  Ligar com `-config Dreamcast:AutoSaveState=yes` transitório é tecnicamente
+  igual ao caso do RetroArch: fica como decisão pendente do Douglas.
+- **Flycast, cartão:** com `PerGameVmu` ligado (padrão), o arquivo do cartão é
+  `<código do disco>_vmu_save_A1.bin`, e o código vem do disco, que o ZeuX não
+  lê. Então o resultado sai com `memory_cards_unknown: true` e a lista vazia — o
+  que a tela mostra como "desconhecido", não "nenhum cartão". Com `PerGameVmu`
+  desligado, lista o `vmu_save_A1.bin` compartilhado e marca
+  `memory_card_shared`.
+
+**Mudanças que afetam emuladores já existentes:**
+
+- `saveAdapterFor` ganhou 3DS, DS e Dreamcast. Se o emulador dedicado **não**
+  estiver instalado, `gameSavesContext` cai no RetroArch quando ele cobre o
+  console. Isso vale também para PS1 e PS2: antes, sem DuckStation/PCSX2
+  instalados, a resposta era `known: false`; agora pode mostrar os saves do
+  RetroArch (com a mesma ressalva de "pode não ser o último emulador usado").
+- A tela de saves só exige o serial do disco para DuckStation e PCSX2. Antes,
+  qualquer jogo sem `serial` mostrava "Os estados aparecem depois que você
+  jogar…" — **inclusive o RetroArch, cujos states nunca apareciam**. Isso foi
+  corrigido de carona.
+- `GameSaves` ganhou `memory_cards_unknown` (JSON `memory_cards_unknown`).
+
+**O que quebra se desfizer:** tirar o `-config Dreamcast:AutoLoadState=no` do
+fresh faz o "Iniciar do zero" do Flycast abrir no estado se o `emu.cfg` do
+usuário tiver o carregamento ligado. Tirar os `-config` do resume faz o
+"Continuar" do Flycast abrir no início sem aviso (o estado fica ali, sem
+uso). Remover os casos de `saveAdapterFor` faz 3DS/DS/Dreamcast voltarem a
+depender só do RetroArch.
+
+**Não validado com o binário (todos):**
+
+- Azahar: que o save do jogo cai mesmo em `sdmc\…\data\00000001\` (a árvore
+  foi lida no código, não num save real); que não existe auto-load de state por
+  config (não achado nos arquivos lidos, não exaustivo); que os IDs `<id0>/<id1>`
+  são os que a pasta usa. A pasta do usuário no Linux e no macOS não foi lida: lá
+  o ZeuX não aponta nada.
+- melonDS: que o Qt grava o `melonDS.toml` em `%LocalAppData%\melonDS` (a tabela
+  da documentação do Qt aponta `AppData/Local` para `ConfigLocation`, não foi
+  testado). Sem o arquivo, o resultado sai aproximado.
+- Flycast: que `-config Dreamcast:AutoLoadState=yes|no` e
+  `Dreamcast:SavestateSlot=N` são aceitos pelo binário na linha de comando, e que o
+  valor transitório não é sobrescrito pelo `loadGameSpecificSettings`. Que o
+  autosave grava `<nome>.state` no slot configurado (lido em `nullDC.cpp`, não
+  observado).
+- Os três: nenhuma flag foi confirmada com o binário; as flags do Flycast estão
+  no código-fonte de `cl.cpp` e `option.cpp`, e a ajuda do binário (que diz a
+  mesma coisa) não foi conferida ao vivo.
+
+## Saves e retomada: xemu, Vita3K, Xenia e Cemu (2026-10-09)
+
+Pedido do Douglas: seguir o padrão de DuckStation, PCSX2 e RetroArch para os
+quatro emuladores que ainda não tinham nada: localizar saves por jogo, abrir
+num estado ("Continuar") e "Iniciar do zero". Resultado da pesquisa na fonte:
+**nenhum dos quatro tem uma flag de linha de comando, lida no código, que abra
+o jogo num estado salvo** e, para os saves por jogo, a pasta depende de um
+title ID que o ZeuX não lê. Nada foi implementado para "Continuar" nem para
+`FindGameSaves` nestes quatro; o que mudou está listado no fim.
+
+**Por emulador** (fontes lidas com WebFetch e `curl` no raw do GitHub, em
+2026-10-09; nenhuma observada com o binário rodando):
+
+| Emulador | Saves por jogo | Fresh | Resume | Fonte com trecho | Status |
+|---|---|---|---|---|---|
+| xemu | **Não implementado.** Tudo fica num único HDD qcow2 (`hdd_path`), sem arquivo por jogo | Sem flag extra; ROM por `-dvd_path` (já no adapter) | **Unapplied.** `-loadvm` existe (herdado do QEMU, `system/vl.c`: "'incoming' and 'loadvm' options are mutually exclusive"), mas o ZeuX não tem como gerar um snapshot que o xemu aceite de volta, e não validei se os devices do xemu suportam snapshot. Não usado | `-dvd_path` lido à mão em `qemu_init()`: "Allow overriding the dvd path from command line" (https://raw.githubusercontent.com/xemu-project/xemu/master/system/vl.c) | Só o boot. Sem retomada |
+| Vita3K | **Não implementado.** Pasta `ux0/user/00/savedata/<TITLE_ID>` (padrão de docs/pendencias.md, 2026-09-11, **não confirmado na fonte**); precisa do title ID, que o ZeuX não lê do `.vpk` | Sem flag extra; ROM como argumento posicional (já no adapter) | **Unapplied.** A FAQ oficial não cita savestate nem flag de estado | FAQ: "Filesystem: `%APPDATA%/Vita3K/`" e "`config.yml`: In the same folder as Vita3K.exe." (https://vita3k.org/faq) | Só o boot. Sem retomada |
+| Xenia | **Não implementado.** Pasta `content_root/<perfil>/<TitleID>/00000001` (o `00000001` e o perfil não foram confirmados na fonte) | Sem flag extra; `--fullscreen=true` confirmado (`DEFINE_bool(fullscreen, false, "Whether to launch the emulator in fullscreen.", "Display")`, `emulator_window.cc`) | **Unapplied.** Há `SaveToFile`/`RestoreFromFile` (F7/F8), mas só em `#ifdef DEBUG` e com `"test.sav"` fixo, sem flag | `content_root` padrão = `storage_root / "content"`; `portable.txt` ao lado do exe muda o storage (https://raw.githubusercontent.com/xenia-project/xenia/master/src/xenia/app/xenia_main.cc) | Só o boot. Sem retomada |
+| Cemu | **Não implementado.** `mlc01/usr/save/...` existe (a wiki diz que o mlc guarda "save games"), mas o subcaminho por título não foi lido e precisa do title ID | Sem flag extra; `-g` (jogo) e `-f` (tela cheia) confirmados | **Unapplied.** A lista completa de opções não tem nada de estado (`--game`, `--title-id`, `--mlc`, `--fullscreen`, `--account`, `--cos-*`, `--force-*`, `--enable-gdbstub`, `--open-debugger`) | `LaunchSettings::HandleCommandline` (https://raw.githubusercontent.com/cemu-project/Cemu/main/src/config/LaunchSettings.cpp, linhas 58-82) | Só o boot. Sem retomada |
+
+**Decisões:**
+
+- **Sem `FindGameSaves` para os quatro.** Sem o title ID do jogo, qualquer
+  pasta devolvida seria "de todos os jogos", o que contraria a tela do jogo
+  (que mostra saves *deste* jogo). A tela segue com `known: false`.
+- **Sem retomada, mas com `Unapplied`.** `SupportsResume` continua `false` para
+  os quatro (`resume.go`). O `BuildCommand` já devolve `resumeUnappliedMessage`
+  (`standalone.go`), que é o aviso honesto de "o jogo abre do início".
+- **`-loadvm` do xemu não entra.** Ele existe, mas usar exigiria o ZeuX criar
+  um snapshot de VM por conta própria, e isso não foi verificado com o binário.
+  Um teste (`TestXemuNaoUsaLoadvmParaRetomar`) trava a decisão.
+- **Texto de UI próprio** (`resumeNoSaveStateEmulator`, `GameDetailScreen`):
+  diz que o ZeuX não tem como abrir o jogo num estado, e que o jogo segue pelo
+  save do próprio jogo. A frase evita "ainda não", que sugere função em
+  andamento.
+
+**Testes:** `internal/emulator/sem_retomada_test.go` trava que os quatro não
+entram em `SupportsResume`, que `Continuar` vira `Unapplied` sem vazar o caminho
+do estado, que o modo fresh não carrega nem avisa nada, que o xemu não usa
+`-loadvm` e que a ROM do xemu sai por `-dvd_path`.
+
+**Ressalva (obrigatória):** nenhuma destas flags foi validada contra o binário
+real. Os trechos citados são de código-fonte, não de execução.
+
+**Não validado:**
+
+- A pasta de save da Vita3K (`ux0/user/00/savedata`) e o layout da Xenia
+  (`00000001`, perfil) não foram confirmados na fonte; só a FAQ e a ajuda do
+  Xenia foram lidas.
+- O subcaminho de save do Cemu não foi lido no código (o wiki só fala de
+  `mlc01`).
+- Não tentei a CLI da Vita3K no código: os caminhos testados deram 404. O
+  adapter continua usando o argumento posicional, que o próprio código já
+  documenta como o caminho para ROM solta.
+
+**O que quebra se desfizer:** adicionar um destes quatro a `SupportsResume` sem
+flag confirmada faria o `-statefile`/`-loadvm` ser montado com um arquivo que
+o emulador talvez não aceite, e a tela mostraria "Continuar" habilitado
+quando não há como cumprir. Os testes de `sem_retomada_test.go` pegam isso.
+
+## Auto-save de estado ligado pelo ZeuX em todos os emuladores (2026-10-09)
+
+**Decisão do Douglas (2026-10-09):** em todo emulador que oferece salvar o estado
+automaticamente ao fechar o jogo, o ZeuX liga essa opção por padrão, porque é ela
+que gera o estado que o "Continuar" retoma. A opção aparece nas configurações de
+cada emulador dentro do ZeuX, com a mesma chave (`auto_save_state`, padrão
+ligado), para a pessoa poder desligar.
+
+**Reverte** a decisão de 2026-10-05 sobre o PCSX2 ("o ZeuX deixou de ligar
+`SaveStateOnShutdown` sozinho"). Naquela data a regra era "não mudar o
+comportamento do emulador sem o usuário pedir"; agora o pedido é do Douglas, e
+vale para todos. A decisão de 2026-10-09 sobre o RetroArch ("o ZeuX liga
+`savestate_auto_save`") fica como estava; a nova entrada estende a mesma escolha
+para o controle na tela. A frase "o ZeuX não liga `Dreamcast.AutoSaveState`" do
+Flycast, em "Saves e retomada: Azahar, melonDS e Flycast", está superada por esta.
+
+**Verificação na fonte** (código-fonte oficial, lido com `curl` no raw do GitHub
+em 2026-10-09; nada observado com o binário rodando):
+
+| Emulador | Tem a opção? | Mecanismo do ZeuX | Onde fica a escolha | Fonte |
+|---|---|---|---|---|
+| DuckStation | Sim: `[Main] SaveStateOnExit`, padrão `true` | Chave no `settings.ini` (já escrito pelo ZeuX na instalação gerenciada) | No próprio `settings.ini`. Padrão reforçado só se a chave falta (`dsIfAbsent`) | https://raw.githubusercontent.com/stenzek/duckstation/master/src/core/settings.cpp (`save_state_on_exit = si.GetBoolValue("Main", "SaveStateOnExit", true)`) |
+| PCSX2 | Sim: `[EmuCore] SaveStateOnShutdown`, padrão `false` | Chave no `PCSX2.ini` (já escrito pelo ZeuX). `MergePCSX2Defaults` grava `true` só se a chave falta | No próprio `PCSX2.ini` | `pcsx2/Config.h` (campo `SaveStateOnShutdown`); `pcsx2-qt/MainWindow.cpp` (`requestShutdown(..., EmuConfig.SaveStateOnShutdown)`); `pcsx2-qt/QtHost.cpp` (`VMManager::Shutdown(m_save_state_on_shutdown)`); `pcsx2/VMManager.cpp` (`Shutdown(save_resume_state)` grava `GetCurrentSaveStateFileName(-1)`) |
+| RetroArch | Sim: `savestate_auto_save`, padrão `false` | Override `--appendconfig` com `savestate_auto_save = "true"` ou `"false"`, sempre explícito | Tabela `emulator_launch_prefs` (migração 0014) | `retroarch.cfg` (comentário de `savestate_auto_save`); `config.def.h` (`DEFAULT_SAVESTATE_AUTO_SAVE false`) |
+| Flycast | Sim: `Dreamcast.AutoSaveState`, padrão `false` | `-config Dreamcast:AutoSaveState=yes` ou `=no`, transitório, em todos os modos | Tabela `emulator_launch_prefs` | `core/cfg/option.cpp`; `core/emulator.cpp` (`unloadGame`: `gui_saveState(false)` quando `AutoSaveState`); `core/cfg/cl.cpp` (`-config`: "Transient config values won't be saved to emu.cfg.") |
+| Dolphin | Não encontrado | — | — | `Source/Core/Core/Config/MainSettings.cpp` lido: só `Core.EnableSaveStates`, sem salvar ao fechar |
+| RPCS3 | Não encontrado | — | — | `rpcs3/Emu/system_config.h`, nó `savestate` lido: `Suspend Emulation Savestate Mode` ("Close emulation when saving, delete save after loading") e `Maximum SaveState Files`. Não é salvar ao fechar; não usado |
+| PPSSPP | Não encontrado | — | — | `Core/Config.cpp` lido: só `AutoLoadSaveState` (carregar, por jogo) e `SaveStateSlotCount`, sem salvar ao fechar |
+| melonDS | Não encontrado | — | — | `Config.cpp` lido: só `SaveFilePath` e `SavestatePath` |
+| RMG (mupen64plus) | Não encontrado | — | — | `Source/RMG-Core/Settings.cpp` lido: só `SaveStatePath` e atalhos de `SaveState` |
+| Azahar | Não encontrado nos arquivos lidos | — | — | `src/citra_qt/citra_qt.cpp` e `configure_general` (não lido inteiro): nenhuma chave de auto-save. Não exaustivo |
+| Cemu | Não encontrado | — | — | `src/config/CemuConfig.h` lido: sem opção de estado ao fechar |
+| Xenia | Não encontrado | — | — | `src/xenia/app/xenia_main.cc` lido: só `content_root` |
+| xemu, Vita3K | Não verificado | — | — | Os caminhos de fonte tentados deram 404; nada foi confirmado. Ficam sem a opção |
+
+As linhas "Não encontrado" vêm de busca por palavras-chave (`auto`, `exit`,
+`shut`, `save`) nos arquivos citados, não de leitura integral dos arquivos.
+
+Onde a opção não existe, ela **não aparece** na tela, e o "Continuar" segue com a
+frase que já existia para o emulador (sem estado de retomada, ou "não há como").
+
+**Mecanismo, e por que não há um segundo lugar quando o emulador já tem um:**
+
+- **DuckStation e PCSX2** guardam a escolha na própria chave do arquivo de
+  configuração, que o ZeuX já escreve na instalação gerenciada. A tela lê e grava
+  a chave; o lançamento só garante o padrão (`MergeDuckStationDefaults` com
+  `dsIfAbsent`; `MergePCSX2Defaults` grava `true` se a chave falta). Um
+  "desligado" escolhido pela pessoa não é revertido no lançamento seguinte.
+- **RetroArch e Flycast** não têm um arquivo que o ZeuX possa usar como fonte de
+  verdade: o RetroArch recebe um override por lançamento, e o Flycast recebe
+  `-config` transitório. A escolha vai para a tabela `emulator_launch_prefs`
+  (migração `0014_emulator_launch_prefs.sql`, SQLite local, sem ORM). Sem linha,
+  vale o padrão, ligado. Lida por `Launcher.AutoSaveStateFor`; gravada por
+  `SetStoredEmulatorSettings`.
+- **O ID é o mesmo em todos** (`auto_save_state`), para a tela ter um só texto e um
+  só controle (`EmulatorSettingsPanel.i18n.ts`, chave `auto_save_state`).
+
+**Ajustes de código decorrentes:**
+
+- `Request.AutoSaveStateOff` (zero = ligado): `BuildCommand` do Flycast emite
+  sempre o `-config Dreamcast:AutoSaveState=` explícito. O zero é o padrão do
+  produto, então a prévia (`POST /games/preview`) continua mostrando o que o
+  lançamento real faria.
+- `writeRetroArchAppendConfig(mode, autoSave)` e `retroArchAppendConfigContent`
+  recebem a escolha; `savestate_auto_save` sai sempre explícito (`"true"` ou
+  `"false"`), porque desligada a opção do ZeuX também precisa sobrepor um
+  `savestate_auto_save` ligado no `retroarch.cfg` do usuário.
+- A tela do RetroArch e a do Flycast abrem o mesmo modal de configurações
+  (`EmulatorSettingsModal`), com o texto `modalDescriptionZeuX` no lugar de "gravadas
+  direto no arquivo", e a tecla de print só no RetroArch. O botão do RetroArch que
+  abria só a tecla de print (2026-10-06) foi substituído por esse modal.
+- Com a opção desligada, o botão "Continuar" desabilitado diz isso
+  (`resumeAutoSaveOff`, `GameDetailScreen`): a tela lê `auto_save_state` de
+  `GET /emulators/{id}/settings` e só mostra a frase se o valor é `false`.
+
+**O que quebra se desfizer:** tirar o `-config Dreamcast:AutoSaveState=yes` do
+Flycast faz o "Continuar" sumir sem erro visível (o estado não nasce). Tirar a
+linha `savestate_auto_save` do override do RetroArch tem o mesmo efeito. Tirar o
+`SaveStateOnShutdown = true` do `MergePCSX2Defaults` volta a PCSX2 para o padrão
+desligado, e o "Continuar" do PS2 some sem erro visível.
+
+**Não validado com o binário:** que o DuckStation e o PCSX2 gravam o estado de
+retomada com a chave ligada (o caminho do arquivo confere com o código lido); que o
+`-config Dreamcast:AutoSaveState=yes|no` é aceito pelo Flycast na linha de comando
+e prevalece sobre o `emu.cfg`; e que o `savestate_auto_save` do override sobrepõe o
+`retroarch.cfg`. Nenhuma destas afirmações foi testada com um jogo rodando.
+
+**Riscos:**
+
+- Quem desligou "Salvar estado ao fechar" no RetroArch por fora, no próprio
+  `retroarch.cfg`, passa a ter o ZeuX sobrepondo esse valor com `"true"` (padrão).
+  É a escolha do produto, mas vale saber.
+- O Flycast recebe `AutoSaveState=no` quando o ZeuX está desligado, mesmo que o
+  `emu.cfg` tenha o salvamento ligado. Mesma regra do RetroArch.

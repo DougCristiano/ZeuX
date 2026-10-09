@@ -52,8 +52,52 @@ export const dict = {
   chooseBanner: { "pt-BR": "Escolher banner", en: "Choose banner" },
   screenshotsHeading: { "pt-BR": "Prints", en: "Screenshots" },
   continueButton: { "pt-BR": "Continuar", en: "Continue" },
-  playFromStart: { "pt-BR": "Jogar do início", en: "Play from start" },
+  playFromStart: { "pt-BR": "Iniciar do zero", en: "Start from scratch" },
   resumeSavedAt: { "pt-BR": "de onde você parou · {{date}}", en: "where you left off · {{date}}" },
+  resumeNoState: {
+    "pt-BR": "Ainda não há estado salvo. O emulador grava um ao fechar o jogo; depois disso, Continuar abre dali.",
+    en: "No saved state yet. The emulator writes one when you close the game; after that, Continue picks up there.",
+  },
+  // O ZeuX liga o savestate_auto_save do RetroArch nos lançamentos (decisão
+  // do Douglas, 2026-10-09), então o estado de retomada nasce ao fechar o jogo
+  // sem depender de configuração do usuário. Por isso a frase não tem condição.
+  resumeNoStateRetroArch: {
+    "pt-BR": "Ainda não há estado salvo. O RetroArch grava um ao fechar o jogo; depois disso, Continuar abre dali.",
+    en: "No saved state yet. RetroArch writes one when you close the game; after that, Continue picks up there.",
+  },
+  // O Dolphin não grava estado sozinho ao fechar (o ZeuX não liga nada para
+  // isso): o estado de "Continuar" só existe depois que a pessoa salva um
+  // durante o jogo. Por isso a frase do Dolphin não diz que o emulador grava
+  // ao fechar, como a do RetroArch e a do DuckStation/PCSX2 fazem.
+  resumeNoStateDolphin: {
+    "pt-BR": "Ainda não há estado salvo. Salve um estado durante o jogo, no próprio Dolphin; depois disso, Continuar abre dali.",
+    en: "No saved state yet. Save a state during the game, inside Dolphin itself; after that, Continue picks up there.",
+  },
+  // O Flycast só grava o estado ao fechar se a opção "Automatic State: Save"
+  // dele estiver ligada (core/ui/settings_general.cpp, rótulo "Save"). O ZeuX
+  // não liga essa opção sozinho, então a frase diz a condição.
+  resumeNoStateFlycast: {
+    "pt-BR": "Ainda não há estado salvo. O Flycast grava um ao fechar o jogo se a opção \"Estado automático: Salvar\" estiver ligada nele; depois disso, Continuar abre dali.",
+    en: "No saved state yet. Flycast writes one when you close the game if its \"Automatic State: Save\" option is on; after that, Continue picks up there.",
+  },
+  // Salvar estado ao fechar desligado nas configurações do emulador: sem ele
+  // nenhum estado nasce ao fechar, e o "Continuar" não tem de onde retomar.
+  // A frase aponta onde a pessoa liga de novo (decisão de 2026-10-09).
+  resumeAutoSaveOff: {
+    "pt-BR": "Ainda não há estado salvo, e o salvamento ao fechar o jogo está desligado nas configurações do {{name}}. Ligue-o lá para o Continuar ter de onde retomar.",
+    en: "No saved state yet, and saving the state when closing the game is off in {{name}}'s settings. Turn it on there so Continue has somewhere to resume from.",
+  },
+  resumeUnsupported: {
+    "pt-BR": "Este emulador ainda não abre o jogo num estado salvo. Por enquanto o jogo abre do início.",
+    en: "This emulator can't open a game from a saved state yet. For now the game starts from the beginning.",
+  },
+  // Para xemu, Vita3K, Xenia e Cemu o ZeuX não achou, nas fontes lidas, como
+  // abrir o jogo num estado salvo. A frase diz isso sem prometer que o
+  // emulador "ainda" vai ganhar a função, e diz onde fica o progresso.
+  resumeNoSaveStateEmulator: {
+    "pt-BR": "Este emulador não tem um jeito de o ZeuX abrir o jogo num estado salvo. O jogo continua pelo save do próprio jogo, dentro do emulador.",
+    en: "This emulator has no way for ZeuX to open a game from a saved state. The game carries on from the game's own save, inside the emulator.",
+  },
   coreDownloadingMessage: {
     "pt-BR": "O core {{core_name}} ainda não estava no seu computador. Baixando…{{extra}}{{percent}}",
     en: "The {{core_name}} core wasn't on your computer yet. Downloading…{{extra}}{{percent}}",

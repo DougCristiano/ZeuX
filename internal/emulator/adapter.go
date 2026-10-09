@@ -30,6 +30,30 @@ const (
 	RendererSoftware Renderer = "software"
 )
 
+// Mode diz de onde o jogo começa. Existe como campo explícito (e não só como
+// um bool "continuar") para que "Iniciar do zero" seja uma escolha dita pelo
+// pedido, nunca o resultado de um campo que ficou de fora. Quando nada é
+// informado, vale ModeFresh: o caminho que não carrega nenhum estado é o
+// padrão seguro.
+type Mode string
+
+const (
+	// ModeFresh dá boot normal, como colocar o disco no console: o jogo passa
+	// pela tela inicial e o save que está no memory card continua valendo. Nenhum
+	// save state é carregado.
+	ModeFresh Mode = "fresh"
+
+	// ModeResume abre o jogo no ponto exato em que a pessoa saiu, carregando o
+	// estado de retomada gravado pelo emulador ao fechar.
+	ModeResume Mode = "resume"
+)
+
+// Valid diz se o modo é um dos conhecidos. A string vazia não é válida aqui:
+// quem aceita pedido sem modo aplica ModeFresh antes de chegar a este ponto.
+func (m Mode) Valid() bool {
+	return m == ModeFresh || m == ModeResume
+}
+
 // Options é o preset de execução em forma legível por máquina.
 //
 // É a contraparte estruturada do texto de preset do catálogo: o texto existe
@@ -73,11 +97,37 @@ type Request struct {
 
 	Options Options
 
+	// Mode escolhe entre começar do início e continuar. Vazio equivale a
+	// ModeFresh.
+	Mode Mode
+
 	// StatePath, quando preenchido, abre o jogo já carregando este save
-	// state ("Continuar", resume.go). Só os adapters de SupportsResume o
-	// usam; o Launcher nunca o preenche para os outros.
+	// state ("Continuar", resume.go). Só vale com Mode == ModeResume: num
+	// pedido "fresh" o campo é ignorado de propósito, para que um caminho de
+	// estado que sobrou por engano nunca vire um carregamento escondido. Só os
+	// adapters de SupportsResume o usam; o Launcher nunca o preenche para os
+	// outros.
 	StatePath string
+	// AppendConfigPath é o arquivo de config extra que o RetroArch lê por cima
+	// do retroarch.cfg (--appendconfig). Quem o grava é o launcher, antes de
+	// BuildCommand, conforme o modo: é ele que decide se o savestate_auto_load
+	// fica ligado ou desligado naquele lançamento. BuildCommand só referencia o
+	// caminho. Vazio (prévia, ou a gravação falhou) vira aviso em Unapplied.
+	AppendConfigPath string
+
+	// AutoSaveStateOff desliga o salvamento do estado ao fechar o jogo. Vale
+	// só para os emuladores que o ZeuX guarda no próprio banco (RetroArch e
+	// Flycast, ver launch_prefs.go). O zero vale "ligado", que é o padrão do
+	// ZeuX: uma prévia ou um pedido sem a escolha continua mostrando o que
+	// o lançamento real faria.
+	AutoSaveStateOff bool
 }
+
+// resumeUnappliedMessage é o aviso que um adapter sem suporte a retomada
+// devolve no Unapplied quando recebe ModeResume. Fica aqui, e não em cada
+// adapter, porque a regra é a mesma para todos: o pedido de continuar não foi
+// atendido, e o jogo abre do início.
+const resumeUnappliedMessage = "O ZeuX ainda não sabe continuar jogos neste emulador; o jogo abre do início."
 
 // Command é a linha de comando pronta, junto do que não coube nela.
 //

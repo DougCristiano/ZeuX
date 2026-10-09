@@ -3,6 +3,7 @@ package emulator
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strconv"
 )
 
@@ -56,6 +57,19 @@ func (a standaloneAdapter) BuildCommand(install Installation, req Request) (Comm
 
 	opts, romPart, unapplied := a.buildArgs(req)
 
+	// Continuar num emulador sem suporte não pode fingir que foi atendido: o
+	// jogo abre do início e o usuário precisa saber disso pela própria prévia.
+	if req.Mode == ModeResume {
+		if !SupportsResume(a.id) {
+			unapplied = append(unapplied, resumeUnappliedMessage)
+		} else if req.StatePath == "" {
+			// Prévia (POST /games/preview): não há disco consultado, então o
+			// estado só entra no lançamento de verdade.
+			unapplied = append(unapplied,
+				"O estado de retomada é localizado na hora de abrir o jogo; esta prévia mostra a linha sem ele.")
+		}
+	}
+
 	argv := append([]string{install.BinaryPath}, opts...)
 	argv = append(argv, req.Options.Extra...)
 	argv = append(argv, romPart...)
@@ -102,8 +116,11 @@ func newDuckStation() Adapter {
 			}
 			// `-statefile <arquivo>` está na ajuda do próprio DuckStation
 			// (duckstation-qt/qthost.cpp, PrintCommandLineHelp) — "Loads state
-			// from the specified filename". Não validado contra o binário.
-			if req.StatePath != "" {
+			// from the specified filename". Lido no código-fonte, não no binário.
+			// Usamos o caminho explícito e não o `-resume`, que escolhe o
+			// arquivo pelo nome do jogo ou pelo mais recente: aqui o estado
+			// deste jogo já é conhecido (resume.go).
+			if req.Mode == ModeResume && req.StatePath != "" {
 				opts = append(opts, "-statefile", req.StatePath)
 			}
 
@@ -145,7 +162,7 @@ func newPCSX2() Adapter {
 			}
 			// Mesma flag do DuckStation, na ajuda do PCSX2
 			// (pcsx2-qt/QtHost.cpp). Fica antes do "--": é opção, não jogo.
-			if req.StatePath != "" {
+			if req.Mode == ModeResume && req.StatePath != "" {
 				opts = append(opts, "-statefile", req.StatePath)
 			}
 
@@ -193,6 +210,14 @@ func newDolphin() Adapter {
 				opts = append(opts, "-C", "Dolphin.Core.GFXBackend=Software Renderer")
 			}
 
+			// `-s <arquivo>` (Source/Core/UICommon/CommandLineParse.cpp,
+			// "Load the initial save state"). O estado é carregado depois do
+			// boot (Core.cpp), então a ordem em relação a `-e` não muda o
+			// resultado; fica antes do jogo por consistência com os demais.
+			if req.Mode == ModeResume && req.StatePath != "" {
+				opts = append(opts, "-s", req.StatePath)
+			}
+
 			return opts, []string{"-e", req.ROMPath}, nil
 		},
 	}
@@ -232,6 +257,15 @@ func newPPSSPP() Adapter {
 				unapplied = append(unapplied,
 					"O backend gráfico precisa ser escolhido dentro do PPSSPP.")
 			}
+			// `--state FILE` está em Core/CmdLine.cpp (g_autoParams, "Load state
+			// from specified file"), e a própria ajuda do PPSSPP imprime
+			// "--state=FILE". A documentação pública (ppsspp.org/docs/reference/
+			// command-line) não lista a flag, por isso a confirmação vem do código.
+			// O estado só é carregado se o jogo também vier na linha (UI/NativeApp.cpp,
+			// "if (!boot_filename.empty() && stateToLoad)"): o caminho do jogo continua.
+			if req.Mode == ModeResume && req.StatePath != "" {
+				opts = append(opts, "--state", req.StatePath)
+			}
 
 			return opts, []string{req.ROMPath}, unapplied
 		},
@@ -257,6 +291,16 @@ func newFlycast() Adapter {
 			if req.Options.Fullscreen {
 				opts = append(opts, "-config", "window:fullscreen=yes")
 			}
+			// Salvar estado ao fechar (decisão do Douglas, 2026-10-09): ligado por
+			// padrão do ZeuX, e explícito nos dois sentidos, para que o emu.cfg do
+			// usuário não decida no lugar da escolha feita na tela. Sem essa linha
+			// nenhum estado de retomada é gravado ao fechar (Dreamcast.AutoSaveState,
+			// core/emulator.cpp, unloadGame).
+			if req.AutoSaveStateOff {
+				opts = append(opts, "-config", "Dreamcast:AutoSaveState=no")
+			} else {
+				opts = append(opts, "-config", "Dreamcast:AutoSaveState=yes")
+			}
 			if req.Options.InternalScale > 1 {
 				unapplied = append(unapplied,
 					"A resolução interna precisa ser ajustada dentro do Flycast.")
@@ -268,6 +312,32 @@ func newFlycast() Adapter {
 			if req.Options.ExitOnClose {
 				unapplied = append(unapplied,
 					"O Flycast volta ao menu ao fechar o jogo; não há opção de linha de comando para encerrá-lo junto.")
+			}
+
+			// Iniciar do zero e Continuar (2026-10-09). Sem nenhuma opção, o Flycast
+			// segue o "Automatic State: Load" do emu.cfg do usuário, então o modo é
+			// dito explicitamente com "-config" transitório: Dreamcast.AutoLoadState
+			// (core/cfg/option.cpp) e, para Continuar, Dreamcast.SavestateSlot. A
+			// ajuda do binário diz que o valor transitório não vai para o emu.cfg
+			// (core/cfg/cl.cpp, usage: "Transient config values won't be saved to
+			// emu.cfg."). Lido no código-fonte, não no binário.
+			switch {
+			case req.Mode == ModeResume && req.StatePath != "":
+				if slot, ok := flycastStateSlot(filepath.Base(req.StatePath), req.ROMPath); ok {
+					opts = append(opts, "-config", "Dreamcast:AutoLoadState=yes",
+						"-config", "Dreamcast:SavestateSlot="+strconv.Itoa(slot))
+				} else {
+					// Nome que não casa com este jogo: melhor abrir do início e dizer
+					// isso do que carregar o estado de outro jogo.
+					opts = append(opts, "-config", "Dreamcast:AutoLoadState=no")
+					unapplied = append(unapplied,
+						"O estado escolhido não corresponde a este jogo; o jogo abre do início.")
+				}
+			case req.Mode == ModeResume:
+				// Prévia sem o caminho do estado: o aviso de "localizado na hora" já
+				// vem do standalone, e a linha fica sem a opção.
+			default:
+				opts = append(opts, "-config", "Dreamcast:AutoLoadState=no")
 			}
 
 			return opts, []string{req.ROMPath}, unapplied
@@ -304,7 +374,19 @@ func newRPCS3() Adapter {
 					"Resolução e backend gráfico precisam ser ajustados dentro do RPCS3.")
 			}
 
-			return opts, []string{req.ROMPath}, unapplied
+			// `--savestate <arquivo>` está em rpcs3/rpcs3.cpp (QCommandLineOption
+			// "Path for directly loading a savestate."). O bloco que trata esta
+			// opção é um "else if" antes do que abre o caminho posicional do jogo:
+			// com --savestate, o RPCS3 ignora o caminho do jogo. Por isso o jogo
+			// só sai da linha quando o estado vai junto — o estado já diz qual é o
+			// jogo. Sem StatePath (prévia, ou "do zero") o jogo entra normalmente.
+			romPart := []string{req.ROMPath}
+			if req.Mode == ModeResume && req.StatePath != "" {
+				opts = append(opts, "--savestate", req.StatePath)
+				romPart = nil
+			}
+
+			return opts, romPart, unapplied
 		},
 	}
 }

@@ -483,9 +483,10 @@ export type LaunchBody = {
   core?: string;
   /** Ausente aciona a autoconfiguração a partir do parecer do console. */
   options?: LaunchOptions;
-  /** Abre no estado de retomada da última sessão ("Continuar"). Só faz
-   * sentido quando o jogo traz `resume_saved_at`. */
-  resume?: boolean;
+  /** "fresh" começa do início (padrão do servidor); "resume" abre no estado
+   * de retomada da última sessão ("Continuar"). "resume" só faz sentido
+   * quando o jogo traz `resume_saved_at`. */
+  mode?: "fresh" | "resume";
 };
 
 export type Command = {
@@ -614,6 +615,7 @@ export type GameSaves = {
   /** Cartão único para todos os jogos (PCSX2). */
   memory_card_shared?: boolean;
   memory_cards_approximate?: boolean;
+  memory_cards_unknown?: boolean;
   save_states: SaveFileInfo[];
   /** Ausente = o jogo ainda não foi fechado pelo ZeuX; states ficam de fora. */
   serial?: string;

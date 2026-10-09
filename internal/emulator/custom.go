@@ -177,6 +177,12 @@ func (a customAdapter) BuildCommand(install Installation, req Request) (Command,
 		unapplied = append(unapplied,
 			"O preset pede resolução aumentada, mas os argumentos não usam "+PlaceholderScale+".")
 	}
+	// Emulador personalizado não tem gramática conhecida para estado salvo:
+	// o template do usuário é a única fonte de verdade, e o ZeuX não inventa
+	// uma flag para ele.
+	if req.Mode == ModeResume {
+		unapplied = append(unapplied, resumeUnappliedMessage)
+	}
 
 	return Command{Argv: argv, Unapplied: unapplied}, nil
 }

@@ -40,6 +40,22 @@ func (s *Server) handleEmulatorSettings(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusOK, map[string]any{"available": false, "message": "Este emulador não está instalado."})
 		return
 	}
+	if emulator.StoresSettingsInZeuX(id) {
+		// RetroArch e Flycast: a opção mora no banco do ZeuX, não no arquivo do
+		// emulador, então não há o que ler do disco nem o que esperar do emulador
+		// fechado.
+		stored, err := s.launcher.StoredEmulatorSettings(r.Context(), id)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "emulator_settings_read_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"available": true,
+			"running":   s.launcher.AdapterRunning(r.Context(), id),
+			"settings":  stored,
+		})
+		return
+	}
 	settings, err := emulator.ReadEmulatorSettings(id, install)
 	if errors.Is(err, emulator.ErrDuckStationNotManaged) {
 		writeJSON(w, http.StatusOK, map[string]any{"available": false, "message": err.Error()})
@@ -68,14 +84,30 @@ func (s *Server) handleSetEmulatorSettings(w http.ResponseWriter, r *http.Reques
 		s.writeError(w, http.StatusBadRequest, "invalid_body", `O corpo deve ser {"values": {"Seção.Chave": "valor"}}.`)
 		return
 	}
-	if s.launcher.AdapterRunning(r.Context(), id) {
-		s.writeError(w, http.StatusConflict, "emulator_running",
-			"Feche o emulador antes de mudar as opções — ele grava a configuração dele ao fechar e desfaria a mudança.")
-		return
-	}
 	install, ok := s.emulatorInstall(r, id)
 	if !ok {
 		s.writeError(w, http.StatusBadRequest, "emulator_not_installed", "Este emulador não está instalado.")
+		return
+	}
+	if emulator.StoresSettingsInZeuX(id) {
+		// Guardada no ZeuX, não no arquivo do emulador: não há o que desfazer se
+		// o emulador regravar a própria configuração ao fechar, então o aberto
+		// não bloqueia a escolha. Vale para o próximo lançamento.
+		if err := s.launcher.SetStoredEmulatorSettings(r.Context(), id, body.Values); err != nil {
+			s.writeError(w, http.StatusBadRequest, "emulator_settings_invalid", err.Error())
+			return
+		}
+		stored, err := s.launcher.StoredEmulatorSettings(r.Context(), id)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "emulator_settings_read_failed", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"available": true, "running": s.launcher.AdapterRunning(r.Context(), id), "settings": stored})
+		return
+	}
+	if s.launcher.AdapterRunning(r.Context(), id) {
+		s.writeError(w, http.StatusConflict, "emulator_running",
+			"Feche o emulador antes de mudar as opções — ele grava a configuração dele ao fechar e desfaria a mudança.")
 		return
 	}
 	if err := emulator.WriteEmulatorSettings(id, install, body.Values); err != nil {
@@ -90,16 +122,45 @@ func (s *Server) handleSetEmulatorSettings(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"available": true, "running": false, "settings": settings})
 }
 
-// saveAdapterFor diz qual emulador guarda os saves de um console (só os
-// dois com o local verificado).
+// saveAdapterFor diz qual emulador dedicado guarda os saves de um console. Os
+// com local verificado no código-fonte: PS1, PS2, GameCube/Wii (Dolphin), PS3
+// (RPCS3), PSP (PPSSPP), 3DS (Azahar), DS (melonDS) e Dreamcast (Flycast). Se o
+// dedicado não estiver instalado e o RetroArch cobrir o console, o
+// gameSavesContext cai no RetroArch; os demais consoles dependem só dele.
 func saveAdapterFor(consoleID string) string {
 	switch consoleID {
 	case "ps1":
 		return "duckstation"
 	case "ps2":
 		return "pcsx2"
+	case "gamecube", "wii":
+		// Dolphin: os estados vêm do GameID do jogo (dolphin_saves.go). A
+		// listagem não mostra cartão nem NAND do Wii ainda.
+		return "dolphin"
+	case "ps3":
+		return "rpcs3"
+	case "psp":
+		return "ppsspp"
+	case "3ds":
+		return "azahar"
+	case "nds":
+		return "melonds"
+	case "dreamcast":
+		return "flycast"
 	}
 	return ""
+}
+
+// retroArchRunsConsole diz se o RetroArch cobre o console (tem algum core para
+// ele no catálogo). Consulta o registro de adapters, não o catálogo de cores,
+// para não depender de a instalação estar pronta.
+func (s *Server) retroArchRunsConsole(consoleID string) bool {
+	for _, a := range s.emulators.ForConsole(consoleID) {
+		if a.ID() == "retroarch" {
+			return true
+		}
+	}
+	return false
 }
 
 // gameSavesContext resolve jogo, emulador, instalação e saves de um pedido.
@@ -119,10 +180,23 @@ func (s *Server) gameSavesContext(w http.ResponseWriter, r *http.Request) (libra
 		return library.Game{}, "", emulator.GameSaves{}, false, false
 	}
 	adapterID := saveAdapterFor(game.ConsoleID)
+	var install emulator.Installation
+	installed := false
+	if adapterID != "" {
+		install, installed = s.emulatorInstall(r, adapterID)
+	}
+	if !installed && s.retroArchRunsConsole(game.ConsoleID) {
+		// Sem o emulador dedicado instalado, o RetroArch é o que mais provavelmente
+		// abriu o jogo: é o único adapter que cobre a maioria dos consoles.
+		// Não há como saber, pela biblioteca, qual emulador foi usado de fato —
+		// a tela deve tratar o resultado como "saves do RetroArch", não como
+		// certeza sobre o último lançamento.
+		adapterID = "retroarch"
+		install, installed = s.emulatorInstall(r, adapterID)
+	}
 	if adapterID == "" {
 		return game, "", emulator.GameSaves{}, false, true
 	}
-	install, installed := s.emulatorInstall(r, adapterID)
 	if !installed {
 		return game, adapterID, emulator.GameSaves{}, false, true
 	}

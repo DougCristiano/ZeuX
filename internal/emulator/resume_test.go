@@ -19,7 +19,7 @@ func TestResumeStateFileGoesBeforeTheGame(t *testing.T) {
 		id, cons string
 	}{{newDuckStation(), "duckstation", "ps1"}, {newPCSX2(), "pcsx2", "ps2"}} {
 		cmd, err := tc.adapter.BuildCommand(install(tc.id, "/opt/"+tc.id),
-			Request{ROMPath: "/jogos/jogo.iso", ConsoleID: tc.cons, StatePath: "/estados/jogo.resume"})
+			Request{ROMPath: "/jogos/jogo.iso", ConsoleID: tc.cons, Mode: ModeResume, StatePath: "/estados/jogo.resume"})
 		if err != nil {
 			t.Fatalf("%s: %v", tc.id, err)
 		}

@@ -267,7 +267,9 @@ func TestSeedPCSX2PreservesExistingSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := custom + "\n[AutoUpdater]\nCheckAtStartup = false\n"
+	// Além do auto-update, o salvamento ao fechar entra ligado porque a chave
+	// faltava (decisão do Douglas, 2026-10-09). O que a pessoa já tinha fica.
+	want := custom + "\n[AutoUpdater]\nCheckAtStartup = false\n\n[EmuCore]\nSaveStateOnShutdown = true\n"
 	if string(got) != want {
 		t.Errorf("PCSX2.ini existente: got %q, want %q", got, want)
 	}

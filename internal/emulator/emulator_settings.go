@@ -59,9 +59,11 @@ func choiceSetting(section, key, def string, choices ...string) EmulatorSetting 
 // ErrSettingsUnsupported: o ZeuX ainda não tem catálogo para o emulador.
 var ErrSettingsUnsupported = errors.New("o ZeuX ainda não ajusta as opções deste emulador")
 
-// SupportsSettings diz se há catálogo de opções para o emulador.
+// SupportsSettings diz se há catálogo de opções para o emulador. RetroArch e
+// Flycast têm só a opção de salvar estado, guardada no ZeuX (launch_prefs.go):
+// não passam por settingsTarget, e quem chama usa StoredEmulatorSettings.
 func SupportsSettings(adapterID string) bool {
-	return adapterID == "duckstation" || adapterID == "pcsx2"
+	return adapterID == "duckstation" || adapterID == "pcsx2" || StoresSettingsInZeuX(adapterID)
 }
 
 // settingsTarget resolve o arquivo e o catálogo de um emulador.
@@ -187,7 +189,9 @@ var pcsx2SettingsCatalog = []EmulatorSetting{
 	boolSetting("EmuCore", "EnableDiscordPresence", "false"),
 	boolSetting("EmuCore", "UseSavestateSelector", "true"),
 	boolSetting("EmuCore", "BackupSavestate", "true"),
-	boolSetting("EmuCore", "SaveStateOnShutdown", "false"),
+	// Padrão ligado do ZeuX (decisão do Douglas, 2026-10-09). O padrão do PCSX2
+	// é desligado, então MergePCSX2Defaults grava "true" quando a chave falta.
+	fileAutoSaveSetting("EmuCore", "SaveStateOnShutdown"),
 	intSetting("SPU2/Output", "BufferMS", "50", 10, 500),
 	intSetting("SPU2/Output", "StandardVolume", "100", 0, 100),
 	intSetting("EmuCore/GS", "upscale_multiplier", "4", 1, 8),

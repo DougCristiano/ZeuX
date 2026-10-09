@@ -81,7 +81,9 @@ export function GameSavesPanel({ gameId }: { gameId: number }) {
 
       <div className="flex flex-col gap-1.5">
         <p className="font-mono text-[11px] tracking-wide text-muted uppercase">{t("memoryCard")}</p>
-        {saves.memory_cards.length === 0 ? (
+        {saves.memory_cards_unknown ? (
+          <p className="text-sm text-muted">{t("memoryCardUnknown")}</p>
+        ) : saves.memory_cards.length === 0 ? (
           <p className="text-sm text-muted">{t("noMemoryCard")}</p>
         ) : (
           saves.memory_cards.map((f) => (
@@ -94,7 +96,10 @@ export function GameSavesPanel({ gameId }: { gameId: number }) {
 
       <div className="flex flex-col gap-1.5">
         <p className="font-mono text-[11px] tracking-wide text-muted uppercase">{t("states")}</p>
-        {!saves.serial ? (
+        {/* Só PS1 e PS2 precisam do serial do disco para ligar os states ao
+            jogo (2026-10-05). Os demais emuladores ligam pelo nome do arquivo
+            ou pelo ID que o próprio ZeuX lê da ROM, então a frase não se aplica. */}
+        {!saves.serial && (saves.adapter_id === "duckstation" || saves.adapter_id === "pcsx2") ? (
           <p className="text-sm text-muted">{t("noSerial")}</p>
         ) : saves.save_states.length === 0 ? (
           <p className="text-sm text-muted">{t("noStates")}</p>

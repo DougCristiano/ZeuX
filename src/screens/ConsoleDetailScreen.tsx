@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
-import { Camera, Pencil, Settings2 } from "lucide-react";
+import { Pencil, Settings2 } from "lucide-react";
 import { api, ApiError } from "../api";
 import type {
   ConsoleEmulatorOption,
@@ -39,7 +39,6 @@ import { ManualInstallGuide } from "../components/ManualInstallGuide";
 import { EmulatorConfigPanel } from "../components/EmulatorConfigPanel";
 import { SaveDataPanel } from "../components/SaveDataPanel";
 import { EmulatorSettingsModal } from "../components/EmulatorSettingsPanel";
-import { ScreenshotHotkeyModal } from "../components/ScreenshotHotkeySection";
 import { useCoreInstall } from "../hooks/useCoreInstall";
 import { useEmulatorInstall } from "../hooks/useEmulatorInstall";
 import { percentOf } from "../lib/format";
@@ -864,17 +863,19 @@ export function ConsoleDetailScreen({
   const coreByName = new Map(cores.map((c) => [c.name, c]));
   const consoleFolders = folders.filter((f) => f.console_id === consoleId);
   // Botão de configurações no topo (2026-10-05): DuckStation no PS1 e PCSX2
-  // no PS2 — os dois com catálogo de opções verificado.
+  // no PS2 — os dois com catálogo de opções verificado. RetroArch e Flycast
+  // (2026-10-09): a opção "Salvar estado ao fechar o jogo" fica guardada no
+  // ZeuX; o mesmo modal mostra a tecla de print do RetroArch.
   const settingsEmulator =
     consoleId === "ps1" && readiness.chosen?.adapter_id === "duckstation"
       ? { id: "duckstation", name: "DuckStation" }
       : consoleId === "ps2" && readiness.chosen?.adapter_id === "pcsx2"
         ? { id: "pcsx2", name: "PCSX2" }
-        : null;
-  // RetroArch (2026-10-06): sem catálogo de opções, mas com a tecla de print
-  // levantada — botão próprio, abre um modal só com ela.
-  const hotkeyOnlyEmulator =
-    !settingsEmulator && readiness.chosen?.adapter_id === "retroarch" ? { id: "retroarch", name: "RetroArch" } : null;
+        : readiness.chosen?.adapter_id === "retroarch"
+          ? { id: "retroarch", name: "RetroArch" }
+          : readiness.chosen?.adapter_id === "flycast"
+            ? { id: "flycast", name: "Flycast" }
+            : null;
   const verdict = report?.verdicts.find((v) => v.console_id === consoleId);
   const chosenEntry = readiness.chosen ? emulatorById.get(readiness.chosen.adapter_id) : undefined;
   const requiresExternalFile = entry.requires_external_file ?? false;
@@ -1068,23 +1069,7 @@ export function ConsoleDetailScreen({
             </Button>
           </div>
         )}
-        {hotkeyOnlyEmulator && (
-          <div>
-            <Button variant="chrome" onClick={() => setEmulatorSettingsOpen(true)}>
-              <Camera size={14} aria-hidden="true" />
-              {t("screenshotKeyButton", { name: hotkeyOnlyEmulator.name })}
-            </Button>
-          </div>
-        )}
       </Card>
-
-      {emulatorSettingsOpen && hotkeyOnlyEmulator && (
-        <ScreenshotHotkeyModal
-          adapterId={hotkeyOnlyEmulator.id}
-          name={hotkeyOnlyEmulator.name}
-          onClose={() => setEmulatorSettingsOpen(false)}
-        />
-      )}
 
       {emulatorSettingsOpen && settingsEmulator && (
         <EmulatorSettingsModal

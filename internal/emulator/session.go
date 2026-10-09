@@ -112,9 +112,11 @@ type LaunchInput struct {
 
 	Options Options
 
-	// Resume abre o jogo no estado de retomada gravado na última sessão
-	// ("Continuar", resume.go), em vez de começar do início.
-	Resume bool
+	// Mode escolhe "Continuar" (ModeResume, estado de retomada da última
+	// sessão, resume.go) ou começar do início (ModeFresh). Vazio vale
+	// ModeFresh. Valor fora dos conhecidos é recusado antes de qualquer
+	// processo subir.
+	Mode Mode
 }
 
 // Launch inicia o jogo e passa a acompanhar o processo.
@@ -146,8 +148,18 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 			l.logger.Warn("não foi possível silenciar a tela de boas-vindas do RPCS3", "erro", err)
 		}
 	}
+	mode := input.Mode
+	if mode == "" {
+		mode = ModeFresh
+	}
+	if !mode.Valid() {
+		return Session{}, fmt.Errorf("modo de lançamento %q desconhecido", string(input.Mode))
+	}
+	// Só o modo resume procura estado. No fresh o caminho fica vazio e nenhum
+	// argumento de carregamento é montado — a garantia de "do início" vive
+	// aqui e em BuildCommand, não só na tela.
 	var statePath string
-	if input.Resume {
+	if mode == ModeResume {
 		statePath, err = l.resumeStateFor(ctx, input.ROMPath, adapter.ID())
 		if err != nil {
 			return Session{}, err
@@ -161,10 +173,10 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 			l.logger.Warn("não foi possível completar a configuração do DuckStation", "erro", err)
 		}
 	}
-	// O PCSX2 grava o estado de retomada só com SaveStateOnShutdown ligado,
-	// e o padrão é desligado. Até 2026-10-05 o ZeuX ligava sozinho; agora é
-	// opção do usuário na tela do PS2 ("não mudar comportamento sem o usuário
-	// pedir"). Aqui só entra o auto-update desligado.
+	// O PCSX2 grava o estado de retomada só com SaveStateOnShutdown ligado, e
+	// o padrão dele é desligado. Desde 2026-10-09 (decisão do Douglas) o ZeuX
+	// liga essa chave quando ela falta, e a pessoa pode desligá-la na tela do
+	// PS2; EnsurePCSX2Defaults cuida das duas coisas.
 	if adapter.ID() == "pcsx2" && !l.AdapterRunning(ctx, "pcsx2") {
 		if err := EnsurePCSX2Defaults(); err != nil {
 			l.logger.Warn("não foi possível completar a configuração do PCSX2", "erro", err)
@@ -207,18 +219,41 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		options.Renderer = RendererDefault
 	}
 
+	// O RetroArch decide "do início" ou "no estado salvo" por um arquivo de
+	// config extra gravado no diretório do ZeuX (retroarch_resume.go). Não
+	// gravar não pode bloquear o jogo: o aviso vai para a sessão, e o
+	// retroarch.cfg do usuário segue valendo.
+	// A opção "Salvar estado ao fechar o jogo" do RetroArch e do Flycast mora no
+	// banco do ZeuX (launch_prefs.go); no RetroArch ela também vai para o
+	// arquivo de override, junto com o modo.
+	autoSave := l.AutoSaveStateFor(ctx, adapter.ID())
+	var appendConfig string
+	var appendUnapplied []string
+	if adapter.ID() == "retroarch" {
+		appendConfig, err = writeRetroArchAppendConfig(mode, autoSave)
+		if err != nil {
+			l.logger.Warn("não foi possível gravar a configuração de lançamento do RetroArch",
+				"modo", string(mode), "erro", err)
+			appendUnapplied = append(appendUnapplied,
+				"Não foi possível preparar a escolha de início do RetroArch; o jogo abre com a configuração que você já tem nele.")
+		}
+	}
+
 	built, err := adapter.BuildCommand(install, Request{
-		ROMPath:   input.ROMPath,
-		ConsoleID: input.ConsoleID,
-		Core:      input.Core,
-		Options:   options,
-		StatePath: statePath,
+		ROMPath:          input.ROMPath,
+		ConsoleID:        input.ConsoleID,
+		Core:             input.Core,
+		Options:          options,
+		Mode:             mode,
+		StatePath:        statePath,
+		AppendConfigPath: appendConfig,
+		AutoSaveStateOff: !autoSave,
 	})
 	if err != nil {
 		return Session{}, err
 	}
 
-	unapplied := append(append([]string{}, configUnapplied...), built.Unapplied...)
+	unapplied := append(append(append([]string{}, configUnapplied...), appendUnapplied...), built.Unapplied...)
 
 	// O processo é desligado do contexto da requisição de propósito: o jogo
 	// precisa continuar rodando muito depois de a resposta HTTP ter sido

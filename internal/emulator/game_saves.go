@@ -55,8 +55,12 @@ type GameSaves struct {
 	MemoryCardShared bool `json:"memory_card_shared,omitempty"`
 	// MemoryCardsApproximate: o nome do cartão foi adivinhado (DuckStation
 	// com tipo de cartão que não é por nome de arquivo).
-	MemoryCardsApproximate bool           `json:"memory_cards_approximate,omitempty"`
-	SaveStates             []SaveFileInfo `json:"save_states"`
+	MemoryCardsApproximate bool `json:"memory_cards_approximate,omitempty"`
+	// MemoryCardsUnknown: o emulador guarda o cartão por um código que o ZeuX
+	// não lê (VMU do Flycast com PerGameVmu, que leva o código do disco). A
+	// lista fica vazia, e a tela diz que não sabe — vazio aqui não é "nenhum".
+	MemoryCardsUnknown bool           `json:"memory_cards_unknown,omitempty"`
+	SaveStates         []SaveFileInfo `json:"save_states"`
 	// Serial do disco; vazio = ainda desconhecido (o jogo nunca foi fechado
 	// pelo ZeuX), e então os states ficam de fora.
 	Serial    string `json:"serial,omitempty"`
@@ -105,6 +109,22 @@ func FindGameSaves(adapterID string, install Installation, romPath string, id Ga
 		}
 		sortStates(out.SaveStates)
 		return out, true
+	case "retroarch":
+		return findRetroArchGameSaves(install, romPath)
+	case "dolphin":
+		return findDolphinGameSaves(install, id)
+	case "rpcs3":
+		return findRPCS3GameSaves(install, romPath)
+	case "ppsspp":
+		// O ID do jogo (DISC_ID) vem do DiscIDFor: o do repositório ou o do nome
+		// do state. Sem ele, ppsspp_saves.go devolve "não sei".
+		return findPPSSPPGameSaves(install, id.Serial)
+	case "azahar":
+		return findAzaharGameSaves(install, romPath)
+	case "melonds":
+		return findMelonDSGameSaves(install, romPath)
+	case "flycast":
+		return findFlycastGameSaves(install, romPath)
 	default:
 		return GameSaves{}, false
 	}
@@ -279,6 +299,14 @@ func (l *Launcher) DiscIDFor(ctx context.Context, romPath string) GameDiscID {
 			case "pcsx2":
 				if m := pcsx2StateName.FindStringSubmatch(name); m != nil {
 					return GameDiscID{ROMPath: romPath, AdapterID: st.AdapterID, Serial: m[1], CRC: strings.ToUpper(m[2])}
+				}
+			case "dolphin":
+				if gameID, ok := dolphinGameIDFromState(st.StatePath); ok {
+					return GameDiscID{ROMPath: romPath, AdapterID: st.AdapterID, Serial: gameID}
+				}
+			case "ppsspp":
+				if m := ppssppStateName.FindStringSubmatch(name); m != nil {
+					return GameDiscID{ROMPath: romPath, AdapterID: st.AdapterID, Serial: m[1]}
 				}
 			}
 		}

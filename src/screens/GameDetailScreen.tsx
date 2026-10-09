@@ -40,6 +40,19 @@ import { faseExtraDeDownload, percentOf } from "../lib/format";
 import { useT } from "../i18n/i18n";
 import { dict } from "./GameDetailScreen.i18n";
 
+// Emuladores que o ZeuX sabe abrir num estado salvo. Espelha
+// `emulator.SupportsResume` no Go: mudar um exige mudar o outro. Fica aqui só
+// para escolher o motivo certo quando "Continuar" aparece desabilitado — a
+// decisão de fato (há estado ou não) continua vindo do servidor.
+const RESUME_ADAPTERS = new Set(["duckstation", "pcsx2", "retroarch", "dolphin", "rpcs3", "ppsspp", "flycast"]);
+// Emuladores com a opção "Salvar estado ao fechar o jogo" (EmulatorSettingsPanel).
+const AUTO_SAVE_ADAPTERS = new Set(["duckstation", "pcsx2", "retroarch", "flycast"]);
+
+// Emuladores em que o ZeuX não achou, nas fontes lidas, nenhuma forma de abrir
+// o jogo num estado salvo (ver docs/decisoes.md, 2026-10-09). A frase é outra
+// porque "ainda não" sugere uma função em andamento, e aqui não há isso.
+const NO_SAVE_STATE_ADAPTERS = new Set(["xemu", "vita3k", "xenia", "cemu"]);
+
 function formatPlaytime(
   seconds: number,
   neverPlayedText: string,
@@ -462,6 +475,25 @@ export function GameDetailScreen({
     ? (emulators ?? []).find((e) => e.adapter_id === verdict.adapter_id)
     : undefined;
   const launchability = emulators ? evaluateGameLaunchability(game, verdict, adapterEntry) : undefined;
+  // "Salvar estado ao fechar o jogo" desligado nas configurações do emulador
+  // (decisão do Douglas, 2026-10-09): sem ele não nasce estado para o
+  // "Continuar", e o texto do botão desabilitado precisa dizer isso.
+  const autoSaveAdapterId = adapterEntry?.adapter_id;
+  const [autoSaveOff, setAutoSaveOff] = useState(false);
+  useEffect(() => {
+    if (!autoSaveAdapterId || !AUTO_SAVE_ADAPTERS.has(autoSaveAdapterId)) {
+      setAutoSaveOff(false);
+      return;
+    }
+    api
+      .getEmulatorSettings(autoSaveAdapterId)
+      .then((res) =>
+        setAutoSaveOff(
+          res.available && (res.settings ?? []).some((s) => s.id === "auto_save_state" && s.value === "false"),
+        ),
+      )
+      .catch(() => setAutoSaveOff(false));
+  }, [autoSaveAdapterId]);
   const install = useInlineInstall({
     onEmulatorInstalled: (adapterId) =>
       setEmulators((prev) => (prev ?? []).map((e) => (e.adapter_id === adapterId ? { ...e, installed: true } : e))),
@@ -738,18 +770,23 @@ export function GameDetailScreen({
 
         {/* "Continuar" (2026-10-05, pedido do Douglas): quando o emulador
             gravou um estado de retomada ao fechar, ele vira a ação principal
-            e "Jogar" vira "Jogar do início". O save do memory card continua
+            e "Jogar" vira "Iniciar do zero". O save do memory card continua
             valendo nos dois — o estado é o ponto exato em que a pessoa saiu.
             Vai direto para `launch`, sem a cadeia de instalação: se há
-            estado, o emulador já está instalado. */}
+            estado, o emulador já está instalado.
+
+            Sem estado, "Continuar" aparece desabilitado com o motivo (em vez
+            de sumir): a pessoa fica sabendo que a opção existe e o que falta
+            para ela funcionar. O motivo depende do emulador — ver
+            RESUME_ADAPTERS. */}
         <div className="flex flex-wrap items-center gap-3">
-        {game.resume_saved_at && (
+        {(game.resume_saved_at || adapterEntry) && (
           <Button
-            variant="primary"
-            autoFocus
-            disabled={playBusy}
-            onClick={() => void launch(game, false, { resume: true })}
-            size="lg"
+            variant={game.resume_saved_at ? "primary" : "chrome"}
+            autoFocus={Boolean(game.resume_saved_at)}
+            disabled={playBusy || !game.resume_saved_at}
+            onClick={() => void launch(game, false, { mode: "resume" })}
+            size={game.resume_saved_at ? "lg" : "md"}
             className="w-fit"
           >
             {status.kind === "launching" ? (
@@ -809,6 +846,23 @@ export function GameDetailScreen({
           </span>
         )}
         </div>
+        {!game.resume_saved_at && adapterEntry && (
+          <p className="max-w-md text-sm text-muted">
+            {autoSaveOff && AUTO_SAVE_ADAPTERS.has(adapterEntry.adapter_id)
+              ? t("resumeAutoSaveOff", { name: adapterEntry.name })
+              : adapterEntry.adapter_id === "retroarch"
+              ? t("resumeNoStateRetroArch")
+              : adapterEntry.adapter_id === "dolphin"
+                ? t("resumeNoStateDolphin")
+                : adapterEntry.adapter_id === "flycast"
+                  ? t("resumeNoStateFlycast")
+                  : RESUME_ADAPTERS.has(adapterEntry.adapter_id)
+                    ? t("resumeNoState")
+                    : NO_SAVE_STATE_ADAPTERS.has(adapterEntry.adapter_id)
+                      ? t("resumeNoSaveStateEmulator")
+                      : t("resumeUnsupported")}
+          </p>
+        )}
 
         {/* Princípios 2 e 3: quando o jogo não abre no clique simples, dizer
             o motivo — e, para "sem preset", qual componente barra (a frase

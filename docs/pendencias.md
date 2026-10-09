@@ -972,7 +972,7 @@ verdade, fotografar antes/depois, registrar em `decisoes.md`.
 | **duckstation** | `<user dir>/memcards/*.mcd` | `<user dir>/savestates/` | `settings.ini` | Sim, via `portable.txt` — já é o que `seedDuckStationPortable` ativa; sem ele, hoje o padrão passou de `Documents\DuckStation` para `%LocalAppData%\DuckStation` (mudou de versão para versão — mais um motivo para manter modo portátil). |
 | **pcsx2** | `Documents\PCSX2\memcards\` | `Documents\PCSX2\sstates\` | `Documents\PCSX2\inis\PCSX2.ini` | **Não** — confirmado ao vivo em 2026-09-11 que o PCSX2 ignora modo portátil nesta máquina (ver `pcsx2_config.go`). Único já com `ResolveSaveDataDirs` implementado. |
 | **ppsspp** | `<memstick>/PSP/SAVEDATA/` | `<memstick>/PSP/PPSSPP_STATE/` | `ppsspp.ini` (dentro do memstick) | Sim — sem instalador, o "Memory Stick" já fica ao lado do `.exe`; só cai em `Documents\PPSSPP` se a pasta do exe não for gravável (ex.: Program Files). |
-| **dolphin** | cartão de memória GC é um **arquivo único** (`MemcardA.raw` etc.), caminho gravado em `Dolphin.ini` (`MemcardAPath`) — padrão em `Documents\Dolphin Emulator\GC\`; saves de Wii ficam dentro de `Wii/title/.../data/` (estrutura NAND emulada) | `Documents\Dolphin Emulator\StateSaves\` | `Documents\Dolphin Emulator\Config\Dolphin.ini` (+ `GFX.ini`, `GameSettings/*.ini` por jogo) | Existe modo portátil (`portable.txt`), não pesquisado a fundo aqui. |
+| **dolphin** | cartão de memória GC é um **arquivo único** (`MemcardA.raw` etc.), caminho gravado em `Dolphin.ini` (`MemcardAPath`) — padrão em `Documents\Dolphin Emulator\GC\`; saves de Wii ficam dentro de `Wii/title/.../data/` (estrutura NAND emulada). **Feito em 2026-10-09:** states (`<GameID>.sNN`) e "Continuar" via `-s` (ver `docs/decisoes.md`, "Saves e retomada: Dolphin e RMG"). **Pendente:** cartão GC/GCI, NAND do Wii, GameID lido do ISO/RVZ | `Documents\Dolphin Emulator\StateSaves\` (`<pasta de usuário>/StateSaves`) | `Documents\Dolphin Emulator\Config\Dolphin.ini` (+ `GFX.ini`, `GameSettings/*.ini` por jogo) | Modo portátil (`portable.txt` ao lado do executável) é tratado em `dolphin_saves.go`; caminho `Documents` no Windows não confirmado no código-fonte. |
 | **flycast** | `vmu_save_A1.bin` (e B1/C1/D1) soltos na pasta `data/` ao lado do executável (standalone) — **por design, um VMU por slot, compartilhado entre jogos**, não por jogo | não encontrado documentado para o standalone nesta pesquisa | `emu.cfg` | Comportamento standalone parece já ser "ao lado do exe" por padrão — precisa confirmar. |
 | **rpcs3** | `dev_hdd0/home/00000001/savedata/<ID do jogo>/` dentro da pasta de instalação (a árvore `dev_hdd0` é o "HD emulado") | citado como existente (RPCS3 tem save state próprio), local não confirmado nesta pesquisa | `config.yml` | RPCS3 é portátil por padrão (tudo relativo à pasta do executável), mas há um bug conhecido no macOS que grava fora dela — vale checar o equivalente no Windows antes de confiar. |
 | **melonds** | `.sav` ao lado da ROM, ou pasta configurável (`Documents\melonDS\saves\` como default comum) — **local final é o que o usuário configurou na primeira execução**, não fixo | não pesquisado a fundo | `melonDS.ini` | Sem confirmação de portátil. |
@@ -981,7 +981,7 @@ verdade, fotografar antes/depois, registrar em `decisoes.md`.
 | **vita3k** | `ux0/user/00/savedata/<Title ID>/`, dentro de `%AppData%/Vita3K/` (caminho customizável via `pref-path` no `config.yml`) | não pesquisado | `config.yml` (ao lado do exe) | Filesystem emulado fica em AppData por padrão, não ao lado do exe — atenção, mesmo padrão de risco do PCSX2/Azahar. |
 | **xenia** | `Documents\Xenia\content\` (ou ao lado do exe, se houver `portable.txt`) | não pesquisado a fundo | `Documents\Xenia\xenia.config.toml` (ou ao lado do exe em modo portátil) | Sim, via `portable.txt` — mesmo mecanismo que `seedXenia` já pressupõe, mas **não confirmado se o ZeuX ativa esse portable.txt** (não vi isso no `firstrun.go` atual). |
 | **cemu** | `mlc01/usr/save/` dentro do MLC (path configurável) | não pesquisado | `settings.xml` | **Mudou de comportamento entre versões**: Cemu passou a ser não-portátil por padrão no Windows (`%AppData%\Roaming\Cemu`), com portátil ainda disponível via pasta `portable` ao lado do exe — `seedCemu` hoje só cria `mlc01` dentro do `installDir`, o que pode não ser onde o Cemu moderno olha. **Precisa verificação ao vivo, mesmo padrão do PCSX2.** |
-| **rmg** | não pesquisado a fundo (Mupen64Plus core guarda save por jogo, formato `.sra`/`.mpk` conforme o tipo) | `.../RMG/Save/State` | `.../RMG/config/mupen64plus.cfg` (ou local, se portátil) | A doc citada diz que a versão portátil guarda tudo dentro da própria pasta — consistente com `seedRMG`. |
+| **rmg** | Mupen64Plus core guarda save por jogo (`.eep`/`.sra`/`.fla`/`.mpk`) e state como `<goodname>.stN`. **Feito em 2026-10-09:** só o modo explícito (fresh = sem flag; resume = `Unapplied`, porque o slot do estado não é conhecido). **Pendente:** saves por jogo e resume — dependem do goodname da ROM e de `SaveStatePath`/`SaveSRAMPath` no `mupen64plus.cfg` (`--load-state-slot` confirmado em `Source/RMG/main.cpp`) | `.../RMG/Save/State` (não verificado) | `.../RMG/config/mupen64plus.cfg` (ou local, se portátil) | A doc citada diz que a versão portátil guarda tudo dentro da própria pasta — consistente com `seedRMG`. |
 | **retroarch** | `savefile_directory` no `retroarch.cfg` (pode ser `default` = ao lado da ROM, ou um caminho fixo) | `savestate_directory`, mesma regra | `retroarch.cfg` | **Leitura e escrita feitas (2026-09-11):** `GET/POST /emulators/retroarch/save-data` lê e grava as duas chaves do `retroarch.cfg` real (`retroArchSaveDataDirs`/`SetSaveDataDirs`). Campo vazio no `POST` volta para `"default"`. **Falta o frontend** — nenhuma tela chama a rota ainda. |
 
 ### O padrão de risco que se repete
@@ -1251,3 +1251,172 @@ A tecla de print por emulador existe (ver `docs/decisoes.md`). Pendente:
   com o emulador aberto que nenhum atalho dispara.
 - **Outros emuladores** (Flycast, RPCS3, Vita3K, xemu, Dolphin...): precisam
   do mesmo levantamento antes de ganhar a opção.
+
+## RetroArch: "Iniciar do zero" e "Continuar" a validar com o binário (2026-10-09)
+
+Implementado (ver `docs/decisoes.md`, "Iniciar do zero e Continuar no RetroArch",
+2026-10-09). As flags vêm do código-fonte do RetroArch e nunca rodaram contra o
+binário. Pendente:
+
+- **Validar com o binário:** `--appendconfig` com `savestate_auto_load` ligado e
+  desligado; que o arquivo extra tem prioridade sobre o `retroarch.cfg`; que
+  `config_save_on_exit = "false"` impede a gravação de volta; que o jogo abre no
+  `<jogo>.state.auto` ao continuar.
+- ~~**"Continuar" depende do auto-save do RetroArch**~~ — **RESOLVIDO em
+  2026-10-09** (decisão do Douglas): o ZeuX liga `savestate_auto_save` nos dois
+  modos do arquivo de override. Fonte: `retroarch.cfg` e `config.def.h`
+  (padrão `false`) e a chamada em `retroarch.c` ao fechar o conteúdo. Ver
+  `docs/decisoes.md`, "savestate_auto_save ligado pelo ZeuX (2026-10-09)". A
+  diferença para o PCSX2 (que não recebeu o mesmo tratamento em 2026-10-05) está
+  registrada lá. Continua sujeito a validação com o binário.
+- **Detecção só a partir da primeira sessão encerrada pelo ZeuX:** um
+  `.state.auto` gravado com o RetroArch aberto por fora não aparece como
+  "Continuar".
+- **RetroAchievements em modo hardcore:** o RetroArch não carrega estado na
+  abertura, então "Continuar" não carrega nada e o ZeuX não avisa. Decidir se a
+  tela deve dizer isso.
+- **Validar com o binário (DuckStation e PCSX2):** `-statefile` e a ausência de
+  auto-load sem flag (ver `docs/decisoes.md`, 2026-10-09, "Iniciar do zero" e
+  "Continuar" como modo explícito).
+
+## Saves por jogo e retomada, por emulador (2026-10-09)
+
+Estado final depois da união dos ramos de saves. Fonte da pesquisa: código-fonte
+oficial no GitHub (lido com `curl` no raw), docs oficiais quando existem; nada
+foi validado com o binário rodando. Detalhes, trechos e riscos em
+`docs/decisoes.md`, nas entradas "Saves e retomada: ..." de 2026-10-09.
+
+Quando o emulador dedicado não está instalado e o RetroArch cobre o console, a
+tela de saves cai nos saves do RetroArch (`gameSavesContext`); isso vale também
+para PS3 e PSP.
+
+| Emulador | Saves por jogo | Iniciar do zero | Continuar | Mecanismo / o que falta |
+|---|---|---|---|---|
+| DuckStation, PCSX2 | Sim | Sim | Sim | `-statefile` (já existia) |
+| RetroArch | Sim (aproximado: convenção de nomes de fonte secundária) | Sim | Sim | `<jogo>.state.auto` via `--appendconfig`; `savestate_auto_save` ligado por decisão de 2026-10-09 |
+| Dolphin | Só states `<GameID>.sNN`; cartão GC e NAND do Wii **não** entram | Sim (omite `-s`) | Sim | `-s <estado>`; o GameID só é conhecido depois do primeiro state gravado; o Dolphin não grava state ao fechar |
+| RMG | Não (nome depende do goodname da ROM) | Sim | Não (`Unapplied`) | `--load-state-slot` existe, mas o ZeuX não sabe o slot |
+| RPCS3 | Sim (aproximado; ID vem do `games.yml`) | Sim | Sim | `--savestate <arquivo>` (o RPCS3 ignora o jogo posicional quando ela vem) |
+| PPSSPP | Sim (aproximado; só Windows confirmado) | Sim | Sim | `--state <arquivo>` (não está na doc pública; confirmada no código) |
+| Azahar | Sim (árvore em `sdmc`; `.cia` fica `known: false`) | Sim | Não (`Unapplied`) | Sem flag de estado em `citra_qt.cpp` |
+| melonDS | Sim (`<ROM>.sav`, `.ml0`-`.ml9`) | Sim | Não (`Unapplied`) | Sem flag de estado em `CLI.cpp`; só via config |
+| Flycast | States sim; cartão VMU só com `PerGameVmu` desligado (senão `memory_cards_unknown`) | Sim (`AutoLoadState=no`) | Sim | `-config Dreamcast:AutoLoadState=yes` + `SavestateSlot=N`, transitórios |
+| xemu, Vita3K, Xenia, Cemu | Não (dependem de title ID que o ZeuX não lê; xemu tem um HDD único) | Sim | Não (`Unapplied`, sem flag de estado lida na fonte) | `NO_SAVE_STATE_ADAPTERS` na tela; `sem_retomada_test.go` trava |
+
+### Pendente
+
+- **Confirmar o nome do save do RetroArch ao vivo** (`<jogo>.srm`,
+  `<jogo>.state[N]`, `.state.auto`). Hoje vem de fonte secundária.
+- **Cartão do RetroArch por jogo** exige o `savefile_directory` fixo; com
+  `default`, o ZeuX procura ao lado da ROM e isso ainda não foi testado.
+- **Dolphin:** cartão de memória GC (arquivo raw ou pasta GCI, caminho em
+  `Dolphin.ini`) e NAND do Wii; GameID a partir do ISO/RVZ (cabeçalho do disco
+  não confirmado). Se existe auto-load de estado por config: não procurado
+  sistematicamente. A pasta padrão do Windows (`Documents\Dolphin Emulator`)
+  veio desta documentação, não do código lido.
+- **RMG:** saber o slot do último estado e o goodname da ROM, para "Continuar" e
+  saves por jogo.
+- ~~**Flycast, "Continuar" depende da opção "Automatic State: Save" do usuário.**~~ —
+  **RESOLVIDO em 2026-10-09** (decisão do Douglas): o ZeuX liga
+  `Dreamcast.AutoSaveState` por `-config` transitório em todo lançamento, e a
+  opção aparece na tela do Flycast. Ver `docs/decisoes.md`, "Auto-save de estado
+  ligado pelo ZeuX em todos os emuladores (2026-10-09)".
+- **Flycast, cartão VMU com `PerGameVmu` ligado (padrão):** o arquivo leva o
+  código do disco (`<gameId>_vmu_save_A1.bin`). Falta ler o código do disco
+  (IP.BIN) nos formatos `.gdi`, `.cdi` e `.chd`.
+- **Azahar, `.cia`:** o ID do programa está no TMD, não no cabeçalho.
+- **Azahar e melonDS, retomada:** procurar uma flag que abra num estado; no
+  melonDS só via config (`melonDS.toml`), o que o ZeuX não faz.
+- **Validar com o binário:** `-s` do Dolphin, `-config Dreamcast:*` do Flycast,
+  o caminho `<usuário>\sdmc\…\data\00000001` do Azahar, o `melonDS.toml` em
+  `%LocalAppData%\melonDS`, e as flags usadas por xemu, Vita3K, Xenia e Cemu.
+- **Pasta padrão por SO** de vários emuladores segue não lida.
+- **Como forçar boot limpo** quando o emulador tem auto-load ligado: só o
+  RetroArch e o Flycast têm isso mapeado.
+
+## Saves RPCS3 e PPSSPP: o que falta (2026-10-09)
+
+Implementado nesta data (saves por jogo e "Iniciar do zero"/"Continuar"), com
+o que ficou aberto registrado aqui. Detalhes e fontes em `docs/decisoes.md`.
+
+- **PPSSPP — auto-load por jogo.** A opção "Auto load savestate" do PPSSPP
+  (`AutoLoadSaveState`, padrão desligada, por jogo) pode fazer o "Iniciar do zero"
+  abrir num state. O ZeuX não a desliga. Falta descobrir onde essa chave por jogo
+  fica no `ppsspp.ini` e se dá para gravá-la sem mexer no resto.
+- **PPSSPP — Linux e macOS.** Só o Windows foi confirmado (documentação oficial de
+  storage). Nos outros sistemas as listas de saves dão "não sei". Falta ler a pasta
+  padrão de memstick de cada um, no código-fonte ou por observação.
+- **PPSSPP — ID antes do primeiro state.** O DISC_ID só aparece no nome do state.
+  Ler o `PARAM.SFO` de dentro de ISO/CSO daria o ID antes, mas exige parser de
+  ISO9660 e CSO, fora do escopo desta rodada.
+- **RPCS3 — `games.yml` e caminhos.** O ID vem do mapa `games.yml`, que só tem a
+  entrada depois do primeiro boot pelo RPCS3. Caminho de disco não casado (ex.:
+  jogo em pasta com outro formato) deixa o ID desconhecido. Falta testar com jogos
+  reais de cada formato.
+- **RPCS3 — `vfs.yml` e usuário.** O ZeuX assume `dev_hdd0` na pasta de
+  configuração e o usuário `00000001`. Um `vfs.yml` que mude `dev_hdd0`, ou outro
+  usuário, faz a lista de saves sair vazia (sem erro). Falta ler o `vfs.yml`, como
+  o ZeuX já faz para o firmware (`rpcs3CustomDevFlash`).
+- **RPCS3 — state automático.** Não achei auto-load de state ao abrir o jogo sem
+  flag, mas a leitura do código não foi exaustiva. Falta confirmar com o binário.
+- **Tudo, com o binário.** Nenhuma das flags (`--savestate`, `--state`) foi
+  testada com o emulador rodando um jogo real; os nomes de arquivo e de pasta
+  também não.
+
+## Saves e retomada: xemu, Vita3K, Xenia e Cemu (2026-10-09)
+
+Decisão e fontes em `docs/decisoes.md`, entrada de mesmo nome. Resumo do que
+ficou pendente:
+
+- [ ] **Cemu: saves por jogo.** Confirmar o subcaminho `mlc01/usr/save/<high>/<low>/user/...`
+      no código (o wiki só cita `mlc01`). Precisa do title ID do jogo, que o ZeuX
+      não lê do `.wud`/`.wux`/`.rpx`. Sem isso, `FindGameSaves` não tem como ser
+      por jogo.
+- [ ] **Xenia: saves por jogo.** Confirmar `content/<perfil>/<TitleID>/00000001` na
+      fonte (o perfil e o `00000001` não foram lidos). Mesmo impedimento: title ID.
+- [ ] **Vita3K: saves por jogo.** Confirmar `ux0/user/00/savedata/<TITLE_ID>` na
+      fonte. O title ID está em `sce_sys/param.sfo` dentro do `.vpk`; ler isso exige
+      parser de SFO e zip, e isso ainda não foi feito.
+- [ ] **xemu: saves.** O HDD (`hdd_path`) é um único qcow2 com todos os jogos; não
+      há arquivo por jogo. Só daria para apontar o HDD, o que não resolve a tela do
+      jogo. Decidir se vale mostrar o HDD como item à parte, ou deixar de fora.
+- [ ] **xemu: retomada.** Só se o xemu gravar um snapshot de VM que o ZeuX possa
+      carregar com `-loadvm`. Não há caminho confirmado para o ZeuX criar esse
+      snapshot, e não foi verificado se os devices do xemu suportam snapshot.
+- [ ] **Vita3K, Xenia, Cemu: retomada.** Só com flag confirmada no código. Até lá,
+      `Unapplied` (ver `sem_retomada_test.go`).
+- [ ] **Validar com o binário** que nenhuma das flags usadas nestes quatro
+      (`-dvd_path`, `-full-screen`, `--fullscreen=true`, `-f`, `-g`, a ROM posicional
+      da Vita3K) abre o emulador recusando argumento. Ressalva registrada em
+      `decisoes.md`.
+
+## Salvar estado ao fechar, ligado por padrão (2026-10-09)
+
+Implementado nesta data (decisão do Douglas: ligado por padrão em todo emulador
+que tem a opção, com controle na tela de cada um). Detalhes e fontes em
+`docs/decisoes.md`, "Auto-save de estado ligado pelo ZeuX em todos os emuladores
+(2026-10-09)". O que ficou aberto:
+
+- **Validar com o binário:** que DuckStation (`[Main] SaveStateOnExit`) e PCSX2
+  (`[EmuCore] SaveStateOnShutdown`) gravam o estado de retomada com a chave ligada,
+  no caminho que o ZeuX procura (`<serial>_resume.sav` e `.resume.p2s`).
+- **Validar com o binário:** `-config Dreamcast:AutoSaveState=yes|no` no Flycast
+  (aceito na linha de comando e prevalece sobre o `emu.cfg`) e que o estado sai como
+  `<jogo>.state` no slot 0.
+- **Validar com o binário:** `savestate_auto_save = "true"|"false"` no
+  `--appendconfig`, com a prioridade sobre o `retroarch.cfg` (ver também a
+  pendência de 2026-10-09 sobre "Iniciar do zero" no RetroArch).
+- **Não encontrado nas fontes lidas:** opção de salvar ao fechar em Dolphin, RPCS3,
+  PPSSPP, melonDS, RMG, Cemu e Xenia (busca por palavras-chave). Em Azahar a leitura
+  não foi exaustiva. **xemu e Vita3K não foram verificados** (os caminhos de fonte
+  tentados deram 404). Se alguma dessas tiver a opção, entra no mesmo padrão.
+- **RetroArch com "Salvar estado ao fechar" desligado no `retroarch.cfg` do usuário:**
+  o ZeuX passa a sobrepor esse valor com `"true"` nos lançamentos dele. É a escolha
+  do produto, mas o efeito sobre a configuração do usuário precisa ser conferido com
+  ele.
+- **Tela:** o botão "Continuar" desabilitado diz que o salvamento está desligado
+  só quando a tela consegue ler a opção (`GET /emulators/{id}/settings` com
+  `available: true`). Sem instalação do emulador, a frase genérica continua.
+- **Prévia:** `POST /games/preview` mostra o `-config ...AutoSaveState=` com a
+  escolha atual, mas o RetroArch não mostra o `--appendconfig` (a prévia não grava
+  o arquivo, como já era).
