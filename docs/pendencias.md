@@ -1279,101 +1279,58 @@ binário. Pendente:
   auto-load sem flag (ver `docs/decisoes.md`, 2026-10-09, "Iniciar do zero" e
   "Continuar" como modo explícito).
 
-## Saves por jogo: o que falta além do RetroArch (2026-10-09)
+## Saves por jogo e retomada, por emulador (2026-10-09)
 
-Feito nesta rodada: RetroArch com saves por jogo (`internal/emulator/retroarch_saves.go`,
-decisão em `docs/decisoes.md`, 2026-10-09). Continua pendente:
+Estado final depois da união dos ramos de saves. Fonte da pesquisa: código-fonte
+oficial no GitHub (lido com `curl` no raw), docs oficiais quando existem; nada
+foi validado com o binário rodando. Detalhes, trechos e riscos em
+`docs/decisoes.md`, nas entradas "Saves e retomada: ..." de 2026-10-09.
+
+Quando o emulador dedicado não está instalado e o RetroArch cobre o console, a
+tela de saves cai nos saves do RetroArch (`gameSavesContext`); isso vale também
+para PS3 e PSP.
+
+| Emulador | Saves por jogo | Iniciar do zero | Continuar | Mecanismo / o que falta |
+|---|---|---|---|---|
+| DuckStation, PCSX2 | Sim | Sim | Sim | `-statefile` (já existia) |
+| RetroArch | Sim (aproximado: convenção de nomes de fonte secundária) | Sim | Sim | `<jogo>.state.auto` via `--appendconfig`; `savestate_auto_save` ligado por decisão de 2026-10-09 |
+| Dolphin | Só states `<GameID>.sNN`; cartão GC e NAND do Wii **não** entram | Sim (omite `-s`) | Sim | `-s <estado>`; o GameID só é conhecido depois do primeiro state gravado; o Dolphin não grava state ao fechar |
+| RMG | Não (nome depende do goodname da ROM) | Sim | Não (`Unapplied`) | `--load-state-slot` existe, mas o ZeuX não sabe o slot |
+| RPCS3 | Sim (aproximado; ID vem do `games.yml`) | Sim | Sim | `--savestate <arquivo>` (o RPCS3 ignora o jogo posicional quando ela vem) |
+| PPSSPP | Sim (aproximado; só Windows confirmado) | Sim | Sim | `--state <arquivo>` (não está na doc pública; confirmada no código) |
+| Azahar | Sim (árvore em `sdmc`; `.cia` fica `known: false`) | Sim | Não (`Unapplied`) | Sem flag de estado em `citra_qt.cpp` |
+| melonDS | Sim (`<ROM>.sav`, `.ml0`-`.ml9`) | Sim | Não (`Unapplied`) | Sem flag de estado em `CLI.cpp`; só via config |
+| Flycast | States sim; cartão VMU só com `PerGameVmu` desligado (senão `memory_cards_unknown`) | Sim (`AutoLoadState=no`) | Sim | `-config Dreamcast:AutoLoadState=yes` + `SavestateSlot=N`, transitórios |
+| xemu, Vita3K, Xenia, Cemu | Não (dependem de title ID que o ZeuX não lê; xemu tem um HDD único) | Sim | Não (`Unapplied`, sem flag de estado lida na fonte) | `NO_SAVE_STATE_ADAPTERS` na tela; `sem_retomada_test.go` trava |
+
+### Pendente
 
 - **Confirmar o nome do save do RetroArch ao vivo** (`<jogo>.srm`,
   `<jogo>.state[N]`, `.state.auto`). Hoje vem de fonte secundária.
-- **Demais emuladores** (Dolphin, PPSSPP, Flycast, RPCS3, melonDS, Azahar,
-  xemu, Vita3K, Xenia, Cemu, RMG): a tabela desta seção de 2026-09-11 é pesquisa
-  não verificada contra o binário. Nenhum deles tem `FindGameSaves` ainda — a
-  tela do jogo mostra `known: false`.
 - **Cartão do RetroArch por jogo** exige o `savefile_directory` fixo; com
   `default`, o ZeuX procura ao lado da ROM e isso ainda não foi testado.
-
-## Pesquisa: saves e retomada nos demais emuladores (2026-10-09)
-
-**Escopo:** pesquisa só, sem implementação. Fonte: código-fonte oficial no GitHub
-(lido com `curl` no raw, não por resumo), docs oficiais quando existem. O que não
-apareceu em fonte oficial está como **desconhecido**. Os itens marcados como
-"não pesquisado" ficaram fora desta rodada por falta de tempo.
-
-**Prioridade desta rodada:** Dolphin, PPSSPP, RPCS3, Azahar, melonDS, e RMG
-(que estava na lista). Flycast, xemu, Vita3K, Xenia e Cemu: não pesquisado.
-
-| Emulador | Save de jogo (cartão/SRAM/NAND/HDD) | Save state (nome) | Flag para abrir num estado | Boot limpo | Viabilidade no ZeuX | Fonte principal |
-|---|---|---|---|---|---|---|
-| Dolphin | Cartão GC em pasta por jogo (GCI, pasta com o GameID); cartão raw e NAND do Wii: **nome e pasta não lidos** | `<pasta de estados do User>/<GameID>.sNN` (NN = slot, 2 dígitos) | **Sim, documentada:** `-s, --save_state <file>` ("Load the initial save state") | Omitir `-s` | **Fácil** (flag documentada; falta só escolher o arquivo) | [CommandLineParse.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/UICommon/CommandLineParse.cpp), [State.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/Core/State.cpp), [EXI_DeviceMemoryCard.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/Core/HW/EXI/EXI_DeviceMemoryCard.cpp) |
-| PPSSPP | Memstick/SAVEDATA: **não lido** | `.ppst` (`STATE_EXTENSION`); nome por jogo e slot: **não lido por completo** | **Desconhecido.** Ajuda oficial não lista flag de estado. O código tem `cmdLineOptions.stateToLoad` (`SaveState::Load` na abertura), mas o nome da flag não foi achado | Omitir (sem flag) | **Médio**, se a flag for confirmada. Hoje não dá para afirmar | [docs](https://www.ppsspp.org/docs/reference/command-line/), [NativeApp.cpp](https://raw.githubusercontent.com/hrydgard/ppsspp/master/UI/NativeApp.cpp) (linhas 788-789), [SaveState.cpp](https://raw.githubusercontent.com/hrydgard/ppsspp/master/Core/SaveState.cpp) |
-| RPCS3 | HDD virtual: `dev_hdd0/home/<usuário>/savedata/` (por jogo). Pasta de config do SO: **não lida** | `<config>/savestates/<TITLE>/<TITLE>_<prefixo>_<id>.SAVESTAT` | **Sim, documentadas:** `--savestate <path>` ("Path for directly loading a savestate.") e `--last-savestate <Title-ID ou caminho>` ("Loading the last savestate of a game.") | Omitir as flags | **Médio.** Flag existe e é oficial; falta resolver a pasta de config por SO | [rpcs3.cpp](https://raw.githubusercontent.com/RPCS3/rpcs3/master/rpcs3/rpcs3.cpp) (linhas 839-842, 1191-1205), [savestate_utils.cpp](https://raw.githubusercontent.com/RPCS3/rpcs3/master/rpcs3/Emu/savestate_utils.cpp) (linhas 288-303, 435), [System.cpp](https://raw.githubusercontent.com/RPCS3/rpcs3/master/rpcs3/Emu/System.cpp) (linha 634) |
-| Azahar | **Lido em 2026-10-09:** `sdmc\Nintendo 3DS\<id0>\<id1>\title\<alto>\<baixo>\data\00000001\` (árvore) | `<pasta de estados>/<PROGRAM_ID em 16 hex>.<slot 2 dígitos>.cst` | **Não encontrada** nas fontes lidas (`citra_qt.cpp` não tem opção de estado na linha de comando). Não exaustivo | Omitir | **Saves e states implementados; retomada não** (sem flag) | [savestate.cpp](https://raw.githubusercontent.com/azahar-emu/azahar/master/src/core/savestate.cpp) (linhas 41-48), [citra_qt.cpp](https://raw.githubusercontent.com/azahar-emu/azahar/master/src/citra_qt/citra_qt.cpp) |
-| melonDS | **Lido em 2026-10-09:** `<ROM>.sav` na pasta da ROM, ou `SaveFilePath` do `melonDS.toml` | **Lido em 2026-10-09:** `<ROM>.ml0`–`.ml9`, ou `SavestatePath` | **Não existe** na linha de comando: `CLI.cpp` só tem `-b/--boot`, `-f`, `-a`, `-A` e as ROMs | Sem flag | **Difícil.** Retomada exigiria controlar a GUI ou mexer na config, o que o ZeuX não faz hoje | [CLI.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/CLI.cpp), [Config.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/Config.cpp) (linhas 302-303), [main.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/main.cpp) (pasta `portable` ao lado do executável) |
-| RMG | **Não lido** | Slots numerados (0 a 9); pasta e nome **não lidos** | **Sim, documentada:** `--load-state-slot <n>` ("Loads save state slot when launching the ROM"). Só aceita slot, não arquivo | Omitir a flag | **Médio.** Abre por slot, não por arquivo; o ZeuX teria de saber qual slot é o último | [RMG main.cpp](https://raw.githubusercontent.com/Rosalie241/RMG/master/Source/RMG/main.cpp) (linhas 218, 280-287) |
-| Flycast | **Resolvido em 2026-10-09** (ver nota abaixo a tabela) | `<ROM>.state`, `<ROM>_N.state` | `-config Dreamcast:AutoLoadState=no` (transitório) | `-config Dreamcast:AutoLoadState=yes` + `-config Dreamcast:SavestateSlot=N` | Implementado | [cl.cpp](https://raw.githubusercontent.com/flyinghead/flycast/master/core/cfg/cl.cpp), [option.cpp](https://raw.githubusercontent.com/flyinghead/flycast/master/core/cfg/option.cpp), [oslib.cpp](https://raw.githubusercontent.com/flyinghead/flycast/master/core/oslib/oslib.cpp) |
-| xemu, Vita3K, Xenia, Cemu | **Não pesquisado** | Não pesquisado | Não pesquisado | Não pesquisado | Não pesquisado | — |
-
-**Atualização de 2026-10-09 (Azahar, melonDS e Flycast):** implementados os saves
-e states dos três, e a retomada só no Flycast. Azahar e melonDS continuam sem
-"Continuar" porque nenhuma flag de linha de comando abre num estado (Azahar:
-`citra_qt.cpp`; melonDS: `CLI.cpp`). Detalhes, trechos das fontes e riscos em
-`docs/decisoes.md`, "Saves e retomada: Azahar, melonDS e Flycast (2026-10-09)".
-Itens em aberto que essa entrada deixou para o Douglas decidir ou validar:
-
-- [ ] **Flycast, "Continuar" depende da opção "Automatic State: Save" do usuário.** O ZeuX não liga `Dreamcast.AutoSaveState` (como liga o `savestate_auto_save` do RetroArch). Decidir se liga por lançamento, transitório.
-- [ ] **Flycast, cartão VMU com `PerGameVmu` ligado (padrão):** o arquivo leva o código do disco (`<gameId>_vmu_save_A1.bin`). Para listar, falta ler o código do disco (IP.BIN) nos formatos `.gdi`, `.cdi` e `.chd`. Hoje sai como `memory_cards_unknown`.
-- [ ] **Azahar, `.cia`:** o ID do programa está no TMD, não no cabeçalho. Hoje `known: false`.
-- [ ] **Azahar, retomada:** procurar uma flag que abra num `.cst` (o estado é `<ID>.<slot>.cst`, já mapeado).
-- [ ] **melonDS, retomada:** só via config (`melonDS.toml`), o que o ZeuX não faz. Fica para depois de decidir sobre editar config de emulador.
-- [ ] **Validar com o binário:** as flags `-config Dreamcast:*` do Flycast, o caminho `<usuário>\sdmc\…\data\00000001` do Azahar, e o `melonDS.toml` em `%LocalAppData%\melonDS`.
-
-**Notas por emulador:**
-
-- **Dolphin.** `-s` pede o arquivo de estado e o ZeuX já sabe o caminho (um
-  arquivo por jogo e slot). A pasta portátil existe: se houver `portable.txt`
-  ao lado do executável, a pasta `User` fica ali
-  ([FileUtil.cpp](https://raw.githubusercontent.com/dolphin-emu/dolphin/master/Source/Core/Common/FileUtil.cpp), linhas 317-374). A pasta padrão por SO não foi lida.
-  **Desconhecido:** se existe auto-load de estado por config. Não apareceu nos
-  arquivos lidos, mas não foi procurado no `Config` inteiro.
-- **PPSSPP.** A ajuda oficial não lista flag de estado, mas o código usa uma opção
-  de linha de comando de estado. Enquanto o nome não for confirmado, a
-  viabilidade fica em aberto. **Não afirmar que a flag existe.**
-- **RPCS3.** Melhor caso documentado de carregamento por arquivo. `--savestate`
-  aceita caminho. A pasta de config muda por SO e precisa ser lida antes de
-  implementar.
-- **Azahar.** Nomes de estado são previsíveis (por ID do programa e slot), mas a
-  flag não foi achada. Só vale implementar se alguém confirmar.
-- **melonDS.** Sem flag de estado. O único caminho seria mexer na config do
-  usuário, o que vai contra o princípio de não alterar o emulador sem pedido
-  (ver 2026-10-05 sobre PCSX2 e RetroArch).
-- **RMG.** Pode abrir o slot. Para o "Continuar", o ZeuX precisaria saber o slot
-  da última sessão, o que a pesquisa não cobriu.
-
-**Atualização (2026-10-09):** RPCS3 e PPSSPP foram implementados (saves e
-"Continuar"); ver a seção "Saves RPCS3 e PPSSPP: o que falta" no fim deste
-arquivo e a entrada de decisoes.md de mesma data. A ordem abaixo é o histórico da pesquisa.
-
-**Ordem sugerida de implementação (histórico, de 2026-10-09):**
-
-1. **Dolphin:** flag documentada, nome do estado por GameID já conhecido. Maior
-   retorno com menor risco.
-2. **RPCS3:** `--savestate` com caminho e `--last-savestate` são documentados.
-   Antes, levantar a pasta de config por SO.
-3. **RMG:** `--load-state-slot` existe, mas só por slot. Precisa de uma forma de
-   o ZeuX guardar o slot da última sessão.
-4. **PPSSPP:** só depois de confirmar o nome da flag na fonte oficial.
-5. **Azahar, melonDS:** deixar como `Unapplied` (comportamento atual) até achar
-   fonte para a flag, ou aceitar que não terão "Continuar".
-
-**Desconhecido (não achado em fonte oficial nesta rodada):**
-- ~~Nome da flag de estado do PPSSPP (`stateToLoad`).~~ Resolvido em 2026-10-09: `--state`, em `Core/CmdLine.cpp` (ver decisoes.md).
-- Pastas padrão por SO de todos os emuladores, exceto onde foi citado.
-- Se algum emulador tem auto-load de estado por config (Dolphin, PPSSPP, RPCS3,
-  Azahar, melonDS, RMG). Não foi procurado sistematicamente.
-- Nome dos saves de jogo de Azahar, melonDS e RMG.
-- Como forçar boot limpo quando o emulador tem auto-load ligado. Só o RetroArch
-  tem esse caso mapeado (ver 2026-10-09).
+- **Dolphin:** cartão de memória GC (arquivo raw ou pasta GCI, caminho em
+  `Dolphin.ini`) e NAND do Wii; GameID a partir do ISO/RVZ (cabeçalho do disco
+  não confirmado). Se existe auto-load de estado por config: não procurado
+  sistematicamente. A pasta padrão do Windows (`Documents\Dolphin Emulator`)
+  veio desta documentação, não do código lido.
+- **RMG:** saber o slot do último estado e o goodname da ROM, para "Continuar" e
+  saves por jogo.
+- **Flycast, "Continuar" depende da opção "Automatic State: Save" do usuário.**
+  O ZeuX não liga `Dreamcast.AutoSaveState` (como liga o `savestate_auto_save`
+  do RetroArch). Decidir se liga por lançamento, transitório.
+- **Flycast, cartão VMU com `PerGameVmu` ligado (padrão):** o arquivo leva o
+  código do disco (`<gameId>_vmu_save_A1.bin`). Falta ler o código do disco
+  (IP.BIN) nos formatos `.gdi`, `.cdi` e `.chd`.
+- **Azahar, `.cia`:** o ID do programa está no TMD, não no cabeçalho.
+- **Azahar e melonDS, retomada:** procurar uma flag que abra num estado; no
+  melonDS só via config (`melonDS.toml`), o que o ZeuX não faz.
+- **Validar com o binário:** `-s` do Dolphin, `-config Dreamcast:*` do Flycast,
+  o caminho `<usuário>\sdmc\…\data\00000001` do Azahar, o `melonDS.toml` em
+  `%LocalAppData%\melonDS`, e as flags usadas por xemu, Vita3K, Xenia e Cemu.
+- **Pasta padrão por SO** de vários emuladores segue não lida.
+- **Como forçar boot limpo** quando o emulador tem auto-load ligado: só o
+  RetroArch e o Flycast têm isso mapeado.
 
 ## Saves RPCS3 e PPSSPP: o que falta (2026-10-09)
 
@@ -1403,3 +1360,30 @@ o que ficou aberto registrado aqui. Detalhes e fontes em `docs/decisoes.md`.
 - **Tudo, com o binário.** Nenhuma das flags (`--savestate`, `--state`) foi
   testada com o emulador rodando um jogo real; os nomes de arquivo e de pasta
   também não.
+
+## Saves e retomada: xemu, Vita3K, Xenia e Cemu (2026-10-09)
+
+Decisão e fontes em `docs/decisoes.md`, entrada de mesmo nome. Resumo do que
+ficou pendente:
+
+- [ ] **Cemu: saves por jogo.** Confirmar o subcaminho `mlc01/usr/save/<high>/<low>/user/...`
+      no código (o wiki só cita `mlc01`). Precisa do title ID do jogo, que o ZeuX
+      não lê do `.wud`/`.wux`/`.rpx`. Sem isso, `FindGameSaves` não tem como ser
+      por jogo.
+- [ ] **Xenia: saves por jogo.** Confirmar `content/<perfil>/<TitleID>/00000001` na
+      fonte (o perfil e o `00000001` não foram lidos). Mesmo impedimento: title ID.
+- [ ] **Vita3K: saves por jogo.** Confirmar `ux0/user/00/savedata/<TITLE_ID>` na
+      fonte. O title ID está em `sce_sys/param.sfo` dentro do `.vpk`; ler isso exige
+      parser de SFO e zip, e isso ainda não foi feito.
+- [ ] **xemu: saves.** O HDD (`hdd_path`) é um único qcow2 com todos os jogos; não
+      há arquivo por jogo. Só daria para apontar o HDD, o que não resolve a tela do
+      jogo. Decidir se vale mostrar o HDD como item à parte, ou deixar de fora.
+- [ ] **xemu: retomada.** Só se o xemu gravar um snapshot de VM que o ZeuX possa
+      carregar com `-loadvm`. Não há caminho confirmado para o ZeuX criar esse
+      snapshot, e não foi verificado se os devices do xemu suportam snapshot.
+- [ ] **Vita3K, Xenia, Cemu: retomada.** Só com flag confirmada no código. Até lá,
+      `Unapplied` (ver `sem_retomada_test.go`).
+- [ ] **Validar com o binário** que nenhuma das flags usadas nestes quatro
+      (`-dvd_path`, `-full-screen`, `--fullscreen=true`, `-f`, `-g`, a ROM posicional
+      da Vita3K) abre o emulador recusando argumento. Ressalva registrada em
+      `decisoes.md`.

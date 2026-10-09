@@ -84,6 +84,13 @@ export const dict = {
     "pt-BR": "Este emulador ainda não abre o jogo num estado salvo. Por enquanto o jogo abre do início.",
     en: "This emulator can't open a game from a saved state yet. For now the game starts from the beginning.",
   },
+  // Para xemu, Vita3K, Xenia e Cemu o ZeuX não achou, nas fontes lidas, como
+  // abrir o jogo num estado salvo. A frase diz isso sem prometer que o
+  // emulador "ainda" vai ganhar a função, e diz onde fica o progresso.
+  resumeNoSaveStateEmulator: {
+    "pt-BR": "Este emulador não tem um jeito de o ZeuX abrir o jogo num estado salvo. O jogo continua pelo save do próprio jogo, dentro do emulador.",
+    en: "This emulator has no way for ZeuX to open a game from a saved state. The game carries on from the game's own save, inside the emulator.",
+  },
   coreDownloadingMessage: {
     "pt-BR": "O core {{core_name}} ainda não estava no seu computador. Baixando…{{extra}}{{percent}}",
     en: "The {{core_name}} core wasn't on your computer yet. Downloading…{{extra}}{{percent}}",

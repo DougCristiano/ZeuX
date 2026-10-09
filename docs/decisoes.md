@@ -2909,3 +2909,63 @@ depender só do RetroArch.
 - Os três: nenhuma flag foi confirmada com o binário; as flags do Flycast estão
   no código-fonte de `cl.cpp` e `option.cpp`, e a ajuda do binário (que diz a
   mesma coisa) não foi conferida ao vivo.
+
+## Saves e retomada: xemu, Vita3K, Xenia e Cemu (2026-10-09)
+
+Pedido do Douglas: seguir o padrão de DuckStation, PCSX2 e RetroArch para os
+quatro emuladores que ainda não tinham nada: localizar saves por jogo, abrir
+num estado ("Continuar") e "Iniciar do zero". Resultado da pesquisa na fonte:
+**nenhum dos quatro tem uma flag de linha de comando, lida no código, que abra
+o jogo num estado salvo** e, para os saves por jogo, a pasta depende de um
+title ID que o ZeuX não lê. Nada foi implementado para "Continuar" nem para
+`FindGameSaves` nestes quatro; o que mudou está listado no fim.
+
+**Por emulador** (fontes lidas com WebFetch e `curl` no raw do GitHub, em
+2026-10-09; nenhuma observada com o binário rodando):
+
+| Emulador | Saves por jogo | Fresh | Resume | Fonte com trecho | Status |
+|---|---|---|---|---|---|
+| xemu | **Não implementado.** Tudo fica num único HDD qcow2 (`hdd_path`), sem arquivo por jogo | Sem flag extra; ROM por `-dvd_path` (já no adapter) | **Unapplied.** `-loadvm` existe (herdado do QEMU, `system/vl.c`: "'incoming' and 'loadvm' options are mutually exclusive"), mas o ZeuX não tem como gerar um snapshot que o xemu aceite de volta, e não validei se os devices do xemu suportam snapshot. Não usado | `-dvd_path` lido à mão em `qemu_init()`: "Allow overriding the dvd path from command line" (https://raw.githubusercontent.com/xemu-project/xemu/master/system/vl.c) | Só o boot. Sem retomada |
+| Vita3K | **Não implementado.** Pasta `ux0/user/00/savedata/<TITLE_ID>` (padrão de docs/pendencias.md, 2026-09-11, **não confirmado na fonte**); precisa do title ID, que o ZeuX não lê do `.vpk` | Sem flag extra; ROM como argumento posicional (já no adapter) | **Unapplied.** A FAQ oficial não cita savestate nem flag de estado | FAQ: "Filesystem: `%APPDATA%/Vita3K/`" e "`config.yml`: In the same folder as Vita3K.exe." (https://vita3k.org/faq) | Só o boot. Sem retomada |
+| Xenia | **Não implementado.** Pasta `content_root/<perfil>/<TitleID>/00000001` (o `00000001` e o perfil não foram confirmados na fonte) | Sem flag extra; `--fullscreen=true` confirmado (`DEFINE_bool(fullscreen, false, "Whether to launch the emulator in fullscreen.", "Display")`, `emulator_window.cc`) | **Unapplied.** Há `SaveToFile`/`RestoreFromFile` (F7/F8), mas só em `#ifdef DEBUG` e com `"test.sav"` fixo, sem flag | `content_root` padrão = `storage_root / "content"`; `portable.txt` ao lado do exe muda o storage (https://raw.githubusercontent.com/xenia-project/xenia/master/src/xenia/app/xenia_main.cc) | Só o boot. Sem retomada |
+| Cemu | **Não implementado.** `mlc01/usr/save/...` existe (a wiki diz que o mlc guarda "save games"), mas o subcaminho por título não foi lido e precisa do title ID | Sem flag extra; `-g` (jogo) e `-f` (tela cheia) confirmados | **Unapplied.** A lista completa de opções não tem nada de estado (`--game`, `--title-id`, `--mlc`, `--fullscreen`, `--account`, `--cos-*`, `--force-*`, `--enable-gdbstub`, `--open-debugger`) | `LaunchSettings::HandleCommandline` (https://raw.githubusercontent.com/cemu-project/Cemu/main/src/config/LaunchSettings.cpp, linhas 58-82) | Só o boot. Sem retomada |
+
+**Decisões:**
+
+- **Sem `FindGameSaves` para os quatro.** Sem o title ID do jogo, qualquer
+  pasta devolvida seria "de todos os jogos", o que contraria a tela do jogo
+  (que mostra saves *deste* jogo). A tela segue com `known: false`.
+- **Sem retomada, mas com `Unapplied`.** `SupportsResume` continua `false` para
+  os quatro (`resume.go`). O `BuildCommand` já devolve `resumeUnappliedMessage`
+  (`standalone.go`), que é o aviso honesto de "o jogo abre do início".
+- **`-loadvm` do xemu não entra.** Ele existe, mas usar exigiria o ZeuX criar
+  um snapshot de VM por conta própria, e isso não foi verificado com o binário.
+  Um teste (`TestXemuNaoUsaLoadvmParaRetomar`) trava a decisão.
+- **Texto de UI próprio** (`resumeNoSaveStateEmulator`, `GameDetailScreen`):
+  diz que o ZeuX não tem como abrir o jogo num estado, e que o jogo segue pelo
+  save do próprio jogo. A frase evita "ainda não", que sugere função em
+  andamento.
+
+**Testes:** `internal/emulator/sem_retomada_test.go` trava que os quatro não
+entram em `SupportsResume`, que `Continuar` vira `Unapplied` sem vazar o caminho
+do estado, que o modo fresh não carrega nem avisa nada, que o xemu não usa
+`-loadvm` e que a ROM do xemu sai por `-dvd_path`.
+
+**Ressalva (obrigatória):** nenhuma destas flags foi validada contra o binário
+real. Os trechos citados são de código-fonte, não de execução.
+
+**Não validado:**
+
+- A pasta de save da Vita3K (`ux0/user/00/savedata`) e o layout da Xenia
+  (`00000001`, perfil) não foram confirmados na fonte; só a FAQ e a ajuda do
+  Xenia foram lidas.
+- O subcaminho de save do Cemu não foi lido no código (o wiki só fala de
+  `mlc01`).
+- Não tentei a CLI da Vita3K no código: os caminhos testados deram 404. O
+  adapter continua usando o argumento posicional, que o próprio código já
+  documenta como o caminho para ROM solta.
+
+**O que quebra se desfizer:** adicionar um destes quatro a `SupportsResume` sem
+flag confirmada faria o `-statefile`/`-loadvm` ser montado com um arquivo que
+o emulador talvez não aceite, e a tela mostraria "Continuar" habilitado
+quando não há como cumprir. Os testes de `sem_retomada_test.go` pegam isso.
