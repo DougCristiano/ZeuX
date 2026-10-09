@@ -1252,16 +1252,41 @@ A tecla de print por emulador existe (ver `docs/decisoes.md`). Pendente:
 - **Outros emuladores** (Flycast, RPCS3, Vita3K, xemu, Dolphin...): precisam
   do mesmo levantamento antes de ganhar a opção.
 
-## "Continuar" no RetroArch e garantia do "Iniciar do zero" (2026-10-09)
+## RetroArch: "Iniciar do zero" e "Continuar" a validar com o binário (2026-10-09)
 
-- **RetroArch sem "Continuar":** `-e/--entryslot` existe (ajuda do `retroarch.c`),
-  mas abrir no slot certo exige controlar `savestate_auto_load` (e
-  `savestate_auto_save`) por lançamento, via `--appendconfig` com um arquivo
-  do ZeuX. Hoje é `Unapplied`. Falta: decidir onde esse arquivo fica e validar
-  com o binário.
-- **"Iniciar do zero" no RetroArch não é garantido:** se o `retroarch.cfg` do
-  usuário tem `savestate_auto_load = true`, o boot carrega o estado mesmo sem
-  flag. Falta: checar o `retroarch.cfg` (o ZeuX já lê esse arquivo para as
-  pastas de save) e avisar ou forçar `false` via `--appendconfig`.
-- **Validar com o binário:** `-statefile` no DuckStation e no PCSX2, e a
-  ausência de auto-load nos dois sem flag (ver decisoes.md, 2026-10-09).
+Implementado (ver `docs/decisoes.md`, "Iniciar do zero e Continuar no RetroArch",
+2026-10-09). As flags vêm do código-fonte do RetroArch e nunca rodaram contra o
+binário. Pendente:
+
+- **Validar com o binário:** `--appendconfig` com `savestate_auto_load` ligado e
+  desligado; que o arquivo extra tem prioridade sobre o `retroarch.cfg`; que
+  `config_save_on_exit = "false"` impede a gravação de volta; que o jogo abre no
+  `<jogo>.state.auto` ao continuar.
+- **Decisão do Douglas, "Continuar" depende do auto-save do RetroArch:** sem
+  `savestate_auto_save` ligado no RetroArch do usuário não existe
+  `<jogo>.state.auto`, e o botão fica desabilitado. Opções: oferecer a opção na
+  tela do RetroArch (como o PCSX2 em 2026-10-05, com consentimento) ou ligar só
+  nos lançamentos do ZeuX (o que muda o comportamento do emulador sem pedido).
+- **Detecção só a partir da primeira sessão encerrada pelo ZeuX:** um
+  `.state.auto` gravado com o RetroArch aberto por fora não aparece como
+  "Continuar".
+- **RetroAchievements em modo hardcore:** o RetroArch não carrega estado na
+  abertura, então "Continuar" não carrega nada e o ZeuX não avisa. Decidir se a
+  tela deve dizer isso.
+- **Validar com o binário (DuckStation e PCSX2):** `-statefile` e a ausência de
+  auto-load sem flag (ver `docs/decisoes.md`, 2026-10-09, "Iniciar do zero" e
+  "Continuar" como modo explícito).
+
+## Saves por jogo: o que falta além do RetroArch (2026-10-09)
+
+Feito nesta rodada: RetroArch com saves por jogo (`internal/emulator/retroarch_saves.go`,
+decisão em `docs/decisoes.md`, 2026-10-09). Continua pendente:
+
+- **Confirmar o nome do save do RetroArch ao vivo** (`<jogo>.srm`,
+  `<jogo>.state[N]`, `.state.auto`). Hoje vem de fonte secundária.
+- **Demais emuladores** (Dolphin, PPSSPP, Flycast, RPCS3, melonDS, Azahar,
+  xemu, Vita3K, Xenia, Cemu, RMG): a tabela desta seção de 2026-09-11 é pesquisa
+  não verificada contra o binário. Nenhum deles tem `FindGameSaves` ainda — a
+  tela do jogo mostra `known: false`.
+- **Cartão do RetroArch por jogo** exige o `savefile_directory` fixo; com
+  `default`, o ZeuX procura ao lado da ROM e isso ainda não foi testado.

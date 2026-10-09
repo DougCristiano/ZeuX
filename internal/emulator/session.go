@@ -219,19 +219,36 @@ func (l *Launcher) Launch(ctx context.Context, input LaunchInput) (Session, erro
 		options.Renderer = RendererDefault
 	}
 
+	// O RetroArch decide "do início" ou "no estado salvo" por um arquivo de
+	// config extra gravado no diretório do ZeuX (retroarch_resume.go). Não
+	// gravar não pode bloquear o jogo: o aviso vai para a sessão, e o
+	// retroarch.cfg do usuário segue valendo.
+	var appendConfig string
+	var appendUnapplied []string
+	if adapter.ID() == "retroarch" {
+		appendConfig, err = writeRetroArchAppendConfig(mode)
+		if err != nil {
+			l.logger.Warn("não foi possível gravar a configuração de lançamento do RetroArch",
+				"modo", string(mode), "erro", err)
+			appendUnapplied = append(appendUnapplied,
+				"Não foi possível preparar a escolha de início do RetroArch; o jogo abre com a configuração que você já tem nele.")
+		}
+	}
+
 	built, err := adapter.BuildCommand(install, Request{
-		ROMPath:   input.ROMPath,
-		ConsoleID: input.ConsoleID,
-		Core:      input.Core,
-		Options:   options,
-		Mode:      mode,
-		StatePath: statePath,
+		ROMPath:          input.ROMPath,
+		ConsoleID:        input.ConsoleID,
+		Core:             input.Core,
+		Options:          options,
+		Mode:             mode,
+		StatePath:        statePath,
+		AppendConfigPath: appendConfig,
 	})
 	if err != nil {
 		return Session{}, err
 	}
 
-	unapplied := append(append([]string{}, configUnapplied...), built.Unapplied...)
+	unapplied := append(append(append([]string{}, configUnapplied...), appendUnapplied...), built.Unapplied...)
 
 	// O processo é desligado do contexto da requisição de propósito: o jogo
 	// precisa continuar rodando muito depois de a resposta HTTP ter sido

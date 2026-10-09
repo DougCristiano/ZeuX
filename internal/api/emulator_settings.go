@@ -102,6 +102,18 @@ func saveAdapterFor(consoleID string) string {
 	return ""
 }
 
+// retroArchRunsConsole diz se o RetroArch cobre o console (tem algum core para
+// ele no catálogo). Consulta o registro de adapters, não o catálogo de cores,
+// para não depender de a instalação estar pronta.
+func (s *Server) retroArchRunsConsole(consoleID string) bool {
+	for _, a := range s.emulators.ForConsole(consoleID) {
+		if a.ID() == "retroarch" {
+			return true
+		}
+	}
+	return false
+}
+
 // gameSavesContext resolve jogo, emulador, instalação e saves de um pedido.
 func (s *Server) gameSavesContext(w http.ResponseWriter, r *http.Request) (library.Game, string, emulator.GameSaves, bool, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -119,6 +131,14 @@ func (s *Server) gameSavesContext(w http.ResponseWriter, r *http.Request) (libra
 		return library.Game{}, "", emulator.GameSaves{}, false, false
 	}
 	adapterID := saveAdapterFor(game.ConsoleID)
+	if adapterID == "" && s.retroArchRunsConsole(game.ConsoleID) {
+		// Sem emulador dedicado de saves, o RetroArch é o que mais provavelmente
+		// abriu o jogo: é o único adapter que cobre a maioria dos consoles.
+		// Não há como saber, pela biblioteca, qual emulador foi usado de fato —
+		// a tela deve tratar o resultado como "saves do RetroArch", não como
+		// certeza sobre o último lançamento.
+		adapterID = "retroarch"
+	}
 	if adapterID == "" {
 		return game, "", emulator.GameSaves{}, false, true
 	}

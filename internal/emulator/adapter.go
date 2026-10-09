@@ -108,6 +108,12 @@ type Request struct {
 	// adapters de SupportsResume o usam; o Launcher nunca o preenche para os
 	// outros.
 	StatePath string
+	// AppendConfigPath é o arquivo de config extra que o RetroArch lê por cima
+	// do retroarch.cfg (--appendconfig). Quem o grava é o launcher, antes de
+	// BuildCommand, conforme o modo: é ele que decide se o savestate_auto_load
+	// fica ligado ou desligado naquele lançamento. BuildCommand só referencia o
+	// caminho. Vazio (prévia, ou a gravação falhou) vira aviso em Unapplied.
+	AppendConfigPath string
 }
 
 // resumeUnappliedMessage é o aviso que um adapter sem suporte a retomada

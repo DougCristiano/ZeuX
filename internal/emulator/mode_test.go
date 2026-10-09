@@ -1,8 +1,6 @@
 package emulator
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -85,36 +83,6 @@ func TestFreshOnStandaloneHasNoResumeWarning(t *testing.T) {
 	}
 	if containsString(cmd.Unapplied, resumeUnappliedMessage) {
 		t.Errorf("modo fresh não deveria avisar sobre retomada: %v", cmd.Unapplied)
-	}
-}
-
-// Trava que RetroArch, sem entrada de retomada validada, declara "Continuar"
-// como não aplicado (o -e existe, mas o auto-load depende do retroarch.cfg).
-func TestRetroArchResumeDeclaresUnapplied(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("APPDATA", t.TempDir())
-	bin := filepath.Join(t.TempDir(), "retroarch")
-	coreDir := filepath.Join(filepath.Dir(bin), "cores")
-	if err := os.MkdirAll(coreDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(coreDir, retroArchCores["mesen"]+coreExtension()), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, mode := range []Mode{ModeFresh, ModeResume} {
-		cmd, err := newRetroArch().BuildCommand(install("retroarch", bin),
-			Request{ROMPath: "/roms/mario.nes", ConsoleID: "nes", Mode: mode})
-		if err != nil {
-			t.Fatalf("modo %s: %v", mode, err)
-		}
-		has := containsString(cmd.Unapplied, resumeUnappliedMessage)
-		if mode == ModeResume && !has {
-			t.Errorf("modo resume deveria declarar o aviso: %v", cmd.Unapplied)
-		}
-		if mode == ModeFresh && has {
-			t.Errorf("modo fresh não deveria declarar o aviso: %v", cmd.Unapplied)
-		}
 	}
 }
 

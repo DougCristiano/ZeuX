@@ -58,6 +58,13 @@ export const dict = {
     "pt-BR": "Ainda não há estado salvo. O emulador grava um ao fechar o jogo; depois disso, Continuar abre dali.",
     en: "No saved state yet. The emulator writes one when you close the game; after that, Continue picks up there.",
   },
+  // O RetroArch só grava o estado de retomada ao fechar quando o próprio
+  // RetroArch tem o salvamento automático ligado; o texto genérico ("o emulador
+  // grava um ao fechar") prometeria um comportamento que o ZeuX não liga.
+  resumeNoStateRetroArch: {
+    "pt-BR": "Ainda não há estado salvo. O RetroArch grava um ao fechar o jogo se o salvamento automático estiver ligado nele; depois disso, Continuar abre dali.",
+    en: "No saved state yet. RetroArch writes one when you close the game if its automatic save is on; after that, Continue picks up there.",
+  },
   resumeUnsupported: {
     "pt-BR": "Este emulador ainda não abre o jogo num estado salvo. Por enquanto o jogo abre do início.",
     en: "This emulator can't open a game from a saved state yet. For now the game starts from the beginning.",

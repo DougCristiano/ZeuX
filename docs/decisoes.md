@@ -2425,7 +2425,7 @@ o binário rodando):
 |---|---|---|---|
 | DuckStation | `-statefile <arquivo>` ("Loads state from the specified filename") e `-resume` ("Load resume save state", escolhe pelo nome do jogo ou pelo mais recente) | https://raw.githubusercontent.com/stenzek/duckstation/master/src/duckstation-qt/qthost.cpp (`PrintCommandLineHelp`, `ParseCommandLineParametersAndInitializeConfig`) | Implementado com `-statefile`, que aponta o estado deste jogo; `-resume` não foi usado porque escolheria pelo nome do jogo ou pelo mais recente. |
 | PCSX2 | `-statefile <filename>` ("Loads state from the specified filename."). Não há `-resume` no `QtHost.cpp`. | https://raw.githubusercontent.com/PCSX2/pcsx2/master/pcsx2-qt/QtHost.cpp | Implementado. |
-| RetroArch | `-e, --entryslot=NUMBER` ("Slot from which to load an entry state."); `--appendconfig=FILE` para config extra | https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c (`retroarch_print_help`) | Via `Unapplied`. O `-e` existe, mas abrir no estado depende de `savestate_auto_load` no `retroarch.cfg` do usuário, que o ZeuX não controla hoje. |
+| RetroArch | `-e, --entryslot=NUMBER` ("Slot from which to load an entry state."); `--appendconfig=FILE` para config extra | https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c (`retroarch_print_help`) | Superado em 2026-10-09 (ver "Iniciar do zero e Continuar no RetroArch", no fim do arquivo). Na data desta entrada era `Unapplied`, porque o `-e` não resolvia sozinho o carregamento automático do `retroarch.cfg`. |
 | Demais standalone (Dolphin, PPSSPP, Flycast, RPCS3, MelonDS, Azahar, Xemu, Vita3K, Xenia, Cemu, RMG) | Nenhum levantado | — | Via `Unapplied` (`resumeUnappliedMessage`). |
 | Emulador personalizado | Gramática do template é do usuário | — | Via `Unapplied`. |
 
@@ -2440,3 +2440,124 @@ mesmo assim. O ZeuX ainda não consegue garantir isso — pendência em
 **Não validado:** que DuckStation e PCSX2 não carreguem um estado de retomada
 sozinhos ao iniciar sem nenhuma flag. A ajuda dos dois não descreve auto-load
 (só `SaveStateOnExit` grava), mas isso não foi confirmado com o binário.
+
+## Saves por jogo no RetroArch (2026-10-09)
+
+Pedido do Douglas: o ZeuX localizar e gerir cartão e save states de todos os
+emuladores, como já faz com DuckStation e PCSX2. Esta rodada cobre o RetroArch,
+que é o adapter que mais consoles atende.
+
+- **Diretórios:** `savefile_directory` e `savestate_directory` lidos do
+  `retroarch.cfg` real (`retroArchSaveDataDirs`, já existente). Chave vazia ou
+  `"default"` cai na pasta da ROM. Fonte primária: comentário do
+  `retroarch.cfg` oficial (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.cfg):
+  "Save all save files (*.srm) to this directory" / "Save all save states
+  (*.state) to this directory" / "This will be overridden by explicit command
+  line options".
+- **Nome do arquivo de cada jogo: NÃO verificado em documentação oficial.** As
+  fontes encontradas foram fóruns e readme de core (RetroPie, forums.libretro.com):
+  o save leva o nome da ROM sem extensão, `<jogo>.srm`; states `<jogo>.state`,
+  `<jogo>.stateN` (slot N) e `<jogo>.state.auto` (auto-save, comentário de
+  `savestate_auto_save` no retroarch.cfg: "The path is $SRAM_PATH.auto"). Por
+  isso o resultado sai com `memory_cards_approximate: true`. O slot 0 para
+  `.state` sem número é dedução, não documentado.
+- **Flag de linha de comando:** nenhuma flag de save foi usada nesta entrada.
+  `--appendconfig` e `-e/--entryslot` estão na ajuda do `retroarch.c` (ver a
+  entrada de 2026-10-09, "Iniciar do zero e Continuar no RetroArch"), mas o
+  que o ZeuX faz com eles é decisão daquela entrada, não desta. A pasta de
+  save continua vindo da config.
+- **Ligação com a API:** consoles sem emulador dedicado de save
+  (`saveAdapterFor`: só PS1 e PS2) passam a usar o RetroArch quando ele cobre o
+  console no registro. O ZeuX não sabe qual emulador abriu o jogo, então a
+  resposta é "saves do RetroArch", não certeza sobre o último lançamento.
+- **O que quebra se desfizer:** a tela do jogo deixa de listar saves de
+  RetroArch (volta a `known: false`), e o backup/restauração desses consoles
+  para de funcionar, sem erro visível.
+- **Não validado com o binário:** a convenção de nomes precisa de uma sessão
+  real (salvar um jogo e conferir o arquivo gerado).
+
+## Iniciar do zero e Continuar no RetroArch (2026-10-09)
+
+Pedido do Douglas: o modo "fresh"/"resume" da entrada anterior tem que valer
+no RetroArch também. Ele não tem flag de linha de comando que diga "abra no
+estado" ou "abra sem estado": quem decide é `savestate_auto_load` no
+`retroarch.cfg` do usuário. O ZeuX passa um arquivo extra que tem prioridade
+sobre o `retroarch.cfg`.
+
+**Fontes (lidas com WebFetch nesta data):**
+
+- `--appendconfig` (ajuda de `retroarch_print_help`, `retroarch.c`):
+  "Extra config files are loaded in, and take priority over config selected in
+  -c (or default)." e "To keep them out of it, put config_save_on_exit = "false"
+  in the appended file." (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c)
+- Carregamento do estado na abertura (`runloop.c`):
+  `if (runloop_st->entry_state_slot < 0 && settings->bools.savestate_auto_load) command_event_load_auto_state();`
+  e, antes, `if (entry_state_load && !command_event_load_entry_state(settings))`,
+  onde `entry_state_load` vem de `entry_state_slot > -1` (só `-e` define o slot).
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/runloop.c)
+- Caminho do estado automático (`retroarch.cfg`, comentário de `savestate_auto_load`):
+  "The path is $SRAM_PATH.auto" e "RetroArch will automatically load any savestate
+  with this path on startup if savestate_auto_load is set." Gravado ao fechar
+  quando `savestate_auto_save` está ligado. (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.cfg)
+- Padrões (`config.def.h`): `DEFAULT_SAVESTATE_AUTO_LOAD false` e
+  `DEFAULT_SAVESTATE_AUTO_SAVE false`.
+
+**Mecanismo escolhido:**
+
+- **Iniciar do zero:** arquivo extra com `savestate_auto_load = "false"`. O
+  RetroArch não carrega `<jogo>.state.auto` mesmo com o `retroarch.cfg` do
+  usuário ligado.
+- **Continuar:** arquivo extra com `savestate_auto_load = "true"`. Na abertura o
+  RetroArch carrega `<jogo>.state.auto`.
+- **Não usamos `-e/--entryslot`.** Ele existe ("Slot from which to load an entry
+  state.") e carregaria um slot numerado, mas o nome do arquivo de cada slot
+  (`.state`, `.stateN`) ainda é dedução (`retroarch_saves.go`), e o ZeuX não
+  confirmou isso contra o binário. O auto-load usa um nome que a fonte documenta.
+- `config_save_on_exit = "false"` vai em todo arquivo extra. Sem isso, o
+  `savestate_auto_load` de cada modo seria gravado no `retroarch.cfg` do usuário
+  quando o RetroArch salvar a config ao fechar, e o comportamento de outros jogos
+  mudaria sem pedido.
+
+**Quem grava o arquivo e onde:** `writeRetroArchAppendConfig` (em
+`internal/emulator/retroarch_resume.go`), chamado por `Launcher.Launch` antes de
+`BuildCommand`. Caminho: `<AppDataDir>/retroarch/lancamento-fresh.cfg` ou
+`lancamento-resume.cfg` (`AppDataDir` é a pasta de dados do ZeuX, nunca a do
+usuário). Regravado a cada lançamento, porque o conteúdo não depende do jogo.
+`BuildCommand` continua pura: recebe o caminho em `Request.AppendConfigPath`,
+monta `--appendconfig=<caminho>` antes do caminho do jogo, e declara em
+`Unapplied` se o caminho não veio (prévia, ou gravação que falhou). Caminho com
+`|` é recusado: o RetroArch separa vários arquivos por esse caractere. Falha de
+gravação não bloqueia o jogo; vira aviso na sessão.
+
+**"Continuar" no RetroArch.** O estado entra no mesmo `resume_states` dos outros
+emuladores. Ao fim da sessão, `recordResumeState` procura `<jogo>.state.auto`
+(pasta de estados do `retroarch.cfg`, ou a da ROM quando `default`) com data a
+partir do início da sessão (folga de 2 s). Se achar, grava o registro com
+`adapter_id: "retroarch"`. `GET /library/games` expõe `resume_saved_at` como para
+os demais, e a tela do jogo deixa "Continuar" habilitado. Um `.state.auto` de
+antes da sessão não conta, para que "Continuar" nunca mostre um "onde você
+parou" que ninguém salvou.
+
+**Consequências:**
+
+- "Continuar" só aparece no RetroArch quando o salvamento automático está ligado
+  no próprio RetroArch (`savestate_auto_save`). O ZeuX não liga essa opção
+  sozinho, pelo mesmo motivo da decisão de 2026-10-05 sobre o PCSX2: não mudar o
+  comportamento do emulador sem pedido. Sem ela, nenhum `.state.auto` é gravado
+  e o botão fica desabilitado com o motivo ("O RetroArch grava um ao fechar o
+  jogo se o salvamento automático estiver ligado nele").
+- A tela do RetroArch deixou de usar o texto genérico "Este emulador ainda não
+  abre o jogo num estado salvo" (`resumeUnsupported`), que não vale mais para ele.
+- **O que quebra se desfizer:** o "Iniciar do zero" no RetroArch volta a depender
+  do `retroarch.cfg` do usuário (se o auto-load estiver ligado, o jogo abre no
+  estado), e o "Continuar" some sem erro visível.
+
+**Não validado com o binário:** `--appendconfig` com `savestate_auto_load` nos
+dois valores, a prioridade do arquivo extra sobre o `retroarch.cfg`, e que o
+`config_save_on_exit = "false"` impede a gravação de volta. Também não foi
+verificado que o RetroArch não consulta playlist (`PLAYLIST_ENTRY_SLOT` em
+`runloop.c`) ao abrir por caminho de ROM.
+
+**Limite conhecido:** em `runloop.c`, o bloco que carrega estado na abertura só
+roda com `!cheevos_enable || !cheevos_hardcore_mode_enable`. Com RetroAchievements
+em modo hardcore, "Continuar" não carrega nada e o ZeuX não avisa isso.

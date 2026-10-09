@@ -44,7 +44,7 @@ var ErrNoResumeState = errors.New("não há um estado salvo para continuar este 
 
 // SupportsResume diz se o ZeuX sabe abrir este emulador num estado salvo.
 func SupportsResume(adapterID string) bool {
-	return adapterID == "duckstation" || adapterID == "pcsx2"
+	return adapterID == "duckstation" || adapterID == "pcsx2" || adapterID == "retroarch"
 }
 
 // resumeStateLocation devolve a pasta de save states do emulador e como
@@ -121,11 +121,20 @@ func (l *Launcher) recordResumeState(session Session, install Installation) {
 	if !ok || !SupportsResume(session.AdapterID) {
 		return
 	}
-	dir, match, ok := resumeStateLocation(session.AdapterID, install)
-	if !ok {
-		return
+	var path string
+	var savedAt time.Time
+	if session.AdapterID == "retroarch" {
+		// O RetroArch grava um arquivo fixo por jogo (<jogo>.state.auto), e não
+		// um arquivo de retomada numa pasta compartilhada: o lookup é por nome.
+		path, savedAt, ok = retroArchResumeFile(install, session.ROMPath, session.StartedAt)
+	} else {
+		var dir string
+		var match func(string) bool
+		dir, match, ok = resumeStateLocation(session.AdapterID, install)
+		if ok {
+			path, savedAt, ok = newestResumeFile(dir, match, session.StartedAt)
+		}
 	}
-	path, savedAt, ok := newestResumeFile(dir, match, session.StartedAt)
 	if !ok {
 		return
 	}
