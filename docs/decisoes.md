@@ -2619,3 +2619,107 @@ auto-load é controlado à parte).
 
 **Não validado com o binário:** que o arquivo gerado no disco tem o nome
 `<jogo>.state.auto` e fica na pasta de estados do `retroarch.cfg`.
+
+## Saves e retomada: RPCS3 e PPSSPP (2026-10-09)
+
+Pedido do Douglas: copiar para RPCS3 e PPSSPP o que já existe em DuckStation,
+PCSX2 e RetroArch: localizar os saves de cada jogo e oferecer "Iniciar do zero"
+e "Continuar". Fontes lidas com `curl` no raw do GitHub nesta data (não por
+resumo); nada foi observado com o binário rodando.
+
+**RPCS3 (`rpcs3_saves.go`, `standalone.go`):**
+
+- **Retomada:** `--savestate <arquivo>` ("Path for directly loading a
+  savestate.", `rpcs3/rpcs3.cpp`, linhas 839-842). O bloco que trata a opção é um
+  `else if` antes do que abre o caminho posicional do jogo (linhas 1191 e 1251):
+  com `--savestate`, o RPCS3 **ignora o caminho do jogo**. Por isso o ZeuX tira o
+  jogo da linha quando o estado vai junto. Na prévia e no "do zero", o jogo entra
+  normalmente.
+- **ID do jogo:** o RPCS3 guarda `ID: caminho` no `games.yml`
+  (`rpcs3/Emu/games_config.cpp`, `save_nl` e `load`). No Windows o arquivo fica em
+  `<config>/config/games.yml` (`get_config_dir(true)` acrescenta `config/`); no
+  Linux e no macOS, em `<config>/games.yml`. O ZeuX lê esse mapa sem parser YAML,
+  porque o arquivo é plano e gravado pelo próprio RPCS3. Se o jogo nunca rodou
+  pelo RPCS3, o ID é desconhecido e a tela diz "não sei".
+- **Pasta de configuração:** `Utilities/File.cpp`, `fs::get_config_dir`. Usa a
+  pasta `portable/` ao lado do executável se existir; no Windows, `RPCS3_CONFIG_DIR`
+  ou a pasta do executável; no Linux, `$XDG_CONFIG_HOME/rpcs3` ou
+  `~/.config/rpcs3`; no macOS, `~/Library/Application Support/rpcs3`. É a mesma
+  lógica que `rpcs3ConfigDir` (firmware.go) já usa.
+- **Saves de jogo:** `<config>/dev_hdd0/home/00000001/savedata/<pasta>/`
+  (`System.cpp`, `cellSaveData.cpp`). A pasta é escolhida pelo jogo
+  (`SAVEDATA_DIRECTORY`), então o ZeuX casa pelo prefixo do ID. Usuário fixo em
+  `00000001` (padrão do RPCS3, sem `--user-id`). Resultado **aproximado**
+  (`memory_cards_approximate: true`). Só arquivos soltos em cada pasta entram, pelo
+  mesmo motivo do backup dos outros emuladores.
+- **States:** `<config>/savestates/<ID>/<ID>_<prefixo>_<id>.SAVESTAT`
+  (`savestate_utils.cpp`, `get_savestate_file`). A pasta `savestates` fica na
+  pasta de configuração **sem** o `config/` do Windows. Aceita `.SAVESTAT` e
+  `.SAVESTAT.zst` (`rpcs3_savestate.cpp`, `make_savestate_reader`).
+- **"Continuar":** o RPCS3 não tem arquivo de retomada fixo. O ZeuX registra o
+  state que apareceu na pasta do ID **depois** de a sessão começar. Um state
+  antigo não conta.
+
+**PPSSPP (`ppsspp_saves.go`, `standalone.go`):**
+
+- **Retomada:** `--state FILE` ("Load state from specified file",
+  `Core/CmdLine.cpp`, `g_autoParams`; a ajuda do próprio binário imprime
+  `--state=FILE`). **Não está na documentação pública**
+  (https://www.ppsspp.org/docs/reference/command-line/): a confirmação é do código,
+  e a ressalva fica no comentário de `standalone.go`. O estado só é carregado se o
+  jogo também vier na linha (`UI/NativeApp.cpp`, linha 788: `if
+  (!boot_filename.empty() && cmdLineOptions.stateToLoad.has_value())`), então aqui
+  o caminho do jogo continua indo junto.
+- **Nome do state:** `<DISC_ID>_<DISC_VERSION>_<slot>.ppst`
+  (`Core/SaveState.cpp`, `GenerateFullDiscId`, `GenerateSaveSlotFilename`,
+  `STATE_EXTENSION = "ppst"`). Os arquivos `.undo.ppst` e `load_undo.ppst` ficam de
+  fora. O DISC_ID é tirado do nome do state; o ZeuX **não lê o PARAM.SFO de dentro
+  do ISO**, então o ID só é conhecido depois do primeiro state gravado.
+- **Pastas:** `<memstick>/PSP/SAVEDATA/` e `<memstick>/PSP/PPSSPP_STATE/`
+  (`Core/Util/PathUtil.cpp`, `GetSysDirectory`). Se a pasta escolhida já se chamar
+  `PSP`, não ganha outro `PSP` dentro.
+- **Onde fica o Memory Stick:** só o **Windows** foi confirmado, na documentação
+  oficial (https://www.ppsspp.org/docs/getting-started/save-data-and-storage-windows/):
+  pasta `memstick` ao lado do executável; se houver `installed.txt` ao lado dele,
+  vazio = `%USERPROFILE%\Documents\PPSSPP`, com caminho = esse caminho. Linux e
+  macOS **não** foram confirmados, e lá o ZeuX devolve "não sei" em vez de chutar.
+- **"Continuar":** igual ao RPCS3, o state precisa ter sido gravado durante a
+  sessão. Ao achá-lo, o ZeuX também guarda o DISC_ID no repositório, para que os
+  saves apareçam mesmo que o state seja apagado depois.
+
+**Ordem de `saveAdapterFor` (`internal/api/emulator_settings.go`):** PS3 passa a
+usar `rpcs3` e PSP passa a usar `ppsspp`. Antes, esses consoles caíam no
+RetroArch, quando ele cobre o console. Agora, se o RPCS3 ou o PPSSPP não estiver
+instalado, a tela mostra `known: false` mesmo que o RetroArch tenha saves desse
+jogo. É uma troca de propósito: a tela mostra os saves do emulador que de fato
+roda o jogo, quando o ZeuX consegue dizer qual é.
+
+**Decisões de desenho:**
+
+- Nenhum arquivo do emulador é escrito para habilitar a retomada: nem
+  `games.yml`, nem `config.yml`, nem o `ppsspp.ini`. Quem decide o que o emulador
+  grava é a própria pessoa, como nos outros.
+- `BuildCommand` continua pura: a leitura do `games.yml` e do `installed.txt`
+  acontece em `FindGameSaves` e `recordResumeState`, fora do `BuildCommand`.
+- Os testes usam uma pasta `portable/` temporária e nunca tocam a configuração real
+  do usuário (`rpcs3PortableInstall`, `findPPSSPPSavesIn`, `ppssppResumeIn`).
+
+**Risco conhecido — "Iniciar do zero" no PPSSPP:** o PPSSPP tem a opção
+"Auto load savestate" (`AutoLoadSaveState`, `Core/Config.cpp`, padrão `0` = desligada,
+marcada como `PER_GAME`). Se a pessoa a ligou para um jogo, o "do zero" do ZeuX
+abre no state mesmo sem `--state`. O ZeuX **não** resolve isso: a chave é por jogo e
+não há certeza de onde ela fica no arquivo de configuração. Fica em
+`pendencias.md`.
+
+**Risco conhecido — RPCS3:** o RPCS3 pode ter `vfs.yml` que move `dev_hdd0` para
+outra pasta; o ZeuX não lê isso e assume a pasta padrão. Também não foi verificado
+se o RPCS3 carrega um state sozinho ao abrir o jogo, sem flag. Não encontrei esse
+caminho no código lido (`System.cpp`), mas a leitura não foi exaustiva.
+
+**Não validado com o binário:** a flag `--savestate` do RPCS3 e a `--state` do
+PPSSPP com o jogo rodando de fato; que os dois arquivos gerados têm o nome e a
+pasta descritos aqui; e a convenção do prefixo do save do PPSSPP (`PSP/SAVEDATA`).
+
+**O que quebra se desfizer:** a tela do jogo deixa de listar saves de PS3 e PSP
+(volta a `known: false`); "Continuar" nesses dois emuladores vira "Unapplied"
+com a frase genérica de que o ZeuX ainda não sabe continuar aquele jogo.
