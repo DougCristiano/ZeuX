@@ -248,6 +248,15 @@ func newPPSSPP() Adapter {
 				unapplied = append(unapplied,
 					"O backend gráfico precisa ser escolhido dentro do PPSSPP.")
 			}
+			// `--state FILE` está em Core/CmdLine.cpp (g_autoParams, "Load state
+			// from specified file"), e a própria ajuda do PPSSPP imprime
+			// "--state=FILE". A documentação pública (ppsspp.org/docs/reference/
+			// command-line) não lista a flag, por isso a confirmação vem do código.
+			// O estado só é carregado se o jogo também vier na linha (UI/NativeApp.cpp,
+			// "if (!boot_filename.empty() && stateToLoad)"): o caminho do jogo continua.
+			if req.Mode == ModeResume && req.StatePath != "" {
+				opts = append(opts, "--state", req.StatePath)
+			}
 
 			return opts, []string{req.ROMPath}, unapplied
 		},
@@ -320,7 +329,19 @@ func newRPCS3() Adapter {
 					"Resolução e backend gráfico precisam ser ajustados dentro do RPCS3.")
 			}
 
-			return opts, []string{req.ROMPath}, unapplied
+			// `--savestate <arquivo>` está em rpcs3/rpcs3.cpp (QCommandLineOption
+			// "Path for directly loading a savestate."). O bloco que trata esta
+			// opção é um "else if" antes do que abre o caminho posicional do jogo:
+			// com --savestate, o RPCS3 ignora o caminho do jogo. Por isso o jogo
+			// só sai da linha quando o estado vai junto — o estado já diz qual é o
+			// jogo. Sem StatePath (prévia, ou "do zero") o jogo entra normalmente.
+			romPart := []string{req.ROMPath}
+			if req.Mode == ModeResume && req.StatePath != "" {
+				opts = append(opts, "--savestate", req.StatePath)
+				romPart = nil
+			}
+
+			return opts, romPart, unapplied
 		},
 	}
 }

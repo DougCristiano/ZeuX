@@ -91,13 +91,17 @@ func (s *Server) handleSetEmulatorSettings(w http.ResponseWriter, r *http.Reques
 }
 
 // saveAdapterFor diz qual emulador guarda os saves de um console (só os
-// dois com o local verificado).
+// com o local verificado: PS1, PS2, PS3 e PSP).
 func saveAdapterFor(consoleID string) string {
 	switch consoleID {
 	case "ps1":
 		return "duckstation"
 	case "ps2":
 		return "pcsx2"
+	case "ps3":
+		return "rpcs3"
+	case "psp":
+		return "ppsspp"
 	}
 	return ""
 }

@@ -44,7 +44,7 @@ import { dict } from "./GameDetailScreen.i18n";
 // `emulator.SupportsResume` no Go: mudar um exige mudar o outro. Fica aqui só
 // para escolher o motivo certo quando "Continuar" aparece desabilitado — a
 // decisão de fato (há estado ou não) continua vindo do servidor.
-const RESUME_ADAPTERS = new Set(["duckstation", "pcsx2", "retroarch"]);
+const RESUME_ADAPTERS = new Set(["duckstation", "pcsx2", "retroarch", "rpcs3", "ppsspp"]);
 
 function formatPlaytime(
   seconds: number,
