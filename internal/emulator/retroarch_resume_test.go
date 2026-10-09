@@ -51,6 +51,19 @@ func TestRetroArchResumeOverrideEnablesAutoLoad(t *testing.T) {
 	}
 }
 
+// Trava que os dois modos ligam o savestate_auto_save: é ele que grava
+// <jogo>.state.auto ao fechar, e sem esse arquivo o "Continuar" nunca habilita.
+// Decisão do Douglas (2026-10-09): vale também no "Iniciar do zero", porque é
+// ao sair dessa partida que nasce o primeiro estado para continuar depois.
+func TestRetroArchOverridesEnableAutoSaveInBothModes(t *testing.T) {
+	for _, mode := range []Mode{ModeFresh, ModeResume} {
+		content := string(retroArchAppendConfigContent(mode))
+		if !strings.Contains(content, `savestate_auto_save = "true"`) {
+			t.Errorf("modo %s: deveria ligar o savestate_auto_save:\n%s", mode, content)
+		}
+	}
+}
+
 // Trava que o arquivo de override nunca deixa o savestate_auto_load escapar
 // para o retroarch.cfg do usuário: o help do --appendconfig diz que as
 // configurações do arquivo extra são gravadas no principal ao salvar, "on exit

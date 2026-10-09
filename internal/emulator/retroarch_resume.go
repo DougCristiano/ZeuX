@@ -36,14 +36,25 @@ const retroArchModeUnappliedMessage = "A escolha entre começar do início e con
 // retroArchAutoLoadKey é a chave que liga o carregamento automático de estado.
 const retroArchAutoLoadKey = "savestate_auto_load"
 
+// retroArchAutoSaveKey é a chave que liga o salvamento automático ao fechar o
+// jogo. Sem ela não nasce `<jogo>.state.auto`, e o "Continuar" nunca habilita.
+// Decisão do Douglas (2026-10-09), e vale nos dois modos: é ao sair de uma
+// partida iniciada do zero que o primeiro estado para continuar é gravado.
+// Fonte: o retroarch.cfg diz "Automatically saves a savestate at the end of
+// RetroArch's lifetime. The path is $SRAM_PATH.auto.". O padrão do RetroArch é
+// desligado (DEFAULT_SAVESTATE_AUTO_SAVE false em config.def.h), por isso o
+// ZeuX precisa ligar explicitamente.
+const retroArchAutoSaveKey = "savestate_auto_save"
+
 // retroArchAppendConfigContent devolve o arquivo de config extra para o modo
 // pedido. Função pura (sem disco), para o teste travar o conteúdo sem gravar
 // nada.
 //
 // config_save_on_exit = "false" é obrigatório: o help do --appendconfig diz que
 // as configurações do arquivo extra são gravadas no config principal "whenever
-// it is saved, on exit included", e sem essa linha o savestate_auto_load do
-// modo escolhido vazaria para o retroarch.cfg do usuário.
+// it is saved, on exit included", e sem essa linha o savestate_auto_load e o
+// savestate_auto_save do modo escolhido vazariam para o retroarch.cfg do
+// usuário.
 func retroArchAppendConfigContent(mode Mode) []byte {
 	autoLoad := "false"
 	if mode == ModeResume {
@@ -52,8 +63,9 @@ func retroArchAppendConfigContent(mode Mode) []byte {
 	return []byte(fmt.Sprintf(
 		"# Gerado pelo ZeuX para o lançamento (%s). Não edite: é regravado a cada jogo.\n"+
 			"%s = %q\n"+
+			"%s = \"true\"\n"+
 			"config_save_on_exit = \"false\"\n",
-		string(mode), retroArchAutoLoadKey, autoLoad))
+		string(mode), retroArchAutoLoadKey, autoLoad, retroArchAutoSaveKey))
 }
 
 // retroArchAppendConfigPath é o caminho do arquivo de override de cada modo,

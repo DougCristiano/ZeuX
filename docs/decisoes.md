@@ -2561,3 +2561,61 @@ verificado que o RetroArch não consulta playlist (`PLAYLIST_ENTRY_SLOT` em
 **Limite conhecido:** em `runloop.c`, o bloco que carrega estado na abertura só
 roda com `!cheevos_enable || !cheevos_hardcore_mode_enable`. Com RetroAchievements
 em modo hardcore, "Continuar" não carrega nada e o ZeuX não avisa isso.
+
+## savestate_auto_save ligado pelo ZeuX (2026-10-09)
+
+Decisão do Douglas (2026-10-09): o ZeuX liga `savestate_auto_save` do RetroArch
+nos dois arquivos de override (`lancamento-fresh.cfg` e `lancamento-resume.cfg`).
+Sem isso não nasce `<jogo>.state.auto`, e o "Continuar" nunca habilita. Vale
+também no "Iniciar do zero": é ao sair de uma partida iniciada do zero que nasce
+o primeiro estado para continuar depois.
+
+**Fontes (lidas em 2026-10-09 pelo `curl` no raw do GitHub, não por resumo):**
+
+- `retroarch.cfg`, comentário de `savestate_auto_save`: "Automatically saves a
+  savestate at the end of RetroArch's lifetime. The path is $SRAM_PATH.auto."
+  e "RetroArch will automatically load any savestate with this path on startup
+  if savestate_auto_load is set."
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.cfg)
+- `config.def.h`: `#define DEFAULT_SAVESTATE_AUTO_SAVE false` (o padrão é
+  desligado, por isso o ZeuX precisa ligar explicitamente).
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/config.def.h)
+- `retroarch.c`: três chamadas a `command_event_save_auto_state()` guardadas por
+  `settings->bools.savestate_auto_save` (uma delas com a condição
+  `RUNLOOP_FLAG_CORE_RUNNING && !RUNLOOP_FLAG_SHUTDOWN_INITIATED`, com o
+  comentário "Save auto state"). Não rastreei cada caminho até o fim do
+  encerramento; o que se afirma é que a gravação depende dessa chave.
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/retroarch.c)
+- `command.c`, `command_event_save_auto_state`: monta o nome como o nome do
+  estado mais `.auto` (`strlcpy_lit(... ".auto")`) e chama
+  `content_auto_save_state`. Não conferi de onde vem `runloop_st->name.savestate`
+  (espera-se `<jogo>.state`); essa parte segue sem verificação direta.
+  (https://raw.githubusercontent.com/libretro/RetroArch/master/command.c)
+- `runloop.c`: o carregamento na abertura só roda com
+  `entry_state_slot < 0 && settings->bools.savestate_auto_load`. Já citado na
+  entrada de 2026-10-09 ("Iniciar do zero e Continuar no RetroArch").
+
+**Por que difere do PCSX2 (decisão de 2026-10-05):** naquela data o ZeuX não
+ligou o auto-save do PCSX2 sem pedido, porque isso muda o comportamento do
+emulador. Agora há pedido explícito do Douglas, registrado aqui, e a escolha vale
+só para os lançamentos feitos pelo ZeuX: `config_save_on_exit = "false"` impede
+que a chave escape para o `retroarch.cfg` do usuário. O PCSX2 segue como estava.
+
+**Consequências:**
+
+- Ao fechar um jogo aberto pelo ZeuX, o RetroArch grava `<jogo>.state.auto`
+  (nos dois modos). O "Continuar" passa a habilitar depois da primeira sessão.
+- Um estado de retomada gravado pelo ZeuX sobrescreve o anterior, mesmo quando a
+  sessão foi "Iniciar do zero". Isso é intencional: o último ponto da partida
+  passa a ser o que "Continuar" retoma.
+- Os textos de UI que condicionavam o "Continuar" ao auto-save do RetroArch
+  foram ajustados (`src/screens/GameDetailScreen.i18n.ts`).
+- A entrada de 2026-10-09 ("Iniciar do zero e Continuar no RetroArch") dizia que
+  o ZeuX não ligava essa opção; esta entrada a supera nesse ponto.
+
+**O que quebra se desfizer:** remover a linha do override faz o "Continuar" do
+RetroArch sumir sem erro visível, e o "Iniciar do zero" continua correto (o
+auto-load é controlado à parte).
+
+**Não validado com o binário:** que o arquivo gerado no disco tem o nome
+`<jogo>.state.auto` e fica na pasta de estados do `retroarch.cfg`.

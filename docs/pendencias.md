@@ -1262,11 +1262,13 @@ binário. Pendente:
   desligado; que o arquivo extra tem prioridade sobre o `retroarch.cfg`; que
   `config_save_on_exit = "false"` impede a gravação de volta; que o jogo abre no
   `<jogo>.state.auto` ao continuar.
-- **Decisão do Douglas, "Continuar" depende do auto-save do RetroArch:** sem
-  `savestate_auto_save` ligado no RetroArch do usuário não existe
-  `<jogo>.state.auto`, e o botão fica desabilitado. Opções: oferecer a opção na
-  tela do RetroArch (como o PCSX2 em 2026-10-05, com consentimento) ou ligar só
-  nos lançamentos do ZeuX (o que muda o comportamento do emulador sem pedido).
+- ~~**"Continuar" depende do auto-save do RetroArch**~~ — **RESOLVIDO em
+  2026-10-09** (decisão do Douglas): o ZeuX liga `savestate_auto_save` nos dois
+  modos do arquivo de override. Fonte: `retroarch.cfg` e `config.def.h`
+  (padrão `false`) e a chamada em `retroarch.c` ao fechar o conteúdo. Ver
+  `docs/decisoes.md`, "savestate_auto_save ligado pelo ZeuX (2026-10-09)". A
+  diferença para o PCSX2 (que não recebeu o mesmo tratamento em 2026-10-05) está
+  registrada lá. Continua sujeito a validação com o binário.
 - **Detecção só a partir da primeira sessão encerrada pelo ZeuX:** um
   `.state.auto` gravado com o RetroArch aberto por fora não aparece como
   "Continuar".
