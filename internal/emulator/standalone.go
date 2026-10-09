@@ -209,6 +209,14 @@ func newDolphin() Adapter {
 				opts = append(opts, "-C", "Dolphin.Core.GFXBackend=Software Renderer")
 			}
 
+			// `-s <arquivo>` (Source/Core/UICommon/CommandLineParse.cpp,
+			// "Load the initial save state"). O estado é carregado depois do
+			// boot (Core.cpp), então a ordem em relação a `-e` não muda o
+			// resultado; fica antes do jogo por consistência com os demais.
+			if req.Mode == ModeResume && req.StatePath != "" {
+				opts = append(opts, "-s", req.StatePath)
+			}
+
 			return opts, []string{"-e", req.ROMPath}, nil
 		},
 	}

@@ -60,8 +60,9 @@ func TestResumePreviewWithoutStatePathSaysWhenStateIsFound(t *testing.T) {
 // Trava que um emulador sem suporte a retomada declara "Continuar" como não
 // aplicado, em vez de abrir em silêncio no início como se tivesse atendido.
 func TestStandaloneWithoutResumeSupportDeclaresUnapplied(t *testing.T) {
-	cmd, err := newDolphin().BuildCommand(install("dolphin", "/opt/dolphin"),
-		Request{ROMPath: "/jogos/jogo.iso", ConsoleID: "gamecube", Mode: ModeResume, StatePath: "/x.sav"})
+	// PPSSPP serve de exemplo: o Dolphin já tem retomada (dolphin_saves.go).
+	cmd, err := newPPSSPP().BuildCommand(install("ppsspp", "/opt/ppsspp"),
+		Request{ROMPath: "/jogos/jogo.iso", ConsoleID: "psp", Mode: ModeResume, StatePath: "/x.sav"})
 	if err != nil {
 		t.Fatal(err)
 	}

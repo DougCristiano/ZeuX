@@ -107,6 +107,8 @@ func FindGameSaves(adapterID string, install Installation, romPath string, id Ga
 		return out, true
 	case "retroarch":
 		return findRetroArchGameSaves(install, romPath)
+	case "dolphin":
+		return findDolphinGameSaves(install, id)
 	default:
 		return GameSaves{}, false
 	}
@@ -281,6 +283,10 @@ func (l *Launcher) DiscIDFor(ctx context.Context, romPath string) GameDiscID {
 			case "pcsx2":
 				if m := pcsx2StateName.FindStringSubmatch(name); m != nil {
 					return GameDiscID{ROMPath: romPath, AdapterID: st.AdapterID, Serial: m[1], CRC: strings.ToUpper(m[2])}
+				}
+			case "dolphin":
+				if gameID, ok := dolphinGameIDFromState(st.StatePath); ok {
+					return GameDiscID{ROMPath: romPath, AdapterID: st.AdapterID, Serial: gameID}
 				}
 			}
 		}
