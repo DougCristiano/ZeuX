@@ -1311,7 +1311,8 @@ apareceu em fonte oficial está como **desconhecido**. Os itens marcados como
 | Azahar | **Não lido** (pasta de usuário/NAND) | `<pasta de estados>/<PROGRAM_ID em 16 hex>.<slot 2 dígitos>.cst` | **Não encontrada** nas fontes lidas (`citra_qt.cpp` não tem opção de estado na linha de comando). Não exaustivo | Omitir | **Difícil** sem flag; há o estado por slot, mas nenhuma forma de abri-lo pela linha de comando foi achada | [savestate.cpp](https://raw.githubusercontent.com/azahar-emu/azahar/master/src/core/savestate.cpp) (linhas 41-48), [citra_qt.cpp](https://raw.githubusercontent.com/azahar-emu/azahar/master/src/citra_qt/citra_qt.cpp) |
 | melonDS | Config `SaveFilePath` (pasta do save): **padrão não lido** | Config `SavestatePath` (pasta): **nome não lido** | **Não existe** na linha de comando: `CLI.cpp` só tem `-b/--boot`, `-f`, `-a`, `-A` e as ROMs | Sem flag | **Difícil.** Retomada exigiria controlar a GUI ou mexer na config, o que o ZeuX não faz hoje | [CLI.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/CLI.cpp), [Config.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/Config.cpp) (linhas 302-303), [main.cpp](https://raw.githubusercontent.com/melonDS-emu/melonDS/master/src/frontend/qt_sdl/main.cpp) (pasta `portable` ao lado do executável) |
 | RMG | **Não lido** | Slots numerados (0 a 9); pasta e nome **não lidos** | **Sim, documentada:** `--load-state-slot <n>` ("Loads save state slot when launching the ROM"). Só aceita slot, não arquivo | Omitir a flag | **Médio.** Abre por slot, não por arquivo; o ZeuX teria de saber qual slot é o último | [RMG main.cpp](https://raw.githubusercontent.com/Rosalie241/RMG/master/Source/RMG/main.cpp) (linhas 218, 280-287) |
-| Flycast, xemu, Vita3K, Xenia, Cemu | **Não pesquisado** | Não pesquisado | Não pesquisado | Não pesquisado | Não pesquisado | — |
+| Flycast | **Não pesquisado** | Não pesquisado | Não pesquisado | Não pesquisado | Não pesquisado | — |
+| xemu, Vita3K, Xenia, Cemu | Pesquisado em 2026-10-09, ver a seção abaixo | — | **Não existe flag de estado lida na fonte** | Só o boot | Sem retomada; saves por jogo dependem de title ID | ver a seção "Saves e retomada: xemu, Vita3K, Xenia e Cemu" |
 
 **Notas por emulador:**
 
@@ -1355,3 +1356,33 @@ apareceu em fonte oficial está como **desconhecido**. Os itens marcados como
 - Nome dos saves de jogo de Azahar, melonDS e RMG.
 - Como forçar boot limpo quando o emulador tem auto-load ligado. Só o RetroArch
   tem esse caso mapeado (ver 2026-10-09).
+
+## Saves e retomada: xemu, Vita3K, Xenia e Cemu (2026-10-09)
+
+Decisão e fontes em `docs/decisoes.md`, entrada de mesmo nome. Resumo do que
+ficou pendente:
+
+- [ ] **Cemu: saves por jogo.** Confirmar o subcaminho `mlc01/usr/save/<high>/<low>/user/...`
+      no código (o wiki só cita `mlc01`). Precisa do title ID do jogo, que o ZeuX
+      não lê do `.wud`/`.wux`/`.rpx`. Sem isso, `FindGameSaves` não tem como ser
+      por jogo.
+- [ ] **Xenia: saves por jogo.** Confirmar `content/<perfil>/<TitleID>/00000001` na
+      fonte (o perfil e o `00000001` não foram lidos). Mesmo impedimento: title ID.
+- [ ] **Vita3K: saves por jogo.** Confirmar `ux0/user/00/savedata/<TITLE_ID>` na
+      fonte. O title ID está em `sce_sys/param.sfo` dentro do `.vpk`; ler isso exige
+      parser de SFO e zip, e isso ainda não foi feito.
+- [ ] **xemu: saves.** O HDD (`hdd_path`) é um único qcow2 com todos os jogos; não
+      há arquivo por jogo. Só daria para apontar o HDD, o que não resolve a tela do
+      jogo. Decidir se vale mostrar o HDD como item à parte, ou deixar de fora.
+- [ ] **xemu: retomada.** Só se o xemu gravar um snapshot de VM que o ZeuX possa
+      carregar com `-loadvm`. Não há caminho confirmado para o ZeuX criar esse
+      snapshot, e não foi verificado se os devices do xemu suportam snapshot.
+- [ ] **Vita3K, Xenia, Cemu: retomada.** Só com flag confirmada no código. Até lá,
+      `Unapplied` (ver `sem_retomada_test.go`).
+- [ ] **Validar com o binário** que nenhuma das flags usadas nestes quatro
+      (`-dvd_path`, `-full-screen`, `--fullscreen=true`, `-f`, `-g`, a ROM posicional
+      da Vita3K) abre o emulador recusando argumento. Ressalva registrada em
+      `decisoes.md`.
+- [ ] **Checagem de tipos da UI** (`GameDetailScreen.tsx`, texto
+      `resumeNoSaveStateEmulator`): não rodada, porque o checkout não tem
+      `node_modules`. Rodar `tsc` antes de publicar.

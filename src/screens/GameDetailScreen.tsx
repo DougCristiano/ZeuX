@@ -46,6 +46,11 @@ import { dict } from "./GameDetailScreen.i18n";
 // decisão de fato (há estado ou não) continua vindo do servidor.
 const RESUME_ADAPTERS = new Set(["duckstation", "pcsx2", "retroarch"]);
 
+// Emuladores em que o ZeuX não achou, nas fontes lidas, nenhuma forma de abrir
+// o jogo num estado salvo (ver docs/decisoes.md, 2026-10-09). A frase é outra
+// porque "ainda não" sugere uma função em andamento, e aqui não há isso.
+const NO_SAVE_STATE_ADAPTERS = new Set(["xemu", "vita3k", "xenia", "cemu"]);
+
 function formatPlaytime(
   seconds: number,
   neverPlayedText: string,
@@ -826,7 +831,9 @@ export function GameDetailScreen({
               ? t("resumeNoStateRetroArch")
               : RESUME_ADAPTERS.has(adapterEntry.adapter_id)
                 ? t("resumeNoState")
-                : t("resumeUnsupported")}
+                : NO_SAVE_STATE_ADAPTERS.has(adapterEntry.adapter_id)
+                  ? t("resumeNoSaveStateEmulator")
+                  : t("resumeUnsupported")}
           </p>
         )}
 
